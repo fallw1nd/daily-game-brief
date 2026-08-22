@@ -26,6 +26,8 @@ const manifest: BriefManifest = {
   latest: edition.id,
   editions: [
     {
+      archiveTitle: "早报｜《GTA VI》泄漏片段疑云升级",
+      leadEntryId: "2026-08-21-am-rumors-0",
       id: "2026-08-21-am",
       issueNumber: 1,
       date: "2026-08-21",
@@ -35,6 +37,8 @@ const manifest: BriefManifest = {
       path: "archive/2026/08/2026-08-21-am.json",
     },
     {
+      archiveTitle: "晚报｜《潜行者2》大型扩展与2.0更新上线",
+      leadEntryId: "2026-08-21-pm-releases-2",
       id: edition.id,
       issueNumber: edition.issueNumber,
       date: edition.date,
@@ -140,6 +144,13 @@ describe("brief page regression", () => {
     );
 
     expect(document.querySelectorAll(".archive-edition-list > a")).toHaveLength(2);
+    const editionTitles = [
+      ...document.querySelectorAll<HTMLElement>(".archive-edition-list strong"),
+    ].map((node) => node.textContent);
+    expect(editionTitles).toContain("早报｜《GTA VI》泄漏片段疑云升级");
+    expect(editionTitles).toContain("晚报｜《潜行者2》大型扩展与2.0更新上线");
+    expect(editionTitles).not.toContain("游戏早报");
+    expect(editionTitles).not.toContain("游戏晚报");
     expect(document.querySelectorAll(".archive-search-results > a")).toHaveLength(1);
     const result = document.querySelector<HTMLAnchorElement>(".archive-search-results > a");
     expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");
