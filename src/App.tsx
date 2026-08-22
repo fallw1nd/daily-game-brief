@@ -436,6 +436,10 @@ function App({
     ...(sectionsByKey.reviews ?? []),
     ...edition.entries,
   ]).slice(0, 5);
+  const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
+  const pageTitle = edition.archiveTitle?.trim() ||
+    manifestEdition?.archiveTitle?.trim() ||
+    `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
 
   const directoryItems = [
     ...visibleStorySections.map((section) => ({
@@ -615,7 +619,7 @@ function App({
         </div>
         <div className="accent-picker" ref={accentPickerRef}>
           <button
-            className="accent-toggle interaction-orb"
+            className="accent-toggle interaction-state"
             type="button"
             aria-label={`切换主题强调色，当前为${accentOptions.find((option) => option.id === accent)?.label}`}
             aria-expanded={accentPickerOpen}
@@ -649,7 +653,7 @@ function App({
           </div>
         </div>
         <button
-          className="theme-toggle interaction-orb"
+          className="theme-toggle interaction-state"
           type="button"
           aria-label={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
           title={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
@@ -661,7 +665,7 @@ function App({
           <span>{theme === "dark" ? "日间" : "夜间"}</span>
         </button>
         <button
-          className="menu-button interaction-orb"
+          className="menu-button interaction-state"
           type="button"
           aria-label={menuOpen ? "关闭目录" : "打开目录"}
           aria-expanded={menuOpen}
@@ -685,7 +689,7 @@ function App({
         <section className="edition-masthead" aria-labelledby="page-title">
           <div className="edition-masthead__title masthead-reveal">
             <span>ISSUE {String(edition.issueNumber).padStart(3, "0")}</span>
-            <h1 id="page-title">游戏{period.edition}</h1>
+            <h1 id="page-title">{pageTitle}</h1>
             <p>{edition.date.replaceAll("-", ".")} / 北京时间</p>
           </div>
           <dl className="edition-facts masthead-reveal" aria-label="本期基础信息">
@@ -868,17 +872,9 @@ function App({
           </section>
         </section>
 
-        <section className="publication-strip" id="about" aria-labelledby="about-title">
-          <div><span>出版信息</span><h2 id="about-title">游戏圈动态</h2></div>
-          <p>每日北京时间10:10与17:00更新。新闻、发售、产业信息与来源核验共同归档。</p>
-          <dl>
-            <div><dt>下一期</dt><dd>{period.nextTime} · {period.nextEdition}</dd></div>
-            <div><dt>时区</dt><dd>Asia/Shanghai</dd></div>
-          </dl>
-        </section>
       </main>
 
-      <footer className="site-footer">
+      <footer className="site-footer" id="about">
         <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
         <p>编辑：Fallw1nd-津秋</p>
         <div className="footer-links">
