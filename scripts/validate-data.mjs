@@ -21,6 +21,15 @@ function hasValidImage(asset, kind) {
   );
 }
 
+function hasValidArchiveTitle(title, period) {
+  const prefix = period === "am" ? "早报｜" : "晚报｜";
+  return (
+    typeof title === "string" &&
+    title.trim().startsWith(prefix) &&
+    [...title.trim()].length >= 8 &&
+    [...title.trim()].length <= 40
+  );
+}
 
 async function readJson(path) {
   try {
@@ -92,6 +101,20 @@ function validateEdition(edition, path) {
     }
   }
 
+  if (edition.schemaVersion === 2) {
+    if (!hasValidArchiveTitle(edition.archiveTitle, edition.period)) {
+      errors.push(
+        `${path}: archiveTitle must match the edition period and contain 8–40 characters`,
+      );
+    }
+    if (
+      typeof edition.leadEntryId !== "string" ||
+      !ids.has(edition.leadEntryId)
+    ) {
+      errors.push(`${path}: leadEntryId must reference an entry in this edition`);
+    }
+  }
+
   if (requiresImages && !Array.isArray(edition.upcoming)) {
     errors.push(`${path}: upcoming must be an array`);
   } else if (requiresImages) {
@@ -134,6 +157,12 @@ if (manifest) {
     for (const item of manifest.editions) {
       if (seen.has(item.id)) errors.push(`manifest.json: duplicate id ${item.id}`);
       seen.add(item.id);
+      if (!hasValidArchiveTitle(item.archiveTitle, item.period)) {
+        errors.push(`manifest.json: invalid archiveTitle for ${item.id}`);
+      }
+      if (typeof item.leadEntryId !== "string" || item.leadEntryId.length === 0) {
+        errors.push(`manifest.json: missing leadEntryId for ${item.id}`);
+      }
       if (!/^archive\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-(am|pm)\.json$/.test(item.path ?? "")) {
         errors.push(`manifest.json: invalid archive path for ${item.id}`);
         continue;
@@ -148,6 +177,16 @@ if (manifest) {
         validateEdition(archived, item.path);
         if (archived.id !== item.id || archived.issueNumber !== item.issueNumber) {
           errors.push(`manifest.json: metadata mismatch for ${item.id}`);
+        }
+        if (!archived.entries.some((entry) => entry.id === item.leadEntryId)) {
+          errors.push(`manifest.json: leadEntryId is not in archive ${item.id}`);
+        }
+        if (
+          archived.schemaVersion === 2 &&
+          (archived.archiveTitle !== item.archiveTitle ||
+            archived.leadEntryId !== item.leadEntryId)
+        ) {
+          errors.push(`manifest.json: archive title metadata mismatch for ${item.id}`);
         }
       }
     }
