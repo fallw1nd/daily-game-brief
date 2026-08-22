@@ -26,7 +26,7 @@ Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use war
 
 ## Archive Titles, Themes & Search
 
-Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实` or `晚报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
+Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实` or `晚报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报` or `游戏晚报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
 
 Maintain accessible dark/light themes with persistent keyboard-operable switching. Hide empty departments from content, directories, and top-level links. Archive rows represent editions; cross-edition search links results to their source edition and entry anchor.
 
