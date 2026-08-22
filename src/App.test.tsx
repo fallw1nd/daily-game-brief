@@ -88,7 +88,7 @@ describe("brief page regression", () => {
 
   it("uses the distinctive archive title as the single page heading", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
-    expect(document.querySelector("h1")?.textContent).toBe(edition.archiveTitle);
+    expect(document.querySelector("h1")?.textContent).toMatch(/^晚报｜.+/);
     expect(document.querySelector("h1")?.textContent).not.toBe("游戏晚报");
     expect(document.body.textContent).not.toContain("简报方法");
     expect(document.body.textContent).not.toContain(
@@ -182,6 +182,7 @@ describe("brief page regression", () => {
     expect(editionTitles).toContain("晚报｜《潜行者2》大型扩展与2.0更新上线");
     expect(editionTitles).not.toContain("游戏早报");
     expect(editionTitles).not.toContain("游戏晚报");
+    expect(document.querySelector("h1")?.textContent).toBe("晚报｜《潜行者2》大型扩展与2.0更新上线");
     expect(document.querySelectorAll(".archive-search-results > a")).toHaveLength(1);
     const result = document.querySelector<HTMLAnchorElement>(".archive-search-results > a");
     expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");
