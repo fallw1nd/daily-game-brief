@@ -142,7 +142,11 @@ function EditorialImage({
   const isPlaceholder = !asset || asset.placeholder === true || failed;
 
   return (
-    <figure className={"media-slot media-slot--" + kind}>
+    <figure
+      className={`media-slot media-slot--${kind} media-slot--aspect-${
+        asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")
+      }`}
+    >
       <img
         src={failed ? fallback : requested}
         alt={isPlaceholder ? title + "：暂无可核实配图" : asset.alt}

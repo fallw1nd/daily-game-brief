@@ -39,7 +39,9 @@ Starting with `schemaVersion: 2`, every news entry and upcoming game must explic
 }
 ```
 
-For game covers, set `kind` to `cover`. Prefer downloading official press images to `public/media/briefs/YYYY/MM/<edition-id>/`, converting them to WebP or JPEG, and keeping files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
+For game covers, set `kind` to `cover` and `aspect` to `square`, `portrait`, or `landscape`. Prefer PSN Hong Kong square images, Nintendo eShop Japan square images, then Microsoft/Xbox Store rectangles; for PC-only games use Xbox when present in Game Pass, otherwise a directly traceable official store rectangle. Store reusable product pages in `config/media-catalog.json` or an upcoming item's `mediaSources`.
+
+Download accepted assets to `public/media/briefs/YYYY/MM/<edition-id>/`, convert them to WebP or JPEG, and keep files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
 
 Before publishing, confirm that every supplied image URL loads and that `alt`, `credit`, and `sourceUrl` are present. CI rejects an unresolved media state on new editions: each item needs either valid media or a specific unavailable reason.
 

@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const dataRoot = resolve("public/data");
 const errors = [];
+const mediaFiles = new Map();
 
 function hasValidImage(asset, kind) {
   if (!asset || typeof asset !== "object" || asset.placeholder === true) return false;
@@ -10,6 +11,8 @@ function hasValidImage(asset, kind) {
   const local = /^media\/briefs\/\d{4}\/\d{2}\/[^/]+\/.+\.(avif|jpe?g|png|webp)$/i.test(
     asset.url ?? "",
   );
+  const validAspect = asset.aspect === undefined ||
+    new Set(["square", "portrait", "landscape"]).has(asset.aspect);
   return (
     (remote || local) &&
     asset.kind === kind &&
@@ -17,8 +20,15 @@ function hasValidImage(asset, kind) {
     asset.alt.trim().length > 0 &&
     typeof asset.credit === "string" &&
     asset.credit.trim().length > 0 &&
-    /^https:\/\//.test(asset.sourceUrl ?? "")
+    /^https:\/\//.test(asset.sourceUrl ?? "") &&
+    validAspect
   );
+}
+
+function trackLocalMedia(asset, context) {
+  if (/^media\/briefs\/\d{4}\/\d{2}\/[^/]+\/.+\.(avif|jpe?g|png|webp)$/i.test(asset?.url ?? "")) {
+    mediaFiles.set(asset.url, context);
+  }
 }
 
 function hasValidArchiveTitle(title, period) {
@@ -78,6 +88,7 @@ function validateEdition(edition, path) {
     }
     if (ids.has(entry.id)) errors.push(`${path}: duplicate entry id ${entry.id}`);
     ids.add(entry.id);
+    for (const asset of entry.images || []) trackLocalMedia(asset, `${path}: entry ${entry.id}`);
     if (
       entry.fact_status === "official" &&
       !entry.sources?.some((source) => source.kind === "primary")
@@ -119,6 +130,7 @@ function validateEdition(edition, path) {
     errors.push(`${path}: upcoming must be an array`);
   } else if (requiresImages) {
     for (const item of edition.upcoming) {
+      trackLocalMedia(item.cover, `${path}: upcoming ${item.id}`);
       const explainsAbsence =
         item.cover_status === "unavailable" &&
         typeof item.coverNote === "string" &&
@@ -198,6 +210,18 @@ if (manifest) {
     if (latest && JSON.stringify(latest) !== JSON.stringify(await readJson(latestItem.path))) {
       errors.push("latest.json must match the latest archived edition");
     }
+  }
+}
+
+for (const [url, context] of mediaFiles) {
+  try {
+    const info = await stat(resolve("public", url));
+    if (!info.isFile()) errors.push(`${context}: media path is not a file: ${url}`);
+    if (info.size > 500 * 1024) {
+      errors.push(`${context}: media exceeds 500 KB: ${url}`);
+    }
+  } catch (error) {
+    errors.push(`${context}: missing local media ${url}: ${error.message}`);
   }
 }
 

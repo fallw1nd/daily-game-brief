@@ -39,6 +39,7 @@ export interface ImageAsset {
   credit: string;
   sourceUrl: string;
   kind: "editorial" | "cover";
+  aspect?: "square" | "portrait" | "landscape";
   placeholder?: boolean;
 }
 
@@ -87,6 +88,7 @@ export interface UpcomingEntry {
   region: string;
   releaseType: string;
   source: SourceLink;
+  mediaSources?: SourceLink[];
   note: string;
   cover?: ImageAsset;
   cover_status?: ImageAvailabilityStatus;

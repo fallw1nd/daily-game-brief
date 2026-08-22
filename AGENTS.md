@@ -32,7 +32,7 @@ Maintain accessible dark/light themes with persistent keyboard-operable switchin
 
 ## Editorial Media Contract
 
-Each new v2 story and upcoming game must provide verified media or an explicit unavailable reason. Use `images`/`cover` only with meaningful Chinese `alt`, `credit`, HTTPS `sourceUrl`, and `kind`; otherwise set `image_status`/`cover_status` to `unavailable` with a specific note. Never force an unrelated image. Prefer traceable WebP/JPEG files below 500 KB under `public/media/briefs/YYYY/MM/<edition-id>/`; display news at 16:9 and covers at 3:4.
+Each new v2 story and upcoming game must provide verified media or an explicit unavailable reason. Use `images`/`cover` only with meaningful Chinese `alt`, `credit`, HTTPS `sourceUrl`, `kind`, and an optional `aspect`; otherwise set `image_status`/`cover_status` to `unavailable` with a specific note. Never force an unrelated image. Prefer traceable WebP/JPEG files below 500 KB under `public/media/briefs/YYYY/MM/<edition-id>/`. Keep news at 16:9. For covers prefer PSN Hong Kong square, Nintendo eShop Japan square, then Xbox Store rectangle; preserve the verified source ratio as `square`, `portrait`, or `landscape`.
 
 ## Visual Acceptance
 

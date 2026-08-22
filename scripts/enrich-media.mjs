@@ -68,7 +68,12 @@ function extractMeta(html, pageUrl) {
     const key = (attrs.property || attrs.name || "").toLowerCase();
     if (key && attrs.content && !values.has(key)) values.set(key, attrs.content);
   }
-  const rawImage = values.get("og:image:secure_url") || values.get("og:image") ||
+  const pageHost = new URL(pageUrl).hostname.toLowerCase();
+  const psnImage = pageHost === "store.playstation.com"
+    ? html.match(/(?:https:\\\/\\\/|https:\/\/)image\.api\.playstation\.com[^"'\\<\s]+/i)?.[0]
+    : null;
+  const rawImage = psnImage?.replaceAll("\\/", "/") ||
+    values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
   if (!rawImage) return null;
   const imageUrl = new URL(rawImage, pageUrl).href;
@@ -81,6 +86,14 @@ function extractMeta(html, pageUrl) {
 
 const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
 const sourceRank = (source) => source.kind === "primary" ? 0 : source.kind === "secondary" ? 1 : 2;
+
+async function mapLimit(items, limit, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await worker(queue.shift());
+  });
+  await Promise.all(runners);
+}
 
 function coverPreference(source, platforms) {
   const url = new URL(source.url);
@@ -187,7 +200,15 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         eligible,
       };
       if (!eligible) {
-        reviewCandidate ||= { status: "candidate", ...result };
+        reviewCandidate ||= {
+          status: "candidate",
+          ...result,
+          attempts: [{
+            label: source.label,
+            url: source.url,
+            error: "仅找到宣传横图或非首选商店素材，未作为封面自动采用",
+          }],
+        };
         continue;
       }
       if (!apply) return { status: "candidate", ...result };
@@ -223,8 +244,8 @@ async function processEdition(manifestItem, options) {
   let changed = false;
   const results = [];
 
-  for (const entry of edition.entries) {
-    if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) continue;
+  await mapLimit(edition.entries, 4, async (entry) => {
+    if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) return;
     const sources = [...(entry.sources || [])]
       .filter((source) => source.url?.startsWith("https://"))
       .sort((a, b) => sourceRank(a) - sourceRank(b));
@@ -240,11 +261,17 @@ async function processEdition(manifestItem, options) {
       entry.imageNote = unavailableNote("editorial", result.attempts || []);
       changed = true;
     }
-  }
+  });
 
-  for (const item of edition.upcoming || []) {
-    if (item.cover?.kind === "cover" && !item.cover.placeholder) continue;
-    const candidates = [item.source, ...(item.mediaSources || [])]
+  await mapLimit(edition.upcoming || [], 4, async (item) => {
+    if (item.cover?.kind === "cover" && !item.cover.placeholder) return;
+    const catalogSources =
+      options.catalog?.games?.[item.title?.title_key]?.mediaSources || [];
+    const candidates = [
+      ...catalogSources,
+      ...(item.mediaSources || []),
+      item.source,
+    ]
       .filter((source) => source?.url?.startsWith("https://"))
       .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
     const result = await resolveRecord(edition, item, "cover", candidates, options.apply);
@@ -259,9 +286,11 @@ async function processEdition(manifestItem, options) {
       item.coverNote = unavailableNote("cover", result.attempts || []);
       changed = true;
     }
-  }
+  });
 
   if (options.apply && options.migrateLegacy && edition.schemaVersion === 1) {
+    edition.archiveTitle ||= manifestItem.archiveTitle;
+    edition.leadEntryId ||= manifestItem.leadEntryId;
     edition.schemaVersion = 2;
     changed = true;
   }
@@ -275,6 +304,7 @@ async function processEdition(manifestItem, options) {
 async function main() {
   const options = { apply: hasArg("--apply"), migrateLegacy: hasArg("--migrate-legacy") };
   const manifest = await readJson(resolve(DATA_ROOT, "manifest.json"));
+  options.catalog = await readJson(resolve("config/media-catalog.json"));
   const editionArg = argValue("--edition");
   let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
