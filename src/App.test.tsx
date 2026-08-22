@@ -85,15 +85,32 @@ describe("brief page regression", () => {
     expect(document.body.textContent).not.toContain(
       "读者不必相信我们，只需沿着证据返回原文。",
     );
+    expect(document.body.textContent).not.toContain("ABOUT / 关于");
   });
 
   it("renders publication chrome, theme control, directory, about, and footer", () => {
     expect(document.querySelector("header.topbar")).not.toBeNull();
     expect(document.querySelector(".site-shell")?.getAttribute("data-theme")).toBe("light");
+    expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("orange");
     expect(document.querySelector('button[aria-label="切换到夜间模式"]')).not.toBeNull();
+    expect(document.querySelector('button[aria-controls="accent-options"]')).not.toBeNull();
     expect(document.querySelector(".edition-directory")).not.toBeNull();
     expect(document.querySelector("#about")).not.toBeNull();
     expect(document.querySelector("footer.site-footer")).not.toBeNull();
+  });
+
+  it("renders four named accent choices with an explicit selected state", () => {
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialTheme="dark" initialAccent="violet" />,
+    );
+
+    expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("violet");
+    expect(document.querySelectorAll('.accent-option[role="radio"]')).toHaveLength(4);
+    expect(document.querySelector('.accent-option--violet')?.getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).toContain("熔岩橙");
+    expect(document.body.textContent).toContain("钴蓝");
+    expect(document.body.textContent).toContain("松石绿");
+    expect(document.body.textContent).toContain("暮紫");
   });
 
   it("omits empty editorial departments from content and directory", () => {
