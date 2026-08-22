@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import {
+  ArrowRight,
   ArrowUpRight,
+  ChatsCircle,
   CheckCircle,
+  GameController,
   List,
   MagnifyingGlass,
   Moon,
   Palette,
+  PlayCircle,
   Sun,
   WarningCircle,
   X,
@@ -247,7 +251,7 @@ function LeadStory({ entry }: { entry: BriefEntry }) {
         <h2>{entry.headline}</h2>
         <p>{entry.summary}</p>
         <a className="read-link" href={"#" + entry.id}>
-          阅读核验记录<span aria-hidden="true">→</span>
+          阅读核验记录<ArrowRight aria-hidden="true" />
         </a>
       </div>
     </article>
@@ -862,7 +866,7 @@ function App({
                   <time>{item.date}</time>
                   <strong>{archiveEditionTitle(item)}</strong>
                   <small>{archiveCounts.get(item.id) ?? "—"} 条新闻 · {item.generatedAt}</small>
-                  <span>{item.id === edition.id ? "当前阅读" : "打开本期"} →</span>
+                  <span>{item.id === edition.id ? "当前阅读" : "打开本期"}<ArrowRight aria-hidden="true" /></span>
                 </a>
               ))}
               {manifest && archiveEditions.length === 0 && (
@@ -878,9 +882,13 @@ function App({
         <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
         <p>编辑：Fallw1nd-津秋</p>
         <div className="footer-links">
-          <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">B站</a>
-          <span>微信公众号：芳墨集</span>
-          <a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">小黑盒</a>
+          <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">
+            <PlayCircle aria-hidden="true" /><span>B站</span>
+          </a>
+          <span><ChatsCircle aria-hidden="true" />微信公众号：芳墨集</span>
+          <a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">
+            <GameController aria-hidden="true" /><span>小黑盒</span>
+          </a>
         </div>
       </footer>
     </div>
