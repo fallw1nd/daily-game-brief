@@ -25,13 +25,15 @@ Treat the product as news, never a marketing landing page. Keep this type langua
 - L3a story subject: game/product name at 18px desktop/17px mobile, weight 650, line-height 1.28, with a semantic-accent rule; it appears before the event headline.
 - L4 evidence: 11–12px JetBrains Mono, line-height 1.5, muted text; semantic-accent links and active states.
 
-Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use warm paper `#F6F1E8`, ink `#1A1714`, and default `#B34200` in light mode. Reader-selectable cobalt, jade, and violet accents may replace orange only through the approved `DESIGN.md` semantic tokens; typography and hierarchy never change with accent choice. Group with rules, columns, and spacing—not large rounded story cards. Ban promotional slogans and generic AI copy.
+Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use warm paper `#F6F1E8`, ink `#1A1714`, and default `#B34200` in light mode. Reader-selectable cobalt, jade, violet, and rose accents may replace orange only through the approved `DESIGN.md` semantic tokens; typography and hierarchy never change with accent choice. Group with rules, columns, and spacing—not large rounded story cards. Ban promotional slogans and generic AI copy.
 
 ## Archive Titles, Themes & Search
 
 Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实` or `晚报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报` or `游戏晚报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
 
 Maintain accessible dark/light themes with persistent keyboard-operable switching. Hide empty departments from content, directories, and top-level links. Archive rows represent editions; cross-edition search links results to their source edition and entry anchor.
+
+Keep top navigation to `内容`, `日历`, and `归档`. Use `DAILY EDITION` as the nonnumeric masthead eyebrow and show `NO.###` only once in top chrome. Let edition H1 titles use the full available width and remain single-line when they fit. Reserve inset space for archive selection rails so they never overlap issue or date text.
 
 ## Editorial Media Contract
 

@@ -44,7 +44,7 @@ import type {
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 type Theme = "light" | "dark";
-type Accent = "orange" | "cobalt" | "jade" | "violet";
+type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose";
 
 type AppProps = {
   initialEdition?: BriefEdition;
@@ -60,6 +60,7 @@ const accentOptions: Array<{ id: Accent; label: string }> = [
   { id: "cobalt", label: "钴蓝" },
   { id: "jade", label: "松石绿" },
   { id: "violet", label: "暮紫" },
+  { id: "rose", label: "\u6a31\u7c89" },
 ];
 
 const statusLabels: Record<FactStatus, string> = {
@@ -134,7 +135,7 @@ function preferredAccent(): Accent {
   if (typeof window === "undefined") return "orange";
   try {
     const stored = window.localStorage.getItem("brief-accent");
-    if (stored === "orange" || stored === "cobalt" || stored === "jade" || stored === "violet") {
+    if (stored === "orange" || stored === "cobalt" || stored === "jade" || stored === "violet" || stored === "rose") {
       return stored;
     }
   } catch {
@@ -464,14 +465,10 @@ function App({
   ];
 
   const primaryLinks = [
-    { href: "#today", label: "今日" },
-    ...visibleStorySections
-      .filter((section) => section.id === "releases" || section.id === "news")
-      .map((section) => ({ href: "#" + section.id, label: section.label })),
-    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "日历" }] : []),
-    { href: "#archive", label: "归档" },
-    { href: "#about", label: "关于" },
-  ].filter((link) => link.href !== "#about");
+    { href: "#content", label: "\u5185\u5bb9" },
+    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386" }] : []),
+    { href: "#archive", label: "\u5f52\u6863" },
+  ];
 
   const archiveEditions = useMemo(
     () => [...(manifest?.editions ?? [])].reverse(),
@@ -698,7 +695,7 @@ function App({
       <main id="top">
         <section className="edition-masthead" aria-labelledby="page-title">
           <div className="edition-masthead__title masthead-reveal">
-            <span>ISSUE {String(edition.issueNumber).padStart(3, "0")}</span>
+            <span>DAILY EDITION</span>
             <h1 id="page-title">{pageTitle}</h1>
             <p>{edition.date.replaceAll("-", ".")} / 北京时间</p>
           </div>
@@ -738,7 +735,7 @@ function App({
           </div>
         )}
 
-        <div className="edition-content">
+        <div className="edition-content" id="content">
           {visibleStorySections.map((section) => (
             <StorySection
               key={section.id}

@@ -58,9 +58,9 @@ Key visible headings include: Lumina; Replace fragmented workflows with unified 
 ## Colors
 Anchor the default palette in primary #EA580C, secondary #000000, accent #D04D09, background #000000, surface #2C2A28, text-primary #FFFFFF. Keep background, surface, text, and border roles distinct so generated layouts retain the same contrast pattern as the source.
 
-The reader may switch the semantic accent without changing hierarchy or content. Approved pairs are orange (#EA580C dark / #B34200 light), cobalt (#7CA5FF / #2457C5), jade (#4DD9A7 / #087A52), and violet (#C58AFF / #7537A8). Accent colors belong to issue numbers, active rules, links, focus rings, selection, and small interaction signals. They must not become large reading backgrounds. Text must retain WCAG AA contrast; interactive state must also use shape, movement, underline, or labels rather than color alone.
+The reader may switch the semantic accent without changing hierarchy or content. Approved pairs are orange (#EA580C dark / #B34200 light), cobalt (#7CA5FF / #2457C5), jade (#4DD9A7 / #087A52), violet (#C58AFF / #7537A8), and rose (#FF8FC7 / #B42362). Accent colors belong to issue numbers, active rules, links, focus rings, selection, and small interaction signals. They must not become large reading backgrounds. Text must retain WCAG AA contrast; interactive state must also use shape, movement, underline, or labels rather than color alone.
 ## Typography
-Use Inter for display moments and JetBrains Mono for body copy unless the HTML clearly demands a compatible fallback. Labels and technical metadata should use JetBrains Mono or an equivalent mono face. The edition H1 must display the issue's verified `archiveTitle` (for example, `晚报｜本期重磅事实`) rather than the generic `游戏早报` or `游戏晚报`; balance it to two lines on desktop and no more than three on narrow screens.
+Use Inter for display moments and JetBrains Mono for body copy unless the HTML clearly demands a compatible fallback. Labels and technical metadata should use JetBrains Mono or an equivalent mono face. The edition H1 must display the issue's verified `archiveTitle` (for example, `晚报｜本期重磅事实`) rather than the generic `游戏早报` or `游戏晚报`; use the full available width and remain on one line whenever it fits, with natural wrapping and no more than three lines on narrow screens.
 
 Within a story, the game or product name is a dedicated subject layer before the event headline: 18px desktop / 17px narrow, weight 650, line-height 1.28, with a 3px semantic-accent rule. The event headline remains larger at 22px / 19px. English names and translation status remain mono evidence, not the primary identifier.
 ## Layout
@@ -72,6 +72,8 @@ Preserve existing motion cues such as masked reveals, staggered entrance, hover 
 
 ## Editorial Chrome
 The sticky top bar uses a distinct chrome surface, a short accent signal rail, and a filled issue-number block. The footer alone carries publication ownership on the deepest chrome surface with a narrow accent termination rule; do not insert a duplicate publication-information panel above it. In dark mode, page, navigation, transient interaction layer, and footer must remain visibly distinct without raising body-copy brightness. Keep these regions square-edged and information-dense; do not convert them into floating rounded containers.
+
+Top-level navigation is limited to Content, Calendar, and Archive. Content begins below the lead desk; Calendar targets the 15-day release list; Archive targets edition history. The masthead eyebrow is the nonnumeric `DAILY EDITION`; the issue number appears only once in top chrome as `NO.###`. Archive selection rails must reserve horizontal space and never overlap issue or date text.
 
 The footer itself is the complete about/publication region. Do not render a separate About section, duplicate publication panel, or top-level About navigation item.
 ## WebGL & Effects

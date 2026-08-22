@@ -111,21 +111,26 @@ describe("brief page regression", () => {
     expect(document.querySelector(".publication-strip")).toBeNull();
     expect(document.querySelector("#about")).toBeNull();
     expect(document.querySelector('nav a[href="#about"]')).toBeNull();
+    expect([...document.querySelectorAll("nav a")].map((link) => link.textContent)).toEqual(["\u5185\u5bb9", "\u65e5\u5386", "\u5f52\u6863"]);
+    expect(document.querySelector('nav a[href="#content"]')).not.toBeNull();
+    expect(document.querySelector("#content")).not.toBeNull();
+    expect(document.querySelector(".edition-masthead__title > span")?.textContent).toBe("DAILY EDITION");
     expect(document.querySelector("footer.site-footer")).not.toBeNull();
   });
 
-  it("renders four named accent choices with an explicit selected state", () => {
+  it("renders five named accent choices with an explicit selected state", () => {
     document.body.innerHTML = renderToStaticMarkup(
       <App initialTheme="dark" initialAccent="violet" />,
     );
 
     expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("violet");
-    expect(document.querySelectorAll('.accent-option[role="radio"]')).toHaveLength(4);
+    expect(document.querySelectorAll('.accent-option[role="radio"]')).toHaveLength(5);
     expect(document.querySelector('.accent-option--violet')?.getAttribute("aria-checked")).toBe("true");
     expect(document.body.textContent).toContain("熔岩橙");
     expect(document.body.textContent).toContain("钴蓝");
     expect(document.body.textContent).toContain("松石绿");
     expect(document.body.textContent).toContain("暮紫");
+    expect(document.body.textContent).toContain("\u6a31\u7c89");
   });
 
   it("omits empty editorial departments from content and directory", () => {
