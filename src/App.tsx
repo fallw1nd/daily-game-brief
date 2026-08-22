@@ -14,7 +14,8 @@ import {
 } from "@phosphor-icons/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { edition, sectionOrder, sourceReport } from "./data/brief";
+import { edition as fallbackEdition, sectionOrder, sourceReport as fallbackSourceReport } from "./data/brief";
+import { loadLatestEdition } from "./data/briefLoader";
 import { entriesForSection, searchEntries } from "./lib/brief";
 import type { BriefEntry, FactStatus, SourceLink } from "./types";
 
@@ -35,6 +36,25 @@ const titleStatusLabels = {
   unavailable: "暂无可核实的官方中文名",
 };
 
+const periodLabels = {
+  am: {
+    edition: "\u65e9\u95f4\u7248",
+    headline: "\u65e9\u62a5",
+    english: "MORNING EDITION",
+    nextTime: "\u4eca\u65e5 17:00",
+    nextHeadline: "\u6e38\u620f\u665a\u62a5",
+  },
+  pm: {
+    edition: "\u665a\u95f4\u7248",
+    headline: "\u665a\u62a5",
+    english: "EVENING EDITION",
+    nextTime: "\u660e\u65e5 10:10",
+    nextHeadline: "\u6e38\u620f\u65e9\u62a5",
+  },
+} as const;
+
+const timeOnly = (value: string) => value.slice(11);
+
 const sourceKindLabels = {
   primary: "一手来源",
   secondary: "补充报道",
@@ -48,7 +68,7 @@ const editorialNotes = [
   },
   {
     title: "窗口边界固定",
-    body: "晚报永远覆盖10:10（不含）至17:00（含），任务延迟不会移动边界。",
+    body: "每期按计划时间计算开闭边界，任务延迟不会移动窗口。",
   },
   {
     title: "补遗保持可见",
@@ -180,17 +200,61 @@ function SectionHeading({ number, title, id }: { number: string; title: string; 
   );
 }
 
+function EntrySection({
+  id,
+  title,
+  number,
+  entries,
+}: {
+  id: string;
+  title: string;
+  number: string;
+  entries: BriefEntry[];
+}) {
+  if (entries.length === 0) return <EmptySection id={id} title={title} number={number} />;
+
+  return (
+    <section className="story-section content-section" id={id} aria-labelledby={`${id}-title`}>
+      <SectionHeading number={number} title={title} id={`${id}-title`} />
+      <div className="story-stack">
+        {entries.map((entry, index) => <StorySheet key={entry.id} entry={entry} index={index} />)}
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [noteIndex, setNoteIndex] = useState(0);
   const [query, setQuery] = useState("");
-  const filteredEntries = useMemo(() => searchEntries(edition.entries, query), [query]);
+  const [edition, setEdition] = useState(fallbackEdition);
+  const sourceReport = edition.sourceReport ?? fallbackSourceReport;
+  const periodLabel = periodLabels[edition.period];
+  const filteredEntries = useMemo(() => searchEntries(edition.entries, query), [edition.entries, query]);
 
   const releases = entriesForSection(edition.entries, "releases");
+  const reviews = entriesForSection(edition.entries, "reviews");
   const news = entriesForSection(edition.entries, "news");
+  const industry = entriesForSection(edition.entries, "industry");
+  const features = entriesForSection(edition.entries, "features");
+  const rumors = entriesForSection(edition.entries, "rumors");
   const observations = entriesForSection(edition.entries, "observations");
-  const focusEntries = [news[0], releases[1], releases[0], news[1], observations[0]].filter(Boolean);
+  const featured = entriesForSection(edition.entries, "focus");
+  const focusEntries = featured.length > 0 ? featured : [news[0], releases[1], releases[0], news[1], observations[0]].filter(Boolean);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadLatestEdition(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setEdition(result.edition);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) console.error("Unable to load brief", error);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(
@@ -276,7 +340,7 @@ function App() {
           <span>游戏圈动态</span>
           <small>DAILY GAME BRIEF</small>
         </a>
-        <p className="header-time">北京时间 2026.08.21 17:00 更新</p>
+        <p className="header-time">北京时间 {edition.generatedAt} 更新</p>
         <button
           className="menu-button"
           type="button"
@@ -299,10 +363,10 @@ function App() {
       <main id="top">
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="hero-edition">第{edition.issueNumber}期 · 晚间版 · 北京时间</p>
+            <p className="hero-edition">第{edition.issueNumber}期 · {periodLabel.edition} · 北京时间</p>
             <h1 id="hero-title">
               <span>游戏</span>
-              <span>晚报</span>
+              <span>{periodLabel.headline}</span>
             </h1>
             <p className="hero-deck">发售、评分、新闻、产业与深读，浓缩成一份可追溯的一手简报。</p>
             <a className="primary-action" href="#today">
@@ -316,26 +380,26 @@ function App() {
               <span />
               <span />
             </div>
-            <div className="edition-card" aria-label="当前第2期晚间版">
+            <div className="edition-card" aria-label={"当前第" + edition.issueNumber + "期" + periodLabel.edition}>
               <div className="edition-card__topline">
                 <span>当前期次</span>
                 <span>已发布</span>
               </div>
               <div className="edition-card__identity">
-                <strong>02</strong>
+                <strong>{String(edition.issueNumber).padStart(2, "0")}</strong>
                 <div>
-                  <p>晚间版</p>
-                  <span>EVENING EDITION</span>
+                  <p>{periodLabel.edition}</p>
+                  <span>{periodLabel.english}</span>
                 </div>
               </div>
               <dl>
                 <div>
                   <dt>日期</dt>
-                  <dd>2026.08.21</dd>
+                  <dd>{edition.date.replaceAll("-", ".")}</dd>
                 </div>
                 <div>
                   <dt>时间窗口</dt>
-                  <dd>10:10—17:00</dd>
+                  <dd>{timeOnly(edition.windowStart)}—{timeOnly(edition.windowEnd)}</dd>
                 </div>
                 <div>
                   <dt>时区</dt>
@@ -353,7 +417,7 @@ function App() {
         <section className="edition-ledger" aria-label="本期基础信息">
           <div>
             <span>信息窗口</span>
-            <strong>10:10（不含）—17:00（含）</strong>
+            <strong>{timeOnly(edition.windowStart)}（不含）—{timeOnly(edition.windowEnd)}（含）</strong>
           </div>
           <div>
             <span>计划运行</span>
@@ -365,7 +429,7 @@ function App() {
           </div>
           <div>
             <span>下一期</span>
-            <strong>明日 10:10</strong>
+            <strong>{periodLabel.nextTime}</strong>
           </div>
         </section>
 
@@ -381,9 +445,9 @@ function App() {
           <SectionHeading number="01" title="最值得关注" id="focus-title" />
           <p className="section-intro">五条导读，按影响力排序。每一条都能定位到本期完整核验记录。</p>
           <div className="focus-grid">
-            <FocusCard entry={focusEntries[0]} rank={1} lead />
-            <FocusCard entry={focusEntries[1]} rank={2} />
-            <FocusCard entry={focusEntries[2]} rank={3} />
+            {focusEntries.slice(0, 3).map((entry, index) => (
+              <FocusCard key={entry.id} entry={entry} rank={index + 1} lead={index === 0} />
+            ))}
           </div>
           <ol className="focus-tail" start={4}>
             {focusEntries.slice(3).map((entry) => (
@@ -421,7 +485,7 @@ function App() {
               </div>
             </section>
 
-            <EmptySection id="reviews" title="新游戏评分" number="03" />
+            <EntrySection id="reviews" title="新游戏评分" number="03" entries={reviews} />
 
             <section className="story-section content-section" id="news" aria-labelledby="news-title">
               <SectionHeading number="04" title="热点新闻" id="news-title" />
@@ -430,9 +494,9 @@ function App() {
               </div>
             </section>
 
-            <EmptySection id="industry" title="公司与产业动向" number="05" />
-            <EmptySection id="features" title="深度文章与专访" number="06" />
-            <EmptySection id="rumors" title="泄漏、爆料与传闻" number="07" />
+            <EntrySection id="industry" title="公司与产业动向" number="05" entries={industry} />
+            <EntrySection id="features" title="深度文章与专访" number="06" entries={features} />
+            <EntrySection id="rumors" title="泄漏、爆料与传闻" number="07" entries={rumors} />
 
             <section className="story-section content-section" id="observations" aria-labelledby="observations-title">
               <SectionHeading number="08" title="延伸观察" id="observations-title" />
@@ -444,7 +508,7 @@ function App() {
 
             <section className="upcoming-section content-section" id="upcoming" aria-labelledby="upcoming-title">
               <SectionHeading number="09" title="未来15天发售前瞻" id="upcoming-title" />
-              <p className="section-intro">滚动窗口：北京时间 2026-08-22—2026-09-05。地区差异并列展示，不强行归一。</p>
+              <p className="section-intro">滚动窗口基于本期数据。地区差异并列展示，不强行归一。</p>
               <div className="upcoming-list">
                 {edition.upcoming.map((item) => (
                   <article key={item.id}>
@@ -544,7 +608,7 @@ function App() {
             </label>
           </div>
           <div className="archive-results" aria-live="polite">
-            <p>{query ? `找到 ${filteredEntries.length} 条结果` : `当前展示第2期的 ${filteredEntries.length} 条已迁移记录`}</p>
+            <p>{query ? "找到 " + filteredEntries.length + " 条结果" : "当前展示第" + edition.issueNumber + "期的 " + filteredEntries.length + " 条已归档记录"}</p>
             {filteredEntries.map((entry) => (
               <a key={entry.id} href={`#${entry.id}`}>
                 <time>{entry.beijingTime.slice(5)}</time>
@@ -562,7 +626,7 @@ function App() {
           <div>
             <CalendarDots aria-hidden="true" />
             <p>下一期 · 北京时间</p>
-            <h2 id="next-title">明日 10:10<br />游戏早报</h2>
+            <h2 id="next-title">{periodLabel.nextTime}<br />{periodLabel.nextHeadline}</h2>
           </div>
           <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
             返回顶部

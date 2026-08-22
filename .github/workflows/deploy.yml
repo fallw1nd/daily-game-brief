@@ -24,6 +24,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Guard append-only archive
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        shell: bash
+        run: |
+          deleted="$(git diff --diff-filter=D --name-only "${{ github.event.before }}" "${{ github.sha }}" -- public/data/archive)"
+          if [ -n "$deleted" ]; then
+            echo "Archived editions are append-only:"
+            echo "$deleted"
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v7

@@ -76,7 +76,14 @@ export interface UpcomingEntry {
   note: string;
 }
 
+export interface SourceReport {
+  checked: string[];
+  limited: string[];
+  note: string;
+}
+
 export interface BriefEdition {
+  schemaVersion?: 1;
   id: string;
   issueNumber: number;
   date: string;
@@ -91,4 +98,22 @@ export interface BriefEdition {
   entries: BriefEntry[];
   upcoming: UpcomingEntry[];
   tracking: string[];
+  sourceReport?: SourceReport;
+}
+
+export interface BriefManifestItem {
+  id: string;
+  issueNumber: number;
+  date: string;
+  period: "am" | "pm";
+  generatedAt: string;
+  revised: boolean;
+  path: string;
+}
+
+export interface BriefManifest {
+  schemaVersion: 1;
+  updatedAt: string;
+  latest: string;
+  editions: BriefManifestItem[];
 }
