@@ -8,11 +8,13 @@ The scheduled ChatGPT task must finish its research first, then use its connecte
 
 1. Add `public/data/archive/YYYY/MM/YYYY-MM-DD-am.json` or `...-pm.json`.
 2. Copy the exact same JSON to `public/data/latest.json`.
-3. Append one item to `public/data/manifest.json` and update `latest` and `updatedAt`.
+3. Append one item to `public/data/manifest.json` and update `latest` and `updatedAt`. The item must copy the edition's `archiveTitle` and `leadEntryId`.
 4. Open and verify every primary source before using `fact_status: "official"`.
 5. Never modify or delete an older archive file. Corrections create a revision commit without changing the issue number.
 
 Every newly scheduled edition must use `schemaVersion: 2`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. Schema version 1 is reserved for existing legacy archives only. Each new edition must include `entries`, `upcoming`, `tracking`, and `sourceReport`, plus the image fields defined below. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
+
+Each v2 edition also requires an `archiveTitle` and `leadEntryId`. The title must start with `早报｜` or `晚报｜` to match `period`, contain 8–40 characters, and summarize one real, high-impact entry without overstating its verification status. Prefer a major game, publisher/platform decision, or broadly discussed event. `leadEntryId` must reference that entry in the same edition. Copy both fields into the appended manifest item. The four legacy manifest items contain an approved one-time metadata backfill; do not rewrite legacy archive JSON or later alter historical titles without an explicit correction.
 
 Before committing, the task should run or request the equivalent of:
 
