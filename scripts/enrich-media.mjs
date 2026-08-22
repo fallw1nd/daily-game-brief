@@ -174,12 +174,12 @@ function mediaPath(edition, record, kind) {
 
 function unavailableNote(kind, attempts) {
   const reason = attempts.length
-    ? attempts.map((item) => `${item.label}: ${item.error}`).join("；")
-    : "条目没有可用于媒体核验的 HTTPS 来源";
+    ? attempts.map((item) => `${item.label}: ${item.error}`).join("锛�")
+    : "鏉＄洰娌℃湁鍙敤浜庡獟浣撴牳楠岀殑 HTTPS 鏉ユ簮";
   const prefix = kind === "cover"
-    ? "未找到符合 PSN 港服、eShop 日服、Xbox 商店优先级的官方封面"
-    : "未找到与事件直接相关且可追溯的官方新闻图";
-  return `${prefix}。${reason}`;
+    ? "鏈壘鍒扮鍚� PSN 娓湇銆乪Shop 鏃ユ湇銆乆box 鍟嗗簵浼樺厛绾х殑瀹樻柟灏侀潰"
+    : "鏈壘鍒颁笌浜嬩欢鐩存帴鐩稿叧涓斿彲杩芥函鐨勫畼鏂规柊闂诲浘";
+  return `${prefix}銆�${reason}`;
 }
 
 async function resolveRecord(edition, record, kind, sourceList, apply) {
@@ -206,7 +206,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
           attempts: [{
             label: source.label,
             url: source.url,
-            error: "���ҵ�������ͼ�����ѡ�̵��زģ�δ��Ϊ�����Զ�����",
+            error: "\\u4ec5\\u627e\\u5230\\u5ba3\\u4f20\\u6a2a\\u56fe\\u6216\\u975e\\u9996\\u9009\\u5546\\u5e97\\u7d20\\u6750\\uff0c\\u672a\\u4f5c\\u4e3a\\u5c01\\u9762\\u81ea\\u52a8\\u91c7\\u7528",
           }],
         };
         continue;
@@ -221,7 +221,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         ...result,
         asset: {
           url: target.relative,
-          alt: candidate.alt || `${title}${kind === "cover" ? "官方商店封面" : `：${record.headline || "相关消息"}官方发布图`}`,
+          alt: candidate.alt || `${title}${kind === "cover" ? "瀹樻柟鍟嗗簵灏侀潰" : `锛�${record.headline || "鐩稿叧娑堟伅"}瀹樻柟鍙戝竷鍥綻}`,
           credit: source.label,
           sourceUrl: candidate.pageUrl,
           kind,
