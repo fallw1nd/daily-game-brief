@@ -21,11 +21,11 @@ npm run validate:data
 npm run check
 ```
 
-Pushing the data commit starts the Pages workflow. The workflow validates the archive, builds the site, and deploys it. No OpenAI or GitHub token is exposed in browser code.
+Pushing the data commit starts the Pages workflow. The workflow validates the archive, generates `public/data/search-index.json` from every manifest-listed edition, builds the site, and deploys it. The generated search index is not committed; it is reproduced by `npm run build:search`, `npm run dev`, and `npm run build`. No OpenAI or GitHub token is exposed in browser code.
 
 ## Image publishing
 
-Starting with `schemaVersion: 2`, every news entry requires at least one non-placeholder `images` item and every upcoming game requires `cover`. Existing v1 archives remain valid. Use this shape:
+Starting with `schemaVersion: 2`, every news entry and upcoming game must explicitly resolve its media state. Prefer at least one verified `images` item for news and one verified `cover` for upcoming games. When no relevant, traceable image exists, use `image_status: "unavailable"` with `imageNote`, or `cover_status: "unavailable"` with `coverNote`; never force an unrelated image. Existing v1 archives remain valid. Use this shape:
 
 ```json
 {
@@ -39,7 +39,7 @@ Starting with `schemaVersion: 2`, every news entry requires at least one non-pla
 
 For game covers, set `kind` to `cover`. Prefer downloading official press images to `public/media/briefs/YYYY/MM/<edition-id>/`, converting them to WebP or JPEG, and keeping files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
 
-Before publishing, confirm that every image URL loads and that `alt`, `credit`, and `sourceUrl` are present. CI rejects missing or placeholder media on new editions.
+Before publishing, confirm that every supplied image URL loads and that `alt`, `credit`, and `sourceUrl` are present. CI rejects an unresolved media state on new editions: each item needs either valid media or a specific unavailable reason.
 
 ## Failure behavior
 
