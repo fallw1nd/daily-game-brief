@@ -174,12 +174,12 @@ function mediaPath(edition, record, kind) {
 
 function unavailableNote(kind, attempts) {
   const reason = attempts.length
-    ? attempts.map((item) => `${item.label}: ${item.error}`).join("锛�")
-    : "鏉＄洰娌℃湁鍙敤浜庡獟浣撴牳楠岀殑 HTTPS 鏉ユ簮";
+    ? attempts.map((item) => `${item.label}: ${item.error}`).join("\\uff1b")
+    : "\\u6761\\u76ee\\u6ca1\\u6709\\u53ef\\u7528\\u4e8e\\u5a92\\u4f53\\u6838\\u9a8c\\u7684 HTTPS \\u6765\\u6e90";
   const prefix = kind === "cover"
-    ? "鏈壘鍒扮鍚� PSN 娓湇銆乪Shop 鏃ユ湇銆乆box 鍟嗗簵浼樺厛绾х殑瀹樻柟灏侀潰"
-    : "鏈壘鍒颁笌浜嬩欢鐩存帴鐩稿叧涓斿彲杩芥函鐨勫畼鏂规柊闂诲浘";
-  return `${prefix}銆�${reason}`;
+    ? "\\u672a\\u627e\\u5230\\u7b26\\u5408 PSN \\u6e2f\\u670d\\u3001eShop \\u65e5\\u670d\\u3001Xbox \\u5546\\u5e97\\u4f18\\u5148\\u7ea7\\u7684\\u5b98\\u65b9\\u5c01\\u9762"
+    : "\\u672a\\u627e\\u5230\\u4e0e\\u4e8b\\u4ef6\\u76f4\\u63a5\\u76f8\\u5173\\u4e14\\u53ef\\u8ffd\\u6eaf\\u7684\\u5b98\\u65b9\\u65b0\\u95fb\\u56fe";
+  return `${prefix}\\u3002${reason}`;
 }
 
 async function resolveRecord(edition, record, kind, sourceList, apply) {
@@ -221,7 +221,10 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         ...result,
         asset: {
           url: target.relative,
-          alt: candidate.alt || `${title}${kind === "cover" ? "瀹樻柟鍟嗗簵灏侀潰" : `锛�${record.headline || "鐩稿叧娑堟伅"}瀹樻柟鍙戝竷鍥綻}`,
+          alt: candidate.alt || `${title}${kind === "cover"
+            ? "\\u5b98\\u65b9\\u5546\\u5e97\\u5c01\\u9762"
+            : `\\uff1a${record.headline || "\\u76f8\\u5173\\u6d88\\u606f"}\\u5b98\\u65b9\\u53d1\\u5e03\\u56fe`
+          }`,
           credit: source.label,
           sourceUrl: candidate.pageUrl,
           kind,
