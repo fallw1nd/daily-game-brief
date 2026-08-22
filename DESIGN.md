@@ -1,16 +1,16 @@
 ---
 version: "neuform-top-creators-featured"
-name: "PaperFlow Design Layout"
-description: "Paperflow Design Pricing Section is designed for comparing plans and supporting conversion decisions. Key features include plan comparison blocks and conversion-oriented actions. It is suitable for subscription pricing pages and plan comparison experiences."
+name: "Lumina — Onboarding Architecture"
+description: "Lumina Architecture Onboarding Section is designed for building reusable UI components in modern web projects. Key features include reusable structure, responsive behavior, and production-ready presentation. It is suitable for component libraries and responsive product interfaces."
 colors:
-  primary: "#E65C00"
-  secondary: "#FDFBF7"
-  accent: "#FFB380"
-  background: "#FDFBF7"
-  surface: "#F7F4EB"
-  text-primary: "#111827"
-  text-secondary: "#4B5563"
-  border: "#E5E7EB"
+  primary: "#EA580C"
+  secondary: "#000000"
+  accent: "#D04D09"
+  background: "#000000"
+  surface: "#2C2A28"
+  text-primary: "#FFFFFF"
+  text-secondary: "#A1A1AA"
+  border: "#2C2A28"
 typography:
   display-lg:
     fontFamily: "Inter"
@@ -19,7 +19,7 @@ typography:
     lineHeight: "1.04"
     letterSpacing: "0"
   body-md:
-    fontFamily: "Inter"
+    fontFamily: "JetBrains Mono"
     fontSize: "16px"
     fontWeight: 400
     lineHeight: "1.6"
@@ -34,8 +34,8 @@ spacing:
   card-padding: "24px"
   section-padding: "80px"
 rounded:
-  card: "16px"
-  control: "8px"
+  card: "32px"
+  control: "32px"
   pill: "9999px"
 components:
   card:
@@ -45,24 +45,24 @@ components:
     background: "Use primary or accent colors for the main action"
     radius: "Use the control or pill radius based on the source HTML"
 ---
-# PaperFlow Design Layout
-Source: Neuform Featured templates from top creators. Author: Sourasith Phomhome (@madebysourasith). Views: 393; favorites: 25; remixes: 7.
-Tags: pricing, section, animated, cta, bento, billing.
+# Lumina — Onboarding Architecture
+Source: Neuform Featured templates from top creators. Author: Meng To (@mengto). Views: 238; favorites: 13; remixes: 3.
+Tags: onboarding, animated, threejs, cta, bento, dither, charts, navigation.
 ## Overview
-Paperflow Design Pricing Section is designed for comparing plans and supporting conversion decisions. Key features include plan comparison blocks and conversion-oriented actions. It is suitable for subscription pricing pages and plan comparison experiences.
+Lumina Architecture Onboarding Section is designed for building reusable UI components in modern web projects. Key features include reusable structure, responsive behavior, and production-ready presentation. It is suitable for component libraries and responsive product interfaces.
 
-Flow Platform Plans Streamline operations with smart workflows. Optimize your daily tasks and harness data for clear outcomes. Get Started Expand capabilities. @jordanhayes Projects About I'm Jordan Hayes , a product en…
+Lumina Flow OS · Experience Design Modules Kits Thesis Support Replace fragmented workflows with unified paper-soft interfaces. Discover clarity. A production-ready onboarding and form design system built for modern Saa…
 ## Composition
 Use the attached HTML reference as the source of truth. Preserve the visible hierarchy, first-screen composition, section rhythm, density, and interaction tone before adapting copy or content.
-Key visible headings include: Streamline operations with smart workflows.; Refined product assets; Frameworks.; Inter Sans; Discover crafted interface patterns..
+Key visible headings include: Lumina; Replace fragmented workflows with unified paper-soft interfaces. Discover clarity.; The friction point.; Five pillars. Seamless adoption.; Contextual Entry; Guided Progression.
 ## Colors
-Anchor the palette in primary #E65C00, secondary #FDFBF7, accent #FFB380, background #FDFBF7, surface #F7F4EB, text-primary #111827. Keep background, surface, text, and border roles distinct so generated layouts retain the same contrast pattern as the source.
+Anchor the palette in primary #EA580C, secondary #000000, accent #D04D09, background #000000, surface #2C2A28, text-primary #FFFFFF. Keep background, surface, text, and border roles distinct so generated layouts retain the same contrast pattern as the source.
 ## Typography
-Use Inter for display moments and Inter for body copy unless the HTML clearly demands a compatible fallback. Labels and technical metadata should use JetBrains Mono or an equivalent mono face.
+Use Inter for display moments and JetBrains Mono for body copy unless the HTML clearly demands a compatible fallback. Labels and technical metadata should use JetBrains Mono or an equivalent mono face.
 ## Layout
 Keep spacing deliberate and stable. Favor the same grid direction, max-width behavior, card density, and responsive stacking seen in the HTML. Do not replace distinctive source structures with generic SaaS sections.
 ## Components
-Authentication and CTA controls should preserve the source button hierarchy, input density, and focused conversion path.
+Dashboard, chart, and data panels should preserve their compact operational hierarchy, nested surfaces, and metric emphasis.
 ## Motion
 Preserve existing motion cues such as masked reveals, staggered entrance, hover lift, scroll-triggered transitions, and ambient movement. Keep easing smooth and restrained.
 ## WebGL & Effects

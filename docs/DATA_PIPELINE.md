@@ -8,11 +8,13 @@ The scheduled ChatGPT task must finish its research first, then use its connecte
 
 1. Add `public/data/archive/YYYY/MM/YYYY-MM-DD-am.json` or `...-pm.json`.
 2. Copy the exact same JSON to `public/data/latest.json`.
-3. Append one item to `public/data/manifest.json` and update `latest` and `updatedAt`.
+3. Append one item to `public/data/manifest.json` and update `latest` and `updatedAt`. The item must copy the edition's `archiveTitle` and `leadEntryId`.
 4. Open and verify every primary source before using `fact_status: "official"`.
 5. Never modify or delete an older archive file. Corrections create a revision commit without changing the issue number.
 
-The edition object must use `schemaVersion: 1`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. It must include `entries`, `upcoming`, `tracking`, and `sourceReport`. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
+Every newly scheduled edition must use `schemaVersion: 2`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. Schema version 1 is reserved for existing legacy archives only. Each new edition must include `entries`, `upcoming`, `tracking`, and `sourceReport`, plus the image fields defined below. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
+
+Each v2 edition also requires an `archiveTitle` and `leadEntryId`. The title must start with `早报｜` or `晚报｜` to match `period`, contain 8–40 characters, and summarize one real, high-impact entry without overstating its verification status. Prefer a major game, publisher/platform decision, or broadly discussed event. `leadEntryId` must reference that entry in the same edition. Copy both fields into the appended manifest item. The four legacy manifest items contain an approved one-time metadata backfill; do not rewrite legacy archive JSON or later alter historical titles without an explicit correction.
 
 Before committing, the task should run or request the equivalent of:
 
@@ -21,7 +23,25 @@ npm run validate:data
 npm run check
 ```
 
-Pushing the data commit starts the Pages workflow. The workflow validates the archive, builds the site, and deploys it. No OpenAI or GitHub token is exposed in browser code.
+Pushing the data commit starts the Pages workflow. The workflow validates the archive, generates `public/data/search-index.json` from every manifest-listed edition, builds the site, and deploys it. The generated search index is not committed; it is reproduced by `npm run build:search`, `npm run dev`, and `npm run build`. No OpenAI or GitHub token is exposed in browser code.
+
+## Image publishing
+
+Starting with `schemaVersion: 2`, every news entry and upcoming game must explicitly resolve its media state. Prefer at least one verified `images` item for news and one verified `cover` for upcoming games. When no relevant, traceable image exists, use `image_status: "unavailable"` with `imageNote`, or `cover_status: "unavailable"` with `coverNote`; never force an unrelated image. Existing v1 archives remain valid. Use this shape:
+
+```json
+{
+  "url": "media/briefs/2026/08/2026-08-22-pm/story-id.webp",
+  "alt": "Meaningful Chinese description of the visible image",
+  "credit": "Publisher or photographer",
+  "sourceUrl": "https://official.example.com/original-page",
+  "kind": "editorial"
+}
+```
+
+For game covers, set `kind` to `cover`. Prefer downloading official press images to `public/media/briefs/YYYY/MM/<edition-id>/`, converting them to WebP or JPEG, and keeping files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
+
+Before publishing, confirm that every supplied image URL loads and that `alt`, `credit`, and `sourceUrl` are present. CI rejects an unresolved media state on new editions: each item needs either valid media or a specific unavailable reason.
 
 ## Failure behavior
 

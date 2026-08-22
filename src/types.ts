@@ -33,6 +33,17 @@ export interface SourceLink {
   kind: "primary" | "secondary" | "discovery";
 }
 
+export interface ImageAsset {
+  url: string;
+  alt: string;
+  credit: string;
+  sourceUrl: string;
+  kind: "editorial" | "cover";
+  placeholder?: boolean;
+}
+
+export type ImageAvailabilityStatus = "verified" | "unavailable";
+
 export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
@@ -63,6 +74,9 @@ export interface BriefEntry {
   verification: string;
   tracking?: boolean;
   imageSeed: string;
+  images?: ImageAsset[];
+  image_status?: ImageAvailabilityStatus;
+  imageNote?: string;
 }
 
 export interface UpcomingEntry {
@@ -74,6 +88,9 @@ export interface UpcomingEntry {
   releaseType: string;
   source: SourceLink;
   note: string;
+  cover?: ImageAsset;
+  cover_status?: ImageAvailabilityStatus;
+  coverNote?: string;
 }
 
 export interface SourceReport {
@@ -83,7 +100,9 @@ export interface SourceReport {
 }
 
 export interface BriefEdition {
-  schemaVersion?: 1;
+  schemaVersion?: 1 | 2;
+  archiveTitle?: string;
+  leadEntryId?: string;
   id: string;
   issueNumber: number;
   date: string;
@@ -102,6 +121,8 @@ export interface BriefEdition {
 }
 
 export interface BriefManifestItem {
+  archiveTitle?: string;
+  leadEntryId?: string;
   id: string;
   issueNumber: number;
   date: string;
@@ -116,4 +137,25 @@ export interface BriefManifest {
   updatedAt: string;
   latest: string;
   editions: BriefManifestItem[];
+}
+
+export interface BriefSearchEntry {
+  editionId: string;
+  issueNumber: number;
+  date: string;
+  period: "am" | "pm";
+  entryId: string;
+  titleZhCn?: string;
+  titleEn: string;
+  headline: string;
+  summary: string;
+  platforms: string[];
+  region: string;
+  factStatus: FactStatus;
+}
+
+export interface BriefSearchIndex {
+  schemaVersion: 1;
+  updatedAt: string;
+  entries: BriefSearchEntry[];
 }

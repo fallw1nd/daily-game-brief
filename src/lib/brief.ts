@@ -1,4 +1,9 @@
-import type { BriefEdition, BriefEntry, SectionKey } from "../types";
+import type {
+  BriefEdition,
+  BriefEntry,
+  BriefSearchEntry,
+  SectionKey,
+} from "../types";
 
 export function entriesForSection(
   entries: BriefEntry[],
@@ -26,6 +31,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasUsableImage(value: unknown, kind: "editorial" | "cover"): boolean {
+  if (!isRecord(value) || value.placeholder === true) return false;
+  return (
+    typeof value.url === "string" &&
+    value.url.length > 0 &&
+    typeof value.alt === "string" &&
+    value.alt.length > 0 &&
+    typeof value.credit === "string" &&
+    value.credit.length > 0 &&
+    typeof value.sourceUrl === "string" &&
+    /^https:\/\//.test(value.sourceUrl) &&
+    value.kind === kind
+  );
+}
+
 export function validateEdition(
   value: unknown,
   options: ValidationOptions = {},
@@ -34,8 +54,8 @@ export function validateEdition(
   if (!isRecord(value)) return ["edition must be an object"];
 
   const edition = value as Partial<BriefEdition>;
-  if (options.requireEnvelope && edition.schemaVersion !== 1) {
-    errors.push("edition schemaVersion must be 1");
+  if (options.requireEnvelope && edition.schemaVersion !== 1 && edition.schemaVersion !== 2) {
+    errors.push("edition schemaVersion must be 1 or 2");
   }
   if (!edition.id || !edition.date || !edition.period) {
     errors.push("edition id, date, and period are required");
@@ -67,6 +87,54 @@ export function validateEdition(
     ) {
       errors.push(`official entry without primary source: ${entry.id}`);
     }
+    if (edition.schemaVersion === 2) {
+      const hasImage =
+        Array.isArray(entry.images) &&
+        entry.images.some((asset) => hasUsableImage(asset, "editorial"));
+      const explainsAbsence =
+        entry.image_status === "unavailable" &&
+        typeof entry.imageNote === "string" &&
+        entry.imageNote.trim().length > 0;
+
+      if (!hasImage && !explainsAbsence) {
+        errors.push(`entry needs an editorial image or an unavailable reason: ${entry.id}`);
+      }
+    }
+  }
+
+  if (edition.schemaVersion === 2) {
+    const expectedPrefix = edition.period === "am" ? "早报｜" : "晚报｜";
+    const archiveTitle =
+      typeof edition.archiveTitle === "string" ? edition.archiveTitle.trim() : "";
+
+    if (
+      !archiveTitle.startsWith(expectedPrefix) ||
+      [...archiveTitle].length < 8 ||
+      [...archiveTitle].length > 40
+    ) {
+      errors.push(
+        `edition archiveTitle must use ${expectedPrefix} and contain 8–40 characters`,
+      );
+    }
+    if (
+      typeof edition.leadEntryId !== "string" ||
+      !ids.has(edition.leadEntryId)
+    ) {
+      errors.push("edition leadEntryId must reference an entry in this edition");
+    }
+  }
+
+  if (edition.schemaVersion === 2 && Array.isArray(edition.upcoming)) {
+    for (const item of edition.upcoming) {
+      const explainsAbsence =
+        item.cover_status === "unavailable" &&
+        typeof item.coverNote === "string" &&
+        item.coverNote.trim().length > 0;
+
+      if (!hasUsableImage(item.cover, "cover") && !explainsAbsence) {
+        errors.push(`upcoming needs a cover or an unavailable reason: ${item.id}`);
+      }
+    }
   }
 
   if (edition.timezone !== "Asia/Shanghai") {
@@ -94,6 +162,29 @@ export function searchEntries(entries: BriefEntry[], query: string): BriefEntry[
     [
       entry.title.title_zh_cn,
       entry.title.title_en,
+      entry.headline,
+      entry.summary,
+      entry.platforms.join(" "),
+      entry.region,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("zh-CN")
+      .includes(term),
+  );
+}
+
+export function searchArchiveEntries(
+  entries: BriefSearchEntry[],
+  query: string,
+): BriefSearchEntry[] {
+  const term = query.trim().toLocaleLowerCase("zh-CN");
+  if (!term) return [];
+
+  return entries.filter((entry) =>
+    [
+      entry.titleZhCn,
+      entry.titleEn,
       entry.headline,
       entry.summary,
       entry.platforms.join(" "),
