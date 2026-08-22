@@ -1,4 +1,9 @@
-import type { BriefEdition, BriefEntry, SectionKey } from "../types";
+import type {
+  BriefEdition,
+  BriefEntry,
+  BriefSearchEntry,
+  SectionKey,
+} from "../types";
 
 export function entriesForSection(
   entries: BriefEntry[],
@@ -35,6 +40,8 @@ function hasUsableImage(value: unknown, kind: "editorial" | "cover"): boolean {
     value.alt.length > 0 &&
     typeof value.credit === "string" &&
     value.credit.length > 0 &&
+    typeof value.sourceUrl === "string" &&
+    /^https:\/\//.test(value.sourceUrl) &&
     value.kind === kind
   );
 }
@@ -80,18 +87,31 @@ export function validateEdition(
     ) {
       errors.push(`official entry without primary source: ${entry.id}`);
     }
-    if (
-      edition.schemaVersion === 2 &&
-      (!Array.isArray(entry.images) ||
-        !entry.images.some((asset) => hasUsableImage(asset, "editorial")))
-    ) {
-      errors.push(`entry without editorial image: ${entry.id}`);
+    if (edition.schemaVersion === 2) {
+      const hasImage =
+        Array.isArray(entry.images) &&
+        entry.images.some((asset) => hasUsableImage(asset, "editorial"));
+      const explainsAbsence =
+        entry.image_status === "unavailable" &&
+        typeof entry.imageNote === "string" &&
+        entry.imageNote.trim().length > 0;
+
+      if (!hasImage && !explainsAbsence) {
+        errors.push(`entry needs an editorial image or an unavailable reason: ${entry.id}`);
+      }
     }
   }
 
   if (edition.schemaVersion === 2 && Array.isArray(edition.upcoming)) {
     for (const item of edition.upcoming) {
-      if (!hasUsableImage(item.cover, "cover")) errors.push(`upcoming without cover: ${item.id}`);
+      const explainsAbsence =
+        item.cover_status === "unavailable" &&
+        typeof item.coverNote === "string" &&
+        item.coverNote.trim().length > 0;
+
+      if (!hasUsableImage(item.cover, "cover") && !explainsAbsence) {
+        errors.push(`upcoming needs a cover or an unavailable reason: ${item.id}`);
+      }
     }
   }
 
@@ -120,6 +140,29 @@ export function searchEntries(entries: BriefEntry[], query: string): BriefEntry[
     [
       entry.title.title_zh_cn,
       entry.title.title_en,
+      entry.headline,
+      entry.summary,
+      entry.platforms.join(" "),
+      entry.region,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("zh-CN")
+      .includes(term),
+  );
+}
+
+export function searchArchiveEntries(
+  entries: BriefSearchEntry[],
+  query: string,
+): BriefSearchEntry[] {
+  const term = query.trim().toLocaleLowerCase("zh-CN");
+  if (!term) return [];
+
+  return entries.filter((entry) =>
+    [
+      entry.titleZhCn,
+      entry.titleEn,
       entry.headline,
       entry.summary,
       entry.platforms.join(" "),
