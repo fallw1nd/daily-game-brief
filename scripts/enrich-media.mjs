@@ -174,12 +174,12 @@ function mediaPath(edition, record, kind) {
 
 function unavailableNote(kind, attempts) {
   const reason = attempts.length
-    ? attempts.map((item) => `${item.label}: ${item.error}`).join("\\uff1b")
-    : "\\u6761\\u76ee\\u6ca1\\u6709\\u53ef\\u7528\\u4e8e\\u5a92\\u4f53\\u6838\\u9a8c\\u7684 HTTPS \\u6765\\u6e90";
+    ? attempts.map((item) => `${item.label}: ${item.error}`).join("\uff1b")
+    : "\u6761\u76ee\u6ca1\u6709\u53ef\u7528\u4e8e\u5a92\u4f53\u6838\u9a8c\u7684 HTTPS \u6765\u6e90";
   const prefix = kind === "cover"
-    ? "\\u672a\\u627e\\u5230\\u7b26\\u5408 PSN \\u6e2f\\u670d\\u3001eShop \\u65e5\\u670d\\u3001Xbox \\u5546\\u5e97\\u4f18\\u5148\\u7ea7\\u7684\\u5b98\\u65b9\\u5c01\\u9762"
-    : "\\u672a\\u627e\\u5230\\u4e0e\\u4e8b\\u4ef6\\u76f4\\u63a5\\u76f8\\u5173\\u4e14\\u53ef\\u8ffd\\u6eaf\\u7684\\u5b98\\u65b9\\u65b0\\u95fb\\u56fe";
-  return `${prefix}\\u3002${reason}`;
+    ? "\u672a\u627e\u5230\u7b26\u5408 PSN \u6e2f\u670d\u3001eShop \u65e5\u670d\u3001Xbox \u5546\u5e97\u4f18\u5148\u7ea7\u7684\u5b98\u65b9\u5c01\u9762"
+    : "\u672a\u627e\u5230\u4e0e\u4e8b\u4ef6\u76f4\u63a5\u76f8\u5173\u4e14\u53ef\u8ffd\u6eaf\u7684\u5b98\u65b9\u65b0\u95fb\u56fe";
+  return `${prefix}\u3002${reason}`;
 }
 
 async function resolveRecord(edition, record, kind, sourceList, apply) {
@@ -206,7 +206,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
           attempts: [{
             label: source.label,
             url: source.url,
-            error: "\\u4ec5\\u627e\\u5230\\u5ba3\\u4f20\\u6a2a\\u56fe\\u6216\\u975e\\u9996\\u9009\\u5546\\u5e97\\u7d20\\u6750\\uff0c\\u672a\\u4f5c\\u4e3a\\u5c01\\u9762\\u81ea\\u52a8\\u91c7\\u7528",
+            error: "\u4ec5\u627e\u5230\u5ba3\u4f20\u6a2a\u56fe\u6216\u975e\u9996\u9009\u5546\u5e97\u7d20\u6750\uff0c\u672a\u4f5c\u4e3a\u5c01\u9762\u81ea\u52a8\u91c7\u7528",
           }],
         };
         continue;
@@ -222,8 +222,8 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         asset: {
           url: target.relative,
           alt: candidate.alt || `${title}${kind === "cover"
-            ? "\\u5b98\\u65b9\\u5546\\u5e97\\u5c01\\u9762"
-            : `\\uff1a${record.headline || "\\u76f8\\u5173\\u6d88\\u606f"}\\u5b98\\u65b9\\u53d1\\u5e03\\u56fe`
+            ? "\u5b98\u65b9\u5546\u5e97\u5c01\u9762"
+            : `\uff1a${record.headline || "\u76f8\u5173\u6d88\u606f"}\u5b98\u65b9\u53d1\u5e03\u56fe`
           }`,
           credit: source.label,
           sourceUrl: candidate.pageUrl,
