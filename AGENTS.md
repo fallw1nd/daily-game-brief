@@ -43,4 +43,4 @@ Every newly published `BriefEntry` and `UpcomingEntry` must explicitly resolve i
 
 ## Themes, Archive & Search
 
-Maintain both dark and warm-paper light themes with the same hierarchy, typography, orange accent, and rule-based grouping. Persist the reader's choice and keep the toggle keyboard accessible. Hide empty editorial departments completely, including their directory and top-level links. The archive lists manifest editions, not current-edition stories. Cross-edition search uses the generated compact index and links each result to its source edition and entry anchor.
+Maintain both dark and warm-paper light themes with the same hierarchy, typography, orange accent, and rule-based grouping. Use the reference `#EA580C` accent in dark mode and the AA-safe tonal adaptation `#B34200` on light surfaces. Persist the reader's choice and keep the toggle keyboard accessible. Hide empty editorial departments completely, including their directory and top-level links. The archive lists manifest editions, not current-edition stories. Cross-edition search uses the generated compact index and links each result to its source edition and entry anchor.
