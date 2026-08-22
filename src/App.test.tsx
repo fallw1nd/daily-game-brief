@@ -86,8 +86,10 @@ describe("brief page regression", () => {
     );
   });
 
-  it("keeps a single editorial page heading and removes the former slogans", () => {
+  it("uses the distinctive archive title as the single page heading", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
+    expect(document.querySelector("h1")?.textContent).toBe(edition.archiveTitle);
+    expect(document.querySelector("h1")?.textContent).not.toBe("游戏晚报");
     expect(document.body.textContent).not.toContain("简报方法");
     expect(document.body.textContent).not.toContain(
       "发售、评分、新闻、产业与深读，浓缩成一份可追溯的一手简报。",
@@ -96,16 +98,18 @@ describe("brief page regression", () => {
       "读者不必相信我们，只需沿着证据返回原文。",
     );
     expect(document.body.textContent).not.toContain("ABOUT / 关于");
+    expect(document.body.textContent).not.toContain("出版信息");
   });
 
-  it("renders publication chrome, theme control, directory, about, and footer", () => {
+  it("renders topbar controls, directory, and a single publication footer", () => {
     expect(document.querySelector("header.topbar")).not.toBeNull();
     expect(document.querySelector(".site-shell")?.getAttribute("data-theme")).toBe("light");
     expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("orange");
     expect(document.querySelector('button[aria-label="切换到夜间模式"]')).not.toBeNull();
     expect(document.querySelector('button[aria-controls="accent-options"]')).not.toBeNull();
     expect(document.querySelector(".edition-directory")).not.toBeNull();
-    expect(document.querySelector("#about")).not.toBeNull();
+    expect(document.querySelector(".publication-strip")).toBeNull();
+    expect(document.querySelector("#about")).toBe(document.querySelector("footer.site-footer"));
     expect(document.querySelector("footer.site-footer")).not.toBeNull();
   });
 
