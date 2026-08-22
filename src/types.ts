@@ -42,6 +42,8 @@ export interface ImageAsset {
   placeholder?: boolean;
 }
 
+export type ImageAvailabilityStatus = "verified" | "unavailable";
+
 export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
@@ -73,6 +75,8 @@ export interface BriefEntry {
   tracking?: boolean;
   imageSeed: string;
   images?: ImageAsset[];
+  image_status?: ImageAvailabilityStatus;
+  imageNote?: string;
 }
 
 export interface UpcomingEntry {
@@ -85,6 +89,8 @@ export interface UpcomingEntry {
   source: SourceLink;
   note: string;
   cover?: ImageAsset;
+  cover_status?: ImageAvailabilityStatus;
+  coverNote?: string;
 }
 
 export interface SourceReport {
@@ -127,4 +133,25 @@ export interface BriefManifest {
   updatedAt: string;
   latest: string;
   editions: BriefManifestItem[];
+}
+
+export interface BriefSearchEntry {
+  editionId: string;
+  issueNumber: number;
+  date: string;
+  period: "am" | "pm";
+  entryId: string;
+  titleZhCn?: string;
+  titleEn: string;
+  headline: string;
+  summary: string;
+  platforms: string[];
+  region: string;
+  factStatus: FactStatus;
+}
+
+export interface BriefSearchIndex {
+  schemaVersion: 1;
+  updatedAt: string;
+  entries: BriefSearchEntry[];
 }
