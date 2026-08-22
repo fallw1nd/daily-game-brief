@@ -102,6 +102,28 @@ export function validateEdition(
     }
   }
 
+  if (edition.schemaVersion === 2) {
+    const expectedPrefix = edition.period === "am" ? "早报｜" : "晚报｜";
+    const archiveTitle =
+      typeof edition.archiveTitle === "string" ? edition.archiveTitle.trim() : "";
+
+    if (
+      !archiveTitle.startsWith(expectedPrefix) ||
+      [...archiveTitle].length < 8 ||
+      [...archiveTitle].length > 40
+    ) {
+      errors.push(
+        `edition archiveTitle must use ${expectedPrefix} and contain 8–40 characters`,
+      );
+    }
+    if (
+      typeof edition.leadEntryId !== "string" ||
+      !ids.has(edition.leadEntryId)
+    ) {
+      errors.push("edition leadEntryId must reference an entry in this edition");
+    }
+  }
+
   if (edition.schemaVersion === 2 && Array.isArray(edition.upcoming)) {
     for (const item of edition.upcoming) {
       const explainsAbsence =
