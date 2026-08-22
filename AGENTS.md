@@ -18,11 +18,11 @@ Treat the product as news, never a marketing landing page. Keep this type langua
 
 - L0 site chrome: 12px JetBrains Mono, weight 600, tabular figures.
 - L1 edition H1: Inter with Noto Sans SC/system fallback, 40px desktop/32px mobile, weight 500, line-height 1.05.
-- L2 section headings: 28px desktop/24px mobile, weight 600, line-height 1.2; 12px orange mono numbers.
+- L2 section headings: 28px desktop/24px mobile, weight 600, line-height 1.2; 12px semantic-accent mono numbers.
 - L3 story headlines: 22px desktop/19px mobile, weight 600, line-height 1.35; summaries 15.5px/1.75 near 65 characters per line.
-- L4 evidence: 11–12px JetBrains Mono, line-height 1.5, muted text; orange links and active states.
+- L4 evidence: 11–12px JetBrains Mono, line-height 1.5, muted text; semantic-accent links and active states.
 
-Use `#000000`, `#FFFFFF`, `#A1A1AA`, and `#EA580C` in dark mode; use warm paper `#F6F1E8`, ink `#1A1714`, and AA-safe orange `#B34200` in light mode. Group with rules, columns, and spacing—not large rounded story cards. Ban promotional slogans and generic AI copy.
+Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use warm paper `#F6F1E8`, ink `#1A1714`, and default `#B34200` in light mode. Reader-selectable cobalt, jade, and violet accents may replace orange only through the approved `DESIGN.md` semantic tokens; typography and hierarchy never change with accent choice. Group with rules, columns, and spacing—not large rounded story cards. Ban promotional slogans and generic AI copy.
 
 ## Archive Titles, Themes & Search
 
