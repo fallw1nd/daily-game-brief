@@ -27,6 +27,7 @@ import type {
   BriefEdition,
   BriefEntry,
   BriefManifest,
+  BriefManifestItem,
   BriefSearchIndex,
   FactStatus,
   ImageAsset,
@@ -94,6 +95,10 @@ const storySectionDefinitions: Array<{
 const timeOnly = (value: string) => value.slice(11);
 const storyTitle = (entry: BriefEntry) =>
   entry.title.title_zh_cn ? "《" + entry.title.title_zh_cn + "》" : entry.title.title_en;
+
+const archiveEditionTitle = (item: BriefManifestItem) =>
+  item.archiveTitle?.trim() ||
+  `${item.period === "am" ? "早报" : "晚报"}｜本期简报`;
 
 function resolveMediaUrl(url: string): string {
   if (/^(https?:|data:|blob:)/.test(url)) return url;
@@ -753,7 +758,7 @@ function App({
                 >
                   <span>NO.{String(item.issueNumber).padStart(3, "0")}</span>
                   <time>{item.date}</time>
-                  <strong>游戏{item.period === "am" ? "早报" : "晚报"}</strong>
+                  <strong>{archiveEditionTitle(item)}</strong>
                   <small>{archiveCounts.get(item.id) ?? "—"} 条新闻 · {item.generatedAt}</small>
                   <span>{item.id === edition.id ? "当前阅读" : "打开本期"} →</span>
                 </a>
