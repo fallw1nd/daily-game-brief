@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { edition } from "./data/brief";
+import type { BriefManifest, BriefSearchIndex } from "./types";
+
 vi.hoisted(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
@@ -18,9 +20,56 @@ vi.hoisted(() => {
   });
 });
 
+const manifest: BriefManifest = {
+  schemaVersion: 1,
+  updatedAt: edition.generatedAt,
+  latest: edition.id,
+  editions: [
+    {
+      id: "2026-08-21-am",
+      issueNumber: 1,
+      date: "2026-08-21",
+      period: "am",
+      generatedAt: "2026-08-21 10:12",
+      revised: false,
+      path: "archive/2026/08/2026-08-21-am.json",
+    },
+    {
+      id: edition.id,
+      issueNumber: edition.issueNumber,
+      date: edition.date,
+      period: edition.period,
+      generatedAt: edition.generatedAt,
+      revised: false,
+      path: "archive/2026/08/" + edition.id + ".json",
+    },
+  ],
+};
+
+const searchIndex: BriefSearchIndex = {
+  schemaVersion: 1,
+  updatedAt: edition.generatedAt,
+  entries: [{
+    editionId: "2026-08-21-am",
+    issueNumber: 1,
+    date: "2026-08-21",
+    period: "am",
+    entryId: "archive-story",
+    titleZhCn: "跨期测试游戏",
+    titleEn: "Archive Test Game",
+    headline: "跨期搜索可以打开原始早报",
+    summary: "这是用于验证归档搜索直达能力的新闻内容。",
+    platforms: ["PC"],
+    region: "全球",
+    factStatus: "official",
+  }],
+};
+
 describe("brief page regression", () => {
   beforeEach(() => {
-    document.body.innerHTML = renderToStaticMarkup(<App />);
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialTheme="light" />,
+    );
   });
 
   it("keeps a single editorial page heading and removes the former slogans", () => {
@@ -34,11 +83,29 @@ describe("brief page regression", () => {
     );
   });
 
-  it("renders the publication chrome, directory, about information, and footer", () => {
+  it("renders publication chrome, theme control, directory, about, and footer", () => {
     expect(document.querySelector("header.topbar")).not.toBeNull();
+    expect(document.querySelector(".site-shell")?.getAttribute("data-theme")).toBe("light");
+    expect(document.querySelector('button[aria-label="切换到夜间模式"]')).not.toBeNull();
     expect(document.querySelector(".edition-directory")).not.toBeNull();
     expect(document.querySelector("#about")).not.toBeNull();
     expect(document.querySelector("footer.site-footer")).not.toBeNull();
+  });
+
+  it("omits empty editorial departments from content and directory", () => {
+    const newsOnlyEdition = {
+      ...edition,
+      entries: edition.entries.map((entry) => ({ ...entry, section: "news" as const })),
+    };
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialEdition={newsOnlyEdition} initialTheme="dark" />,
+    );
+
+    expect(document.querySelector("#news")).not.toBeNull();
+    expect(document.querySelector("#releases")).toBeNull();
+    expect(document.querySelector("#reviews")).toBeNull();
+    expect(document.querySelector('.edition-directory a[href="#releases"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("本时段未发现可靠新增");
   });
 
   it("renders an editorial image slot for every story", () => {
@@ -60,5 +127,22 @@ describe("brief page regression", () => {
     for (const game of upcomingGames) {
       expect(game.querySelector(".media-slot--cover > img")).not.toBeNull();
     }
+  });
+
+  it("lists editions instead of current entries and links search results to source briefs", () => {
+    document.body.innerHTML = renderToStaticMarkup(
+      <App
+        initialManifest={manifest}
+        initialSearchIndex={searchIndex}
+        initialTheme="light"
+        initialQuery="跨期"
+      />,
+    );
+
+    expect(document.querySelectorAll(".archive-edition-list > a")).toHaveLength(2);
+    expect(document.querySelectorAll(".archive-search-results > a")).toHaveLength(1);
+    const result = document.querySelector<HTMLAnchorElement>(".archive-search-results > a");
+    expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");
+    expect(result?.getAttribute("href")).toContain("#archive-story");
   });
 });
