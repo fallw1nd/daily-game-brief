@@ -26,6 +26,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasUsableImage(value: unknown, kind: "editorial" | "cover"): boolean {
+  if (!isRecord(value) || value.placeholder === true) return false;
+  return (
+    typeof value.url === "string" &&
+    value.url.length > 0 &&
+    typeof value.alt === "string" &&
+    value.alt.length > 0 &&
+    typeof value.credit === "string" &&
+    value.credit.length > 0 &&
+    value.kind === kind
+  );
+}
+
 export function validateEdition(
   value: unknown,
   options: ValidationOptions = {},
@@ -34,8 +47,8 @@ export function validateEdition(
   if (!isRecord(value)) return ["edition must be an object"];
 
   const edition = value as Partial<BriefEdition>;
-  if (options.requireEnvelope && edition.schemaVersion !== 1) {
-    errors.push("edition schemaVersion must be 1");
+  if (options.requireEnvelope && edition.schemaVersion !== 1 && edition.schemaVersion !== 2) {
+    errors.push("edition schemaVersion must be 1 or 2");
   }
   if (!edition.id || !edition.date || !edition.period) {
     errors.push("edition id, date, and period are required");
@@ -66,6 +79,19 @@ export function validateEdition(
         !entry.sources.some((source) => source.kind === "primary"))
     ) {
       errors.push(`official entry without primary source: ${entry.id}`);
+    }
+    if (
+      edition.schemaVersion === 2 &&
+      (!Array.isArray(entry.images) ||
+        !entry.images.some((asset) => hasUsableImage(asset, "editorial")))
+    ) {
+      errors.push(`entry without editorial image: ${entry.id}`);
+    }
+  }
+
+  if (edition.schemaVersion === 2 && Array.isArray(edition.upcoming)) {
+    for (const item of edition.upcoming) {
+      if (!hasUsableImage(item.cover, "cover")) errors.push(`upcoming without cover: ${item.id}`);
     }
   }
 

@@ -23,3 +23,19 @@ There is no history from which to infer conventions. Start with Conventional Com
 ## Content, Sources & Design Constraints
 
 Use `Asia/Shanghai` and calculate windows from scheduled, not actual, run times. Never label an item ‚Äúofficial‚Äù without opening a primary source, machine-translate game titles, delete historical editions, or let revisions renumber issues. Keep rumor and verified-news states structured and distinct. Visual decisions belong to `DESIGN.md` and the `gpt-taste` skill; do not copy the former `chatgpt.site` presentation.
+
+## Permanent Editorial Hierarchy & Typography
+
+Treat this product as a news publication, not a marketing landing page. This hierarchy and type language remain stable even when the visual theme changes:
+
+- **L0 °™ Site chrome:** the sticky top bar contains the publication name, current edition/date, and highest-level links: Today, Releases, Archive, About. Use 12px JetBrains Mono, weight 600, uppercase English labels, and tabular figures.
+- **L1 °™ Edition masthead:** the single page H1 identifies morning/evening edition. Use Inter with `Noto Sans SC`/system sans fallback, 40px desktop and 32px mobile, weight 500, line-height 1.05, white.
+- **L2 °™ Section heading:** numbered editorial departments use 28px desktop and 24px mobile, weight 600, line-height 1.2. Section numbers use 12px JetBrains Mono in `#EA580C`.
+- **L3 °™ Story headline:** use 22px desktop and 19px mobile, weight 600, line-height 1.35, white. Summaries use 15.5px, line-height 1.75, and `#D4D4D8`; keep paragraphs near 65 characters per line.
+- **L4 °™ Evidence and metadata:** timestamps, platforms, regions, title status, verification state, and source labels use 11®C12px JetBrains Mono, line-height 1.5, `#A1A1AA`. Source links and active states use `#EA580C`.
+
+Use `#000000` for the page, `#2C2A28` for secondary surfaces and borders, `#FFFFFF` for primary text, and `#A1A1AA` for secondary text. Never introduce oversized promotional slogans, generic AI copy, or display text that competes with the news headline. Use thin rules, columns, and spacing for grouping; do not wrap every story in a large rounded card. The source report belongs near the end of the edition as operational metadata. Publication/about information belongs in the footer.
+
+## Editorial Image Contract
+
+Every newly published `BriefEntry` must include at least one `images` item; every `UpcomingEntry` must include one `cover`. Prefer repository-hosted WebP/JPEG assets under `public/media/briefs/YYYY/MM/<edition-id>/` and store paths relative to `public/`, for example `media/briefs/2026/08/2026-08-22-pm/story-id.webp`. Remote URLs are allowed only for durable official media/CDN assets. Each asset requires meaningful Chinese `alt`, `credit`, `sourceUrl`, and a `kind` of `editorial` or `cover`. News images use a 16:9 display slot; game covers use 3:4. Keep files below 500 KB where practical. Legacy editions may render the designed fallback, but new scheduled editions must not omit their image fields.

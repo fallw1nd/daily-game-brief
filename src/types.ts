@@ -33,6 +33,15 @@ export interface SourceLink {
   kind: "primary" | "secondary" | "discovery";
 }
 
+export interface ImageAsset {
+  url: string;
+  alt: string;
+  credit: string;
+  sourceUrl: string;
+  kind: "editorial" | "cover";
+  placeholder?: boolean;
+}
+
 export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
@@ -63,6 +72,7 @@ export interface BriefEntry {
   verification: string;
   tracking?: boolean;
   imageSeed: string;
+  images?: ImageAsset[];
 }
 
 export interface UpcomingEntry {
@@ -74,6 +84,7 @@ export interface UpcomingEntry {
   releaseType: string;
   source: SourceLink;
   note: string;
+  cover?: ImageAsset;
 }
 
 export interface SourceReport {
@@ -83,7 +94,7 @@ export interface SourceReport {
 }
 
 export interface BriefEdition {
-  schemaVersion?: 1;
+  schemaVersion?: 1 | 2;
   id: string;
   issueNumber: number;
   date: string;

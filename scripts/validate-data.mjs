@@ -4,6 +4,24 @@ import { resolve } from "node:path";
 const dataRoot = resolve("public/data");
 const errors = [];
 
+function hasValidImage(asset, kind) {
+  if (!asset || typeof asset !== "object" || asset.placeholder === true) return false;
+  const remote = /^https:\/\//.test(asset.url ?? "");
+  const local = /^media\/briefs\/\d{4}\/\d{2}\/[^/]+\/.+\.(avif|jpe?g|png|webp)$/i.test(
+    asset.url ?? "",
+  );
+  return (
+    (remote || local) &&
+    asset.kind === kind &&
+    typeof asset.alt === "string" &&
+    asset.alt.trim().length > 0 &&
+    typeof asset.credit === "string" &&
+    asset.credit.trim().length > 0 &&
+    /^https:\/\//.test(asset.sourceUrl ?? "")
+  );
+}
+
+
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(resolve(dataRoot, path), "utf8"));
@@ -19,7 +37,9 @@ function validateEdition(edition, path) {
     return;
   }
 
-  if (edition.schemaVersion !== 1) errors.push(`${path}: schemaVersion must be 1`);
+  if (!new Set([1, 2]).has(edition.schemaVersion)) {
+    errors.push(`${path}: schemaVersion must be 1 or 2`);
+  }
   if (edition.id !== `${edition.date}-${edition.period}`) {
     errors.push(`${path}: id must match date and period`);
   }
@@ -40,6 +60,7 @@ function validateEdition(edition, path) {
     return;
   }
 
+  const requiresImages = edition.schemaVersion === 2;
   const ids = new Set();
   for (const entry of edition.entries) {
     if (!entry?.id) {
@@ -53,6 +74,23 @@ function validateEdition(edition, path) {
       !entry.sources?.some((source) => source.kind === "primary")
     ) {
       errors.push(`${path}: official entry ${entry.id} needs a primary source`);
+    }
+    if (
+      requiresImages &&
+      (!Array.isArray(entry.images) ||
+        !entry.images.some((asset) => hasValidImage(asset, "editorial")))
+    ) {
+      errors.push(`${path}: entry ${entry.id} needs a non-placeholder editorial image`);
+    }
+  }
+
+  if (requiresImages && !Array.isArray(edition.upcoming)) {
+    errors.push(`${path}: upcoming must be an array`);
+  } else if (requiresImages) {
+    for (const item of edition.upcoming) {
+      if (!hasValidImage(item.cover, "cover")) {
+        errors.push(`${path}: upcoming ${item.id} needs a cover image`);
+      }
     }
   }
 

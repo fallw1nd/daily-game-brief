@@ -11,6 +11,18 @@ describe("brief integrity", () => {
     expect(validateEdition(edition)).toEqual([]);
   });
 
+  it("requires editorial images and covers after the legacy editions", () => {
+    const errors = validateEdition({
+      ...edition,
+      schemaVersion: 2,
+      entries: edition.entries.map((entry) => ({ ...entry, images: undefined })),
+      upcoming: edition.upcoming.map((item) => ({ ...item, cover: undefined })),
+    });
+
+    expect(errors.some((error) => error.includes("editorial image"))).toBe(true);
+    expect(errors.some((error) => error.includes("without cover"))).toBe(true);
+  });
+
   it("excludes supplements from the current time window", () => {
     const supplement = edition.entries.find((entry) =>
       entry.entry_flags.includes("supplement"),

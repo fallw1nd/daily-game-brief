@@ -23,6 +23,24 @@ npm run check
 
 Pushing the data commit starts the Pages workflow. The workflow validates the archive, builds the site, and deploys it. No OpenAI or GitHub token is exposed in browser code.
 
+## Image publishing
+
+Starting with `schemaVersion: 2`, every news entry requires at least one non-placeholder `images` item and every upcoming game requires `cover`. Existing v1 archives remain valid. Use this shape:
+
+```json
+{
+  "url": "media/briefs/2026/08/2026-08-22-pm/story-id.webp",
+  "alt": "Meaningful Chinese description of the visible image",
+  "credit": "Publisher or photographer",
+  "sourceUrl": "https://official.example.com/original-page",
+  "kind": "editorial"
+}
+```
+
+For game covers, set `kind` to `cover`. Prefer downloading official press images to `public/media/briefs/YYYY/MM/<edition-id>/`, converting them to WebP or JPEG, and keeping files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
+
+Before publishing, confirm that every image URL loads and that `alt`, `credit`, and `sourceUrl` are present. CI rejects missing or placeholder media on new editions.
+
 ## Failure behavior
 
 If GitHub is unavailable, the task should report the prepared edition without pretending it was published. If `latest.json` is missing or invalid, the deployed app shows its bundled fallback data. CI rejects schema errors, discontinuous issue numbers, metadata mismatches, and deleted archive files.
