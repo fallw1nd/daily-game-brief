@@ -4,6 +4,16 @@ import App from "./App";
 import { edition } from "./data/brief";
 import type { BriefManifest, BriefSearchIndex } from "./types";
 
+vi.mock("@gsap/react", () => ({ useGSAP: () => undefined }));
+vi.mock("gsap", () => ({
+  default: {
+    registerPlugin: () => undefined,
+    from: () => undefined,
+    utils: { toArray: () => [] },
+  },
+}));
+vi.mock("gsap/ScrollTrigger", () => ({ ScrollTrigger: {} }));
+
 vi.hoisted(() => {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
@@ -76,8 +86,10 @@ describe("brief page regression", () => {
     );
   });
 
-  it("keeps a single editorial page heading and removes the former slogans", () => {
+  it("uses the distinctive archive title as the single page heading", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
+    expect(document.querySelector("h1")?.textContent).toMatch(/^晚报｜.+/);
+    expect(document.querySelector("h1")?.textContent).not.toBe("游戏晚报");
     expect(document.body.textContent).not.toContain("简报方法");
     expect(document.body.textContent).not.toContain(
       "发售、评分、新闻、产业与深读，浓缩成一份可追溯的一手简报。",
@@ -85,15 +97,35 @@ describe("brief page regression", () => {
     expect(document.body.textContent).not.toContain(
       "读者不必相信我们，只需沿着证据返回原文。",
     );
+    expect(document.body.textContent).not.toContain("ABOUT / 关于");
+    expect(document.body.textContent).not.toContain("出版信息");
   });
 
-  it("renders publication chrome, theme control, directory, about, and footer", () => {
+  it("renders topbar controls, directory, and a single publication footer", () => {
     expect(document.querySelector("header.topbar")).not.toBeNull();
     expect(document.querySelector(".site-shell")?.getAttribute("data-theme")).toBe("light");
+    expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("orange");
     expect(document.querySelector('button[aria-label="切换到夜间模式"]')).not.toBeNull();
+    expect(document.querySelector('button[aria-controls="accent-options"]')).not.toBeNull();
     expect(document.querySelector(".edition-directory")).not.toBeNull();
-    expect(document.querySelector("#about")).not.toBeNull();
+    expect(document.querySelector(".publication-strip")).toBeNull();
+    expect(document.querySelector("#about")).toBeNull();
+    expect(document.querySelector('nav a[href="#about"]')).toBeNull();
     expect(document.querySelector("footer.site-footer")).not.toBeNull();
+  });
+
+  it("renders four named accent choices with an explicit selected state", () => {
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialTheme="dark" initialAccent="violet" />,
+    );
+
+    expect(document.querySelector(".site-shell")?.getAttribute("data-accent")).toBe("violet");
+    expect(document.querySelectorAll('.accent-option[role="radio"]')).toHaveLength(4);
+    expect(document.querySelector('.accent-option--violet')?.getAttribute("aria-checked")).toBe("true");
+    expect(document.body.textContent).toContain("熔岩橙");
+    expect(document.body.textContent).toContain("钴蓝");
+    expect(document.body.textContent).toContain("松石绿");
+    expect(document.body.textContent).toContain("暮紫");
   });
 
   it("omits empty editorial departments from content and directory", () => {
@@ -119,6 +151,7 @@ describe("brief page regression", () => {
     for (const story of stories) {
       expect(story.id).not.toBe("");
       expect(story.querySelector(".media-slot--editorial > img")).not.toBeNull();
+      expect(story.querySelector(".story-identity__primary")).not.toBeNull();
     }
   });
 
@@ -130,6 +163,7 @@ describe("brief page regression", () => {
     expect(upcomingGames).toHaveLength(edition.upcoming.length);
     for (const game of upcomingGames) {
       expect(game.querySelector(".media-slot--cover > img")).not.toBeNull();
+      expect(game.querySelector(".media-slot--cover figcaption")).toBeNull();
     }
   });
 
@@ -151,6 +185,7 @@ describe("brief page regression", () => {
     expect(editionTitles).toContain("晚报｜《潜行者2》大型扩展与2.0更新上线");
     expect(editionTitles).not.toContain("游戏早报");
     expect(editionTitles).not.toContain("游戏晚报");
+    expect(document.querySelector("h1")?.textContent).toBe("晚报｜《潜行者2》大型扩展与2.0更新上线");
     expect(document.querySelectorAll(".archive-search-results > a")).toHaveLength(1);
     const result = document.querySelector<HTMLAnchorElement>(".archive-search-results > a");
     expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");

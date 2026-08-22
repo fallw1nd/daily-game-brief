@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import {
+  ArrowRight,
   ArrowUpRight,
+  ChatsCircle,
   CheckCircle,
+  GameController,
   List,
   MagnifyingGlass,
   Moon,
+  Palette,
+  PlayCircle,
   Sun,
   WarningCircle,
   X,
@@ -39,14 +44,23 @@ import type {
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 type Theme = "light" | "dark";
+type Accent = "orange" | "cobalt" | "jade" | "violet";
 
 type AppProps = {
   initialEdition?: BriefEdition;
   initialManifest?: BriefManifest | null;
   initialSearchIndex?: BriefSearchIndex | null;
   initialTheme?: Theme;
+  initialAccent?: Accent;
   initialQuery?: string;
 };
+
+const accentOptions: Array<{ id: Accent; label: string }> = [
+  { id: "orange", label: "熔岩橙" },
+  { id: "cobalt", label: "钴蓝" },
+  { id: "jade", label: "松石绿" },
+  { id: "violet", label: "暮紫" },
+];
 
 const statusLabels: Record<FactStatus, string> = {
   official: "官方",
@@ -116,6 +130,19 @@ function preferredTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function preferredAccent(): Accent {
+  if (typeof window === "undefined") return "orange";
+  try {
+    const stored = window.localStorage.getItem("brief-accent");
+    if (stored === "orange" || stored === "cobalt" || stored === "jade" || stored === "violet") {
+      return stored;
+    }
+  } catch {
+    // Storage can be unavailable in privacy-restricted contexts.
+  }
+  return "orange";
+}
+
 function editionHref(editionId: string, entryId = "top"): string {
   const params = new URLSearchParams({ edition: editionId });
   return import.meta.env.BASE_URL + "?" + params.toString() + "#" + encodeURIComponent(entryId);
@@ -154,7 +181,7 @@ function EditorialImage({
         fetchPriority={eager ? "high" : "auto"}
         onError={() => setFailed(true)}
       />
-      {!isPlaceholder && (
+      {!isPlaceholder && kind === "editorial" && (
         <figcaption>
           <span>{asset.credit}</span>
           <a href={asset.sourceUrl} target="_blank" rel="noreferrer">
@@ -202,9 +229,11 @@ function SourceLinks({ sources }: { sources: SourceLink[] }) {
 function StoryIdentity({ entry }: { entry: BriefEntry }) {
   return (
     <div className="story-identity">
-      <span>{storyTitle(entry)}</span>
-      <span>{entry.title.title_en}</span>
-      <span>{titleStatusLabels[entry.title.title_zh_status]}</span>
+      <strong className="story-identity__primary">{storyTitle(entry)}</strong>
+      <div className="story-identity__meta">
+        {entry.title.title_zh_cn && <span>{entry.title.title_en}</span>}
+        <span>{titleStatusLabels[entry.title.title_zh_status]}</span>
+      </div>
     </div>
   );
 }
@@ -228,7 +257,7 @@ function LeadStory({ entry }: { entry: BriefEntry }) {
         <h2>{entry.headline}</h2>
         <p>{entry.summary}</p>
         <a className="read-link" href={"#" + entry.id}>
-          阅读核验记录<span aria-hidden="true">→</span>
+          阅读核验记录<ArrowRight aria-hidden="true" />
         </a>
       </div>
     </article>
@@ -364,11 +393,15 @@ function App({
   initialManifest = null,
   initialSearchIndex = null,
   initialTheme,
+  initialAccent,
   initialQuery,
 }: AppProps = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const accentPickerRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accentPickerOpen, setAccentPickerOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => initialTheme ?? preferredTheme());
+  const [accent, setAccent] = useState<Accent>(() => initialAccent ?? preferredAccent());
   const [query, setQuery] = useState(() => {
     if (initialQuery !== undefined) return initialQuery;
     if (typeof window === "undefined") return "";
@@ -413,6 +446,10 @@ function App({
     ...(sectionsByKey.reviews ?? []),
     ...edition.entries,
   ]).slice(0, 5);
+  const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
+  const pageTitle = edition.archiveTitle?.trim() ||
+    manifestEdition?.archiveTitle?.trim() ||
+    `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
 
   const directoryItems = [
     ...visibleStorySections.map((section) => ({
@@ -434,7 +471,7 @@ function App({
     ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "日历" }] : []),
     { href: "#archive", label: "归档" },
     { href: "#about", label: "关于" },
-  ];
+  ].filter((link) => link.href !== "#about");
 
   const archiveEditions = useMemo(
     () => [...(manifest?.editions ?? [])].reverse(),
@@ -461,6 +498,35 @@ function App({
       // Keep the selected theme for this session when storage is unavailable.
     }
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+    try {
+      window.localStorage.setItem("brief-accent", accent);
+    } catch {
+      // Keep the selected accent for this session when storage is unavailable.
+    }
+  }, [accent]);
+
+  useEffect(() => {
+    if (!accentPickerOpen) return;
+
+    const closeOnPointer = (event: PointerEvent) => {
+      if (!accentPickerRef.current?.contains(event.target as Node)) {
+        setAccentPickerOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccentPickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnPointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accentPickerOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -532,6 +598,12 @@ function App({
       stagger: 0.07,
       ease: "power3.out",
     });
+    gsap.from(".accent-signal", {
+      scaleX: 0,
+      duration: 0.86,
+      transformOrigin: "left center",
+      ease: "power3.out",
+    });
     gsap.utils.toArray<HTMLElement>(".reveal-row").forEach((row) => {
       gsap.from(row, {
         y: 20,
@@ -544,7 +616,7 @@ function App({
   }, { scope: rootRef, dependencies: [edition.id], revertOnUpdate: true });
 
   return (
-    <div className="site-shell" data-theme={theme} ref={rootRef}>
+    <div className="site-shell" data-theme={theme} data-accent={accent} ref={rootRef}>
       <a className="skip-link" href="#today">跳到今日简报</a>
       <header className="topbar">
         <a className="brand" href="#top" aria-label="游戏圈动态首页">
@@ -555,8 +627,43 @@ function App({
           <span>{edition.date}</span>
           <span>{period.english}</span>
         </div>
+        <div className="accent-picker" ref={accentPickerRef}>
+          <button
+            className="accent-toggle interaction-state"
+            type="button"
+            aria-label={`切换主题强调色，当前为${accentOptions.find((option) => option.id === accent)?.label}`}
+            aria-expanded={accentPickerOpen}
+            aria-controls="accent-options"
+            onClick={() => setAccentPickerOpen((open) => !open)}
+          >
+            <Palette aria-hidden="true" />
+            <span>配色</span>
+          </button>
+          <div className="accent-options" id="accent-options" hidden={!accentPickerOpen}>
+            <p>主题强调色</p>
+            <div role="radiogroup" aria-label="选择主题强调色">
+              {accentOptions.map((option) => (
+                <button
+                  key={option.id}
+                  className={`accent-option accent-option--${option.id}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={accent === option.id}
+                  onClick={() => {
+                    setAccent(option.id);
+                    setAccentPickerOpen(false);
+                  }}
+                >
+                  <span className="accent-swatch" aria-hidden="true" />
+                  <span>{option.label}</span>
+                  {accent === option.id && <CheckCircle aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <button
-          className="theme-toggle"
+          className="theme-toggle interaction-state"
           type="button"
           aria-label={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
           title={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
@@ -568,7 +675,7 @@ function App({
           <span>{theme === "dark" ? "日间" : "夜间"}</span>
         </button>
         <button
-          className="menu-button"
+          className="menu-button interaction-state"
           type="button"
           aria-label={menuOpen ? "关闭目录" : "打开目录"}
           aria-expanded={menuOpen}
@@ -585,13 +692,14 @@ function App({
             </a>
           ))}
         </nav>
+        <span className="accent-signal" aria-hidden="true" />
       </header>
 
       <main id="top">
         <section className="edition-masthead" aria-labelledby="page-title">
           <div className="edition-masthead__title masthead-reveal">
             <span>ISSUE {String(edition.issueNumber).padStart(3, "0")}</span>
-            <h1 id="page-title">游戏{period.edition}</h1>
+            <h1 id="page-title">{pageTitle}</h1>
             <p>{edition.date.replaceAll("-", ".")} / 北京时间</p>
           </div>
           <dl className="edition-facts masthead-reveal" aria-label="本期基础信息">
@@ -764,7 +872,7 @@ function App({
                   <time>{item.date}</time>
                   <strong>{archiveEditionTitle(item)}</strong>
                   <small>{archiveCounts.get(item.id) ?? "—"} 条新闻 · {item.generatedAt}</small>
-                  <span>{item.id === edition.id ? "当前阅读" : "打开本期"} →</span>
+                  <span>{item.id === edition.id ? "当前阅读" : "打开本期"}<ArrowRight aria-hidden="true" /></span>
                 </a>
               ))}
               {manifest && archiveEditions.length === 0 && (
@@ -774,23 +882,19 @@ function App({
           </section>
         </section>
 
-        <section className="publication-strip" id="about" aria-labelledby="about-title">
-          <div><span>ABOUT / 关于</span><h2 id="about-title">游戏圈动态</h2></div>
-          <p>每日北京时间10:10与17:00更新。新闻、发售、产业信息与来源核验共同归档。</p>
-          <dl>
-            <div><dt>下一期</dt><dd>{period.nextTime} · {period.nextEdition}</dd></div>
-            <div><dt>时区</dt><dd>Asia/Shanghai</dd></div>
-          </dl>
-        </section>
       </main>
 
       <footer className="site-footer">
         <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
         <p>编辑：Fallw1nd-津秋</p>
         <div className="footer-links">
-          <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">B站</a>
-          <span>微信公众号：芳墨集</span>
-          <a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">小黑盒</a>
+          <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">
+            <PlayCircle aria-hidden="true" /><span>B站</span>
+          </a>
+          <span><ChatsCircle aria-hidden="true" />微信公众号：芳墨集</span>
+          <a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">
+            <GameController aria-hidden="true" /><span>小黑盒</span>
+          </a>
         </div>
       </footer>
     </div>

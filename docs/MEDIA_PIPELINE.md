@@ -6,12 +6,17 @@ The media pipeline is deliberately conservative. It enriches the latest edition 
 
 For multi-platform games, use the first verified source available in this order:
 
-1. PlayStation Store (prefer Hong Kong and Simplified Chinese), square product image.
-2. Nintendo eShop Japan, square product image; only use a physical vertical cover when the Japanese eShop has no listing.
-3. Microsoft/Xbox Store, official rectangular product image.
-4. PC-only games: Xbox Store when included with Game Pass, otherwise an official store rectangle such as Steam.
+1. PlayStation Store (prefer Hong Kong and Simplified Chinese) product art.
+2. Nintendo eShop Japan or another traceable Nintendo product page.
+3. Microsoft/Xbox Store, Steam, publisher stores, and media rooms.
+4. The user-supplied discovery sites for edition identification.
+5. Open-web image search when the listed chain produces no usable result.
 
 Storefront URLs belong in config/media-catalog.json for reuse or in an upcoming item's mediaSources. Query parameters may be removed only on known PlayStation, Nintendo, and Microsoft image CDNs. Keep the original product page as sourceUrl.
+
+Source order is a reliability preference, not a shape requirement. Accept square, portrait, or landscape covers and preserve the source orientation. Search results must use the original image URL and source page, never a search-engine thumbnail; cover credit remains in JSON but is not rendered as a visible caption.
+
+The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. Without that variable it safely continues with item-level sources supplied by the scheduled ChatGPT task.
 
 MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not automatic image sources. MobyGames requires its licensed API plan and attribution; Gavas prohibits unapproved reproduction and image hotlinking; the remaining sites lack a confirmed machine-readable reuse permission or block automation. They may help a human identify an edition, but the final asset must resolve to an approved original source.
 

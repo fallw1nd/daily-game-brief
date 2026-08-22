@@ -10,6 +10,7 @@ const MAX_HTML_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const TARGET_IMAGE_BYTES = 500 * 1024;
 const USER_AGENT = "DailyGameBriefMediaBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
+const BRAVE_SEARCH_API_KEY = process.env.BRAVE_SEARCH_API_KEY?.trim();
 const args = new Set(process.argv.slice(2));
 
 const hasArg = (name) => args.has(name) || [...args].some((arg) => arg.startsWith(name + "="));
@@ -86,6 +87,94 @@ function extractMeta(html, pageUrl) {
 
 const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
 const sourceRank = (source) => source.kind === "primary" ? 0 : source.kind === "secondary" ? 1 : 2;
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("zh-CN")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function resultMatchesRecord(record, result) {
+  const haystack = normalizeSearchText([
+    result.title,
+    result.url,
+    result.source,
+    result.description,
+  ].filter(Boolean).join(" "));
+  const names = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
+
+  return names.some((name) => {
+    const normalized = normalizeSearchText(name);
+    if (normalized.length >= 4 && haystack.includes(normalized)) return true;
+    const tokens = normalized.split(" ").filter((token) => token.length >= 3);
+    if (!tokens.length) return false;
+    const matches = tokens.filter((token) => haystack.includes(token)).length;
+    return matches >= Math.min(2, tokens.length);
+  });
+}
+
+function isBlockedSearchHost(hostname, blockedHosts) {
+  const host = hostname.toLowerCase();
+  return ["imgs.search.brave.com", ...blockedHosts].some(
+    (blocked) => host === blocked || host.endsWith("." + blocked),
+  );
+}
+
+async function discoverWebSources(record, kind, blockedHosts = []) {
+  if (!BRAVE_SEARCH_API_KEY) return [];
+
+  const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
+  const intent = kind === "cover"
+    ? "game cover key art"
+    : `${record.headline || "game news"} official screenshot`;
+  const endpoint = new URL("https://api.search.brave.com/res/v1/images/search");
+  endpoint.search = new URLSearchParams({
+    q: [...titleParts, intent].join(" ").slice(0, 380),
+    count: "20",
+    country: "ALL",
+    safesearch: "strict",
+    spellcheck: "true",
+  }).toString();
+
+  const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(18_000),
+    headers: {
+      Accept: "application/json",
+      "X-Subscription-Token": BRAVE_SEARCH_API_KEY,
+      "User-Agent": USER_AGENT,
+    },
+  });
+  if (!response.ok) throw new Error(`Brave Image Search HTTP ${response.status}`);
+  const body = await response.text();
+  if (Buffer.byteLength(body) > MAX_HTML_BYTES) {
+    throw new Error("Brave Image Search response is too large");
+  }
+
+  const data = JSON.parse(body);
+  return (data.results || []).flatMap((result) => {
+    try {
+      const imageUrl = result.properties?.url;
+      const pageUrl = result.url;
+      if (!imageUrl?.startsWith("https://") || !pageUrl?.startsWith("https://")) return [];
+      const imageHost = new URL(imageUrl).hostname;
+      const pageHost = new URL(pageUrl).hostname;
+      if (isBlockedSearchHost(imageHost, blockedHosts) ||
+          isBlockedSearchHost(pageHost, blockedHosts) ||
+          !resultMatchesRecord(record, result)) return [];
+      return [{
+        label: result.source || pageHost,
+        url: pageUrl,
+        kind: "discovery",
+        webSearch: true,
+        imageUrl,
+        alt: result.title || displayTitle(record),
+      }];
+    } catch {
+      return [];
+    }
+  }).slice(0, 8);
+}
 
 async function mapLimit(items, limit, worker) {
   const queue = [...items];
@@ -115,15 +204,18 @@ function coverPreference(source, platforms) {
   return 20 + sourceRank(source);
 }
 
-function eligibleCover(source, platforms, aspect) {
-  const preference = coverPreference(source, platforms);
-  if (preference > 1) return false;
-  const joined = platforms.join(" ").toLowerCase();
-  const pcOnly = !/ps[45]|playstation|switch|nintendo|xbox/.test(joined);
-  return pcOnly ? true : aspect === "square" || /xbox|microsoft/.test(new URL(source.url).hostname);
+function eligibleCover(source) {
+  return source.kind === "primary" || source.webSearch === true;
 }
 
 async function discoverFromSource(source) {
+  if (source.imageUrl) {
+    return {
+      imageUrl: source.imageUrl,
+      alt: source.alt || "",
+      pageUrl: source.url,
+    };
+  }
   const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
   if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
   const meta = extractMeta(result.bytes.toString("utf8"), result.url);
@@ -177,8 +269,8 @@ function unavailableNote(kind, attempts) {
     ? attempts.map((item) => `${item.label}: ${item.error}`).join("\uff1b")
     : "\u6761\u76ee\u6ca1\u6709\u53ef\u7528\u4e8e\u5a92\u4f53\u6838\u9a8c\u7684 HTTPS \u6765\u6e90";
   const prefix = kind === "cover"
-    ? "\u672a\u627e\u5230\u7b26\u5408 PSN \u6e2f\u670d\u3001eShop \u65e5\u670d\u3001Xbox \u5546\u5e97\u4f18\u5148\u7ea7\u7684\u5b98\u65b9\u5c01\u9762"
-    : "\u672a\u627e\u5230\u4e0e\u4e8b\u4ef6\u76f4\u63a5\u76f8\u5173\u4e14\u53ef\u8ffd\u6eaf\u7684\u5b98\u65b9\u65b0\u95fb\u56fe";
+    ? "\u672a\u627e\u5230\u4e0e\u6e38\u620f\u6b63\u786e\u5bf9\u5e94\u4e14\u53ef\u8ffd\u6eaf\u6765\u6e90\u7684\u5c01\u9762"
+    : "\u672a\u627e\u5230\u4e0e\u4e8b\u4ef6\u76f4\u63a5\u76f8\u5173\u4e14\u53ef\u8ffd\u6eaf\u6765\u6e90\u7684\u65b0\u95fb\u914d\u56fe";
   return `${prefix}\u3002${reason}`;
 }
 
@@ -189,8 +281,8 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
     try {
       const candidate = await discoverFromSource(source);
       const encoded = await downloadCandidate(candidate, kind);
-      const eligible = source.kind === "primary" &&
-        (kind === "editorial" || eligibleCover(source, record.platforms || [], encoded.aspect));
+      const eligible = (source.kind === "primary" || source.webSearch === true) &&
+        (kind === "editorial" || eligibleCover(source));
       const result = {
         recordId: record.id,
         kind,
@@ -206,7 +298,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
           attempts: [{
             label: source.label,
             url: source.url,
-            error: "\u4ec5\u627e\u5230\u5ba3\u4f20\u6a2a\u56fe\u6216\u975e\u9996\u9009\u5546\u5e97\u7d20\u6750\uff0c\u672a\u4f5c\u4e3a\u5c01\u9762\u81ea\u52a8\u91c7\u7528",
+            error: "candidate did not pass relevance, source, or dimension checks",
           }],
         };
         continue;
@@ -222,8 +314,8 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         asset: {
           url: target.relative,
           alt: candidate.alt || `${title}${kind === "cover"
-            ? "\u5b98\u65b9\u5546\u5e97\u5c01\u9762"
-            : `\uff1a${record.headline || "\u76f8\u5173\u6d88\u606f"}\u5b98\u65b9\u53d1\u5e03\u56fe`
+            ? "\u6e38\u620f\u5c01\u9762"
+            : `\uff1a${record.headline || "\u76f8\u5173\u6d88\u606f"}\u76f8\u5173\u914d\u56fe`
           }`,
           credit: source.label,
           sourceUrl: candidate.pageUrl,
@@ -238,6 +330,37 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
   return reviewCandidate || { status: "unavailable", recordId: record.id, kind, attempts };
 }
 
+async function resolveWithWebFallback(edition, record, kind, sources, options) {
+  const initial = await resolveRecord(edition, record, kind, sources, options.apply);
+  if (!BRAVE_SEARCH_API_KEY || initial.status === "applied" || initial.eligible === true) {
+    return initial;
+  }
+
+  const blockedHosts = [
+    ...(options.sourcePolicy?.manualDiscoveryOnly || []),
+    ...(options.sourcePolicy?.blockedForImport || []),
+  ];
+  let webSources;
+  try {
+    webSources = await discoverWebSources(record, kind, blockedHosts);
+  } catch (error) {
+    return {
+      ...initial,
+      attempts: [
+        ...(initial.attempts || []),
+        { label: "Brave Image Search", url: "https://search.brave.com/", error: error.message },
+      ],
+    };
+  }
+  if (!webSources.length) return initial;
+
+  const searched = await resolveRecord(edition, record, kind, webSources, options.apply);
+  if (searched.status === "applied" || searched.eligible === true) return searched;
+  return {
+    ...(initial.status === "candidate" ? initial : searched),
+    attempts: [...(initial.attempts || []), ...(searched.attempts || [])],
+  };
+}
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + "\n");
 
@@ -252,7 +375,7 @@ async function processEdition(manifestItem, options) {
     const sources = [...(entry.sources || [])]
       .filter((source) => source.url?.startsWith("https://"))
       .sort((a, b) => sourceRank(a) - sourceRank(b));
-    const result = await resolveRecord(edition, entry, "editorial", sources, options.apply);
+    const result = await resolveWithWebFallback(edition, entry, "editorial", sources, options);
     results.push(result);
     if (result.status === "applied") {
       entry.images = [result.asset];
@@ -277,7 +400,7 @@ async function processEdition(manifestItem, options) {
     ]
       .filter((source) => source?.url?.startsWith("https://"))
       .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
-    const result = await resolveRecord(edition, item, "cover", candidates, options.apply);
+    const result = await resolveWithWebFallback(edition, item, "cover", candidates, options);
     results.push(result);
     if (result.status === "applied") {
       item.cover = result.asset;
@@ -308,6 +431,7 @@ async function main() {
   const options = { apply: hasArg("--apply"), migrateLegacy: hasArg("--migrate-legacy") };
   const manifest = await readJson(resolve(DATA_ROOT, "manifest.json"));
   options.catalog = await readJson(resolve("config/media-catalog.json"));
+  options.sourcePolicy = await readJson(resolve("config/media-sources.json"));
   const editionArg = argValue("--edition");
   let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
