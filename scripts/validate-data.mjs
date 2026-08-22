@@ -75,12 +75,20 @@ function validateEdition(edition, path) {
     ) {
       errors.push(`${path}: official entry ${entry.id} needs a primary source`);
     }
-    if (
-      requiresImages &&
-      (!Array.isArray(entry.images) ||
-        !entry.images.some((asset) => hasValidImage(asset, "editorial")))
-    ) {
-      errors.push(`${path}: entry ${entry.id} needs a non-placeholder editorial image`);
+    if (requiresImages) {
+      const hasImage =
+        Array.isArray(entry.images) &&
+        entry.images.some((asset) => hasValidImage(asset, "editorial"));
+      const explainsAbsence =
+        entry.image_status === "unavailable" &&
+        typeof entry.imageNote === "string" &&
+        entry.imageNote.trim().length > 0;
+
+      if (!hasImage && !explainsAbsence) {
+        errors.push(
+          `${path}: entry ${entry.id} needs an editorial image or an unavailable reason`,
+        );
+      }
     }
   }
 
@@ -88,8 +96,15 @@ function validateEdition(edition, path) {
     errors.push(`${path}: upcoming must be an array`);
   } else if (requiresImages) {
     for (const item of edition.upcoming) {
-      if (!hasValidImage(item.cover, "cover")) {
-        errors.push(`${path}: upcoming ${item.id} needs a cover image`);
+      const explainsAbsence =
+        item.cover_status === "unavailable" &&
+        typeof item.coverNote === "string" &&
+        item.coverNote.trim().length > 0;
+
+      if (!hasValidImage(item.cover, "cover") && !explainsAbsence) {
+        errors.push(
+          `${path}: upcoming ${item.id} needs a cover or an unavailable reason`,
+        );
       }
     }
   }
