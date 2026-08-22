@@ -28,6 +28,8 @@ describe("brief integrity", () => {
     const errors = validateEdition({
       ...edition,
       schemaVersion: 2,
+      archiveTitle: `${edition.period === "am" ? "早报" : "晚报"}｜测试重磅新闻`,
+      leadEntryId: edition.entries[0].id,
       entries: edition.entries.map((entry) => ({
         ...entry,
         images: undefined,
@@ -43,6 +45,18 @@ describe("brief integrity", () => {
     });
 
     expect(errors).toEqual([]);
+  });
+
+  it("requires a period-matched archive title and a real lead entry", () => {
+    const errors = validateEdition({
+      ...edition,
+      schemaVersion: 2,
+      archiveTitle: "早报｜并非本期时段的标题",
+      leadEntryId: "missing-entry",
+    });
+
+    expect(errors.some((error) => error.includes("archiveTitle"))).toBe(true);
+    expect(errors.some((error) => error.includes("leadEntryId"))).toBe(true);
   });
 
   it("excludes supplements from the current time window", () => {
