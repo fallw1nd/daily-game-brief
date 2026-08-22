@@ -1,0 +1,303 @@
+import { lookup } from "node:dns/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import sharp from "sharp";
+
+const DATA_ROOT = resolve("public/data");
+const PUBLIC_ROOT = resolve("public");
+const REPORT_PATH = resolve("artifacts/media-audit.json");
+const MAX_HTML_BYTES = 3 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const TARGET_IMAGE_BYTES = 500 * 1024;
+const USER_AGENT = "DailyGameBriefMediaBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
+const args = new Set(process.argv.slice(2));
+
+const hasArg = (name) => args.has(name) || [...args].some((arg) => arg.startsWith(name + "="));
+const argValue = (name) => [...args].find((arg) => arg.startsWith(name + "="))?.slice(name.length + 1);
+
+function isPrivateIp(address) {
+  return /^(127\.|10\.|0\.|169\.254\.|192\.168\.|::1$|fc|fd|fe80)/i.test(address) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(address);
+}
+
+async function assertSafeHttps(input) {
+  const url = new URL(input);
+  if (url.protocol !== "https:") throw new Error("only HTTPS media is allowed");
+  if (/^(localhost|.+\.local)$/i.test(url.hostname)) throw new Error("local host is not allowed");
+  const addresses = await lookup(url.hostname, { all: true });
+  if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("private network target is not allowed");
+  return url;
+}
+
+async function fetchLimited(input, limit, accept) {
+  const url = await assertSafeHttps(input);
+  const response = await fetch(url, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(18_000),
+    headers: { Accept: accept, "User-Agent": USER_AGENT },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > limit) throw new Error(`response exceeds ${limit} bytes`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > limit) throw new Error(`response exceeds ${limit} bytes`);
+  return { bytes, contentType: response.headers.get("content-type") || "", url: response.url };
+}
+
+function decodeEntities(value) {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
+function tagAttributes(tag) {
+  const attrs = {};
+  for (const match of tag.matchAll(/([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) {
+    attrs[match[1].toLowerCase()] = decodeEntities(match[2] ?? match[3] ?? match[4] ?? "");
+  }
+  return attrs;
+}
+
+function extractMeta(html, pageUrl) {
+  const values = new Map();
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = tagAttributes(tag);
+    const key = (attrs.property || attrs.name || "").toLowerCase();
+    if (key && attrs.content && !values.has(key)) values.set(key, attrs.content);
+  }
+  const rawImage = values.get("og:image:secure_url") || values.get("og:image") ||
+    values.get("twitter:image") || values.get("twitter:image:src");
+  if (!rawImage) return null;
+  const imageUrl = new URL(rawImage, pageUrl).href;
+  if (/logo|avatar|favicon|icon[-_.]/i.test(imageUrl)) return null;
+  return {
+    imageUrl,
+    alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+  };
+}
+
+const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
+const sourceRank = (source) => source.kind === "primary" ? 0 : source.kind === "secondary" ? 1 : 2;
+
+function coverPreference(source, platforms) {
+  const url = new URL(source.url);
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  const joined = platforms.join(" ").toLowerCase();
+  const hasPlayStation = /ps[45]|playstation/.test(joined);
+  const hasNintendo = /switch|nintendo/.test(joined);
+  const hasXbox = /xbox/.test(joined);
+  const isPsn = /(^|\.)store\.playstation\.com$/.test(host) || /playstation\.com$/.test(host) && path.includes("/product/");
+  const isNintendoJp = host === "store-jp.nintendo.com";
+  const isXboxStore = /(^|\.)(xbox|microsoft)\.com$/.test(host) && /\/games\/store\/|\/store\//.test(path);
+  const pcOnly = !hasPlayStation && !hasNintendo && !hasXbox;
+
+  if (hasPlayStation && isPsn) return 0;
+  if (!hasPlayStation && hasNintendo && isNintendoJp) return 0;
+  if (!hasPlayStation && !hasNintendo && hasXbox && isXboxStore) return 0;
+  if (pcOnly && host === "store.steampowered.com") return 1;
+  return 20 + sourceRank(source);
+}
+
+function eligibleCover(source, platforms, aspect) {
+  const preference = coverPreference(source, platforms);
+  if (preference > 1) return false;
+  const joined = platforms.join(" ").toLowerCase();
+  const pcOnly = !/ps[45]|playstation|switch|nintendo|xbox/.test(joined);
+  return pcOnly ? true : aspect === "square" || /xbox|microsoft/.test(new URL(source.url).hostname);
+}
+
+async function discoverFromSource(source) {
+  const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
+  if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
+  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+  if (!meta) throw new Error("no usable social image metadata");
+  return { ...meta, pageUrl: result.url };
+}
+
+function imageAspect(width, height) {
+  const ratio = width / height;
+  if (ratio >= 0.9 && ratio <= 1.1) return "square";
+  return ratio < 0.9 ? "portrait" : "landscape";
+}
+
+async function encodeUnderLimit(bytes, kind) {
+  const metadata = await sharp(bytes, { failOn: "warning", limitInputPixels: 40_000_000 }).metadata();
+  if (!metadata.width || !metadata.height || metadata.width < 320 || metadata.height < 320) {
+    throw new Error("image dimensions are too small");
+  }
+  const aspect = imageAspect(metadata.width, metadata.height);
+  if (kind === "editorial" && metadata.width / metadata.height < 1.15) {
+    throw new Error("editorial candidate is not sufficiently landscape");
+  }
+  const widths = kind === "editorial" ? [1280, 1120, 960, 800] : [900, 800, 700, 600];
+  for (const width of widths) {
+    for (const quality of [84, 78, 72, 66]) {
+      let pipeline = sharp(bytes).rotate();
+      pipeline = kind === "editorial"
+        ? pipeline.resize({ width, height: Math.round(width * 9 / 16), fit: "cover", position: "attention" })
+        : pipeline.resize({ width, height: width, fit: "inside", withoutEnlargement: true });
+      const output = await pipeline.jpeg({ quality, mozjpeg: true }).toBuffer();
+      if (output.length <= TARGET_IMAGE_BYTES) return { output, aspect };
+    }
+  }
+  throw new Error("could not encode below 500 KB");
+}
+
+async function downloadCandidate(candidate, kind) {
+  const result = await fetchLimited(candidate.imageUrl, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
+  if (!result.contentType.startsWith("image/")) throw new Error(`not an image (${result.contentType})`);
+  return encodeUnderLimit(result.bytes, kind);
+}
+
+function mediaPath(edition, record, kind) {
+  const slug = record.id.replace(/[^a-zA-Z0-9_-]+/g, "-");
+  const relative = `media/briefs/${edition.date.slice(0, 4)}/${edition.date.slice(5, 7)}/${edition.id}/${slug}-${kind}.jpg`;
+  return { relative, absolute: resolve(PUBLIC_ROOT, relative) };
+}
+
+function unavailableNote(kind, attempts) {
+  const reason = attempts.length
+    ? attempts.map((item) => `${item.label}: ${item.error}`).join("；")
+    : "条目没有可用于媒体核验的 HTTPS 来源";
+  const prefix = kind === "cover"
+    ? "未找到符合 PSN 港服、eShop 日服、Xbox 商店优先级的官方封面"
+    : "未找到与事件直接相关且可追溯的官方新闻图";
+  return `${prefix}。${reason}`;
+}
+
+async function resolveRecord(edition, record, kind, sourceList, apply) {
+  const attempts = [];
+  let reviewCandidate = null;
+  for (const source of sourceList) {
+    try {
+      const candidate = await discoverFromSource(source);
+      const encoded = await downloadCandidate(candidate, kind);
+      const eligible = source.kind === "primary" &&
+        (kind === "editorial" || eligibleCover(source, record.platforms || [], encoded.aspect));
+      const result = {
+        recordId: record.id,
+        kind,
+        source: source.url,
+        imageUrl: candidate.imageUrl,
+        aspect: encoded.aspect,
+        eligible,
+      };
+      if (!eligible) {
+        reviewCandidate ||= { status: "candidate", ...result };
+        continue;
+      }
+      if (!apply) return { status: "candidate", ...result };
+      const target = mediaPath(edition, record, kind);
+      await mkdir(dirname(target.absolute), { recursive: true });
+      await writeFile(target.absolute, encoded.output);
+      const title = displayTitle(record);
+      return {
+        status: "applied",
+        ...result,
+        asset: {
+          url: target.relative,
+          alt: candidate.alt || `${title}${kind === "cover" ? "官方商店封面" : `：${record.headline || "相关消息"}官方发布图`}`,
+          credit: source.label,
+          sourceUrl: candidate.pageUrl,
+          kind,
+          aspect: encoded.aspect,
+        },
+      };
+    } catch (error) {
+      attempts.push({ label: source.label, url: source.url, error: error.message });
+    }
+  }
+  return reviewCandidate || { status: "unavailable", recordId: record.id, kind, attempts };
+}
+
+const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
+const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + "\n");
+
+async function processEdition(manifestItem, options) {
+  const path = resolve(DATA_ROOT, manifestItem.path);
+  const edition = await readJson(path);
+  let changed = false;
+  const results = [];
+
+  for (const entry of edition.entries) {
+    if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) continue;
+    const sources = [...(entry.sources || [])]
+      .filter((source) => source.url?.startsWith("https://"))
+      .sort((a, b) => sourceRank(a) - sourceRank(b));
+    const result = await resolveRecord(edition, entry, "editorial", sources, options.apply);
+    results.push(result);
+    if (result.status === "applied") {
+      entry.images = [result.asset];
+      entry.image_status = "verified";
+      delete entry.imageNote;
+      changed = true;
+    } else if (options.apply && options.migrateLegacy) {
+      entry.image_status = "unavailable";
+      entry.imageNote = unavailableNote("editorial", result.attempts || []);
+      changed = true;
+    }
+  }
+
+  for (const item of edition.upcoming || []) {
+    if (item.cover?.kind === "cover" && !item.cover.placeholder) continue;
+    const candidates = [item.source, ...(item.mediaSources || [])]
+      .filter((source) => source?.url?.startsWith("https://"))
+      .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
+    const result = await resolveRecord(edition, item, "cover", candidates, options.apply);
+    results.push(result);
+    if (result.status === "applied") {
+      item.cover = result.asset;
+      item.cover_status = "verified";
+      delete item.coverNote;
+      changed = true;
+    } else if (options.apply && options.migrateLegacy) {
+      item.cover_status = "unavailable";
+      item.coverNote = unavailableNote("cover", result.attempts || []);
+      changed = true;
+    }
+  }
+
+  if (options.apply && options.migrateLegacy && edition.schemaVersion === 1) {
+    edition.schemaVersion = 2;
+    changed = true;
+  }
+  if (options.apply && changed) {
+    edition.revised = true;
+    await writeJson(path, edition);
+  }
+  return { edition, changed, results };
+}
+
+async function main() {
+  const options = { apply: hasArg("--apply"), migrateLegacy: hasArg("--migrate-legacy") };
+  const manifest = await readJson(resolve(DATA_ROOT, "manifest.json"));
+  const editionArg = argValue("--edition");
+  let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
+  if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
+  if (!items.length) throw new Error("no matching edition found");
+
+  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, editions: [] };
+  let latestEdition = null;
+  for (const item of items) {
+    const result = await processEdition(item, options);
+    audit.editions.push({ id: item.id, changed: result.changed, results: result.results });
+    if (item.id === manifest.latest) latestEdition = result.edition;
+  }
+  if (options.apply && latestEdition) await writeJson(resolve(DATA_ROOT, "latest.json"), latestEdition);
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
+  await writeJson(REPORT_PATH, audit);
+
+  const flat = audit.editions.flatMap((edition) => edition.results);
+  const summary = Object.groupBy(flat, (item) => item.status);
+  console.log(`Media audit: ${flat.length} item(s); applied=${summary.applied?.length || 0}; candidate=${summary.candidate?.length || 0}; unavailable=${summary.unavailable?.length || 0}`);
+  console.log(`Report: ${REPORT_PATH}`);
+}
+
+main().catch((error) => {
+  console.error(error.stack || error.message);
+  process.exit(1);
+});
