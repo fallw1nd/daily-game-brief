@@ -12,7 +12,7 @@ The scheduled ChatGPT task must finish its research first, then use its connecte
 4. Open and verify every primary source before using `fact_status: "official"`.
 5. Never modify or delete an older archive file. Corrections create a revision commit without changing the issue number.
 
-The edition object must use `schemaVersion: 1`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. It must include `entries`, `upcoming`, `tracking`, and `sourceReport`. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
+Every newly scheduled edition must use `schemaVersion: 2`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. Schema version 1 is reserved for existing legacy archives only. Each new edition must include `entries`, `upcoming`, `tracking`, and `sourceReport`, plus the image fields defined below. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
 
 Before committing, the task should run or request the equivalent of:
 
