@@ -101,6 +101,8 @@ export interface SourceReport {
 
 export interface BriefEdition {
   schemaVersion?: 1 | 2;
+  archiveTitle?: string;
+  leadEntryId?: string;
   id: string;
   issueNumber: number;
   date: string;
@@ -119,6 +121,8 @@ export interface BriefEdition {
 }
 
 export interface BriefManifestItem {
+  archiveTitle?: string;
+  leadEntryId?: string;
   id: string;
   issueNumber: number;
   date: string;
