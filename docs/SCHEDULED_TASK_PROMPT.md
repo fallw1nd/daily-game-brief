@@ -10,6 +10,7 @@ Use the following prompt to update both existing ChatGPT tasks. Keep their curre
 2. 按发售与上线、评分、热点新闻、公司与产业、深度文章与专访、泄漏与传闻、延伸观察分别检索，但不得为了填满栏目而降低事实或来源标准。
 3. 某栏目没有可靠新增时，不写占位条目、不编写概括性空新闻；保留空数组或不产生该 section 的条目，网页会自动隐藏空栏目。
 4. 继续执行北京时间窗口、补遗标记、官方中文名状态、fact_status、time_status、一手来源和标题归一化规则。只有亲自打开一手来源后才能标记 official。
+5. 为本期生成 archiveTitle 和 leadEntryId。archiveTitle 必须以“早报｜”或“晚报｜”开头并与 period 一致，总长8–40个字符；从本期真实条目中选择重要游戏、大型厂商或平台、热议且有信息增量的事件作为标题。不得把未证实传闻写成既定事实，不得使用空泛口号或“游戏早报/游戏晚报”这类无信息标题。leadEntryId 必须指向被选中的本期 entry。
 
 二、图片
 1. 新简报使用 schemaVersion: 2。为每条新闻主动寻找与该事件直接相关的官方新闻图、发行商媒体素材、开发商截图或官方商店素材；未来15天游戏优先使用官方封面。
@@ -27,7 +28,7 @@ Use the following prompt to update both existing ChatGPT tasks. Keep their curre
 1. 如有本地媒体，上传到 public/media/briefs/YYYY/MM/<edition-id>/。
 2. 新增 public/data/archive/YYYY/MM/<edition-id>.json。
 3. 让 public/data/latest.json 与新归档 JSON 完全一致。
-4. 只追加 public/data/manifest.json，更新 latest 和 updatedAt；不得删除、改号或覆盖旧归档。
+4. 只追加 public/data/manifest.json，更新 latest 和 updatedAt；新 manifest item 必须复制本期 archiveTitle 与 leadEntryId。不得删除、改号、改写标题或覆盖旧归档。
 5. 不要手工维护 public/data/search-index.json；npm 构建会根据全部归档自动生成跨期搜索索引。
 6. 运行 npm run validate:data 和 npm run check。任何失败都先修复，不得推送半成品。
 7. 推送 main 后等待 GitHub Actions 成功，验证线上 latest.json、当期归档、manifest、搜索索引以及所有实际使用的图片 URL 均返回 HTTP 200。
