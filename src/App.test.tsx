@@ -76,6 +76,7 @@ const searchIndex: BriefSearchIndex = {
     platforms: ["PC"],
     region: "全球",
     factStatus: "official",
+    tracking: true,
   }],
 };
 
@@ -131,6 +132,56 @@ describe("brief page regression", () => {
     expect(document.body.textContent).toContain("松石绿");
     expect(document.body.textContent).toContain("暮紫");
     expect(document.body.textContent).toContain("\u6a31\u7c89");
+  });
+
+  it("integrates pending items into lead, focus, and section cards without a tracking board", () => {
+    const pendingEdition = {
+      ...edition,
+      entries: edition.entries.map((entry, index) => ({
+        ...entry,
+        tracking: index < 2 ? true : undefined,
+      })),
+    };
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialEdition={pendingEdition} initialTheme="light" />,
+    );
+
+    expect(document.querySelector("#tracking")).toBeNull();
+    expect(document.body.textContent).not.toContain("\u4ecd\u9700\u8ffd\u8e2a");
+    expect(document.body.textContent).not.toContain(edition.tracking[0]);
+    expect(document.querySelectorAll(".lead-story .pending-mark")).toHaveLength(1);
+    expect(document.querySelectorAll(".focus-item .pending-mark")).toHaveLength(1);
+    expect(document.querySelectorAll(".story-row .pending-mark")).toHaveLength(2);
+    expect(
+      [...document.querySelectorAll(".pending-mark")].every(
+        (mark) => mark.textContent === "\u4ecd\u5f85\u786e\u8ba4",
+      ),
+    ).toBe(true);
+
+    const sectionNumbers = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".desk-label > span, .edition-content .section-header > span, .archive-section > header > span",
+      ),
+    ].map((node) => node.textContent);
+    expect(sectionNumbers).toEqual(
+      sectionNumbers.map((_, index) => String(index + 1).padStart(2, "0")),
+    );
+  });
+
+  it("does not render a pending mark for false or missing tracking fields", () => {
+    const settledEdition = {
+      ...edition,
+      entries: edition.entries.map((entry, index) => ({
+        ...entry,
+        tracking: index === 0 ? false : undefined,
+      })),
+    };
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialEdition={settledEdition} initialTheme="dark" />,
+    );
+
+    expect(document.querySelectorAll(".pending-mark")).toHaveLength(0);
+    expect(document.querySelector("#tracking")).toBeNull();
   });
 
   it("omits empty editorial departments from content and directory", () => {
@@ -193,6 +244,7 @@ describe("brief page regression", () => {
     expect(document.querySelector("h1")?.textContent).toBe("晚报｜《潜行者2》大型扩展与2.0更新上线");
     expect(document.querySelectorAll(".archive-search-results > a")).toHaveLength(1);
     const result = document.querySelector<HTMLAnchorElement>(".archive-search-results > a");
+    expect(result?.querySelector(".pending-mark")?.textContent).toBe("\u4ecd\u5f85\u786e\u8ba4");
     expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");
     expect(result?.getAttribute("href")).toContain("#archive-story");
   });

@@ -144,6 +144,7 @@ export interface BriefManifest {
 export interface BriefSearchEntry {
   editionId: string;
   issueNumber: number;
+  tracking?: boolean;
   date: string;
   period: "am" | "pm";
   entryId: string;

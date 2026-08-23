@@ -31,6 +31,7 @@ for (const item of [...manifest.editions].reverse()) {
       platforms: entry.platforms ?? [],
       region: entry.region ?? "",
       factStatus: entry.fact_status,
+      ...(entry.tracking === true ? { tracking: true } : {}),
     });
   }
 }

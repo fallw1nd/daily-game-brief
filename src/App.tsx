@@ -212,6 +212,11 @@ function StatusMark({ status, timeStatus }: { status: FactStatus; timeStatus: Br
     </span>
   );
 }
+function PendingMark({ tracking }: Pick<BriefEntry, "tracking">) {
+  if (tracking !== true) return null;
+  return <span className="pending-mark">{"\u4ecd\u5f85\u786e\u8ba4"}</span>;
+}
+
 
 function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
@@ -252,6 +257,7 @@ function LeadStory({ entry }: { entry: BriefEntry }) {
       <div className="lead-story__body">
         <div className="story-kicker">
           <time>{entry.beijingTime}</time>
+          <PendingMark tracking={entry.tracking} />
           <StatusMark status={entry.fact_status} timeStatus={entry.time_status} />
         </div>
         <StoryIdentity entry={entry} />
@@ -278,7 +284,10 @@ function FocusItem({ entry, rank }: { entry: BriefEntry; rank: number }) {
       <span className="focus-item__copy">
         <small>{storyTitle(entry)}</small>
         <strong>{entry.headline}</strong>
-        <span>{statusLabels[entry.fact_status]}</span>
+        <span className="focus-item__state">
+          <PendingMark tracking={entry.tracking} />
+          <span>{statusLabels[entry.fact_status]}</span>
+        </span>
       </span>
     </a>
   );
@@ -296,6 +305,7 @@ function StoryRow({ entry, index }: { entry: BriefEntry; index: number }) {
         <h3>{entry.headline}</h3>
         <p className="story-summary">{entry.summary}</p>
         <div className="story-facts">
+          <PendingMark tracking={entry.tracking} />
           <StatusMark status={entry.fact_status} timeStatus={entry.time_status} />
           <span>{entry.platforms.join(" / ")}</span>
           <span>{entry.region}</span>
@@ -430,8 +440,6 @@ function App({
   let nextSectionNumber = visibleStorySections.length + 2;
   const upcomingNumber = String(nextSectionNumber).padStart(2, "0");
   if (edition.upcoming.length > 0) nextSectionNumber += 1;
-  const trackingNumber = String(nextSectionNumber).padStart(2, "0");
-  if (edition.tracking.length > 0) nextSectionNumber += 1;
   const sourceReportNumber = String(nextSectionNumber).padStart(2, "0");
   const archiveNumber = String(nextSectionNumber + 1).padStart(2, "0");
 
@@ -761,23 +769,6 @@ function App({
             </section>
           )}
 
-          {edition.tracking.length > 0 && (
-            <section className="editorial-section tracking-section" id="tracking" aria-labelledby="tracking-title">
-              <SectionHeader
-                number={trackingNumber}
-                title="仍需追踪"
-                count={edition.tracking.length}
-                id="tracking-title"
-              />
-              <ol>
-                {edition.tracking.map((item, index) => (
-                  <li key={item}>
-                    <span>{String(index + 1).padStart(2, "0")}</span><p>{item}</p>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
 
           <section className="editorial-section source-report" id="source-report" aria-labelledby="source-report-title">
             <SectionHeader
@@ -837,7 +828,8 @@ function App({
                     <span className="archive-result__copy">
                       <small>{item.titleZhCn || item.titleEn}</small>
                       <strong>{item.headline}</strong>
-                      <span>{item.summary}</span>
+                      <PendingMark tracking={item.tracking} />
+                      <span className="archive-result__summary">{item.summary}</span>
                     </span>
                     <small>{statusLabels[item.factStatus]} · 打开原文</small>
                   </a>
