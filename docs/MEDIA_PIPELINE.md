@@ -14,7 +14,11 @@ For multi-platform games, use the first verified source available in this order:
 
 Storefront URLs belong in config/media-catalog.json for reuse or in an upcoming item's mediaSources. Query parameters may be removed only on known PlayStation, Nintendo, and Microsoft image CDNs. Keep the original product page as sourceUrl.
 
-Source order is a reliability preference, not a shape requirement. Accept square, portrait, or landscape covers and preserve the source orientation. Search results must use the original image URL and source page, never a search-engine thumbnail; cover credit remains in JSON but is not rendered as a visible caption.
+Source order is a reliability preference, not an eligibility gate or a shape requirement. Accept square, portrait, or landscape covers and preserve the source orientation. Official storefront banners, publisher key art, official screenshots, and Steam header art are valid covers when they clearly depict the same title.
+
+If official storefronts and publisher pages yield no usable asset, a reputable media report, reliable retailer, or recognized game database may supply same-title artwork when the exact source page is opened, the game/edition match is checked, and the rights holder can be credited. Prefer downloading these assets into the repository instead of hotlinking the third-party host. Credit the actual developer, publisher, or rights holder—not merely the page host.
+
+Search results must use the original image URL and source page, never a search-engine thumbnail. Fan art, unrelated images, watermarked composites, and images without an accessible source page remain prohibited. Cover credit remains in JSON but is not rendered as a visible caption.
 
 The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. Without that variable it safely continues with item-level sources supplied by the scheduled ChatGPT task.
 
