@@ -104,4 +104,27 @@ describe("idempotent edition publisher", () => {
     expect(result.edition.revised).toBe(true);
     expect(result.manifest.editions.filter((item) => item.id === "2026-08-27-am")).toHaveLength(1);
   });
+
+  it("preserves a verified cover when the morning table is replaced", () => {
+    const cover = {
+      url: "media/briefs/2026/08/2026-08-26-pm/upcoming-one-cover.jpg",
+      alt: "Upcoming One游戏封面", credit: "Store", sourceUrl: "https://store.example/one",
+      kind: "cover", aspect: "square",
+    };
+    const replacing = {
+      ...editorial,
+      upcomingMode: "replace",
+      upcoming: [{
+        id: "upcoming-one", date: "08.28", titleKey: "upcoming-one", titleZhCn: null,
+        titleEn: "Upcoming One", titleZhStatus: "unavailable", platforms: ["PC"], region: "全球",
+        releaseType: "正式发售", source: { label: "Store", url: "https://store.example/one", kind: "primary" }, note: "",
+      }],
+    };
+    const result = buildEdition({
+      packet, editorial: replacing,
+      latest: { upcoming: [{ ...latest.upcoming[0], cover }] }, manifest,
+    });
+    expect(result.edition.upcoming[0].cover).toEqual(cover);
+    expect(result.edition.upcoming[0].cover_status).toBe("verified");
+  });
 });
