@@ -51,9 +51,9 @@ Use seven days of artifacts to measure:
 
 `scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
 
-### Stage 3 — structured editorial API (requires a secret)
+### Stage 3 — structured editorial API (dry-run contract active; live call requires a secret)
 
-Batch evidence packages through an API model using strict structured output. Expected budget is 30,000–80,000 input tokens and 5,000–15,000 output tokens per day, not per edition. The repository secret should be named `OPENAI_API_KEY`; no key is required for Stages 0–1.
+`scripts/editorialize.mjs` now builds a dry-run Responses API request with strict JSON Schema output and post-response evidence checks. Each edition is capped at 120,000 evidence characters (roughly 30,000 input tokens before prompt overhead). The default model is `gpt-5-mini`, configurable with `OPENAI_EDITOR_MODEL`. Live shadow calls remain disabled until repository variable `ENABLE_EDITORIAL_SHADOW=true` and secret `OPENAI_API_KEY` are both configured.
 
 ### Stage 4 — idempotent publisher (planned)
 
