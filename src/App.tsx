@@ -3,6 +3,7 @@ import { useGSAP } from "@gsap/react";
 import {
   ArrowRight,
   ArrowUpRight,
+  CaretDown,
   ChatsCircle,
   CheckCircle,
   GameController,
@@ -312,18 +313,20 @@ function StoryRow({ entry, index }: { entry: BriefEntry; index: number }) {
           {entry.releaseType && <span>{entry.releaseType}</span>}
         </div>
       </div>
-      <EditorialImage
-        asset={entry.images?.[0]}
-        kind="editorial"
-        title={storyTitle(entry)}
-        unavailableNote={entry.imageNote}
-      />
-      <aside className="story-row__evidence">
-        <SourceLinks sources={entry.sources} />
-        <details>
-          <summary>核验说明</summary>
-          <p>{entry.verification}</p>
-        </details>
+      <aside className="story-row__support">
+        <EditorialImage
+          asset={entry.images?.[0]}
+          kind="editorial"
+          title={storyTitle(entry)}
+          unavailableNote={entry.imageNote}
+        />
+        <div className="story-row__evidence">
+          <SourceLinks sources={entry.sources} />
+          <details>
+            <summary>核验说明</summary>
+            <p>{entry.verification}</p>
+          </details>
+        </div>
       </aside>
     </article>
   );
@@ -422,6 +425,7 @@ function App({
   const [manifest, setManifest] = useState<BriefManifest | null>(initialManifest);
   const [searchIndex, setSearchIndex] = useState<BriefSearchIndex | null>(initialSearchIndex);
   const [archiveError, setArchiveError] = useState("");
+  const [archiveExpanded, setArchiveExpanded] = useState(false);
 
   const sourceReport = edition.sourceReport ?? fallbackSourceReport;
   const period = periodLabels[edition.period];
@@ -489,6 +493,10 @@ function App({
     }
     return counts;
   }, [searchIndex]);
+  const visibleArchiveEditions = archiveExpanded
+    ? archiveEditions
+    : archiveEditions.slice(0, 5);
+  const hiddenArchiveCount = Math.max(archiveEditions.length - 5, 0);
   const searchResults = useMemo(
     () => searchArchiveEntries(searchIndex?.entries ?? [], query),
     [query, searchIndex],
@@ -849,8 +857,8 @@ function App({
               <h3 id="archive-editions-title">全部期次</h3>
               <span>{archiveEditions.length} EDITIONS</span>
             </header>
-            <div className="archive-edition-list">
-              {archiveEditions.map((item) => (
+            <div className="archive-edition-list" id="archive-edition-list">
+              {visibleArchiveEditions.map((item) => (
                 <a
                   key={item.id}
                   className={item.id === edition.id ? "is-current" : ""}
@@ -868,14 +876,41 @@ function App({
                 <p className="empty-line">尚无可用归档。</p>
               )}
             </div>
+            {hiddenArchiveCount > 0 && (
+              <button
+                className="archive-toggle interaction-state"
+                type="button"
+                aria-expanded={archiveExpanded}
+                aria-controls="archive-edition-list"
+                onClick={() => setArchiveExpanded((expanded) => !expanded)}
+              >
+                <span>
+                  {archiveExpanded
+                    ? "收起，仅看最新5期"
+                    : `展开其余${hiddenArchiveCount}期`}
+                </span>
+                <CaretDown aria-hidden="true" />
+              </button>
+            )}
           </section>
         </section>
 
       </main>
 
       <footer className="site-footer">
-        <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
-        <p>编辑：Fallw1nd-津秋</p>
+        <div className="footer-identity">
+          <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
+          <p>每天两次，整理值得核验的游戏行业动态。</p>
+        </div>
+        <div className="footer-meta">
+          <span>编辑与维护</span>
+          <strong>Fallw1nd-津秋</strong>
+          <small>北京时间 10:10 / 17:00 更新</small>
+        </div>
+        <div className="footer-metrics" aria-label="简报归档规模">
+          <span><strong>{manifest?.editions.length ?? "—"}</strong> 期归档</span>
+          <span><strong>{searchIndex?.entries.length ?? "—"}</strong> 条新闻可检索</span>
+        </div>
         <div className="footer-links">
           <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">
             <PlayCircle aria-hidden="true" /><span>B站</span>

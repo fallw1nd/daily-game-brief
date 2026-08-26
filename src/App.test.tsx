@@ -248,4 +248,28 @@ describe("brief page regression", () => {
     expect(result?.getAttribute("href")).toContain("edition=2026-08-21-am");
     expect(result?.getAttribute("href")).toContain("#archive-story");
   });
+
+  it("keeps the archive compact by showing only the latest five editions", () => {
+    const extendedManifest: BriefManifest = {
+      ...manifest,
+      editions: Array.from({ length: 7 }, (_, index) => ({
+        ...manifest.editions[0],
+        id: `2026-08-${String(20 + index).padStart(2, "0")}-am`,
+        issueNumber: index + 1,
+        date: `2026-08-${String(20 + index).padStart(2, "0")}`,
+        archiveTitle: `早报｜第${index + 1}期归档测试标题`,
+        path: `archive/2026/08/archive-${index + 1}.json`,
+      })),
+    };
+
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialManifest={extendedManifest} initialTheme="light" />,
+    );
+
+    expect(document.querySelectorAll(".archive-edition-list > a")).toHaveLength(5);
+    const toggle = document.querySelector<HTMLButtonElement>(".archive-toggle");
+    expect(toggle?.textContent).toContain("展开其余2期");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle?.getAttribute("aria-controls")).toBe("archive-edition-list");
+  });
 });
