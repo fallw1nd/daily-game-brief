@@ -8,6 +8,17 @@ const majorPatterns = [
 
 const chinaPatterns = [/(?:中国|国产|腾讯|网易|米哈游|叠纸|鹰角|莉莉丝|完美世界|Bilibili|哔哩哔哩)/i];
 
+const eventPatterns = [
+  ["delay", /\b(?:delay|delayed|postpone|postponed)\b|延期|発売延期/i],
+  ["release-date", /\b(?:release date|launch date|dated for|launches? on)\b|发售日|定档|発売日/i],
+  ["launch", /\b(?:launch|launched|available now|released)\b|正式上线|现已推出|配信開始/i],
+  ["update", /\b(?:major update|update|patch|season)\b|重大更新|版本更新|アップデート/i],
+  ["dlc", /\b(?:dlc|expansion|add-on)\b|扩展|资料片|追加内容/i],
+  ["company", /\b(?:acquisition|acquire|layoff|lawsuit|policy|earnings)\b|收购|裁员|诉讼|政策|财报/i],
+  ["result", /\b(?:winner|champion|award)\b|冠军|获奖|优勝/i],
+  ["announcement", /\b(?:announce|announced|reveal|revealed|unveil)\b|公布|公开|发表|発表/i],
+];
+
 export function decodeEntities(value = "") {
   return value
     .replaceAll("&amp;", "&")
@@ -128,9 +139,29 @@ function tierFor(record) {
   return "C";
 }
 
-function candidateKey(item) {
-  const normalized = normalizeHeadline(item.headline);
-  return createHash("sha256").update(normalized).digest("hex").slice(0, 20);
+export function eventIdentity(headline) {
+  const raw = stripHtml(headline);
+  const normalized = normalizeHeadline(raw);
+  const eventKind = eventPatterns.find(([, pattern]) => pattern.test(raw))?.[0] || "other";
+  const quoted = raw.match(/[《『「“"]([^》』」”"]{2,100})[》』」”"]/)?.[1];
+  let subjectKey = quoted ? normalizeHeadline(quoted) : "";
+  if (!subjectKey) {
+    const boundary = eventPatterns
+      .flatMap(([, pattern]) => [...raw.matchAll(new RegExp(pattern.source, `${pattern.flags.includes("i") ? "i" : ""}g`))])
+      .map((match) => match.index)
+      .filter(Number.isInteger)
+      .sort((a, b) => a - b)[0];
+    if (Number.isInteger(boundary) && boundary >= 4) subjectKey = normalizeHeadline(raw.slice(0, boundary));
+  }
+  const usefulSubject = subjectKey.length >= 4 && subjectKey.split(" ").length <= 12;
+  const material = usefulSubject && eventKind !== "other"
+    ? `${subjectKey}|${eventKind}`
+    : normalized;
+  return {
+    eventKind,
+    subjectKey: usefulSubject ? subjectKey : null,
+    eventKey: createHash("sha256").update(material).digest("hex").slice(0, 20),
+  };
 }
 
 export function mergeCandidates(records) {
@@ -144,7 +175,7 @@ export function mergeCandidates(records) {
 
   const clusters = new Map();
   for (const record of byUrl.values()) {
-    const key = candidateKey(record);
+    const key = eventIdentity(record.headline).eventKey;
     const cluster = clusters.get(key) || [];
     cluster.push(record);
     clusters.set(key, cluster);
@@ -156,6 +187,7 @@ export function mergeCandidates(records) {
     const independentSources = [...new Set(cluster.map((item) => item.source.independenceKey))];
     const merged = {
       id,
+      ...eventIdentity(lead.headline),
       headline: lead.headline,
       normalizedHeadline: normalizeHeadline(lead.headline),
       url: lead.url,

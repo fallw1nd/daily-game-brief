@@ -53,6 +53,9 @@ jobs:
       - name: Collect low-token candidate snapshot
         run: node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
 
+      - name: Build bounded evidence packages
+        run: node scripts/build-evidence.mjs
+
       - name: Upload candidate evidence
         if: always()
         uses: actions/upload-artifact@v6
@@ -61,6 +64,7 @@ jobs:
           path: |
             artifacts/news-candidates.json
             artifacts/news-shadow-report.json
+            artifacts/news-evidence.json
           if-no-files-found: error
           retention-days: 14
 
@@ -71,11 +75,13 @@ jobs:
           if [ -f artifacts/news-shadow-report.json ]; then
             node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const report = require('./artifacts/news-shadow-report.json');
+          const evidence = require('./artifacts/news-evidence.json');
           console.log('## Shadow discovery');
           console.log(`- Window: ${report.window.windowStart} — ${report.window.windowEnd} Asia/Shanghai`);
           console.log(`- Sources: ${report.totals.healthySources}/${report.totals.sources} healthy`);
           console.log(`- Candidates: ${report.totals.candidates} total; A=${report.totals.tierA}; B=${report.totals.tierB}`);
           console.log(`- Adjacent matches removed before review: ${report.totals.adjacentMatches}`);
+          console.log(`- Evidence packages: ${evidence.totals.packages}; primary + independent=${evidence.totals.primaryPlusIndependent}; limited pages=${evidence.totals.limitedPages}`);
           console.log('- Shadow mode does not modify archives or publish content.');
           NODE
           fi

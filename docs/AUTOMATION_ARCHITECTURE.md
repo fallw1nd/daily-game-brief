@@ -47,9 +47,9 @@ Use seven days of artifacts to measure:
 - source availability and average candidate volume;
 - candidates found by the shadow collector but not by the ChatGPT task, and vice versa.
 
-### Stage 2 — evidence extraction (planned)
+### Stage 2 — evidence extraction (active in shadow mode)
 
-Add source-specific adapters that open only shortlisted A/B pages, extract publication time and relevant passages, and create compact evidence packages. No model call should receive an unbounded page or the complete archive history.
+`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
 
 ### Stage 3 — structured editorial API (requires a secret)
 
