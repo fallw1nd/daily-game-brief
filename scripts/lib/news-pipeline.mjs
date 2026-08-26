@@ -19,6 +19,31 @@ const eventPatterns = [
   ["announcement", /\b(?:announce|announced|reveal|revealed|unveil)\b|公布|公开|发表|発表/i],
 ];
 
+const eventStopWords = new Set([
+  "about", "after", "ahead", "also", "announced", "announces", "announcement", "available",
+  "date", "dated", "debut", "details", "first", "from", "game", "games", "gets", "launch",
+  "launched", "launches", "major", "more", "news", "official", "release", "released", "releases",
+  "revealed", "reveals", "season", "show", "shows", "this", "trailer", "update", "with",
+]);
+
+function distinctiveTokens(value) {
+  return [...new Set(normalizeHeadline(value).split(" ")
+    .filter((token) => /^[a-z0-9][a-z0-9'-]*$/i.test(token))
+    .filter((token) => token.length >= 3 && !eventStopWords.has(token)))];
+}
+
+function sameEventFamily(left, right) {
+  if (left.eventKind === "other" || left.eventKind !== right.eventKind) return false;
+  if (left.subjectKey && right.subjectKey) return left.subjectKey === right.subjectKey;
+  const leftTokens = new Set(left.subjectTokens);
+  const rightTokens = new Set(right.subjectTokens);
+  const shared = [...leftTokens].filter((token) => rightTokens.has(token));
+  if (shared.length < 2 || !shared.some((token) => token.length >= 5)) return false;
+  const unionSize = new Set([...leftTokens, ...rightTokens]).size;
+  const smallerSize = Math.min(leftTokens.size, rightTokens.size);
+  return shared.length / unionSize >= 0.5 && shared.length / smallerSize >= 0.67;
+}
+
 export function decodeEntities(value = "") {
   return value
     .replaceAll("&amp;", "&")
@@ -160,6 +185,7 @@ export function eventIdentity(headline) {
   return {
     eventKind,
     subjectKey: usefulSubject ? subjectKey : null,
+    subjectTokens: distinctiveTokens(usefulSubject ? subjectKey : raw),
     eventKey: createHash("sha256").update(material).digest("hex").slice(0, 20),
   };
 }
@@ -173,21 +199,23 @@ export function mergeCandidates(records) {
     }
   }
 
-  const clusters = new Map();
+  const clusters = [];
   for (const record of byUrl.values()) {
-    const key = eventIdentity(record.headline).eventKey;
-    const cluster = clusters.get(key) || [];
-    cluster.push(record);
-    clusters.set(key, cluster);
+    const identity = eventIdentity(record.headline);
+    const cluster = clusters.find((item) =>
+      item.identity.eventKey === identity.eventKey || sameEventFamily(item.identity, identity)
+    );
+    if (cluster) cluster.records.push(record);
+    else clusters.push({ identity, records: [record] });
   }
 
-  return [...clusters.entries()].map(([id, cluster]) => {
+  return clusters.map(({ identity, records: cluster }) => {
     cluster.sort((a, b) => (b.source.priority || 0) - (a.source.priority || 0));
     const lead = cluster[0];
     const independentSources = [...new Set(cluster.map((item) => item.source.independenceKey))];
     const merged = {
-      id,
-      ...eventIdentity(lead.headline),
+      id: identity.eventKey,
+      ...identity,
       headline: lead.headline,
       normalizedHeadline: normalizeHeadline(lead.headline),
       url: lead.url,
