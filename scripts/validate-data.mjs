@@ -3,7 +3,39 @@ import { resolve } from "node:path";
 
 const dataRoot = resolve("public/data");
 const errors = [];
+const warnings = [];
 const mediaFiles = new Map();
+const factStatuses = new Set([
+  "official",
+  "media_relay_official",
+  "media_report",
+  "multi_source_verified",
+  "unconfirmed",
+]);
+const timeStatuses = new Set(["verified", "date_only", "time_unverified", "uncertain"]);
+const sections = new Set([
+  "releases",
+  "reviews",
+  "news",
+  "industry",
+  "features",
+  "rumors",
+  "observations",
+]);
+const titleZhStatuses = new Set([
+  "official_simplified",
+  "official_traditional",
+  "common_translation",
+  "unavailable",
+]);
+const entryFlags = new Set([
+  "supplement",
+  "rumor",
+  "time_uncertain",
+  "platform_difference",
+  "region_difference",
+]);
+const sourceKinds = new Set(["primary", "secondary", "discovery"]);
 
 function hasValidImage(asset, kind) {
   if (!asset || typeof asset !== "object" || asset.placeholder === true) return false;
@@ -50,6 +82,63 @@ async function readJson(path) {
   }
 }
 
+function beijingTimestamp(value) {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value ?? "")) return NaN;
+  return Date.parse(`${value.replace(" ", "T")}:00+08:00`);
+}
+
+function sourceHost(source) {
+  try {
+    return new URL(source.url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function validateSource(source, context) {
+  if (!source || typeof source !== "object") {
+    errors.push(`${context}: source must be an object`);
+    return;
+  }
+  if (typeof source.label !== "string" || source.label.trim().length === 0) {
+    errors.push(`${context}: source needs a label`);
+  }
+  if (!/^https:\/\//.test(source.url ?? "")) {
+    errors.push(`${context}: source URL must use HTTPS`);
+  }
+  if (!sourceKinds.has(source.kind)) {
+    errors.push(`${context}: invalid source kind ${source.kind}`);
+  }
+}
+
+function validateTitle(title, context) {
+  if (!title || typeof title !== "object") {
+    errors.push(`${context}: title is required`);
+    return;
+  }
+  if (typeof title.title_key !== "string" || title.title_key.trim().length === 0) {
+    errors.push(`${context}: title_key is required`);
+  }
+  if (!title.title_en && !title.title_zh_cn && !title.title_ja) {
+    errors.push(`${context}: title needs at least one displayed language name`);
+  }
+  if (!titleZhStatuses.has(title.title_zh_status)) {
+    errors.push(`${context}: invalid title_zh_status ${title.title_zh_status}`);
+  }
+  if (title.title_zh_status === "unavailable" && title.title_zh_cn) {
+    errors.push(`${context}: unavailable Chinese title must not include title_zh_cn`);
+  }
+}
+
+function upcomingTimestamp(editionDate, value) {
+  if (!/^\d{2}\.\d{2}$/.test(value ?? "")) return NaN;
+  const [month, day] = value.split(".").map(Number);
+  const baseYear = Number(editionDate.slice(0, 4));
+  const baseMonth = Number(editionDate.slice(5, 7));
+  const year = month < baseMonth ? baseYear + 1 : baseYear;
+  return Date.UTC(year, month - 1, day);
+}
+
 function validateEdition(edition, path) {
   if (!edition || typeof edition !== "object" || Array.isArray(edition)) {
     errors.push(`${path}: edition must be an object`);
@@ -74,6 +163,31 @@ function validateEdition(edition, path) {
   if (edition.timezone !== "Asia/Shanghai") {
     errors.push(`${path}: timezone must be Asia/Shanghai`);
   }
+  const plannedAt = beijingTimestamp(edition.plannedAt);
+  const windowStart = beijingTimestamp(edition.windowStart);
+  const windowEnd = beijingTimestamp(edition.windowEnd);
+  if (![plannedAt, windowStart, windowEnd].every(Number.isFinite)) {
+    errors.push(`${path}: plannedAt, windowStart, and windowEnd must use YYYY-MM-DD HH:mm`);
+  } else {
+    const expectedHour = edition.period === "am" ? "10:10" : "17:00";
+    if (edition.plannedAt !== `${edition.date} ${expectedHour}`) {
+      errors.push(`${path}: plannedAt does not match the fixed ${edition.period} schedule`);
+    }
+    if (edition.windowEnd !== edition.plannedAt) {
+      errors.push(`${path}: windowEnd must equal plannedAt`);
+    }
+    const expectedStart = edition.period === "pm"
+      ? `${edition.date} 10:10`
+      : new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Shanghai",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(plannedAt - 24 * 60 * 60 * 1000)) + " 17:00";
+    if (edition.windowStart !== expectedStart) {
+      errors.push(`${path}: windowStart does not match the fixed ${edition.period} window`);
+    }
+  }
   if (!Array.isArray(edition.entries)) {
     errors.push(`${path}: entries must be an array`);
     return;
@@ -88,12 +202,46 @@ function validateEdition(edition, path) {
     }
     if (ids.has(entry.id)) errors.push(`${path}: duplicate entry id ${entry.id}`);
     ids.add(entry.id);
+    const context = `${path}: entry ${entry.id}`;
+    if (!sections.has(entry.section)) errors.push(`${context}: invalid section ${entry.section}`);
+    if (!factStatuses.has(entry.fact_status)) {
+      errors.push(`${context}: invalid fact_status ${entry.fact_status}`);
+    }
+    if (!timeStatuses.has(entry.time_status)) {
+      errors.push(`${context}: invalid time_status ${entry.time_status}`);
+    }
+    if (!Array.isArray(entry.entry_flags) ||
+        entry.entry_flags.some((flag) => !entryFlags.has(flag))) {
+      errors.push(`${context}: invalid entry_flags`);
+    }
+    validateTitle(entry.title, context);
+    if (!Array.isArray(entry.sources) || entry.sources.length === 0) {
+      errors.push(`${context}: at least one source is required`);
+    } else {
+      entry.sources.forEach((source, index) => validateSource(source, `${context}: source ${index}`));
+    }
     for (const asset of entry.images || []) trackLocalMedia(asset, `${path}: entry ${entry.id}`);
     if (
       entry.fact_status === "official" &&
       !entry.sources?.some((source) => source.kind === "primary")
     ) {
       errors.push(`${path}: official entry ${entry.id} needs a primary source`);
+    }
+    if (entry.fact_status === "multi_source_verified") {
+      const independentHosts = new Set((entry.sources || []).map(sourceHost).filter(Boolean));
+      if (independentHosts.size < 2) {
+        errors.push(`${context}: multi_source_verified needs two independent source hosts`);
+      }
+    }
+    if (entry.fact_status === "unconfirmed" && entry.tracking !== true) {
+      errors.push(`${context}: unconfirmed entries must remain tracking:true`);
+    }
+    const entryTime = beijingTimestamp(entry.beijingTime);
+    if (entry.time_status === "verified" &&
+        !entry.entry_flags?.includes("supplement") &&
+        Number.isFinite(entryTime) && Number.isFinite(windowStart) && Number.isFinite(windowEnd) &&
+        (entryTime <= windowStart || entryTime > windowEnd)) {
+      errors.push(`${context}: verified event time falls outside the fixed window`);
     }
     if (requiresImages) {
       const hasImage =
@@ -129,7 +277,21 @@ function validateEdition(edition, path) {
   if (requiresImages && !Array.isArray(edition.upcoming)) {
     errors.push(`${path}: upcoming must be an array`);
   } else if (requiresImages) {
+    const editionDay = Date.parse(`${edition.date}T00:00:00Z`);
+    const upcomingStart = editionDay + 24 * 60 * 60 * 1000;
+    const upcomingEnd = editionDay + 15 * 24 * 60 * 60 * 1000;
     for (const item of edition.upcoming) {
+      const context = `${path}: upcoming ${item.id}`;
+      validateTitle(item.title, context);
+      validateSource(item.source, `${context}: source`);
+      const releaseDays = String(item.date || "").split(/[／/、,]/).map((value) =>
+        upcomingTimestamp(edition.date, value.trim()),
+      );
+      if (!releaseDays.length || releaseDays.some((releaseDay) =>
+        !Number.isFinite(releaseDay) || releaseDay < upcomingStart || releaseDay > upcomingEnd
+      )) {
+        errors.push(`${context}: date must fall in the next-15-day window`);
+      }
       trackLocalMedia(item.cover, `${path}: upcoming ${item.id}`);
       const explainsAbsence =
         item.cover_status === "unavailable" &&
@@ -151,6 +313,31 @@ function validateEdition(edition, path) {
     typeof edition.sourceReport.note !== "string"
   ) {
     errors.push(`${path}: sourceReport is required`);
+  }
+  const strictAudit = edition.plannedAt >= "2026-08-26 00:00";
+  if (strictAudit) {
+    for (const key of [
+      "checkedGroups",
+      "trackingResults",
+      "excludedMajorCandidates",
+      "limitedSources",
+    ]) {
+      if (!Array.isArray(edition.sourceReport?.[key])) {
+        errors.push(`${path}: sourceReport.${key} must be an array`);
+      }
+    }
+    if (!edition.sourceReport?.auditStats || typeof edition.sourceReport.auditStats !== "object") {
+      errors.push(`${path}: sourceReport.auditStats is required`);
+    }
+    if (edition.plannedAt >= "2026-08-27 00:00" &&
+        edition.sourceReport?.auditStats?.discoveryQueries > 14) {
+      errors.push(`${path}: discoveryQueries exceeds the hard limit of 14`);
+    } else if (edition.sourceReport?.auditStats?.discoveryQueries > 14) {
+      warnings.push(`${path}: historical discoveryQueries exceeded 14`);
+    }
+    if (!Array.isArray(edition.tracking) || edition.tracking.length !== 0) {
+      errors.push(`${path}: top-level tracking must remain an empty compatibility array`);
+    }
   }
 }
 
@@ -207,8 +394,18 @@ if (manifest) {
     if (manifest.latest !== latestItem.id) {
       errors.push("manifest.json: latest must reference the final edition");
     }
-    if (latest && JSON.stringify(latest) !== JSON.stringify(await readJson(latestItem.path))) {
+    const latestArchive = await readJson(latestItem.path);
+    if (latest && JSON.stringify(latest) !== JSON.stringify(latestArchive)) {
       errors.push("latest.json must match the latest archived edition");
+    }
+    if (latest) {
+      const [latestText, archiveText] = await Promise.all([
+        readFile(resolve(dataRoot, "latest.json"), "utf8"),
+        readFile(resolve(dataRoot, latestItem.path), "utf8"),
+      ]);
+      if (latestText !== archiveText) {
+        errors.push("latest.json must be byte-identical to the latest archived edition");
+      }
     }
   }
 }
@@ -228,6 +425,10 @@ for (const [url, context] of mediaFiles) {
 if (errors.length > 0) {
   console.error(errors.map((error) => `- ${error}`).join("\n"));
   process.exit(1);
+}
+
+if (warnings.length > 0) {
+  console.warn(warnings.map((warning) => `- warning: ${warning}`).join("\n"));
 }
 
 console.log(`Validated ${manifest.editions.length} archived edition(s).`);

@@ -1,5 +1,7 @@
 # Scheduled Brief Data Pipeline
 
+The staged programmatic migration and reliability ownership are defined in [`AUTOMATION_ARCHITECTURE.md`](./AUTOMATION_ARCHITECTURE.md). Until its cutover criteria pass, the existing ChatGPT tasks remain the publisher and the new collector stays in shadow mode.
+
 The website reads `public/data/latest.json` at runtime. Every published edition is also stored under `public/data/archive/YYYY/MM/`, while `public/data/manifest.json` is the ordered archive index. A malformed payload never replaces the bundled fallback edition.
 
 ## ChatGPT task handoff

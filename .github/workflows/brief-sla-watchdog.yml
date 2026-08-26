@@ -1,0 +1,95 @@
+name: Brief publication SLA watchdog
+
+on:
+  schedule:
+    # 10:45 and 17:35 Asia/Shanghai; avoids relying on a single edition trigger.
+    - cron: "45 2 * * *"
+    - cron: "35 9 * * *"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: Edition period to verify
+        required: true
+        type: choice
+        options:
+          - am
+          - pm
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: brief-sla-watchdog-${{ github.event.schedule || inputs.period }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Select fixed edition period
+        id: edition
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            period="${{ inputs.period }}"
+          elif [ "${{ github.event.schedule }}" = "45 2 * * *" ]; then
+            period="am"
+          else
+            period="pm"
+          fi
+          echo "period=$period" >> "$GITHUB_OUTPUT"
+
+      - name: Check repository and deployed manifest
+        id: sla
+        run: node scripts/check-brief-sla.mjs --period=${{ steps.edition.outputs.period }}
+
+      - name: Open or update SLA incident
+        if: steps.sla.outputs.status != 'healthy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
+          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Close resolved SLA incident
+        if: steps.sla.outputs.status == 'healthy'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
+          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          if [ -n "$number" ]; then
+            gh issue close "$number" --comment "The archive and deployed manifest now contain ${{ steps.sla.outputs.expected }}."
+          fi
+
+      - name: Write SLA summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Brief SLA"
+            echo "- Expected: ${{ steps.sla.outputs.expected }}"
+            echo "- Status: ${{ steps.sla.outputs.status }}"
+            echo "- Local latest: ${{ steps.sla.outputs.local_latest }}"
+            echo "- Online latest: ${{ steps.sla.outputs.online_latest || 'unavailable' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
