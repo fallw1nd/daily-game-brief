@@ -1,6 +1,6 @@
 # Programmatic Brief Automation
 
-This document defines the migration from an all-in-one ChatGPT scheduled run to a deterministic pipeline with a narrow editorial model step. The existing morning and evening tasks remain enabled until the shadow pipeline passes seven consecutive days of coverage review.
+This document defines the migration from an all-in-one ChatGPT scheduled run to a deterministic zero-extra-API-cost pipeline. GitHub Actions prepares bounded evidence and deterministic state; the user's existing ChatGPT tasks perform only the final editorial handoff. No paid model API is called by the repository.
 
 ## Reliability boundary
 
@@ -13,7 +13,7 @@ Code owns deterministic work:
 - media download, conversion, and caching;
 - atomic Git publication, deployment checks, retries, and SLA incidents.
 
-An editorial model may later own only evidence-bounded work:
+The existing ChatGPT scheduled tasks own only evidence-bounded work:
 
 - candidate prioritization after deterministic scoring;
 - concise Chinese headline and summary drafting;
@@ -30,16 +30,16 @@ The model must never calculate issue numbers, mutate manifests directly, downloa
 - Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
 - `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
 
-### Stage 1 — shadow discovery (active)
+### Stage 1 — pre-cutoff discovery (active)
 
-`Shadow news discovery` runs after each fixed cutoff and produces artifacts only. It does not alter archives.
+`Shadow news discovery` runs at 09:55/16:45 Asia/Shanghai, before the fixed 10:10/17:00 editorial tasks. It does not alter archives.
 
 1. `config/news-sources.json` is the curated source registry.
 2. `scripts/collect-news.mjs` reads RSS and list pages without opening article bodies.
 3. Candidates are normalized, scored, compared with the adjacent edition, and split into A/B/C review levels.
 4. The artifact records every limited source so coverage failures remain visible.
 
-Use seven days of artifacts to measure:
+Artifacts and the persistent state branch measure:
 
 - official A-level items absent from the corresponding edition;
 - three-source clusters absent from the edition;
@@ -49,26 +49,23 @@ Use seven days of artifacts to measure:
 
 `scripts/audit-news-coverage.mjs` independently compares opened A/B evidence with the expected archive using normalized source URLs, subject keys, and conservative headline overlap. It reports high-confidence and review omissions without mutating an edition.
 
-### Stage 2 — evidence extraction (active in shadow mode)
+### Stage 2 — evidence extraction and ledger (active)
 
 `scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
 
-### Stage 3 — structured editorial API (dry-run contract active; live call requires a secret)
+### Stage 3 — ChatGPT editorial handoff (active, no paid API)
 
-`scripts/editorialize.mjs` now builds a dry-run Responses API request with strict JSON Schema output and post-response evidence checks. Each edition is capped at 120,000 evidence characters (roughly 30,000 input tokens before prompt overhead). The default model is `gpt-5-mini`, configurable with `OPENAI_EDITOR_MODEL`. Live shadow calls remain disabled until repository variable `ENABLE_EDITORIAL_SHADOW=true` and secret `OPENAI_API_KEY` are both configured.
+`scripts/editorialize.mjs` builds a compact editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, and is persisted on `automation/state`. No repository secret, model API, or additional API billing is used.
 
-### Stage 4 — idempotent publisher (planned)
+### Stage 4 — idempotent publisher (active)
 
-Generate a draft on an automation branch, validate it, and fast-forward `main` only when the expected edition is still absent and HEAD has not changed. Publication must be idempotent by edition ID. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
+`scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
-### Stage 5 — cutover
+The 10:45/17:35 SLA watchdog uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. If no event meets the threshold, it opens an incident instead of fabricating an edition.
 
-After seven consecutive shadow days without unexplained A-level omissions:
+### Stage 5 — observation and refinement
 
-1. enable programmatic publication for one period;
-2. keep the corresponding ChatGPT task as a watchdog for three more days;
-3. compare output and deployment health;
-4. move both ChatGPT tasks to concise exception-reporting prompts only after both periods pass.
+Keep the 10:10/17:00 ChatGPT tasks enabled as the normal publisher. Review omission audits, source health, degraded fallbacks, and media outcomes for seven consecutive days, then tune the deterministic source registry and thresholds without expanding the prompt.
 
 ## Operational states
 
@@ -89,6 +86,11 @@ Silent disappearance is never a valid state.
 ```bash
 npm run news:collect:am
 npm run news:collect:pm
+npm run news:ledger
+npm run news:evidence
+npm run news:packet
+npm run brief:publish-decision
+npm run brief:degraded-decision
 npm run brief:sla:am
 npm run brief:sla:pm
 npm run validate:data
