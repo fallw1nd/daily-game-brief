@@ -16,8 +16,9 @@ on:
           - pm
 
 permissions:
-  contents: read
+  contents: write
   issues: write
+  actions: write
 
 concurrency:
   group: brief-sla-watchdog-${{ github.event.schedule || inputs.period }}
@@ -55,15 +56,65 @@ jobs:
         id: sla
         run: node scripts/check-brief-sla.mjs --period=${{ steps.edition.outputs.period }}
 
+      - name: Restore matching editorial packet
+        id: packet
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          git fetch origin automation/state:refs/remotes/origin/automation/state || true
+          if git show "origin/automation/state:automation/packets/latest-${{ steps.edition.outputs.period }}.json" > artifacts/editorial-packet.json 2>/dev/null; then
+            packet_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' artifacts/editorial-packet.json)"
+            if [ "$packet_id" = "${{ steps.sla.outputs.expected }}" ]; then
+              echo "available=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "Packet is stale: $packet_id" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Audit published coverage
+        id: coverage
+        if: steps.packet.outputs.available == 'true'
+        env:
+          NEWS_EVIDENCE_PATH: artifacts/editorial-packet.json
+        run: node scripts/audit-news-coverage.mjs
+
+      - name: Build and publish degraded fact list
+        id: fallback
+        if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          git pull --ff-only origin main
+          node scripts/build-degraded-decision.mjs
+          node scripts/publish-editorial-decision.mjs
+          node scripts/validate-data.mjs
+          if git diff --quiet -- public/data; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "content(brief): publish degraded ${{ steps.sla.outputs.expected }}"
+          git push origin HEAD:main
+          gh workflow run deploy.yml --ref main
+          gh workflow run media-enrichment.yml --ref main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
       - name: Open or update SLA incident
-        if: steps.sla.outputs.status != 'healthy'
+        if: steps.sla.outputs.status != 'healthy' && steps.fallback.outputs.published != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
           existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
-          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
+          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
           else
@@ -71,7 +122,7 @@ jobs:
           fi
 
       - name: Close resolved SLA incident
-        if: steps.sla.outputs.status == 'healthy'
+        if: steps.sla.outputs.status == 'healthy' || steps.fallback.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -92,4 +143,17 @@ jobs:
             echo "- Status: ${{ steps.sla.outputs.status }}"
             echo "- Local latest: ${{ steps.sla.outputs.local_latest }}"
             echo "- Online latest: ${{ steps.sla.outputs.online_latest || 'unavailable' }}"
+            echo "- Coverage packet: ${{ steps.packet.outputs.available || 'false' }}"
+            echo "- High-confidence omissions: ${{ steps.coverage.outputs.high_omissions || 'not available' }}"
+            echo "- Review omissions: ${{ steps.coverage.outputs.review_omissions || 'not available' }}"
+            echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage audit
+        if: always() && steps.packet.outputs.available == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-audit-${{ steps.sla.outputs.expected }}-${{ github.run_id }}
+          path: artifacts/news-coverage-audit.json
+          if-no-files-found: warn
+          retention-days: 14

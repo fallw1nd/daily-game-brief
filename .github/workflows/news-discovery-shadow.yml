@@ -2,9 +2,9 @@ name: Shadow news discovery
 
 on:
   schedule:
-    # Five minutes after each fixed Beijing cutoff. The report still uses 10:10/17:00.
-    - cron: "15 2 * * *"
-    - cron: "5 9 * * *"
+    # Build the handoff before the fixed 10:10/17:00 Beijing ChatGPT tasks.
+    - cron: "55 1 * * *"
+    - cron: "45 8 * * *"
   workflow_dispatch:
     inputs:
       period:
@@ -16,10 +16,10 @@ on:
           - pm
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: news-discovery-shadow-${{ github.event.schedule || inputs.period }}
+  group: news-discovery-state
   cancel-in-progress: true
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             period="${{ inputs.period }}"
-          elif [ "${{ github.event.schedule }}" = "15 2 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "55 1 * * *" ]; then
             period="am"
           else
             period="pm"
@@ -53,21 +53,21 @@ jobs:
       - name: Collect low-token candidate snapshot
         run: node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
 
+      - name: Restore previous event ledger
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          git fetch origin automation/state:refs/remotes/origin/automation/state || true
+          git show origin/automation/state:automation/ledger/events.json > artifacts/event-ledger-previous.json || true
+
+      - name: Update persistent event ledger
+        run: node scripts/update-event-ledger.mjs
+
       - name: Build bounded evidence packages
         run: node scripts/build-evidence.mjs
 
-      - name: Audit edition coverage independently
-        run: node scripts/audit-news-coverage.mjs
-
       - name: Build bounded editorial request
         run: node scripts/editorialize.mjs
-
-      - name: Run editorial model in shadow mode
-        if: vars.ENABLE_EDITORIAL_SHADOW == 'true'
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_EDITOR_MODEL: ${{ vars.OPENAI_EDITOR_MODEL || 'gpt-5-mini' }}
-        run: node scripts/editorialize.mjs --run
 
       - name: Upload candidate evidence
         if: always()
@@ -78,9 +78,8 @@ jobs:
             artifacts/news-candidates.json
             artifacts/news-shadow-report.json
             artifacts/news-evidence.json
-            artifacts/news-coverage-audit.json
-            artifacts/news-editorial-request.json
-            artifacts/news-editorial-output.json
+            artifacts/event-ledger.json
+            artifacts/editorial-packet.json
           if-no-files-found: error
           retention-days: 14
 
@@ -92,14 +91,40 @@ jobs:
             node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const report = require('./artifacts/news-shadow-report.json');
           const evidence = require('./artifacts/news-evidence.json');
-          const coverage = require('./artifacts/news-coverage-audit.json');
+          const ledger = require('./artifacts/event-ledger.json');
           console.log('## Shadow discovery');
           console.log(`- Window: ${report.window.windowStart} — ${report.window.windowEnd} Asia/Shanghai`);
           console.log(`- Sources: ${report.totals.healthySources}/${report.totals.sources} healthy`);
           console.log(`- Candidates: ${report.totals.candidates} total; A=${report.totals.tierA}; B=${report.totals.tierB}`);
           console.log(`- Adjacent matches removed before review: ${report.totals.adjacentMatches}`);
           console.log(`- Evidence packages: ${evidence.totals.packages}; primary + independent=${evidence.totals.primaryPlusIndependent}; limited pages=${evidence.totals.limitedPages}`);
-          console.log(`- Coverage: ${coverage.status}; high-confidence omissions=${coverage.totals.highConfidenceOmissions}; review=${coverage.totals.reviewOmissions}`);
+          console.log(`- Ledger: ${ledger.totals.events} retained events; recurring=${ledger.totals.recurring}`);
           console.log('- Shadow mode does not modify archives or publish content.');
           NODE
+          fi
+
+      - name: Persist packet and ledger on state branch
+        shell: bash
+        run: |
+          packet="$RUNNER_TEMP/editorial-packet.json"
+          ledger="$RUNNER_TEMP/event-ledger.json"
+          cp artifacts/editorial-packet.json "$packet"
+          cp artifacts/event-ledger.json "$ledger"
+          if git show-ref --verify --quiet refs/remotes/origin/automation/state; then
+            git switch --detach origin/automation/state
+          else
+            git switch -c automation-state-bootstrap
+          fi
+          mkdir -p automation/packets automation/ledger
+          edition="${{ steps.edition.outputs.period }}"
+          edition_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' "$packet")"
+          cp "$packet" "automation/packets/$edition_id.json"
+          cp "$packet" "automation/packets/latest-$edition.json"
+          cp "$ledger" automation/ledger/events.json
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add automation/packets automation/ledger/events.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(automation): persist $edition_id editorial packet"
+            git push origin HEAD:automation/state
           fi
