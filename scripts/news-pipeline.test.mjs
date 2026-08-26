@@ -60,6 +60,47 @@ describe("low-token news discovery pipeline", () => {
     expect(first.eventKind).toBe("release-date");
   });
 
+  it("clusters conservative English headline variants across independent sources", () => {
+    const candidates = mergeCandidates([
+      {
+        headline: "Crimson Desert release date announced for November",
+        url: "https://example.com/crimson-desert-date",
+        summary: "",
+        publishedAt: "2026-08-26T01:00:00.000Z",
+        source: mediaSource,
+      },
+      {
+        headline: "Crimson Desert release date revealed in new trailer",
+        url: "https://second.example/crimson-desert",
+        summary: "",
+        publishedAt: "2026-08-26T01:05:00.000Z",
+        source: { ...mediaSource, id: "second", label: "Second", independenceKey: "second" },
+      },
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].independentSources).toEqual(["example-media", "second"]);
+  });
+
+  it("does not merge different games that share a publisher and event type", () => {
+    const candidates = mergeCandidates([
+      {
+        headline: "Nintendo announces Metroid Prime release date",
+        url: "https://example.com/metroid",
+        summary: "",
+        publishedAt: "2026-08-26T01:00:00.000Z",
+        source: mediaSource,
+      },
+      {
+        headline: "Nintendo announces Mario Tennis release date",
+        url: "https://second.example/mario",
+        summary: "",
+        publishedAt: "2026-08-26T01:05:00.000Z",
+        source: { ...mediaSource, id: "second", label: "Second", independenceKey: "second" },
+      },
+    ]);
+    expect(candidates).toHaveLength(2);
+  });
+
   it("anchors morning and evening windows to Beijing planned time", () => {
     const now = new Date("2026-08-26T01:50:00.000Z");
     expect(plannedWindow("am", now)).toMatchObject({
