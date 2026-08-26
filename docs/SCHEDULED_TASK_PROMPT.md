@@ -33,7 +33,7 @@ The packet is generated about 15 minutes before cutoff. Search only the interval
 2. Commit only the complete structured result to `automation/inbox/<edition-id>.json` on that branch. Never place credentials, full pages, or unrelated files in the inbox.
 3. `Publish editorial decision` restores the matching immutable packet from `automation/state`, validates branch/packet/decision identity and evidence selection, runs the publisher and complete repository check, then atomically pushes archive/latest/manifest/search index to `main`.
 4. Wait for that workflow and its explicitly dispatched Pages deployment. If it fails, fix or replace the same decision file on the same branch; do not restart discovery or allocate another issue.
-5. News text must not wait for images. Leave verified missing media as `unavailable`; the media workflow remains asynchronous.
+5. News text must not wait for images. Leave verified missing media as `unavailable`; a changed publication immediately dispatches asynchronous media enrichment for that exact edition, while 10:35/17:25 remain fallback schedules.
 6. Verify the live archive/latest/manifest/search index and report unavailable reasons.
 
 The 10:45/17:35 SLA watchdog may publish a conservative no-AI fact list if this task has not completed. A later normal run must revise that same edition rather than create another issue.
