@@ -24,6 +24,17 @@ The repository script can use Brave Image Search after listed sources fail when 
 
 MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not automatic image sources. MobyGames requires its licensed API plan and attribution; Gavas prohibits unapproved reproduction and image hotlinking; the remaining sites lack a confirmed machine-readable reuse permission or block automation. They may help a human identify an edition, but the final asset must resolve to an approved original source.
 
+## Editorial fallback ladder
+
+For news images, stop after the first verified match in this order:
+
+1. The exact official news page's social image.
+2. The thumbnail of the exact primary official YouTube upload.
+3. Official key art, cover, store art, or screenshot for the same game or company.
+4. A specific unavailable note and traceable source for the review workflow.
+
+An exact official-upload thumbnail is not a search-result thumbnail. The source must be the opened primary video URL, the script must derive the video ID, and the image response must pass type, size, and dimension checks. The downloader tries `maxresdefault`, `hq720`, `sddefault`, then `hqdefault` and saves the first valid result locally. Do not use another channel's reupload or a merely similar game image.
+
 ## Automatic checks
 
 Run npm run media:audit for a read-only report or npm run media:enrich for the latest edition. The tool:

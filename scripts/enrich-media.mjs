@@ -208,6 +208,26 @@ function eligibleCover(source) {
   return source.kind === "primary" || source.webSearch === true;
 }
 
+function youtubeVideoId(input) {
+  try {
+    const url = new URL(input);
+    if (url.hostname === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || null;
+    if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
+      if (url.pathname === "/watch") return url.searchParams.get("v");
+      const match = url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/);
+      return match?.[1] || null;
+    }
+  } catch {}
+  return null;
+}
+
+const youtubeImageCandidates = (videoId) => [
+  `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+  `https://i.ytimg.com/vi/${videoId}/hq720.jpg`,
+  `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+  `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+];
+
 async function discoverFromSource(source) {
   if (source.imageUrl) {
     return {
@@ -215,6 +235,11 @@ async function discoverFromSource(source) {
       alt: source.alt || "",
       pageUrl: source.url,
     };
+  }
+  const videoId = source.kind === "primary" && youtubeVideoId(source.url);
+  if (videoId) {
+    const [imageUrl, ...fallbackImageUrls] = youtubeImageCandidates(videoId);
+    return { imageUrl, fallbackImageUrls, alt: "", pageUrl: source.url };
   }
   const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
   if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
@@ -253,9 +278,19 @@ async function encodeUnderLimit(bytes, kind) {
 }
 
 async function downloadCandidate(candidate, kind) {
-  const result = await fetchLimited(candidate.imageUrl, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
-  if (!result.contentType.startsWith("image/")) throw new Error(`not an image (${result.contentType})`);
-  return encodeUnderLimit(result.bytes, kind);
+  const urls = [candidate.imageUrl, ...(candidate.fallbackImageUrls || [])];
+  let lastError;
+  for (const url of urls) {
+    try {
+      const result = await fetchLimited(url, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
+      if (!result.contentType.startsWith("image/")) throw new Error(`not an image (${result.contentType})`);
+      candidate.imageUrl = url;
+      return await encodeUnderLimit(result.bytes, kind);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("no image candidate succeeded");
 }
 
 function mediaPath(edition, record, kind) {
