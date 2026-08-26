@@ -27,7 +27,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -62,6 +62,7 @@ jobs:
         run: |
           mkdir -p artifacts
           git fetch origin automation/state:refs/remotes/origin/automation/state || true
+          git show "origin/automation/state:automation/ledger/events.json" > artifacts/event-ledger-previous.json 2>/dev/null || true
           if git show "origin/automation/state:automation/packets/latest-${{ steps.edition.outputs.period }}.json" > artifacts/editorial-packet.json 2>/dev/null; then
             packet_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' artifacts/editorial-packet.json)"
             if [ "$packet_id" = "${{ steps.sla.outputs.expected }}" ]; then
@@ -74,16 +75,73 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Rebuild a missing or stale packet
+        id: recovery
+        if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
+          node scripts/update-event-ledger.mjs
+          node scripts/build-evidence.mjs
+          node scripts/editorialize.mjs
+          packet_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' artifacts/editorial-packet.json)"
+          if [ "$packet_id" != "${{ steps.sla.outputs.expected }}" ]; then
+            echo "Recovered packet is for $packet_id, expected ${{ steps.sla.outputs.expected }}"
+            exit 1
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve recovered packet and ledger
+        if: steps.recovery.outputs.available == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          state_dir="$RUNNER_TEMP/automation-state-recovery"
+          packet="$RUNNER_TEMP/editorial-packet.json"
+          ledger="$RUNNER_TEMP/event-ledger.json"
+          cp artifacts/editorial-packet.json "$packet"
+          cp artifacts/event-ledger.json "$ledger"
+          git fetch origin automation/state:refs/remotes/origin/automation/state || true
+          if git show-ref --verify --quiet refs/remotes/origin/automation/state; then
+            git worktree add --detach "$state_dir" origin/automation/state
+          else
+            git worktree add -b automation-state-recovery "$state_dir" origin/main
+          fi
+          edition_id="${{ steps.sla.outputs.expected }}"
+          period="${{ steps.edition.outputs.period }}"
+          mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
+          cp "$packet" "$state_dir/automation/packets/$edition_id.json"
+          cp "$packet" "$state_dir/automation/packets/latest-$period.json"
+          cp "$ledger" "$state_dir/automation/ledger/events.json"
+          git -C "$state_dir" config user.name "daily-game-brief[bot]"
+          git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git -C "$state_dir" add automation/packets automation/ledger/events.json
+          if ! git -C "$state_dir" diff --cached --quiet; then
+            git -C "$state_dir" commit -m "chore(automation): recover $edition_id packet"
+            git -C "$state_dir" push origin HEAD:automation/state
+          fi
+
+      - name: Resolve usable packet
+        id: packet_ready
+        shell: bash
+        run: |
+          if [ "${{ steps.packet.outputs.available }}" = "true" ] || [ "${{ steps.recovery.outputs.available }}" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Audit published coverage
         id: coverage
-        if: steps.packet.outputs.available == 'true'
+        if: steps.packet_ready.outputs.available == 'true'
         env:
           NEWS_EVIDENCE_PATH: artifacts/editorial-packet.json
         run: node scripts/audit-news-coverage.mjs
 
       - name: Build and publish degraded fact list
         id: fallback
-        if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available == 'true'
+        if: steps.sla.outputs.status != 'healthy' && steps.packet_ready.outputs.available == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -143,17 +201,25 @@ jobs:
             echo "- Status: ${{ steps.sla.outputs.status }}"
             echo "- Local latest: ${{ steps.sla.outputs.local_latest }}"
             echo "- Online latest: ${{ steps.sla.outputs.online_latest || 'unavailable' }}"
-            echo "- Coverage packet: ${{ steps.packet.outputs.available || 'false' }}"
+            echo "- Original packet: ${{ steps.packet.outputs.available || 'false' }}"
+            echo "- Recovered packet: ${{ steps.recovery.outputs.available || 'false' }}"
+            echo "- Usable packet: ${{ steps.packet_ready.outputs.available || 'false' }}"
             echo "- High-confidence omissions: ${{ steps.coverage.outputs.high_omissions || 'not available' }}"
             echo "- Review omissions: ${{ steps.coverage.outputs.review_omissions || 'not available' }}"
             echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage audit
-        if: always() && steps.packet.outputs.available == 'true'
+        if: always() && steps.packet_ready.outputs.available == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: coverage-audit-${{ steps.sla.outputs.expected }}-${{ github.run_id }}
-          path: artifacts/news-coverage-audit.json
+          path: |
+            artifacts/news-candidates.json
+            artifacts/news-shadow-report.json
+            artifacts/news-evidence.json
+            artifacts/event-ledger.json
+            artifacts/editorial-packet.json
+            artifacts/news-coverage-audit.json
           if-no-files-found: warn
           retention-days: 14
