@@ -71,7 +71,9 @@ function metadata(html) {
     description: meta.get("og:description") || meta.get("description") || "",
     publishedAt: meta.get("article:published_time") || meta.get("og:published_time") || time || null,
     imageUrl: meta.get("og:image:secure_url") || meta.get("og:image") || null,
-    canonicalUrl: html.match(/<link\b[^>]*rel\s*=\s*["'][^"']*canonical[^"']*["'][^>]*href\s*=\s*["']([^"']+)["']/i)?.[1] || null,
+    canonicalUrl: (html.match(/<link\b[^>]*rel\s*=\s*["'][^"']*canonical[^"']*["'][^>]*>/gi) || [])
+      .map(attributes)
+      .find((attrs) => attrs.href)?.href || null,
   };
 }
 
