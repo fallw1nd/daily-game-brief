@@ -222,10 +222,10 @@ function youtubeVideoId(input) {
 }
 
 const youtubeImageCandidates = (videoId) => [
-  `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-  `https://i.ytimg.com/vi/${videoId}/hq720.jpg`,
-  `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
-  `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+  `https://img.youtube.com/vi/${videoId}/hq720.jpg`,
+  `https://img.youtube.com/vi/${videoId}/sddefault.jpg`,
+  `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
 ];
 
 async function discoverFromSource(source) {
