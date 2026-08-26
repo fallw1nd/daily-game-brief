@@ -47,10 +47,13 @@ async function fetchSource(source) {
 }
 
 async function mapLimit(items, limit, worker) {
-  const queue = [...items];
-  const results = [];
-  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    while (queue.length) results.push(await worker(queue.shift()));
+  let cursor = 0;
+  const results = new Array(items.length);
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await worker(items[index]);
+    }
   });
   await Promise.all(runners);
   return results;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   mergeCandidates,
+  eventIdentity,
   parseFeed,
   parseHtmlLinks,
   plannedWindow,
@@ -50,6 +51,13 @@ describe("low-token news discovery pipeline", () => {
     }]);
     expect(candidate.tier).toBe("A");
     expect(candidate.score).toBeGreaterThanOrEqual(125);
+  });
+
+  it("clusters differently worded reports around a quoted subject and event", () => {
+    const first = eventIdentity("《Game X》公布发售日");
+    const second = eventIdentity("《Game X》发售日正式公开");
+    expect(first.eventKey).toBe(second.eventKey);
+    expect(first.eventKind).toBe("release-date");
   });
 
   it("anchors morning and evening windows to Beijing planned time", () => {
