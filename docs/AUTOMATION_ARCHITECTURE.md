@@ -47,6 +47,8 @@ Use seven days of artifacts to measure:
 - source availability and average candidate volume;
 - candidates found by the shadow collector but not by the ChatGPT task, and vice versa.
 
+`scripts/audit-news-coverage.mjs` independently compares opened A/B evidence with the expected archive using normalized source URLs, subject keys, and conservative headline overlap. It reports high-confidence and review omissions without mutating an edition.
+
 ### Stage 2 — evidence extraction (active in shadow mode)
 
 `scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
