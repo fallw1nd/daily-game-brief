@@ -1,0 +1,114 @@
+name: Publish editorial decision
+
+on:
+  push:
+    branches:
+      - "automation/editorial/**"
+    paths:
+      - "automation/inbox/*.json"
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: editorial-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout trusted publisher from main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore submitted decision and matching packet
+        id: submission
+        shell: bash
+        run: |
+          edition="${GITHUB_REF_NAME#automation/editorial/}"
+          if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm)$ ]]; then
+            echo "Invalid editorial branch: $GITHUB_REF_NAME"
+            exit 1
+          fi
+          mkdir -p artifacts
+          git fetch origin "$GITHUB_REF_NAME:refs/remotes/origin/$GITHUB_REF_NAME"
+          git show "refs/remotes/origin/$GITHUB_REF_NAME:automation/inbox/$edition.json" > artifacts/editorial-decisions.json
+          git fetch origin automation/state:refs/remotes/origin/automation/state
+          git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
+
+      - name: Validate evidence-bounded submission
+        env:
+          EDITORIAL_BRANCH: ${{ github.ref_name }}
+        run: node scripts/validate-editorial-submission.mjs
+
+      - name: Build and validate edition
+        shell: bash
+        run: |
+          git pull --ff-only origin main
+          node scripts/publish-editorial-decision.mjs
+          npm run check
+
+      - name: Publish edition atomically
+        id: publication
+        shell: bash
+        run: |
+          if git diff --quiet -- public/data; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add public/data
+          git commit -m "content(brief): publish ${{ steps.submission.outputs.edition }}"
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Pages deployment
+        if: steps.publication.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main
+
+      - name: Report publication failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="Editorial publication failed: ${{ steps.submission.outputs.edition || github.ref_name }}"
+          body="The evidence-bounded editorial submission failed before a verified publication.\n\n- Branch: **${{ github.ref_name }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window and issue numbering must be preserved during recovery."
+          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Summarize publication
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Editorial publication"
+            echo "- Edition: ${{ steps.submission.outputs.edition || 'unresolved' }}"
+            echo "- Decision branch: ${{ github.ref_name }}"
+            echo "- Data changed: ${{ steps.publication.outputs.changed || 'false' }}"
+            echo "- Main commit: ${{ steps.publication.outputs.commit || 'unchanged' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

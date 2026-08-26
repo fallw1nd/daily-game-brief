@@ -61,6 +61,8 @@ Artifacts and the persistent state branch measure:
 
 `scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
+The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact packet from `automation/state`, validates all three edition identities, performs the complete check, pushes data atomically, and explicitly dispatches Pages because commits created with the workflow token do not recursively trigger other workflows.
+
 The 10:45/17:35 SLA watchdog uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. If no event meets the threshold, it opens an incident instead of fabricating an edition.
 
 ### Stage 5 — observation and refinement
@@ -90,6 +92,7 @@ npm run news:ledger
 npm run news:evidence
 npm run news:packet
 npm run brief:publish-decision
+npm run brief:validate-submission
 npm run brief:degraded-decision
 npm run brief:sla:am
 npm run brief:sla:pm

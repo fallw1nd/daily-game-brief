@@ -27,12 +27,13 @@ The packet is generated about 15 minutes before cutoff. Search only the interval
 - If nothing material appeared, record that result and stop searching.
 - Do not repeat the packet's full discovery pass.
 
-## Deterministic publication
+## Deterministic publication handoff
 
-1. Save the structured result as `artifacts/editorial-decisions.json` alongside `artifacts/editorial-packet.json`.
-2. Run `npm run brief:publish-decision`, then `npm run validate:data` and `npm run check`.
-3. Re-read `main` before writing. Publish the archive, byte-identical `latest.json`, manifest, and generated search index in one fast-forward commit. Never renumber or rewrite unrelated archives.
-4. News text must not wait for images. Leave verified missing media as `unavailable`; the existing 10:35/17:25 media workflow will attempt official news art, exact official-video thumbnails, and official store/title art asynchronously.
-5. Verify the commit workflow, Pages deployment, live archive/latest/manifest/search index, and report unavailable reasons. If a transient failure occurs, retry the failed deterministic step; do not restart discovery.
+1. Do not depend on a local shell or mutate `public/data` directly. Create or reuse a branch named `automation/editorial/<edition-id>` from current `main`.
+2. Commit only the complete structured result to `automation/inbox/<edition-id>.json` on that branch. Never place credentials, full pages, or unrelated files in the inbox.
+3. `Publish editorial decision` restores the matching immutable packet from `automation/state`, validates branch/packet/decision identity and evidence selection, runs the publisher and complete repository check, then atomically pushes archive/latest/manifest/search index to `main`.
+4. Wait for that workflow and its explicitly dispatched Pages deployment. If it fails, fix or replace the same decision file on the same branch; do not restart discovery or allocate another issue.
+5. News text must not wait for images. Leave verified missing media as `unavailable`; the media workflow remains asynchronous.
+6. Verify the live archive/latest/manifest/search index and report unavailable reasons.
 
 The 10:45/17:35 SLA watchdog may publish a conservative no-AI fact list if this task has not completed. A later normal run must revise that same edition rather than create another issue.
