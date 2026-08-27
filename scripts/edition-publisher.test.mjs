@@ -90,7 +90,9 @@ describe("idempotent edition publisher", () => {
         titleEn: "Fable",
         titleZhCn: null,
         titleZhStatus: "unavailable",
+        headline: "《Fable》正式公布",
       }],
+      archiveTitle: "早报｜《Fable》正式公布",
     };
     const result = buildEdition({ packet, editorial: fableEditorial, latest, manifest, now: new Date("2026-08-27T02:12:00Z") });
     expect(result.edition.entries[0].title).toEqual({
@@ -99,6 +101,8 @@ describe("idempotent edition publisher", () => {
       title_en: "Fable",
       title_zh_status: "official_simplified",
     });
+    expect(result.edition.entries[0].headline).toBe("《神鬼寓言》正式公布");
+    expect(result.edition.archiveTitle).toBe("早报｜《神鬼寓言》正式公布");
   });
 
   it("returns without mutation when the edition already exists", () => {

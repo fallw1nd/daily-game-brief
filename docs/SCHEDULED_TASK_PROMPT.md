@@ -21,6 +21,7 @@ Use this contract for the existing morning and evening ChatGPT tasks. Repository
    - If no official Simplified Chinese title exists, perform a narrow title-only open-web lookup for a stable, widely used Chinese community/media name. Use it with `titleZhStatus:"common_translation"`.
    - If neither an official nor a stable common translation exists, keep the original name with `titleZhCn:null` and `titleZhStatus:"unavailable"`.
    - Never machine-translate, literally translate, or invent a Chinese game name merely to fill the field.
+   - Once `titleZhCn` is resolved, use that same Chinese name wherever the game subject appears in `headline` and the lead `archiveTitle`; keep the English original in `titleEn` metadata rather than repeating it as the visible story subject.
 5. Title-name lookup is the only exception to the finalized packet's complete-evidence rule. It may be used solely to determine `titleZhCn` / `titleZhStatus`; it must not introduce a new event, fact, time, platform, release claim, source classification, or tracking decision.
 6. For each `trackingQueue` item, either continue tracking with a concrete next check or close it with a reason. `needs_review` remains tracked.
 7. Morning uses `upcomingMode:"replace"` for the next 15 days. Evening uses `upcomingMode:"inherit_and_patch"` for new date changes only.

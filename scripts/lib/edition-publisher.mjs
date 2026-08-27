@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { resolveTitleTranslation } from "./title-translations.mjs";
+import { localizeHeadline, resolveTitleTranslation } from "./title-translations.mjs";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -134,11 +134,12 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     counters.set(decision.section, index + 1);
     const id = `${window.id}-${decision.section}-${index}`;
     entryByEvent.set(decision.eventKey, id);
+    const title = displayTitle(decision);
     return {
       id,
       section: decision.section,
-      title: displayTitle(decision),
-      headline: decision.headline,
+      title,
+      headline: localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }),
       summary: decision.summary,
       beijingTime: decision.beijingTime || window.windowEnd,
       timeNote: decision.timeNote || "证据只支持日期或窗口归属，未反推未披露的具体时刻。",
@@ -169,6 +170,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   }
   const upcoming = [...upcomingMap.values()].filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
+  const leadEntryId = entryByEvent.get(editorial.leadEventKey) || entries[0].id;
+  const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
+  const archiveTitle = localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn });
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")
@@ -210,8 +214,8 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       note: editorial.editorialNote,
       editorialDecisionDigest: decisionDigest,
     },
-    archiveTitle: editorial.archiveTitle,
-    leadEntryId: entryByEvent.get(editorial.leadEventKey) || entries[0].id,
+    archiveTitle,
+    leadEntryId,
   };
   const path = `archive/${edition.date.slice(0, 4)}/${edition.date.slice(5, 7)}/${edition.id}.json`;
   const manifestItem = {
