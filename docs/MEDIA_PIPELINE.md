@@ -10,7 +10,7 @@ For multi-platform games, use the first verified source available in this order:
 2. Nintendo eShop Japan or another traceable Nintendo product page.
 3. Microsoft/Xbox Store, Steam, publisher stores, and media rooms.
 4. The user-supplied discovery sites for edition identification.
-5. Open-web image search when the listed chain produces no usable result.
+5. DeepSeek-assisted open-web source discovery when the listed chain produces no usable result.
 
 Storefront URLs belong in config/media-catalog.json for reuse or in an upcoming item's mediaSources. Query parameters may be removed only on known PlayStation, Nintendo, and Microsoft image CDNs. Keep the original product page as sourceUrl.
 
@@ -20,7 +20,7 @@ If official storefronts and publisher pages yield no usable asset, a reputable m
 
 Search results must use the original image URL and source page, never a search-engine thumbnail. Fan art, unrelated images, watermarked composites, and images without an accessible source page remain prohibited. Cover credit remains in JSON but is not rendered as a visible caption.
 
-The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. The media workflow passes the repository secret with that name into the enrichment script. If the secret is absent, the script safely continues with listed item sources and records the remaining item as unavailable rather than forcing a mismatch.
+The repository script can use DeepSeek's Responses API `web_search` only after all listed sources fail, when `DEEPSEEK_API_KEY` is present. DeepSeek is used only to discover candidate **source pages**; it never supplies a trusted image directly. The script opens each returned HTTPS page itself, requires an exact subject term copied from the edition title/headline to be confirmed in the page metadata, extracts that page's `og:image`/Twitter image, and then applies the normal HTTPS, size, dimension, format, and local-normalization checks. If the secret is absent or search fails, the pipeline safely continues without this last-resort layer.
 
 MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not automatic image sources. MobyGames requires its licensed API plan and attribution; Gavas prohibits unapproved reproduction and image hotlinking; the remaining sites lack a confirmed machine-readable reuse permission or block automation. They may help a human identify an edition, but the final asset must resolve to an approved original source.
 
@@ -32,7 +32,7 @@ The goal is to avoid empty story art whenever a clearly related, traceable image
 2. The thumbnail of the exact primary official YouTube upload.
 3. For a person-led story such as an interview, podcast, developer comment, or designer profile: another clearly identified, traceable photo of that same person from an official page or reliable media source. The photo does not need to come from the current interview.
 4. For a game-led story: official key art, game cover/store art, official screenshot, or other publisher/platform artwork for that same game. A game cover is an acceptable fallback for a news item about that game's update, release, test, interview, delay, or other new development.
-5. Open-web image search for the same story subject when the listed sources produce no usable asset. Search person-led stories for the named person first; search game-led stories for the game and allow cover/key art/screenshot fallbacks. The returned image must still resolve to an accessible original source page and pass the same-title/same-person relevance check.
+5. DeepSeek-assisted open-web source discovery for the same story subject when the listed sources produce no usable asset. Person-led stories search for the named person first; game-led stories search for the game and allow cover/key art/screenshot source pages. DeepSeek returns only candidate page URLs. The repository then opens and validates those pages itself before accepting any image.
 6. Only then record a specific unavailable reason.
 
 A fallback image is not required to depict the exact event, but it must depict the correct subject. Do not use a merely similar developer, another game in the series without an explicit relationship, generic convention photography, logos presented as editorial art, or an image whose identity cannot be verified. Prefer a relevant fallback over `unavailable`, but prefer `unavailable` over a plausible-looking mismatch.
@@ -53,3 +53,7 @@ Run npm run media:audit for a read-only report or npm run media:enrich for the l
 - records a specific unavailable reason instead of forcing a mismatch.
 
 The editorial publisher dispatches the workflow for the exact edition immediately after publication. Scheduled runs at 10:35 and 17:25 Asia/Shanghai remain as idempotent recovery checks. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
+
+## DeepSeek search configuration
+
+Create a repository-level GitHub Actions secret named `DEEPSEEK_API_KEY`. The media workflow exposes it only to the enrichment step, which calls `https://api.deepseek.com/responses` with `deepseek-v4-flash` and forces the server-side `web_search` tool. No key means no paid web-search fallback; all free listed-source fallbacks still run normally. Because this is the last fallback layer, API calls occur only for records still missing verified media after the deterministic source chain has been exhausted.

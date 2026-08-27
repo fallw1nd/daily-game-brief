@@ -10,7 +10,7 @@ const MAX_HTML_BYTES = 3 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const TARGET_IMAGE_BYTES = 500 * 1024;
 const USER_AGENT = "DailyGameBriefMediaBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
-const BRAVE_SEARCH_API_KEY = process.env.BRAVE_SEARCH_API_KEY?.trim();
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim();
 const args = new Set(process.argv.slice(2));
 
 const hasArg = (name) => args.has(name) || [...args].some((arg) => arg.startsWith(name + "="));
@@ -79,9 +79,15 @@ function extractMeta(html, pageUrl) {
   if (!rawImage) return null;
   const imageUrl = new URL(rawImage, pageUrl).href;
   if (/logo|avatar|favicon|icon[-_.]/i.test(imageUrl)) return null;
+  const titleTag = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+  ?.replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim() || "";
   return {
     imageUrl,
     alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+    pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+    description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
   };
 }
 
@@ -95,84 +101,152 @@ function normalizeSearchText(value) {
     .trim();
 }
 
-function resultMatchesRecord(record, result) {
-  const haystack = normalizeSearchText([
-    result.title,
-    result.url,
-    result.source,
-    result.description,
+function permittedMatchTerm(record, term) {
+  const normalized = normalizeSearchText(term);
+  if (!normalized || [...normalized.replaceAll(" ", "")].length < 2) return false;
+  const supplied = normalizeSearchText([
+    record.title?.title_zh_cn,
+    record.title?.title_en,
+    record.headline,
   ].filter(Boolean).join(" "));
-  const names = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
-
-  return names.some((name) => {
-    const normalized = normalizeSearchText(name);
-    if (normalized.length >= 4 && haystack.includes(normalized)) return true;
-    const tokens = normalized.split(" ").filter((token) => token.length >= 3);
-    if (!tokens.length) return false;
-    const matches = tokens.filter((token) => haystack.includes(token)).length;
-    return matches >= Math.min(2, tokens.length);
-  });
+  return supplied.includes(normalized);
 }
 
 function isBlockedSearchHost(hostname, blockedHosts) {
   const host = hostname.toLowerCase();
-  return ["imgs.search.brave.com", ...blockedHosts].some(
-    (blocked) => host === blocked || host.endsWith("." + blocked),
-  );
+  return [
+    "google.com",
+    "bing.com",
+    "baidu.com",
+    "search.brave.com",
+    "pinterest.com",
+    ...blockedHosts,
+  ].some((blocked) => host === blocked || host.endsWith("." + blocked));
+}
+
+function deepSeekOutputText(response) {
+  return (response.output || [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) => item.content || [])
+    .filter((part) => part.type === "output_text")
+    .map((part) => part.text || "")
+    .join("");
+}
+
+function pageMatchesRecord(record, source, meta, pageUrl) {
+  if (!source.webSearch) return true;
+  if (!permittedMatchTerm(record, source.matchTerm)) return false;
+  const term = normalizeSearchText(source.matchTerm);
+  const haystack = normalizeSearchText([
+    meta.pageTitle,
+    meta.description,
+    pageUrl,
+  ].filter(Boolean).join(" "));
+  return haystack.includes(term);
 }
 
 async function discoverWebSources(record, kind, blockedHosts = []) {
-  if (!BRAVE_SEARCH_API_KEY) return [];
+  if (!DEEPSEEK_API_KEY) return [];
 
-  const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
   const headline = record.headline || "game news";
   const personLed = /(interview|podcast|developer|designer|producer|director|采访|专访|访谈|播客|制作人|导演|设计师|开发者|编剧|创意总监|艺术总监)/i.test(headline);
-  const intent = kind === "cover"
-    ? "game cover key art"
+  const searchGoal = kind === "cover"
+    ? "Find source pages with same-title cover art, key art, or official game artwork."
     : personLed
-      ? `${headline} interview developer designer producer portrait photo`
-      : `${headline} official screenshot game cover key art`;
-  const endpoint = new URL("https://api.search.brave.com/res/v1/images/search");
-  endpoint.search = new URLSearchParams({
-    q: [...titleParts, intent].join(" ").slice(0, 380),
-    count: "20",
-    country: "ALL",
-    safesearch: "strict",
-    spellcheck: "true",
-  }).toString();
+      ? "Find source pages with a clearly identified photo of the exact person; the current interview image is preferred but another reliable photo of that person is acceptable."
+      : "Find source pages with artwork, cover art, key art, or screenshots of the exact game or product named in the story.";
 
-  const response = await fetch(endpoint, {
-    signal: AbortSignal.timeout(18_000),
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      candidates: {
+        type: "array",
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            url: { type: "string" },
+            label: { type: "string" },
+            title: { type: "string" },
+            matchTerm: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["url", "label", "title", "matchTerm", "reason"],
+        },
+      },
+    },
+    required: ["candidates"],
+  };
+
+  const response = await fetch("https://api.deepseek.com/responses", {
+    method: "POST",
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Accept: "application/json",
-      "X-Subscription-Token": BRAVE_SEARCH_API_KEY,
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      "Content-Type": "application/json",
       "User-Agent": USER_AGENT,
     },
+    body: JSON.stringify({
+      model: "deepseek-v4-flash",
+      instructions: [
+        "You are a search-only source finder for editorial media.",
+        "Use web search and return source PAGE URLs, never direct image URLs or search-result URLs.",
+        "Prefer official publisher/developer/platform/store pages, then reputable games/media reporting pages.",
+        "Reject fan art, forums, wikis, Pinterest, image-CDN-only links, watermarked composites, reuploads, and pages whose subject identity is ambiguous.",
+        "matchTerm must be copied verbatim from the supplied game title or headline and must identify the exact game/product/person shown by the candidate page.",
+        "Do not claim that an image is verified; the caller will open every page and validate its metadata and image independently.",
+      ].join(" "),
+      input: JSON.stringify({
+        kind,
+        title_zh_cn: record.title?.title_zh_cn || null,
+        title_en: record.title?.title_en || null,
+        headline,
+        searchGoal,
+        maxCandidates: 8,
+      }),
+      tools: [{ type: "web_search" }],
+      tool_choice: { type: "web_search" },
+      reasoning: { effort: "none" },
+      max_output_tokens: 1200,
+      temperature: 0.1,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "media_source_candidates",
+          schema,
+        },
+      },
+    }),
   });
-  if (!response.ok) throw new Error(`Brave Image Search HTTP ${response.status}`);
   const body = await response.text();
+  if (!response.ok) throw new Error(`DeepSeek web search HTTP ${response.status}`);
   if (Buffer.byteLength(body) > MAX_HTML_BYTES) {
-    throw new Error("Brave Image Search response is too large");
+    throw new Error("DeepSeek web search response is too large");
   }
-
   const data = JSON.parse(body);
-  return (data.results || []).flatMap((result) => {
+  if (data.status === "failed") {
+    throw new Error(data.error?.message || "DeepSeek web search failed");
+  }
+  const output = deepSeekOutputText(data);
+  if (!output) throw new Error("DeepSeek web search returned no structured output");
+  const parsed = JSON.parse(output);
+
+  return (parsed.candidates || []).flatMap((candidate) => {
     try {
-      const imageUrl = result.properties?.url;
-      const pageUrl = result.url;
-      if (!imageUrl?.startsWith("https://") || !pageUrl?.startsWith("https://")) return [];
-      const imageHost = new URL(imageUrl).hostname;
-      const pageHost = new URL(pageUrl).hostname;
-      if (isBlockedSearchHost(imageHost, blockedHosts) ||
-          isBlockedSearchHost(pageHost, blockedHosts) ||
-          !resultMatchesRecord(record, result)) return [];
+      if (!candidate.url?.startsWith("https://") || !permittedMatchTerm(record, candidate.matchTerm)) return [];
+      const pageUrl = new URL(candidate.url);
+      if (isBlockedSearchHost(pageUrl.hostname, blockedHosts) ||
+          /\.(?:avif|gif|jpe?g|png|webp)$/i.test(pageUrl.pathname)) return [];
       return [{
-        label: result.source || pageHost,
-        url: pageUrl,
+        label: candidate.label || pageUrl.hostname,
+        url: pageUrl.href,
         kind: "discovery",
         webSearch: true,
-        imageUrl,
-        alt: result.title || displayTitle(record),
+        matchTerm: candidate.matchTerm,
+        alt: candidate.title || displayTitle(record),
       }];
     } catch {
       return [];
@@ -232,7 +306,7 @@ const youtubeImageCandidates = (videoId) => [
   `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
 ];
 
-async function discoverFromSource(source) {
+async function discoverFromSource(source, record) {
   if (source.imageUrl) {
     return {
       imageUrl: source.imageUrl,
@@ -249,6 +323,9 @@ async function discoverFromSource(source) {
   if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
   const meta = extractMeta(result.bytes.toString("utf8"), result.url);
   if (!meta) throw new Error("no usable social image metadata");
+  if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+    throw new Error("searched page did not confirm the requested subject");
+  }
   return { ...meta, pageUrl: result.url };
 }
 
@@ -308,7 +385,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
   let reviewCandidate = null;
   for (const source of sourceList) {
     try {
-      const candidate = await discoverFromSource(source);
+      const candidate = await discoverFromSource(source, record);
       const encoded = await downloadCandidate(candidate, kind);
       const eligible = kind === "editorial"
       ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
@@ -362,7 +439,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
 
 async function resolveWithWebFallback(edition, record, kind, sources, options) {
   const initial = await resolveRecord(edition, record, kind, sources, options.apply);
-  if (!BRAVE_SEARCH_API_KEY || initial.status === "applied" || initial.eligible === true) {
+  if (!DEEPSEEK_API_KEY || initial.status === "applied" || initial.eligible === true) {
     return initial;
   }
 
@@ -378,7 +455,7 @@ async function resolveWithWebFallback(edition, record, kind, sources, options) {
       ...initial,
       attempts: [
         ...(initial.attempts || []),
-        { label: "Brave Image Search", url: "https://search.brave.com/", error: error.message },
+        { label: "DeepSeek web search", url: "https://api.deepseek.com/", error: error.message },
       ],
     };
   }
@@ -452,7 +529,7 @@ async function main() {
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
   if (!items.length) throw new Error("no matching edition found");
 
-  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, webSearchEnabled: Boolean(BRAVE_SEARCH_API_KEY), editions: [] };
+  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, webSearchEnabled: Boolean(DEEPSEEK_API_KEY), webSearchProvider: DEEPSEEK_API_KEY ? "deepseek" : null, editions: [] };
   let latestEdition = null;
   for (const item of items) {
     const result = await processEdition(item, options);
@@ -466,7 +543,7 @@ async function main() {
   const flat = audit.editions.flatMap((edition) => edition.results);
   const summary = Object.groupBy(flat, (item) => item.status);
   console.log(`Media audit: ${flat.length} item(s); applied=${summary.applied?.length || 0}; candidate=${summary.candidate?.length || 0}; unavailable=${summary.unavailable?.length || 0}`);
-  console.log(`Web image search: ${BRAVE_SEARCH_API_KEY ? "enabled" : "disabled (BRAVE_SEARCH_API_KEY unavailable)"}`);
+  console.log(`Web source search: ${DEEPSEEK_API_KEY ? "enabled (DeepSeek web_search)" : "disabled (DEEPSEEK_API_KEY unavailable)"}`);
   console.log(`Report: ${REPORT_PATH}`);
 }
 
