@@ -65,7 +65,7 @@ function upcomingEntry(item, previous) {
   const verifiedMedia = previous?.cover?.kind === "cover" && previous.cover.placeholder !== true
     ? {
         cover: previous.cover,
-        cover_status: previous.cover_status || "verified",
+        cover_status: "verified",
         ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),
       }
     : {
