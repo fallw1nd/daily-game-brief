@@ -65,6 +65,10 @@ The ChatGPT task never needs a repository shell. It writes only `automation/inbo
 
 After a changed edition reaches `main`, the publisher also dispatches `media-enrichment.yml` with the exact edition ID. Media enrichment therefore cannot miss an edition merely because the normal ChatGPT run finished after 10:35/17:25 or because a newer edition became `latest` while the job waited. Morning replacement retains a previously verified cover when the stable upcoming ID or `title_key` still matches; only genuinely new or changed games return to `unavailable`.
 
+After the edition dispatches, the publisher writes every structured decision back to the persistent 45-day ledger on `automation/state`. Discovery fields and editorial fields remain separate so a later collection cannot erase an editorial result. Records distinguish included, excluded, actively tracked, and closed tracking states, keep a bounded decision history, and use edition identity to prevent an older rerun from replacing newer judgment. A formal revision replaces the degraded decision for the same edition.
+
+Active tracking records are mandatory editorial input. When fresh opened evidence exists, the event is prioritized in the normal package list; otherwise a compact `trackingQueue` reminder carries its last decision, reason, source URLs, and dates. The ChatGPT task must explicitly continue or close every reminder. Tracking reminders count against the same 120,000-character budget and fail visibly rather than disappearing when the budget cannot contain them.
+
 The 10:45/17:35 SLA watchdog first restores the matching packet from `automation/state`. If it is missing or stale while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet is preserved back to the state branch on a best-effort basis and remains usable locally even if that persistence races another run. The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
 
 ### Stage 5 — observation and refinement
@@ -91,6 +95,7 @@ Silent disappearance is never a valid state.
 npm run news:collect:am
 npm run news:collect:pm
 npm run news:ledger
+npm run news:ledger-feedback
 npm run news:evidence
 npm run news:packet
 npm run brief:publish-decision

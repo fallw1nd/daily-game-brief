@@ -1,3 +1,17 @@
+import { createHash } from "node:crypto";
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function editorialDecisionDigest(editorial) {
+  return createHash("sha256").update(stableJson(editorial)).digest("hex");
+}
+
 function beijingNow(now) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
@@ -91,11 +105,14 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const window = input.window;
   if (editorial.editionId !== window.id) throw new Error("editorial editionId does not match packet window");
   const existingManifestItem = manifest.editions.find((item) => item.id === window.id);
+  const decisionDigest = editorialDecisionDigest(editorial);
   const degradedEdition = latest.id === window.id && (
     latest.entries?.some((item) => item.headline?.startsWith("[自动事实清单]")) ||
     latest.sourceReport?.note?.includes("正常ChatGPT定时任务未在SLA前完成")
   );
-  if (existingManifestItem && !degradedEdition) return { status: "already-exists", edition: null, manifest };
+  if (existingManifestItem && !degradedEdition) {
+    return { status: "already-exists", edition: null, manifest, decisionDigest };
+  }
   const prefix = window.period === "am" ? "早报｜" : "晚报｜";
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
@@ -184,6 +201,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         imageUnavailableEntries: entries.length,
       },
       note: editorial.editorialNote,
+      editorialDecisionDigest: decisionDigest,
     },
     archiveTitle: editorial.archiveTitle,
     leadEntryId: entryByEvent.get(editorial.leadEventKey) || entries[0].id,
@@ -196,6 +214,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   };
   return {
     status: existingManifestItem ? "revised" : "built",
+    decisionDigest,
     edition,
     archivePath: path,
     manifest: {

@@ -104,7 +104,32 @@ export const editorialSchema = {
 export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) {
   const packages = [];
   let usedChars = 0;
-  for (const item of evidence.packages || []) {
+  const activeTracking = Object.values(ledger?.events || {})
+    .filter((item) => item.tracking?.active === true);
+  const activeKeys = new Set(activeTracking.map((item) => item.eventKey));
+  const evidenceItems = [...(evidence.packages || [])].sort((a, b) =>
+    Number(activeKeys.has(b.eventKey)) - Number(activeKeys.has(a.eventKey))
+  );
+  const itemsWithOpenedEvidence = new Set(evidenceItems.filter((item) =>
+    (item.sources || []).some((source) => source.status === "opened" && source.evidenceText)
+  ).map((item) => item.eventKey));
+  const trackingQueue = activeTracking.filter((item) => !itemsWithOpenedEvidence.has(item.eventKey))
+    .map((item) => ({
+      eventKey: item.eventKey,
+      eventKind: item.eventKind,
+      subjectKey: item.subjectKey,
+      lastHeadline: item.lastHeadline,
+      firstSeenAt: item.firstSeenAt,
+      lastSeenAt: item.lastSeenAt,
+      lastDecisionEdition: item.lastDecisionEdition,
+      lastDecisionAt: item.lastDecisionAt,
+      reason: item.tracking.reason,
+      sourceUrls: item.sourceUrls || [],
+    }));
+  for (const item of trackingQueue) usedChars += JSON.stringify(item).length;
+  if (usedChars > maxChars) throw new Error("active tracking queue exceeds the editorial input budget");
+
+  for (const item of evidenceItems) {
     const sources = (item.sources || []).flatMap((source, sourceIndex) => {
       if (source.status !== "opened" || !source.evidenceText) return [];
       return [{
@@ -135,27 +160,43 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
         lastSeenAt: ledger.events[item.eventKey].lastSeenAt,
         windowsSeen: ledger.events[item.eventKey].windowsSeen,
         state: ledger.events[item.eventKey].state,
+        editorialState: ledger.events[item.eventKey].editorialState || null,
+        lastDecision: ledger.events[item.eventKey].lastDecision || null,
+        lastDecisionReason: ledger.events[item.eventKey].lastDecisionReason || null,
+        tracking: ledger.events[item.eventKey].tracking || null,
       } : null,
       sources,
     };
     const size = JSON.stringify(compact).length;
-    if (usedChars + size > maxChars) break;
+    if (usedChars + size > maxChars) {
+      if (activeKeys.has(item.eventKey)) throw new Error(`active tracking evidence exceeds the editorial input budget: ${item.eventKey}`);
+      break;
+    }
     packages.push(compact);
     usedChars += size;
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     window: evidence.window,
     adjacentEdition: evidence.adjacentEdition,
     packages,
-    budget: { maxInputChars: maxChars, usedInputChars: usedChars, estimatedInputTokens: Math.ceil(usedChars / 4) },
+    trackingQueue,
+    budget: {
+      maxInputChars: maxChars,
+      usedInputChars: usedChars,
+      estimatedInputTokens: Math.ceil(usedChars / 4),
+      activeTrackingItems: activeTracking.length,
+    },
   };
 }
 
 export function validateEditorialOutput(output, input) {
   const errors = [];
   if (!output || !Array.isArray(output.decisions)) return ["output.decisions must be an array"];
-  const allowedKeys = new Set(input.packages.map((item) => item.eventKey));
+  const allowedKeys = new Set([
+    ...input.packages.map((item) => item.eventKey),
+    ...(input.trackingQueue || []).map((item) => item.eventKey),
+  ]);
   const seen = new Set();
   for (const [index, item] of output.decisions.entries()) {
     const context = `decisions[${index}]`;
@@ -165,6 +206,7 @@ export function validateEditorialOutput(output, input) {
     if (seen.has(item.eventKey)) errors.push(`${context}: duplicate eventKey`);
     seen.add(item.eventKey);
     if (!new Set(["include", "exclude", "needs_review"]).has(item.decision)) errors.push(`${context}: invalid decision`);
+    if (typeof item.reason !== "string" || !item.reason.trim()) errors.push(`${context}: reason is required`);
     if (item.decision === "include") {
       for (const key of ["section", "titleKey", "titleEn", "headline", "summary", "factStatus", "timeStatus"]) {
         if (!item[key]) errors.push(`${context}: include requires ${key}`);
@@ -180,6 +222,9 @@ export function validateEditorialOutput(output, input) {
     }
     if (item.factStatus === "unconfirmed" && item.tracking !== true) {
       errors.push(`${context}: unconfirmed requires tracking=true`);
+    }
+    if (item.decision === "needs_review" && item.tracking !== true) {
+      errors.push(`${context}: needs_review requires tracking=true`);
     }
     if (item.factStatus === "official") {
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
