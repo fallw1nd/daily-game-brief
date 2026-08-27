@@ -28,7 +28,6 @@ const packet = {
   schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   mode: "chatgpt-handoff",
-  costBoundary: "No paid model API call is permitted by this workflow.",
   instructions,
   outputSchema: editorialSchema,
   editorialInput,
