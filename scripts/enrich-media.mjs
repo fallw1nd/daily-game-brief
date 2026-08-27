@@ -125,9 +125,13 @@ async function discoverWebSources(record, kind, blockedHosts = []) {
   if (!BRAVE_SEARCH_API_KEY) return [];
 
   const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
+  const headline = record.headline || "game news";
+  const personLed = /(interview|podcast|developer|designer|producer|director|采访|专访|访谈|播客|制作人|导演|设计师|开发者|编剧|创意总监|艺术总监)/i.test(headline);
   const intent = kind === "cover"
     ? "game cover key art"
-    : `${record.headline || "game news"} official screenshot`;
+    : personLed
+      ? `${headline} interview developer designer producer portrait photo`
+      : `${headline} official screenshot game cover key art`;
   const endpoint = new URL("https://api.search.brave.com/res/v1/images/search");
   endpoint.search = new URLSearchParams({
     q: [...titleParts, intent].join(" ").slice(0, 380),
@@ -447,7 +451,7 @@ async function main() {
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
   if (!items.length) throw new Error("no matching edition found");
 
-  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, editions: [] };
+  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, webSearchEnabled: Boolean(BRAVE_SEARCH_API_KEY), editions: [] };
   let latestEdition = null;
   for (const item of items) {
     const result = await processEdition(item, options);
@@ -461,6 +465,7 @@ async function main() {
   const flat = audit.editions.flatMap((edition) => edition.results);
   const summary = Object.groupBy(flat, (item) => item.status);
   console.log(`Media audit: ${flat.length} item(s); applied=${summary.applied?.length || 0}; candidate=${summary.candidate?.length || 0}; unavailable=${summary.unavailable?.length || 0}`);
+  console.log(`Web image search: ${BRAVE_SEARCH_API_KEY ? "enabled" : "disabled (BRAVE_SEARCH_API_KEY unavailable)"}`);
   console.log(`Report: ${REPORT_PATH}`);
 }
 
