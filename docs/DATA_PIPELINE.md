@@ -18,6 +18,14 @@ Every newly scheduled edition must use `schemaVersion: 2`, `timezone: "Asia/Shan
 
 Each v2 edition also requires an `archiveTitle` and `leadEntryId`. The title must start with `早报｜` or `晚报｜` to match `period`, contain 8–40 characters, and summarize one real, high-impact entry without overstating its verification status. Prefer a major game, publisher/platform decision, or broadly discussed event. `leadEntryId` must reference that entry in the same edition. Copy both fields into the appended manifest item. The four legacy manifest items contain an approved one-time metadata backfill; do not rewrite legacy archive JSON or later alter historical titles without an explicit correction.
 
+## Chinese title resolution
+
+Game names use a deterministic three-level fallback. Reuse `config/title-translations.json` first; otherwise prefer an official Simplified Chinese name from the publisher, developer, platform, or storefront. If no official Simplified Chinese name exists, a stable and broadly used Chinese community/media name may be used with `title_zh_status: "common_translation"`. Only when neither exists should the original name remain with `title_zh_status: "unavailable"` and no `title_zh_cn` field.
+
+The registry is cumulative: once a title and its evidence have been confirmed, later editions must reuse that registered decision instead of researching or guessing the same name again. New confirmed names may be appended after title-only verification without changing previously published facts.
+
+Never machine-translate, literally translate, or invent a Chinese title merely to fill the field. A narrow open-web lookup is allowed solely to determine the game name and its status; it must not introduce new event facts, times, platforms, release claims, or candidates outside the finalized editorial packet. The publisher applies the registry again before serialization so a known translation is not lost when an editorial decision mistakenly leaves the title unavailable. Historical title-field corrections use `npm run titles:backfill`; the command only fills currently unavailable title fields and does not overwrite an existing official/common translation.
+
 Before committing, the task should run or request the equivalent of:
 
 ```bash

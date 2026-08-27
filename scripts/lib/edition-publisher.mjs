@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { resolveTitleTranslation } from "./title-translations.mjs";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -30,11 +31,17 @@ function nextEditionAt(window) {
 }
 
 function displayTitle(decision) {
+  const resolved = resolveTitleTranslation({
+    titleKey: decision.titleKey,
+    titleZhCn: decision.titleZhCn,
+    titleZhStatus: decision.titleZhStatus,
+    titleEn: decision.titleEn,
+  });
   return {
-    title_key: decision.titleKey,
-    ...(decision.titleZhCn ? { title_zh_cn: decision.titleZhCn } : {}),
-    ...(decision.titleEn ? { title_en: decision.titleEn } : {}),
-    title_zh_status: decision.titleZhStatus,
+    title_key: resolved.titleKey,
+    ...(resolved.titleZhCn ? { title_zh_cn: resolved.titleZhCn } : {}),
+    ...(resolved.titleEn ? { title_en: resolved.titleEn } : {}),
+    title_zh_status: resolved.titleZhStatus,
   };
 }
 
