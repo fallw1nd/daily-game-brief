@@ -128,6 +128,10 @@ function validateTitle(title, context) {
   if (title.title_zh_status === "unavailable" && title.title_zh_cn) {
     errors.push(`${context}: unavailable Chinese title must not include title_zh_cn`);
   }
+  if (title.title_zh_status !== "unavailable" &&
+      (typeof title.title_zh_cn !== "string" || title.title_zh_cn.trim().length === 0)) {
+    errors.push(`${context}: ${title.title_zh_status} requires title_zh_cn`);
+  }
 }
 
 function upcomingTimestamp(editionDate, value) {
