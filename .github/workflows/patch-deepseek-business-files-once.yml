@@ -1,0 +1,295 @@
+name: Patch DeepSeek business files once
+
+on:
+  push:
+    branches:
+      - codex/deepseek-media-search
+    paths:
+      - .github/workflows/patch-deepseek-business-files-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: codex/deepseek-media-search
+
+      - name: Patch script, config, and docs
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          import re
+
+          script_path = Path("scripts/enrich-media.mjs")
+          text = script_path.read_text()
+
+          old = 'const BRAVE_SEARCH_API_KEY = process.env.BRAVE_SEARCH_API_KEY?.trim();'
+          if old not in text:
+            raise SystemExit("Brave API key constant not found")
+          text = text.replace(old, 'const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim();', 1)
+
+          meta_pattern = re.compile(
+              r'  return \{\n'
+              r'    imageUrl,\n'
+              r'    alt: values\.get\("og:image:alt"\) \|\| values\.get\("twitter:image:alt"\) \|\| "",\n'
+              r'  \};\n'
+              r'\}'
+          )
+          meta_replacement = r'''  const titleTag = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+            ?.replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim() || "";
+          return {
+            imageUrl,
+            alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+            pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+            description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+          };
+          }'''
+          text, count = meta_pattern.subn(lambda _: meta_replacement, text, count=1)
+          if count != 1:
+            raise SystemExit("metadata return block not found")
+
+          start = text.find('function resultMatchesRecord(record, result) {')
+          end = text.find('async function mapLimit(items, limit, worker) {')
+          if start < 0 or end < 0 or end <= start:
+            raise SystemExit("web discovery block boundaries not found")
+
+          replacement = r'''function permittedMatchTerm(record, term) {
+            const normalized = normalizeSearchText(term);
+            if (!normalized || [...normalized.replaceAll(" ", "")].length < 2) return false;
+            const supplied = normalizeSearchText([
+              record.title?.title_zh_cn,
+              record.title?.title_en,
+              record.headline,
+            ].filter(Boolean).join(" "));
+            return supplied.includes(normalized);
+          }
+
+          function isBlockedSearchHost(hostname, blockedHosts) {
+            const host = hostname.toLowerCase();
+            return [
+              "google.com",
+              "bing.com",
+              "baidu.com",
+              "search.brave.com",
+              "pinterest.com",
+              ...blockedHosts,
+            ].some((blocked) => host === blocked || host.endsWith("." + blocked));
+          }
+
+          function deepSeekOutputText(response) {
+            return (response.output || [])
+              .filter((item) => item.type === "message")
+              .flatMap((item) => item.content || [])
+              .filter((part) => part.type === "output_text")
+              .map((part) => part.text || "")
+              .join("");
+          }
+
+          function pageMatchesRecord(record, source, meta, pageUrl) {
+            if (!source.webSearch) return true;
+            if (!permittedMatchTerm(record, source.matchTerm)) return false;
+            const term = normalizeSearchText(source.matchTerm);
+            const haystack = normalizeSearchText([
+              meta.pageTitle,
+              meta.description,
+              pageUrl,
+            ].filter(Boolean).join(" "));
+            return haystack.includes(term);
+          }
+
+          async function discoverWebSources(record, kind, blockedHosts = []) {
+            if (!DEEPSEEK_API_KEY) return [];
+
+            const headline = record.headline || "game news";
+            const personLed = /(interview|podcast|developer|designer|producer|director|采访|专访|访谈|播客|制作人|导演|设计师|开发者|编剧|创意总监|艺术总监)/i.test(headline);
+            const searchGoal = kind === "cover"
+              ? "Find source pages with same-title cover art, key art, or official game artwork."
+              : personLed
+                ? "Find source pages with a clearly identified photo of the exact person; the current interview image is preferred but another reliable photo of that person is acceptable."
+                : "Find source pages with artwork, cover art, key art, or screenshots of the exact game or product named in the story.";
+
+            const schema = {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                candidates: {
+                  type: "array",
+                  maxItems: 8,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      url: { type: "string" },
+                      label: { type: "string" },
+                      title: { type: "string" },
+                      matchTerm: { type: "string" },
+                      reason: { type: "string" },
+                    },
+                    required: ["url", "label", "title", "matchTerm", "reason"],
+                  },
+                },
+              },
+              required: ["candidates"],
+            };
+
+            const response = await fetch("https://api.deepseek.com/responses", {
+              method: "POST",
+              signal: AbortSignal.timeout(30_000),
+              headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+                "Content-Type": "application/json",
+                "User-Agent": USER_AGENT,
+              },
+              body: JSON.stringify({
+                model: "deepseek-v4-flash",
+                instructions: [
+                  "You are a search-only source finder for editorial media.",
+                  "Use web search and return source PAGE URLs, never direct image URLs or search-result URLs.",
+                  "Prefer official publisher/developer/platform/store pages, then reputable games/media reporting pages.",
+                  "Reject fan art, forums, wikis, Pinterest, image-CDN-only links, watermarked composites, reuploads, and pages whose subject identity is ambiguous.",
+                  "matchTerm must be copied verbatim from the supplied game title or headline and must identify the exact game/product/person shown by the candidate page.",
+                  "Do not claim that an image is verified; the caller will open every page and validate its metadata and image independently.",
+                ].join(" "),
+                input: JSON.stringify({
+                  kind,
+                  title_zh_cn: record.title?.title_zh_cn || null,
+                  title_en: record.title?.title_en || null,
+                  headline,
+                  searchGoal,
+                  maxCandidates: 8,
+                }),
+                tools: [{ type: "web_search" }],
+                tool_choice: { type: "web_search" },
+                reasoning: { effort: "none" },
+                max_output_tokens: 1200,
+                temperature: 0.1,
+                text: {
+                  format: {
+                    type: "json_schema",
+                    name: "media_source_candidates",
+                    schema,
+                  },
+                },
+              }),
+            });
+            const body = await response.text();
+            if (!response.ok) throw new Error(`DeepSeek web search HTTP ${response.status}`);
+            if (Buffer.byteLength(body) > MAX_HTML_BYTES) {
+              throw new Error("DeepSeek web search response is too large");
+            }
+            const data = JSON.parse(body);
+            if (data.status === "failed") {
+              throw new Error(data.error?.message || "DeepSeek web search failed");
+            }
+            const output = deepSeekOutputText(data);
+            if (!output) throw new Error("DeepSeek web search returned no structured output");
+            const parsed = JSON.parse(output);
+
+            return (parsed.candidates || []).flatMap((candidate) => {
+              try {
+                if (!candidate.url?.startsWith("https://") || !permittedMatchTerm(record, candidate.matchTerm)) return [];
+                const pageUrl = new URL(candidate.url);
+                if (isBlockedSearchHost(pageUrl.hostname, blockedHosts) ||
+                    /\.(?:avif|gif|jpe?g|png|webp)$/i.test(pageUrl.pathname)) return [];
+                return [{
+                  label: candidate.label || pageUrl.hostname,
+                  url: pageUrl.href,
+                  kind: "discovery",
+                  webSearch: true,
+                  matchTerm: candidate.matchTerm,
+                  alt: candidate.title || displayTitle(record),
+                }];
+              } catch {
+                return [];
+              }
+            }).slice(0, 8);
+          }
+
+          '''
+          text = text[:start] + replacement + text[end:]
+
+          text = text.replace('async function discoverFromSource(source) {', 'async function discoverFromSource(source, record) {', 1)
+          discovery_pattern = re.compile(
+              r'  const meta = extractMeta\(result\.bytes\.toString\("utf8"\), result\.url\);\n'
+              r'  if \(!meta\) throw new Error\("no usable social image metadata"\);\n'
+              r'  return \{ \.\.\.meta, pageUrl: result\.url \};'
+          )
+          discovery_replacement = '''  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+          if (!meta) throw new Error("no usable social image metadata");
+          if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+            throw new Error("searched page did not confirm the requested subject");
+          }
+          return { ...meta, pageUrl: result.url };'''
+          text, count = discovery_pattern.subn(lambda _: discovery_replacement, text, count=1)
+          if count != 1:
+            raise SystemExit("discoverFromSource metadata block not found")
+
+          replacements = [
+              ('const candidate = await discoverFromSource(source);', 'const candidate = await discoverFromSource(source, record);'),
+              ('if (!BRAVE_SEARCH_API_KEY || initial.status === "applied" || initial.eligible === true) {', 'if (!DEEPSEEK_API_KEY || initial.status === "applied" || initial.eligible === true) {'),
+              ('{ label: "Brave Image Search", url: "https://search.brave.com/", error: error.message },', '{ label: "DeepSeek web search", url: "https://api.deepseek.com/", error: error.message },'),
+              ('webSearchEnabled: Boolean(BRAVE_SEARCH_API_KEY)', 'webSearchEnabled: Boolean(DEEPSEEK_API_KEY), webSearchProvider: DEEPSEEK_API_KEY ? "deepseek" : null'),
+              ('console.log(`Web image search: ${BRAVE_SEARCH_API_KEY ? "enabled" : "disabled (BRAVE_SEARCH_API_KEY unavailable)"}`);', 'console.log(`Web source search: ${DEEPSEEK_API_KEY ? "enabled (DeepSeek web_search)" : "disabled (DEEPSEEK_API_KEY unavailable)"}`);'),
+          ]
+          for before, after in replacements:
+            if before not in text:
+              raise SystemExit(f"script replacement not found: {before[:60]}")
+            text = text.replace(before, after, 1)
+          if "BRAVE_SEARCH_API_KEY" in text or "api.search.brave.com" in text:
+            raise SystemExit("Brave implementation remains in enrich-media.mjs")
+          script_path.write_text(text)
+
+          config_path = Path("config/media-sources.json")
+          config = json.loads(config_path.read_text())
+          config["webSearchFallback"] = {
+              "provider": "DeepSeek Responses API web_search",
+              "environmentVariable": "DEEPSEEK_API_KEY",
+              "enabledWhenConfigured": True,
+              "mode": "source-page-discovery",
+              "acceptOriginalOnly": True,
+              "preserveAspectRatio": True,
+              "acceptReliableMediaOriginal": True,
+              "requireDeterministicPageMatch": True,
+          }
+          config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+
+          docs_path = Path("docs/MEDIA_PIPELINE.md")
+          docs = docs_path.read_text()
+          docs = docs.replace(
+              "5. Open-web image search when the listed chain produces no usable result.",
+              "5. DeepSeek-assisted open-web source discovery when the listed chain produces no usable result.",
+          )
+          old_docs = "The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. The media workflow passes the repository secret with that name into the enrichment script. If the secret is absent, the script safely continues with listed item sources and records the remaining item as unavailable rather than forcing a mismatch."
+          new_docs = "The repository script can use DeepSeek's Responses API `web_search` only after all listed sources fail, when `DEEPSEEK_API_KEY` is present. DeepSeek is used only to discover candidate **source pages**; it never supplies a trusted image directly. The script opens each returned HTTPS page itself, requires an exact subject term copied from the edition title/headline to be confirmed in the page metadata, extracts that page's `og:image`/Twitter image, and then applies the normal HTTPS, size, dimension, format, and local-normalization checks. If the secret is absent or search fails, the pipeline safely continues without this last-resort layer."
+          if old_docs not in docs:
+            raise SystemExit("Brave documentation paragraph not found")
+          docs = docs.replace(old_docs, new_docs, 1)
+          docs = docs.replace(
+              "5. Open-web image search for the same story subject when the listed sources produce no usable asset. Search person-led stories for the named person first; search game-led stories for the game and allow cover/key art/screenshot fallbacks. The returned image must still resolve to an accessible original source page and pass the same-title/same-person relevance check.",
+              "5. DeepSeek-assisted open-web source discovery for the same story subject when the listed sources produce no usable asset. Person-led stories search for the named person first; game-led stories search for the game and allow cover/key art/screenshot source pages. DeepSeek returns only candidate page URLs. The repository then opens and validates those pages itself before accepting any image.",
+          )
+          docs += "\n## DeepSeek search configuration\n\nCreate a repository-level GitHub Actions secret named `DEEPSEEK_API_KEY`. The media workflow exposes it only to the enrichment step, which calls `https://api.deepseek.com/responses` with `deepseek-v4-flash` and forces the server-side `web_search` tool. No key means no paid web-search fallback; all free listed-source fallbacks still run normally. Because this is the last fallback layer, API calls occur only for records still missing verified media after the deterministic source chain has been exhausted.\n"
+          if "BRAVE_SEARCH_API_KEY" in docs or "Brave Image Search" in docs:
+            raise SystemExit("Brave documentation remains")
+          docs_path.write_text(docs)
+
+      - name: Check script syntax
+        run: node --check scripts/enrich-media.mjs
+
+      - name: Commit business files
+        shell: bash
+        run: |
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add scripts/enrich-media.mjs config/media-sources.json docs/MEDIA_PIPELINE.md
+          git commit -m "feat(media): use DeepSeek for web source fallback"
+          git push origin HEAD:codex/deepseek-media-search
