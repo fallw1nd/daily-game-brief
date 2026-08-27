@@ -1,0 +1,48 @@
+name: Cleanup DeepSeek format once
+
+on:
+  push:
+    branches:
+      - codex/deepseek-media-search
+    paths:
+      - .github/workflows/cleanup-deepseek-format-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/deepseek-media-search
+      - name: Fix indentation
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("scripts/enrich-media.mjs")
+          text = path.read_text()
+          text = text.replace('''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+  ?.replace(/<[^>]+>/g, " ")
+            .replace(/\\s+/g, " ")
+            .trim() || "";''', '''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+            ?.replace(/<[^>]+>/g, " ")
+            .replace(/\\s+/g, " ")
+            .trim() || "";''')
+          text = text.replace('''      const eligible = kind === "editorial"
+      ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
+      : eligibleCover(source);''', '''      const eligible = kind === "editorial"
+        ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
+        : eligibleCover(source);''')
+          path.write_text(text)
+      - name: Check syntax
+        run: node --check scripts/enrich-media.mjs
+      - name: Commit cleanup
+        run: |
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add scripts/enrich-media.mjs
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "style(media): align DeepSeek fallback indentation"
+          git push origin HEAD:codex/deepseek-media-search
