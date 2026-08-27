@@ -81,14 +81,14 @@ function extractMeta(html, pageUrl) {
   if (/logo|avatar|favicon|icon[-_.]/i.test(imageUrl)) return null;
   const titleTag = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
   ?.replace(/<[^>]+>/g, " ")
-  .replace(/\s+/g, " ")
-  .trim() || "";
-return {
-  imageUrl,
-  alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
-  pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
-  description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
-};
+            .replace(/\s+/g, " ")
+            .trim() || "";
+  return {
+    imageUrl,
+    alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+    pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+    description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+  };
 }
 
 const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
@@ -322,11 +322,11 @@ async function discoverFromSource(source, record) {
   const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
   if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
   const meta = extractMeta(result.bytes.toString("utf8"), result.url);
-if (!meta) throw new Error("no usable social image metadata");
-if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
-  throw new Error("searched page did not confirm the requested subject");
-}
-return { ...meta, pageUrl: result.url };
+  if (!meta) throw new Error("no usable social image metadata");
+  if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+    throw new Error("searched page did not confirm the requested subject");
+  }
+  return { ...meta, pageUrl: result.url };
 }
 
 function imageAspect(width, height) {
