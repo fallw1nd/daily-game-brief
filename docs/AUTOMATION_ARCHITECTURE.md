@@ -1,6 +1,6 @@
 # Programmatic Brief Automation
 
-This document defines the migration from an all-in-one ChatGPT scheduled run to a deterministic zero-extra-API-cost pipeline. GitHub Actions prepares bounded evidence and deterministic state; the user's existing ChatGPT tasks perform only the final editorial handoff. No paid model API is called by the repository.
+GitHub Actions prepares bounded evidence and deterministic state. The existing ChatGPT tasks perform the editorial decision and submit a structured handoff.
 
 ## Reliability boundary
 
@@ -22,15 +22,15 @@ The existing ChatGPT scheduled tasks own only evidence-bounded work:
 
 The model must never calculate issue numbers, mutate manifests directly, download media, or decide that a failed deployment succeeded.
 
-## Current migration stages
+## Components
 
-### Stage 0 — hardening (active)
+### Validation and SLA
 
 - `scripts/validate-data.mjs` enforces fixed windows, enums, primary-source requirements, source independence for `multi_source_verified`, tracking for unconfirmed entries, the next-15-day range, detailed audits, and byte-identical latest/archive data.
 - Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
 - `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
 
-### Stage 1 — pre-cutoff discovery (active)
+### Pre-cutoff discovery
 
 `Shadow news discovery` runs at 09:55/16:45 Asia/Shanghai, before the fixed 10:10/17:00 editorial tasks. It does not alter archives.
 
@@ -49,15 +49,15 @@ Artifacts and the persistent state branch measure:
 
 `scripts/audit-news-coverage.mjs` independently compares opened A/B evidence with the expected archive using normalized source URLs, subject keys, and conservative headline overlap. It reports high-confidence and review omissions without mutating an edition.
 
-### Stage 2 — evidence extraction and ledger (active)
+### Evidence extraction and ledger
 
 `scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
 
-### Stage 3 — ChatGPT editorial handoff (active, no paid API)
+### ChatGPT editorial handoff
 
-`scripts/editorialize.mjs` builds a compact editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, and is persisted on `automation/state`. No repository secret, model API, or additional API billing is used.
+`scripts/editorialize.mjs` builds a compact editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, and is persisted on `automation/state`.
 
-### Stage 4 — idempotent publisher (active)
+### Idempotent publisher
 
 `scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
@@ -71,7 +71,7 @@ Active tracking records are mandatory editorial input. When fresh opened evidenc
 
 The 10:45/17:35 SLA watchdog first restores the matching packet from `automation/state`. If it is missing or stale while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet is preserved back to the state branch on a best-effort basis and remains usable locally even if that persistence races another run. The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
 
-### Stage 5 — observation and refinement
+### Observation and refinement
 
 Keep the 10:10/17:00 ChatGPT tasks enabled as the normal publisher. Review omission audits, source health, degraded fallbacks, and media outcomes for seven consecutive days, then tune the deterministic source registry and thresholds without expanding the prompt.
 

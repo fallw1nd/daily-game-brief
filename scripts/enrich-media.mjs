@@ -299,16 +299,6 @@ function mediaPath(edition, record, kind) {
   return { relative, absolute: resolve(PUBLIC_ROOT, relative) };
 }
 
-function unavailableNote(kind, attempts) {
-  const reason = attempts.length
-    ? attempts.map((item) => `${item.label}: ${item.error}`).join("\uff1b")
-    : "\u6761\u76ee\u6ca1\u6709\u53ef\u7528\u4e8e\u5a92\u4f53\u6838\u9a8c\u7684 HTTPS \u6765\u6e90";
-  const prefix = kind === "cover"
-    ? "\u672a\u627e\u5230\u4e0e\u6e38\u620f\u6b63\u786e\u5bf9\u5e94\u4e14\u53ef\u8ffd\u6eaf\u6765\u6e90\u7684\u5c01\u9762"
-    : "\u672a\u627e\u5230\u4e0e\u4e8b\u4ef6\u76f4\u63a5\u76f8\u5173\u4e14\u53ef\u8ffd\u6eaf\u6765\u6e90\u7684\u65b0\u95fb\u914d\u56fe";
-  return `${prefix}\u3002${reason}`;
-}
-
 async function resolveRecord(edition, record, kind, sourceList, apply) {
   const attempts = [];
   let reviewCandidate = null;
@@ -417,10 +407,6 @@ async function processEdition(manifestItem, options) {
       entry.image_status = "verified";
       delete entry.imageNote;
       changed = true;
-    } else if (options.apply && options.migrateLegacy) {
-      entry.image_status = "unavailable";
-      entry.imageNote = unavailableNote("editorial", result.attempts || []);
-      changed = true;
     }
   });
 
@@ -442,19 +428,8 @@ async function processEdition(manifestItem, options) {
       item.cover_status = "verified";
       delete item.coverNote;
       changed = true;
-    } else if (options.apply && options.migrateLegacy) {
-      item.cover_status = "unavailable";
-      item.coverNote = unavailableNote("cover", result.attempts || []);
-      changed = true;
     }
   });
-
-  if (options.apply && options.migrateLegacy && edition.schemaVersion === 1) {
-    edition.archiveTitle ||= manifestItem.archiveTitle;
-    edition.leadEntryId ||= manifestItem.leadEntryId;
-    edition.schemaVersion = 2;
-    changed = true;
-  }
   if (options.apply && changed) {
     edition.revised = true;
     await writeJson(path, edition);
@@ -463,7 +438,7 @@ async function processEdition(manifestItem, options) {
 }
 
 async function main() {
-  const options = { apply: hasArg("--apply"), migrateLegacy: hasArg("--migrate-legacy") };
+  const options = { apply: hasArg("--apply") };
   const manifest = await readJson(resolve(DATA_ROOT, "manifest.json"));
   options.catalog = await readJson(resolve("config/media-catalog.json"));
   options.sourcePolicy = await readJson(resolve("config/media-sources.json"));
