@@ -81,6 +81,26 @@ describe("idempotent edition publisher", () => {
     expect(result.decisionDigest).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("uses the registered Chinese title when editorial output is unavailable", () => {
+    const fableEditorial = {
+      ...editorial,
+      decisions: [{
+        ...editorial.decisions[0],
+        titleKey: "fable",
+        titleEn: "Fable",
+        titleZhCn: null,
+        titleZhStatus: "unavailable",
+      }],
+    };
+    const result = buildEdition({ packet, editorial: fableEditorial, latest, manifest, now: new Date("2026-08-27T02:12:00Z") });
+    expect(result.edition.entries[0].title).toEqual({
+      title_key: "fable",
+      title_zh_cn: "神鬼寓言",
+      title_en: "Fable",
+      title_zh_status: "official_simplified",
+    });
+  });
+
   it("returns without mutation when the edition already exists", () => {
     const result = buildEdition({
       packet, editorial, latest,
