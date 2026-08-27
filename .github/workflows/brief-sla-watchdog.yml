@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -64,18 +65,19 @@ jobs:
           git fetch origin automation/state:refs/remotes/origin/automation/state || true
           git show "origin/automation/state:automation/ledger/events.json" > artifacts/event-ledger-previous.json 2>/dev/null || true
           if git show "origin/automation/state:automation/packets/latest-${{ steps.edition.outputs.period }}.json" > artifacts/editorial-packet.json 2>/dev/null; then
-            packet_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' artifacts/editorial-packet.json)"
-            if [ "$packet_id" = "${{ steps.sla.outputs.expected }}" ]; then
+            if node scripts/validate-editorial-packet.mjs \
+              --edition=${{ steps.sla.outputs.expected }} \
+              --period=${{ steps.edition.outputs.period }}; then
               echo "available=true" >> "$GITHUB_OUTPUT"
             else
               echo "available=false" >> "$GITHUB_OUTPUT"
-              echo "Packet is stale: $packet_id" >> "$GITHUB_STEP_SUMMARY"
+              echo "Packet exists but is stale or invalid; recovery will rebuild it." >> "$GITHUB_STEP_SUMMARY"
             fi
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Rebuild a missing or stale packet
+      - name: Rebuild a missing, stale, or invalid packet
         id: recovery
         if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'
         continue-on-error: true
@@ -85,11 +87,9 @@ jobs:
           node scripts/update-event-ledger.mjs
           node scripts/build-evidence.mjs
           node scripts/editorialize.mjs
-          packet_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' artifacts/editorial-packet.json)"
-          if [ "$packet_id" != "${{ steps.sla.outputs.expected }}" ]; then
-            echo "Recovered packet is for $packet_id, expected ${{ steps.sla.outputs.expected }}"
-            exit 1
-          fi
+          node scripts/validate-editorial-packet.mjs \
+            --edition=${{ steps.sla.outputs.expected }} \
+            --period=${{ steps.edition.outputs.period }}
           echo "available=true" >> "$GITHUB_OUTPUT"
 
       - name: Preserve recovered packet and ledger
@@ -147,22 +147,40 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          git pull --ff-only origin main
-          node scripts/build-degraded-decision.mjs
-          node scripts/publish-editorial-decision.mjs
-          node scripts/validate-data.mjs
-          if git diff --quiet -- public/data; then
-            echo "published=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          edition="${{ steps.sla.outputs.expected }}"
           git config user.name "daily-game-brief[bot]"
           git config user.email "daily-game-brief[bot]@users.noreply.github.com"
-          git add public/data
-          git commit -m "content(brief): publish degraded ${{ steps.sla.outputs.expected }}"
-          git push origin HEAD:main
-          gh workflow run deploy.yml --ref main
-          gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.sla.outputs.expected }}
-          echo "published=true" >> "$GITHUB_OUTPUT"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/build-degraded-decision.mjs
+            node scripts/publish-editorial-decision.mjs
+            node scripts/validate-data.mjs
+
+            if git diff --quiet -- public/data; then
+              echo "Repository already contains $edition; re-dispatching Pages for deployment recovery."
+              gh workflow run deploy.yml --ref main
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              echo "deploy_retriggered=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            git add public/data
+            git commit -m "content(brief): publish degraded $edition"
+            if git push origin HEAD:main; then
+              gh workflow run deploy.yml --ref main
+              gh workflow run media-enrichment.yml --ref main -f edition_id=$edition
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "main advanced during degraded publication; rebuilding $edition (attempt $((attempt + 1))/3)"
+          done
+
+          echo "Failed to publish degraded $edition after three rebuild attempts"
+          exit 1
 
       - name: Write degraded outcomes to persistent ledger
         id: ledger_feedback
@@ -184,7 +202,7 @@ jobs:
               success=true
               break
             fi
-            git -C "$state_dir" commit -m "chore(automation): record ${{ steps.sla.outputs.expected }} degraded outcomes"
+            git -C "$state_dir" commit -m "chore(automation): record $edition degraded outcomes"
             if git -C "$state_dir" push origin HEAD:automation/state; then
               success=true
               break
@@ -203,7 +221,7 @@ jobs:
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
           existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
-          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
+          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Pages re-dispatched: **${{ steps.fallback.outputs.deploy_retriggered || 'false' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
           body="$body\n- Ledger feedback: **${{ steps.ledger_feedback.outcome || 'not run' }}**"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
@@ -239,6 +257,7 @@ jobs:
             echo "- High-confidence omissions: ${{ steps.coverage.outputs.high_omissions || 'not available' }}"
             echo "- Review omissions: ${{ steps.coverage.outputs.review_omissions || 'not available' }}"
             echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
+            echo "- Pages re-dispatched: ${{ steps.fallback.outputs.deploy_retriggered || 'false' }}"
             echo "- Ledger feedback: ${{ steps.ledger_feedback.outcome || 'not run' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
