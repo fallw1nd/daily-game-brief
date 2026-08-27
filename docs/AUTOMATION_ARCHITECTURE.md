@@ -27,6 +27,7 @@ The model must never calculate issue numbers, mutate manifests directly, downloa
 ### Validation and SLA
 
 - `scripts/validate-data.mjs` enforces fixed windows, enums, primary-source requirements, source independence for `multi_source_verified`, tracking for unconfirmed entries, the next-15-day range, detailed audits, and byte-identical latest/archive data.
+- `scripts/validate-editorial-packet.mjs` rejects stale or malformed finalized packets before either ChatGPT or the SLA watchdog treats them as usable. It checks packet/input schema versions, mode, exact edition/period/planned time/window, `coverageThrough`, and post-cutoff finalization.
 - Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
 - `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
 
@@ -57,19 +58,25 @@ Artifacts and the persistent state branch measure:
 
 `scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The ChatGPT task may wait briefly for this same-time GitHub job, but it performs no supplemental discovery.
 
+A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. A packet that exists but is stale, pre-cutoff, malformed, or tied to the wrong fixed window is treated as missing for recovery purposes. The ChatGPT task first avoids racing any matching queued/in-progress collection run; otherwise it may use its edition-scoped one-shot recovery trigger to dispatch the existing collector.
+
 ### Idempotent publisher
 
 `scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
-The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>` and stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all three edition identities and cutoff coverage, performs the complete check, pushes data atomically, and explicitly dispatches Pages because commits created with the workflow token do not recursively trigger other workflows. Deployment verification and incidents remain GitHub responsibilities.
+The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>` and stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all edition identities and cutoff coverage, performs the complete check, and publishes the result.
 
-After a changed edition reaches `main`, the publisher also dispatches `media-enrichment.yml` with the exact edition ID. Media enrichment therefore cannot miss an edition merely because the normal ChatGPT run finished after 10:35/17:25 or because a newer edition became `latest` while the job waited. Morning replacement retains a previously verified cover when the stable upcoming ID or `title_key` still matches; only genuinely new or changed games return to `unavailable`.
+Publication is concurrency-safe against other `main` writers. If a push is rejected because `main` advanced after the edition was built, the workflow resets to the current `origin/main`, rebuilds the same committed editorial decision, reruns the full repository check, and retries up to three times. This preserves concurrent media changes instead of rebasing a stale generated `latest.json` over them. If a validated publication workflow still fails, the original push-triggered run queues at most one `workflow_dispatch` retry for the same committed decision. The retry path is semantically idempotent: an edition that already reached `main` is detected as `already-exists`, keeps its issue number, and can still re-dispatch Pages/media and finish ledger feedback.
+
+After a changed edition reaches `main`, the publisher dispatches `deploy.yml` and `media-enrichment.yml` with the exact edition ID. A workflow-dispatch retry also re-dispatches these downstream workflows even when the content commit already exists, covering the case where the original run failed after the `main` push but before downstream dispatch. Deployment verification and incidents remain GitHub responsibilities.
 
 After the edition dispatches, the publisher writes every structured decision back to the persistent 45-day ledger on `automation/state`. Discovery fields and editorial fields remain separate so a later collection cannot erase an editorial result. Records distinguish included, excluded, actively tracked, and closed tracking states, keep a bounded decision history, and use edition identity to prevent an older rerun from replacing newer judgment. A formal revision replaces the degraded decision for the same edition.
 
 Active tracking records are mandatory editorial input. When fresh opened evidence exists, the event is prioritized in the normal package list; otherwise a compact `trackingQueue` reminder carries its last decision, reason, source URLs, and dates. The ChatGPT task must explicitly continue or close every reminder. Tracking reminders count against the same 120,000-character budget and fail visibly rather than disappearing when the budget cannot contain them.
 
-The 10:45/17:35 SLA watchdog first restores the matching packet from `automation/state`. If it is missing or stale while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet is preserved back to the state branch on a best-effort basis and remains usable locally even if that persistence races another run. The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
+The 10:45/17:35 SLA watchdog first restores the matching packet from `automation/state` and validates the complete finalized-packet contract, not only the edition ID. If the packet is missing, stale, malformed, or pre-cutoff while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet is preserved back to the state branch on a best-effort basis and remains usable locally even if that persistence races another run.
+
+The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. Its `main` publication uses the same rebuild-on-current-main retry principle for up to three attempts. If the repository already contains the edition but Pages is still unhealthy, the watchdog re-dispatches Pages rather than treating the absence of a new data diff as sufficient recovery. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
 
 ### Observation and refinement
 
@@ -98,6 +105,7 @@ npm run news:ledger
 npm run news:ledger-feedback
 npm run news:evidence
 npm run news:packet
+node scripts/validate-editorial-packet.mjs --edition=YYYY-MM-DD-am --period=am
 npm run brief:publish-decision
 npm run brief:validate-submission
 npm run brief:degraded-decision
