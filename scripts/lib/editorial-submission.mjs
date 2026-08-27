@@ -12,8 +12,17 @@ export function validateEditorialSubmission({ branchName, packet, editorial }) {
   if (!branchMatch) return ["branch must be automation/editorial/<YYYY-MM-DD-am|pm>"];
   const editionId = branchMatch[1];
   const input = packet?.editorialInput;
+  if (packet?.schemaVersion !== 3) errors.push("packet must use finalized schemaVersion 3");
   if (!input?.window || !Array.isArray(input.packages)) errors.push("packet.editorialInput is invalid");
   if (input?.window?.id !== editionId) errors.push("packet window does not match the submission branch");
+  const cutoffAt = Date.parse(`${input?.window?.windowEnd?.replace(" ", "T")}:00+08:00`);
+  const finalizedAt = Date.parse(packet?.finalizedAt);
+  if (!Number.isFinite(cutoffAt) || !Number.isFinite(finalizedAt) || finalizedAt < cutoffAt) {
+    errors.push("packet was not finalized at or after the fixed cutoff");
+  }
+  if (packet?.coverageThrough !== input?.window?.windowEnd) {
+    errors.push("packet coverage does not reach the fixed cutoff");
+  }
   if (!editionPattern.test(editorial?.editionId || "") || editorial?.editionId !== editionId) {
     errors.push("editorial editionId does not match the submission branch");
   }
