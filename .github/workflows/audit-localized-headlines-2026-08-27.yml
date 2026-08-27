@@ -43,14 +43,19 @@ jobs:
             }
           }
           const docs = files.sort().map(file => [file, JSON.parse(fs.readFileSync(file, 'utf8'))]);
+          const pairsFor = (t) => {
+            if (!t?.title_en || !t?.title_zh_cn) return [];
+            const ens = t.title_en.split(/\s*\/\s*/).map(v => v.trim()).filter(Boolean);
+            const zhs = t.title_zh_cn.split(/\s*\/\s*/).map(v => v.trim()).filter(Boolean);
+            return ens.length === zhs.length && ens.length > 1 ? ens.map((en, i) => [en, zhs[i]]) : [[t.title_en, t.title_zh_cn]];
+          };
           const mismatches = [];
           const targetHits = [];
           for (const [file, doc] of docs) {
             for (const entry of doc.entries || []) {
               const t = entry.title || {};
-              if (t.title_zh_cn && t.title_en && entry.headline && entry.headline.includes(t.title_en)) {
-                mismatches.push({file,id:entry.id,key:t.title_key,en:t.title_en,zh:t.title_zh_cn,headline:entry.headline});
-              }
+              const stalePairs = pairsFor(t).filter(([en, zh]) => en !== zh && entry.headline?.includes(en));
+              if (stalePairs.length) mismatches.push({file,id:entry.id,key:t.title_key,pairs:stalePairs,headline:entry.headline});
               for (const target of targets) {
                 if ((t.title_en || '').toLowerCase().includes(target.toLowerCase()) || (entry.headline || '').toLowerCase().includes(target.toLowerCase())) {
                   targetHits.push({kind:'entry',target,file,id:entry.id,key:t.title_key,en:t.title_en,zh:t.title_zh_cn,status:t.title_zh_status,headline:entry.headline});
