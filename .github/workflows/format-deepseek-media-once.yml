@@ -1,0 +1,111 @@
+name: Format DeepSeek media once
+
+on:
+  push:
+    branches:
+      - codex/deepseek-media-search
+    paths:
+      - .github/workflows/format-deepseek-media-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/deepseek-media-search
+      - name: Normalize inserted indentation
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("scripts/enrich-media.mjs")
+          text = path.read_text()
+          replacements = {
+          '''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+          ?.replace(/<[^>]+>/g, " ")
+          .replace(/\\s+/g, " ")
+          .trim() || "";
+          return {
+          imageUrl,
+          alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+          pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+          description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+          };
+          }''': '''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+            ?.replace(/<[^>]+>/g, " ")
+            .replace(/\\s+/g, " ")
+            .trim() || "";
+          return {
+            imageUrl,
+            alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+            pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+            description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+          };
+          }''',
+          '''  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+          if (!meta) throw new Error("no usable social image metadata");
+          if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+          throw new Error("searched page did not confirm the requested subject");
+          }
+          return { ...meta, pageUrl: result.url };''': '''  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+          if (!meta) throw new Error("no usable social image metadata");
+          if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+            throw new Error("searched page did not confirm the requested subject");
+          }
+          return { ...meta, pageUrl: result.url };'''
+          }
+          # YAML literal block indentation is removed uniformly; normalize based on actual JS anchors too.
+          text = text.replace('''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+          ?.replace(/<[^>]+>/g, " ")
+          .replace(/\\s+/g, " ")
+          .trim() || "";
+          return {
+          imageUrl,
+          alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+          pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+          description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+          };
+          }''', '''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+            ?.replace(/<[^>]+>/g, " ")
+            .replace(/\\s+/g, " ")
+            .trim() || "";
+          return {
+            imageUrl,
+            alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
+            pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+            description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
+          };
+          }''')
+          text = text.replace('''  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+          if (!meta) throw new Error("no usable social image metadata");
+          if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+          throw new Error("searched page did not confirm the requested subject");
+          }
+          return { ...meta, pageUrl: result.url };''', '''  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
+          if (!meta) throw new Error("no usable social image metadata");
+          if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
+            throw new Error("searched page did not confirm the requested subject");
+          }
+          return { ...meta, pageUrl: result.url };''')
+          # Actual generated blocks have zero indentation on continuation lines; repair them explicitly.
+          text = text.replace('''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+          ?.replace(/<[^>]+>/g, " ")''', '''  const titleTag = html.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+            ?.replace(/<[^>]+>/g, " ")''')
+          text = text.replace('\n  .replace(/\\s+/g, " ")\n  .trim() || "";\nreturn {\n  imageUrl,\n  alt:', '\n            .replace(/\\s+/g, " ")\n            .trim() || "";\n  return {\n    imageUrl,\n    alt:')
+          text = text.replace('\n  pageTitle:', '\n    pageTitle:').replace('\n  description:', '\n    description:').replace('\n};\n}\n\nconst displayTitle', '\n  };\n}\n\nconst displayTitle')
+          text = text.replace('\nif (!meta) throw new Error("no usable social image metadata");\nif (source.webSearch', '\n  if (!meta) throw new Error("no usable social image metadata");\n  if (source.webSearch')
+          text = text.replace(')) {\n  throw new Error("searched page did not confirm the requested subject");\n}\nreturn { ...meta, pageUrl: result.url };', ')) {\n    throw new Error("searched page did not confirm the requested subject");\n  }\n  return { ...meta, pageUrl: result.url };')
+          path.write_text(text)
+      - name: Check syntax
+        run: node --check scripts/enrich-media.mjs
+      - name: Commit formatting
+        run: |
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add scripts/enrich-media.mjs
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "style(media): normalize DeepSeek fallback formatting"
+          git push origin HEAD:codex/deepseek-media-search
