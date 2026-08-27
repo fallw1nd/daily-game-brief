@@ -13,6 +13,11 @@ try { ledger = JSON.parse(await readFile(LEDGER_PATH, "utf8")); } catch (error) 
   if (error.code !== "ENOENT") throw error;
 }
 const editorialInput = buildEditorialInput(evidence, MAX_INPUT_CHARS, ledger);
+const generatedAt = new Date().toISOString();
+const cutoffAt = new Date(`${editorialInput.window.windowEnd.replace(" ", "T")}:00+08:00`).toISOString();
+if (Date.parse(generatedAt) < Date.parse(cutoffAt)) {
+  throw new Error(`Cannot finalize ${editorialInput.window.id} before ${cutoffAt}`);
+}
 const instructions = [
   "你是游戏行业简报编辑，只能依据证据包判断，不得补写证据中没有的事实。",
   "每个事件给出 include、exclude 或 needs_review；A级事实也必须满足来源与时间要求。",
@@ -25,8 +30,10 @@ const instructions = [
   "needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",
 ].join("\n");
 const packet = {
-  schemaVersion: 2,
-  generatedAt: new Date().toISOString(),
+  schemaVersion: 3,
+  generatedAt,
+  finalizedAt: generatedAt,
+  coverageThrough: editorialInput.window.windowEnd,
   mode: "chatgpt-handoff",
   instructions,
   outputSchema: editorialSchema,
