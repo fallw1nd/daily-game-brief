@@ -32,7 +32,7 @@ function nullableDecision(item, reason) {
 
 export function buildDegradedDecision(packet) {
   const input = packet.editorialInput;
-  const decisions = input.packages.map((item) => {
+  const packageDecisions = input.packages.map((item) => {
     const opened = item.sources.filter((source) => source.status === "opened" && source.kind !== "discovery");
     const primary = opened.filter((source) => source.kind === "primary");
     const independent = new Set(opened.map((source) => source.independenceKey || new URL(source.url).hostname));
@@ -57,6 +57,15 @@ export function buildDegradedDecision(packet) {
       sourceIndexes: opened.map((source) => source.sourceIndex), additionalSources: [],
     };
   });
+  const trackingDecisions = (input.trackingQueue || []).map((item) => ({
+    eventKey: item.eventKey, decision: "needs_review", section: null, titleKey: null,
+    titleZhCn: null, titleEn: null, titleZhStatus: null, headline: null, summary: null,
+    factStatus: null, timeStatus: null, entryFlags: [], tracking: true,
+    verification: "无AI缺期兜底不关闭此前尚未解决的追踪项。",
+    reason: item.reason || "等待后续正常编辑任务复查。", beijingTime: null, timeNote: null,
+    platforms: [], region: null, releaseType: null, sourceIndexes: [], additionalSources: [],
+  }));
+  const decisions = [...packageDecisions, ...trackingDecisions];
   const included = decisions.filter((item) => item.decision === "include");
   if (!included.length) throw new Error("No high-confidence A-level event is eligible for degraded publication");
   const prefix = input.window.period === "am" ? "早报｜" : "晚报｜";

@@ -48,9 +48,11 @@ jobs:
           mkdir -p artifacts
           git fetch origin "$GITHUB_REF_NAME:refs/remotes/origin/$GITHUB_REF_NAME"
           git show "refs/remotes/origin/$GITHUB_REF_NAME:automation/inbox/$edition.json" > artifacts/editorial-decisions.json
+          decided_at="$(git show -s --format=%cI "refs/remotes/origin/$GITHUB_REF_NAME")"
           git fetch origin automation/state:refs/remotes/origin/automation/state
           git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
           echo "edition=$edition" >> "$GITHUB_OUTPUT"
+          echo "decided_at=$decided_at" >> "$GITHUB_OUTPUT"
 
       - name: Validate evidence-bounded submission
         env:
@@ -58,11 +60,14 @@ jobs:
         run: node scripts/validate-editorial-submission.mjs
 
       - name: Build and validate edition
+        id: build
         shell: bash
         run: |
           git pull --ff-only origin main
           node scripts/publish-editorial-decision.mjs
           npm run check
+          feedback_eligible="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).feedbackEligible")"
+          echo "feedback_eligible=$feedback_eligible" >> "$GITHUB_OUTPUT"
 
       - name: Publish edition atomically
         id: publication
@@ -89,6 +94,39 @@ jobs:
           gh workflow run deploy.yml --ref main
           gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}
 
+      - name: Write editorial outcomes to persistent ledger
+        id: ledger_feedback
+        if: steps.build.outputs.feedback_eligible == 'true'
+        env:
+          EDITORIAL_DECIDED_AT: ${{ steps.submission.outputs.decided_at }}
+        shell: bash
+        run: |
+          success=false
+          for attempt in 1 2 3; do
+            state_dir="$RUNNER_TEMP/editorial-ledger-$attempt"
+            git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+            git worktree add --detach "$state_dir" origin/automation/state
+            EVENT_LEDGER_PATH="$state_dir/automation/ledger/events.json" node scripts/apply-editorial-feedback.mjs
+            git -C "$state_dir" config user.name "daily-game-brief[bot]"
+            git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
+            git -C "$state_dir" add automation/ledger/events.json
+            if git -C "$state_dir" diff --cached --quiet; then
+              echo "updated=false" >> "$GITHUB_OUTPUT"
+              success=true
+              break
+            fi
+            git -C "$state_dir" commit -m "chore(automation): record ${{ steps.submission.outputs.edition }} editorial outcomes"
+            if git -C "$state_dir" push origin HEAD:automation/state; then
+              echo "updated=true" >> "$GITHUB_OUTPUT"
+              success=true
+              break
+            fi
+          done
+          if [ "$success" != "true" ]; then
+            echo "Failed to update automation/state after three attempts"
+            exit 1
+          fi
+
       - name: Report publication failure
         if: failure()
         env:
@@ -114,4 +152,5 @@ jobs:
             echo "- Decision branch: ${{ github.ref_name }}"
             echo "- Data changed: ${{ steps.publication.outputs.changed || 'false' }}"
             echo "- Main commit: ${{ steps.publication.outputs.commit || 'unchanged' }}"
+            echo "- Ledger updated: ${{ steps.ledger_feedback.outputs.updated || 'false' }}"
           } >> "$GITHUB_STEP_SUMMARY"

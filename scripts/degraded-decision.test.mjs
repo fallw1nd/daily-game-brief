@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 
 function packet(overrides = {}) {
-  return { editorialInput: { window: { id: "2026-08-27-am", period: "am" }, packages: [{
+  return { editorialInput: { window: { id: "2026-08-27-am", period: "am" }, trackingQueue: [], packages: [{
     eventKey: "event-1", eventKind: "announcement", subjectKey: "Example Game",
     headline: "Example Game announced", tier: "A", timeRelation: "window",
     sources: [{ sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher",
@@ -23,5 +23,14 @@ describe("zero-AI degraded decision", () => {
 
   it("refuses to fabricate an edition when no event clears the threshold", () => {
     expect(() => buildDegradedDecision(packet({ tier: "B" }))).toThrow(/No high-confidence/);
+  });
+
+  it("keeps unresolved tracking open without AI judgment", () => {
+    const value = packet();
+    value.editorialInput.trackingQueue = [{ eventKey: "tracked-event", reason: "等待官方确认。" }];
+    const output = buildDegradedDecision(value);
+    expect(output.decisions[1]).toMatchObject({
+      eventKey: "tracked-event", decision: "needs_review", tracking: true,
+    });
   });
 });

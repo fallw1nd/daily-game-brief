@@ -164,8 +164,39 @@ jobs:
           gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.sla.outputs.expected }}
           echo "published=true" >> "$GITHUB_OUTPUT"
 
+      - name: Write degraded outcomes to persistent ledger
+        id: ledger_feedback
+        if: steps.fallback.outputs.published == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          decided_at="$(git show -s --format=%cI HEAD)"
+          success=false
+          for attempt in 1 2 3; do
+            state_dir="$RUNNER_TEMP/degraded-ledger-$attempt"
+            git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+            git worktree add --detach "$state_dir" origin/automation/state
+            EDITORIAL_DECIDED_AT="$decided_at" EVENT_LEDGER_PATH="$state_dir/automation/ledger/events.json" node scripts/apply-editorial-feedback.mjs
+            git -C "$state_dir" config user.name "daily-game-brief[bot]"
+            git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
+            git -C "$state_dir" add automation/ledger/events.json
+            if git -C "$state_dir" diff --cached --quiet; then
+              success=true
+              break
+            fi
+            git -C "$state_dir" commit -m "chore(automation): record ${{ steps.sla.outputs.expected }} degraded outcomes"
+            if git -C "$state_dir" push origin HEAD:automation/state; then
+              success=true
+              break
+            fi
+          done
+          if [ "$success" != "true" ]; then
+            echo "Failed to update automation/state after three attempts"
+            exit 1
+          fi
+
       - name: Open or update SLA incident
-        if: steps.sla.outputs.status != 'healthy' && steps.fallback.outputs.published != 'true'
+        if: steps.sla.outputs.status != 'healthy' && (steps.fallback.outputs.published != 'true' || steps.ledger_feedback.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -173,6 +204,7 @@ jobs:
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
           existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
           body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
+          body="$body\n- Ledger feedback: **${{ steps.ledger_feedback.outcome || 'not run' }}**"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
           else
@@ -180,7 +212,7 @@ jobs:
           fi
 
       - name: Close resolved SLA incident
-        if: steps.sla.outputs.status == 'healthy' || steps.fallback.outputs.published == 'true'
+        if: steps.sla.outputs.status == 'healthy' || (steps.fallback.outputs.published == 'true' && steps.ledger_feedback.outcome != 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -207,6 +239,7 @@ jobs:
             echo "- High-confidence omissions: ${{ steps.coverage.outputs.high_omissions || 'not available' }}"
             echo "- Review omissions: ${{ steps.coverage.outputs.review_omissions || 'not available' }}"
             echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
+            echo "- Ledger feedback: ${{ steps.ledger_feedback.outcome || 'not run' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage audit

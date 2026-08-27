@@ -21,10 +21,11 @@ const instructions = [
   "中文名不得机器直译：无官方名或广泛通行译名时 titleZhCn=null、titleZhStatus=unavailable。",
   "标题直述事件，摘要写具体信息；verification说明证据边界，不使用宣传语和套话。",
   "早报必须以 upcomingMode=replace 重建未来15天；晚报使用 inherit_and_patch，只处理新日期变化。",
-  "对每个输入 eventKey 恰好输出一次决定。",
+  "对 packages 与 trackingQueue 中的每个 eventKey 恰好输出一次决定；trackingQueue 无新证据时必须补查后明确继续追踪或关闭。",
+  "needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",
 ].join("\n");
 const packet = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   mode: "chatgpt-handoff",
   costBoundary: "No paid model API call is permitted by this workflow.",

@@ -77,6 +77,8 @@ describe("idempotent edition publisher", () => {
     expect(result.edition.entries[0].image_status).toBe("unavailable");
     expect(result.edition.upcoming.map((item) => item.id)).toEqual(["upcoming-one"]);
     expect(result.manifest.latest).toBe("2026-08-27-am");
+    expect(result.edition.sourceReport.editorialDecisionDigest).toBe(result.decisionDigest);
+    expect(result.decisionDigest).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("returns without mutation when the edition already exists", () => {
