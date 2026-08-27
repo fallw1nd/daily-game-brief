@@ -30,9 +30,9 @@ The model must never calculate issue numbers, mutate manifests directly, downloa
 - Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
 - `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
 
-### Pre-cutoff discovery
+### Final-window discovery
 
-`Shadow news discovery` runs at 09:55/16:45 Asia/Shanghai, before the fixed 10:10/17:00 editorial tasks. It does not alter archives.
+`Final editorial packet` starts at the fixed 10:10/17:00 Asia/Shanghai cutoffs and captures the complete edition window. It does not alter archives.
 
 1. `config/news-sources.json` is the curated source registry.
 2. `scripts/collect-news.mjs` reads RSS and list pages without opening article bodies.
@@ -55,13 +55,13 @@ Artifacts and the persistent state branch measure:
 
 ### ChatGPT editorial handoff
 
-`scripts/editorialize.mjs` builds a compact editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, and is persisted on `automation/state`.
+`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The ChatGPT task may wait briefly for this same-time GitHub job, but it performs no supplemental discovery.
 
 ### Idempotent publisher
 
 `scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
-The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact packet from `automation/state`, validates all three edition identities, performs the complete check, pushes data atomically, and explicitly dispatches Pages because commits created with the workflow token do not recursively trigger other workflows.
+The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>` and stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all three edition identities and cutoff coverage, performs the complete check, pushes data atomically, and explicitly dispatches Pages because commits created with the workflow token do not recursively trigger other workflows. Deployment verification and incidents remain GitHub responsibilities.
 
 After a changed edition reaches `main`, the publisher also dispatches `media-enrichment.yml` with the exact edition ID. Media enrichment therefore cannot miss an edition merely because the normal ChatGPT run finished after 10:35/17:25 or because a newer edition became `latest` while the job waited. Morning replacement retains a previously verified cover when the stable upcoming ID or `title_key` still matches; only genuinely new or changed games return to `unavailable`.
 
