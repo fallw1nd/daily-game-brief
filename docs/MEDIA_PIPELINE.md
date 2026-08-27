@@ -20,20 +20,24 @@ If official storefronts and publisher pages yield no usable asset, a reputable m
 
 Search results must use the original image URL and source page, never a search-engine thumbnail. Fan art, unrelated images, watermarked composites, and images without an accessible source page remain prohibited. Cover credit remains in JSON but is not rendered as a visible caption.
 
-The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. Without that variable it safely continues with item-level sources supplied by the scheduled ChatGPT task.
+The repository script can use Brave Image Search after listed sources fail when `BRAVE_SEARCH_API_KEY` is present. The media workflow passes the repository secret with that name into the enrichment script. If the secret is absent, the script safely continues with listed item sources and records the remaining item as unavailable rather than forcing a mismatch.
 
 MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not automatic image sources. MobyGames requires its licensed API plan and attribution; Gavas prohibits unapproved reproduction and image hotlinking; the remaining sites lack a confirmed machine-readable reuse permission or block automation. They may help a human identify an edition, but the final asset must resolve to an approved original source.
 
 ## Editorial fallback ladder
 
-For news images, stop after the first verified match in this order:
+The goal is to avoid empty story art whenever a clearly related, traceable image exists. Relevance is to the **subject of the story**, not only the exact event page. Stop after the first verified match in this order:
 
-1. The exact official news page's social image.
+1. The exact official news, announcement, interview, press release, or event page's image.
 2. The thumbnail of the exact primary official YouTube upload.
-3. Official key art, cover, store art, or screenshot for the same game or company.
-4. A specific unavailable note when no candidate passes validation.
+3. For a person-led story such as an interview, podcast, developer comment, or designer profile: another clearly identified, traceable photo of that same person from an official page or reliable media source. The photo does not need to come from the current interview.
+4. For a game-led story: official key art, game cover/store art, official screenshot, or other publisher/platform artwork for that same game. A game cover is an acceptable fallback for a news item about that game's update, release, test, interview, delay, or other new development.
+5. Open-web image search for the same story subject when the listed sources produce no usable asset. Search person-led stories for the named person first; search game-led stories for the game and allow cover/key art/screenshot fallbacks. The returned image must still resolve to an accessible original source page and pass the same-title/same-person relevance check.
+6. Only then record a specific unavailable reason.
 
-An exact official-upload thumbnail is not a search-result thumbnail. The source must be the opened primary video URL, the script must derive the video ID, and the image response must pass type, size, and dimension checks. The downloader tries `maxresdefault`, `hq720`, `sddefault`, then `hqdefault` and saves the first valid result locally. Do not use another channel's reupload or a merely similar game image.
+A fallback image is not required to depict the exact event, but it must depict the correct subject. Do not use a merely similar developer, another game in the series without an explicit relationship, generic convention photography, logos presented as editorial art, or an image whose identity cannot be verified. Prefer a relevant fallback over `unavailable`, but prefer `unavailable` over a plausible-looking mismatch.
+
+An exact official-upload thumbnail is not a search-result thumbnail. The source must be the opened primary video URL, the script must derive the video ID, and the image response must pass type, size, and dimension checks. The downloader tries `maxresdefault`, `hq720`, `sddefault`, then `hqdefault` and saves the first valid result locally. Do not use another channel's reupload.
 
 ## Automatic checks
 
