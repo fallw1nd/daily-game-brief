@@ -1,4 +1,4 @@
-name: Audit missing title translations once
+name: Audit title translations once
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         with:
           ref: main
 
-      - name: Scan unavailable title translations
+      - name: Scan title translations
         shell: node {0}
         run: |
           const fs = require('fs');
@@ -37,48 +37,63 @@ jobs:
               }
             }
           }
-          const map = new Map();
+          const known = new Map();
+          const unavailable = new Map();
           for (const file of files.sort()) {
             const edition = JSON.parse(fs.readFileSync(file, 'utf8'));
             for (const [kind, items] of [['entry', edition.entries || []], ['upcoming', edition.upcoming || []]]) {
               for (const item of items) {
                 const title = item.title || {};
-                if (title.title_zh_status !== 'unavailable') continue;
                 const key = title.title_key || title.title_en || '(missing-key)';
-                const current = map.get(key) || {
-                  titleKey: key,
-                  titleEn: title.title_en || null,
-                  occurrences: [],
-                  kinds: new Set(),
-                  headlines: new Set(),
-                };
-                current.occurrences.push(edition.id);
-                current.kinds.add(kind);
-                if (item.headline) current.headlines.add(item.headline);
-                map.set(key, current);
+                if (title.title_zh_cn && title.title_zh_status !== 'unavailable') {
+                  const signature = `${key}\u0000${title.title_zh_cn}\u0000${title.title_zh_status}`;
+                  const current = known.get(signature) || {
+                    titleKey: key,
+                    titleEn: title.title_en || null,
+                    titleZhCn: title.title_zh_cn,
+                    titleZhStatus: title.title_zh_status,
+                    editions: new Set(),
+                    kinds: new Set(),
+                  };
+                  current.editions.add(edition.id);
+                  current.kinds.add(kind);
+                  known.set(signature, current);
+                }
+                if (title.title_zh_status === 'unavailable') {
+                  const current = unavailable.get(key) || {
+                    titleKey: key,
+                    titleEn: title.title_en || null,
+                    editions: new Set(),
+                    kinds: new Set(),
+                    headlines: new Set(),
+                  };
+                  current.editions.add(edition.id);
+                  current.kinds.add(kind);
+                  if (item.headline) current.headlines.add(item.headline);
+                  unavailable.set(key, current);
+                }
               }
             }
           }
-          const items = [...map.values()].map((item) => ({
-            titleKey: item.titleKey,
-            titleEn: item.titleEn,
-            occurrenceCount: item.occurrences.length,
-            editions: [...new Set(item.occurrences)],
+          const serialize = (item) => ({
+            ...item,
+            editions: [...item.editions],
             kinds: [...item.kinds],
-            headlines: [...item.headlines],
-          })).sort((a, b) => a.titleKey.localeCompare(b.titleKey));
-          fs.mkdirSync('artifacts', { recursive: true });
-          fs.writeFileSync('artifacts/missing-title-translations.json', JSON.stringify({
+            ...(item.headlines ? { headlines: [...item.headlines] } : {}),
+          });
+          const report = {
             generatedAt: new Date().toISOString(),
             editionCount: files.length,
-            uniqueUnavailableTitles: items.length,
-            items,
-          }, null, 2) + '\n');
-          console.log(`Unavailable title translations: ${items.length} unique title(s) across ${files.length} editions.`);
+            knownTranslations: [...known.values()].map(serialize).sort((a, b) => a.titleKey.localeCompare(b.titleKey)),
+            unavailableTitles: [...unavailable.values()].map(serialize).sort((a, b) => a.titleKey.localeCompare(b.titleKey)),
+          };
+          fs.mkdirSync('artifacts', { recursive: true });
+          fs.writeFileSync('artifacts/title-translations-audit.json', JSON.stringify(report, null, 2) + '\n');
+          console.log(`Known translations: ${report.knownTranslations.length}; unavailable unique titles: ${report.unavailableTitles.length}.`);
 
       - name: Upload audit
         uses: actions/upload-artifact@v6
         with:
-          name: missing-title-translations
-          path: artifacts/missing-title-translations.json
+          name: title-translations-audit
+          path: artifacts/title-translations-audit.json
           retention-days: 7
