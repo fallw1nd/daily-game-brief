@@ -209,7 +209,7 @@ function coverPreference(source, platforms) {
 }
 
 function eligibleCover(source) {
-  return source.kind === "primary" || source.webSearch === true;
+  return source.kind === "primary" || source.kind === "secondary" || source.webSearch === true;
 }
 
 function youtubeVideoId(input) {
