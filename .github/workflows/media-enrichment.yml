@@ -1,4 +1,4 @@
-name: Propose verified media
+name: Publish verified media
 
 on:
   schedule:
@@ -14,8 +14,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
-  issues: write
+  actions: write
 
 concurrency:
   group: media-enrichment
@@ -55,7 +54,7 @@ jobs:
             npm run media:enrich
           fi
 
-      - name: Validate proposal
+      - name: Validate media update
         run: npm run check
 
       - name: Upload media audit
@@ -67,8 +66,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Prepare proposal metadata
-        id: proposal
+      - name: Publish verified media
+        id: publication
         shell: bash
         run: |
           edition="${{ inputs.edition_id }}"
@@ -76,67 +75,39 @@ jobs:
             edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
           fi
           echo "edition=$edition" >> "$GITHUB_OUTPUT"
-          echo "branch=automation/media-$edition" >> "$GITHUB_OUTPUT"
           if git diff --quiet -- public/data public/media; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-      - name: Push proposal branch
-        if: steps.proposal.outputs.changed == 'true'
-        shell: bash
-        run: |
-          branch="${{ steps.proposal.outputs.branch }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin "$branch:refs/remotes/origin/$branch" || true
-          git switch -C "$branch"
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
           git add public/data/latest.json public/data/archive public/media
-          git commit -m "chore(media): enrich ${{ steps.proposal.outputs.edition }}"
-          git push --force-with-lease origin "HEAD:$branch"
+          git commit -m "chore(media): enrich $edition"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "Failed to publish media after three attempts"
+          exit 1
 
-      - name: Open or update review PR
-        id: review
-        if: steps.proposal.outputs.changed == 'true'
+      - name: Deploy media update
+        if: steps.publication.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          branch="${{ steps.proposal.outputs.branch }}"
-          existing="$(gh pr list --head "$branch" --base main --state open --json url --jq '.[0].url // ""')"
-          if [ -n "$existing" ]; then
-            echo "Updated $existing"
-            echo "url=$existing" >> "$GITHUB_OUTPUT"
-            echo "status=pr" >> "$GITHUB_OUTPUT"
-          else
-            if created="$(gh pr create --base main --head "$branch" --title "chore(media): enrich ${{ steps.proposal.outputs.edition }}" --body "Automated media proposal for **${{ steps.proposal.outputs.edition }}**. Review every crop, Chinese alt, credit, source page, platform priority, and unavailable reason before merging. This workflow never merges directly." 2>&1)"; then
-              echo "$created"
-              echo "url=$created" >> "$GITHUB_OUTPUT"
-              echo "status=pr" >> "$GITHUB_OUTPUT"
-            else
-              branch_url="https://github.com/${{ github.repository }}/tree/$branch"
-              echo "::warning title=Media review PR could not be created::$created"
-              echo "The verified proposal branch remains available at $branch_url"
-              echo "url=$branch_url" >> "$GITHUB_OUTPUT"
-              echo "status=branch-only" >> "$GITHUB_OUTPUT"
+        run: gh workflow run deploy.yml --ref main
 
-              issue_title="Media review awaiting PR permission: ${{ steps.proposal.outputs.edition }}"
-              existing_issue="$(gh issue list --state open --search \"$issue_title in:title\" --json url --jq '.[0].url // ""' || true)"
-              if [ -z "$existing_issue" ]; then
-                gh issue create --title "$issue_title" --body "The media proposal was generated, validated, and pushed to [$branch]($branch_url), but the workflow token could not create the review PR. Enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**, then rerun this workflow. No media was merged automatically.\n\nGitHub response:\n\`\`\`\n$created\n\`\`\`" || true
-              fi
-            fi
-          fi
-
-      - name: Summarize proposal delivery
-        if: always() && steps.proposal.outputs.changed == 'true'
+      - name: Summarize media publication
+        if: always()
         shell: bash
         run: |
           {
-            echo "## Media proposal"
-            echo "- Edition: ${{ steps.proposal.outputs.edition }}"
-            echo "- Delivery: ${{ steps.review.outputs.status || 'branch-only' }}"
-            echo "- Review URL: ${{ steps.review.outputs.url || format('https://github.com/{0}/tree/{1}', github.repository, steps.proposal.outputs.branch) }}"
-            echo "- The workflow never merges media automatically."
+            echo "## Media publication"
+            echo "- Edition: ${{ steps.publication.outputs.edition || 'unresolved' }}"
+            echo "- Data changed: ${{ steps.publication.outputs.changed || 'false' }}"
+            echo "- Main commit: ${{ steps.publication.outputs.commit || 'unchanged' }}"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 # Media Pipeline
 
-The media pipeline is deliberately conservative. It enriches the latest edition after publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and opens a review PR. It never merges or deploys automatically.
+The media pipeline enriches an edition after publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and publishes the validated data and files directly to `main`. It then dispatches the normal Pages deployment.
 
 ## Cover priority
 
@@ -31,7 +31,7 @@ For news images, stop after the first verified match in this order:
 1. The exact official news page's social image.
 2. The thumbnail of the exact primary official YouTube upload.
 3. Official key art, cover, store art, or screenshot for the same game or company.
-4. A specific unavailable note and traceable source for the review workflow.
+4. A specific unavailable note when no candidate passes validation.
 
 An exact official-upload thumbnail is not a search-result thumbnail. The source must be the opened primary video URL, the script must derive the video ID, and the image response must pass type, size, and dimension checks. The downloader tries `maxresdefault`, `hq720`, `sddefault`, then `hqdefault` and saves the first valid result locally. Do not use another channel's reupload or a merely similar game image.
 
@@ -48,4 +48,4 @@ Run npm run media:audit for a read-only report or npm run media:enrich for the l
 - writes to public/media/briefs/YYYY/MM/<edition-id>/;
 - records a specific unavailable reason instead of forcing a mismatch.
 
-Scheduled runs at 10:35 and 17:25 Asia/Shanghai create or update automation/media-<edition-id> and open a PR. Review the crop, Chinese alt, credit, source page, product edition, and unavailable notes before merging.
+The editorial publisher dispatches the workflow for the exact edition immediately after publication. Scheduled runs at 10:35 and 17:25 Asia/Shanghai remain as idempotent recovery checks. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.

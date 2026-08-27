@@ -43,4 +43,4 @@ Storefronts are preferred discovery sources, not shape requirements. After liste
 
 ## Visual Acceptance
 
-Do not use the Windows browser sandbox for visual QA. Still run data, type, test, and build checks. Hand each visually material round to the user with a precise checklist covering desktop/narrow layouts, both themes, hierarchy, wrapping, focus states, and content accuracy. Do not merge or deploy until that review is approved.
+Do not use the Windows browser sandbox for visual QA. Still run data, type, test, and build checks. Hand UI and design changes to the user with a precise checklist covering desktop/narrow layouts, both themes, hierarchy, wrapping, focus states, and content accuracy. Verified media assets follow the automated Editorial Media Contract above.
