@@ -4,10 +4,8 @@ Use this contract for the existing morning and evening ChatGPT tasks. Repository
 
 ## Input
 
-1. Read `public/data/manifest.json`, `public/data/latest.json`, and the matching packet on `automation/state`:
-   - morning: `automation/packets/latest-am.json`;
-   - evening: `automation/packets/latest-pm.json`.
-2. Require the packet edition ID and fixed Beijing window to match the edition due. If the packet is missing or stale, report the block and stop; the SLA watchdog owns recovery.
+1. Read `public/data/manifest.json`, `public/data/latest.json`, and `automation/packets/<edition-id>.json` on `automation/state`.
+2. Require finalized packet schema v3, the exact edition ID and fixed Beijing window, and `finalizedAt` at or after the cutoff. The GitHub collection starts at the cutoff, so retry briefly when the packet is not yet present. If it remains unavailable, report the block and stop; the SLA watchdog owns recovery.
 3. If a normal edition already exists, verify it and stop. If an `[自动事实清单]` exists, revise that edition without changing its issue number.
 
 ## Editorial decision
@@ -19,13 +17,12 @@ Use this contract for the existing morning and evening ChatGPT tasks. Repository
 5. For each `trackingQueue` item, either continue tracking with a concrete next check or close it with a reason. `needs_review` remains tracked.
 6. Morning uses `upcomingMode:"replace"` for the next 15 days. Evening uses `upcomingMode:"inherit_and_patch"` for new date changes only.
 
-The packet is the main evidence source. Check only the interval from `packet.generatedAt` to the fixed cutoff, with at most four targeted searches or list checks. Add genuinely new events as `last-minute:<stable-slug>` with traceable `additionalSources`.
+The finalized packet is the complete evidence source. Do not perform supplemental discovery or add events outside it.
 
 ## Handoff
 
 1. Create or reuse `automation/editorial/<edition-id>` from current `main`.
 2. Commit only the complete decision to `automation/inbox/<edition-id>.json`.
-3. Wait for `Publish editorial decision`. If it fails, correct the same file on the same branch.
-4. Verify the exact archive, `latest.json`, manifest, search index, and Pages deployment. Report the edition ID, issue number, included/excluded/review counts, deployment result, and any block.
+3. Report the edition ID and included/excluded/review counts after the decision commit succeeds, then stop. Publication, validation, deployment, and incidents are handled by GitHub Actions.
 
-Publication, ledger feedback, SLA recovery, and media enrichment are workflow responsibilities.
+Publication, validation, deployment, ledger feedback, SLA recovery, and media enrichment are workflow responsibilities.
