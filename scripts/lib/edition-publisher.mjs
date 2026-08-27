@@ -146,7 +146,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       tracking: decision.tracking,
       imageSeed: decision.titleKey,
       image_status: "unavailable",
-      imageNote: "正文先行发布；图片交给异步媒体审核流程按一手页、官方视频和商店素材顺序补全。",
+      imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",
     };
   });
   if (!entries.length) throw new Error("an edition needs at least one included entry");

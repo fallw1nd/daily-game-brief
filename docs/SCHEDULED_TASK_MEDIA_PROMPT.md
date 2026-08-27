@@ -2,16 +2,8 @@
 
 将以下内容追加到现有早报与晚报任务；更新原任务，不要创建重复任务：
 
-> 为每个 upcoming 游戏新增 mediaSources 候选列表。必须亲自打开商品页并按 PSN 香港（优先简体中文方图）→ Nintendo eShop 日服（方图）→ Xbox/Microsoft Store（矩形）的顺序查找；多平台游戏在找到更高优先级来源后停止。纯 PC 游戏若进入 XGP 则优先 Xbox，否则可使用 Steam 等官方商店矩形图。mediaSources 每项只保存商品页：label、HTTPS url、kind: primary，不保存搜索结果页或缩略图。Nintendo 日服无商品页时才可记录可追溯的实体竖版封面。
+> 为新闻和 upcoming 游戏提供可追溯的 mediaSources。优先官方新闻页、官方视频、商店或发行素材；PSN 香港、Nintendo eShop 日本、Xbox/Microsoft Store 和 Steam 依次作为封面检索线索，但来源可靠性高于图片形状。mediaSources 只保存原始来源页的 label、HTTPS url 和 kind，不保存搜索结果页或缩略图。
 >
-> 新闻图片继续优先官方新闻稿、开发商/发行商媒体素材和官方截图。若任务能可靠下载并核验图片，则按 schema v2 写 images/cover、中文 alt、credit、sourceUrl、kind、aspect；若不能上传二进制文件，保留 mediaSources 和具体 unavailable 原因，让仓库的 Propose verified media 工作流在 10:35/17:25 生成候选 PR。
+> 若任务能可靠下载并核验图片，则按 schema v2 写 images/cover、中文 alt、credit、sourceUrl、kind、aspect；否则保留 mediaSources 和具体 unavailable 原因，交给仓库媒体工作流自动核验并发布。
 >
-> MobyGames、LaunchBox Games Database、Glitchwave、Gavas、Refuge 只能帮助人工确认版本，不得直接抓图或热链。不得使用搜索缩略图、粉丝图、无关宣传图；不得为了配图降低来源标准。发布新闻数据后仍执行 npm run validate:data 和 npm run check；媒体候选 PR 必须经人工检查裁切、版本、中文 alt、署名和来源页后再合并。
-
-## ���ָ��ǹ���
-
-> �Ϸ��̵�˳��ֻ��Ϊ���ȼ�����·������Ҫ���η��棬Ҳ��Ҫ�����ҵ��ϵ����ȼ���Դ��ֹͣ��ָ��վ���������Դ���޺���ͼƬʱ���������ʹ�û�����ͼƬ�������򿪽����ԭʼ��ҳ����������Ϸ���¼���ȷ��Ӧ��ԭͼ����¼ HTTPS sourceUrl��credit ��ʵ�� aspect������ֱ�ӱ���������������ͼ�����Ρ����桢�����ɣ���ҳ�ᱣ�ֱ�������Ϸ�����ͼԴ��Ϣ������ JSON �У���ǰ̨����ʾ��ͼԴ����Ļ��
->
-> ������Ϸ�����Բ��ùٷ��������������Ϲ㷺������������������γɹ�ʶ��Ȥζ�������ǹٷ�������д title_zh_status: "common_translation"������αװ�ɹٷ�����������Ϊ�˱��ֹٷ��ھ����ö���ֻ�ܿ���Ӣ������
->
-> ���źͷ�������ʹ�ÿ�׷�ݵĹٷ����̵�����زģ����ޣ���ɲ���ȫ�������ҵ�������ȷ��Ӧ��������Դҳ�ɴ򿪵�ͼƬ����Ȼ��ֹ���䡢��������ͼ���޷�ʶ��ԭʼҳ���ͼƬ�����Եķ�˿������
+> 指定来源没有合适图片时，可继续搜索互联网，但必须打开原始网页并记录 sourceUrl、credit 与实际 aspect。禁止错配、搜索缩略图、无法识别原始页面的图片和粉丝二创。方形、竖版、横版均可；新闻图统一裁切为 16:9，封面保留来源比例。
