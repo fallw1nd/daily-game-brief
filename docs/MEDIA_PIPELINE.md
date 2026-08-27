@@ -28,7 +28,7 @@ MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not autom
 
 The goal is to avoid empty story art whenever a clearly related, traceable image exists. Relevance is to the **subject of the story**, not only the exact event page. Stop after the first verified match in this order:
 
-1. The exact official news, announcement, interview, press release, or event page's image.
+1. The exact official source page's image, or the exact reliable secondary report page's image when that report is already one of the story's evidence sources. Secondary-source images may be accepted automatically only from the article page attached to that same story; they are not a license to pull arbitrary third-party imagery.
 2. The thumbnail of the exact primary official YouTube upload.
 3. For a person-led story such as an interview, podcast, developer comment, or designer profile: another clearly identified, traceable photo of that same person from an official page or reliable media source. The photo does not need to come from the current interview.
 4. For a game-led story: official key art, game cover/store art, official screenshot, or other publisher/platform artwork for that same game. A game cover is an acceptable fallback for a news item about that game's update, release, test, interview, delay, or other new development.

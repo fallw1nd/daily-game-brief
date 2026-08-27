@@ -310,8 +310,9 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
     try {
       const candidate = await discoverFromSource(source);
       const encoded = await downloadCandidate(candidate, kind);
-      const eligible = (source.kind === "primary" || source.webSearch === true) &&
-        (kind === "editorial" || eligibleCover(source));
+      const eligible = kind === "editorial"
+      ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
+      : eligibleCover(source);
       const result = {
         recordId: record.id,
         kind,
