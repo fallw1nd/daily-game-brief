@@ -1,0 +1,84 @@
+name: Audit missing title translations once
+
+on:
+  push:
+    branches:
+      - automation/state
+    paths:
+      - .github/workflows/audit-title-translations-2026-08-27.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Scan unavailable title translations
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const path = require('path');
+          const root = 'public/data/archive';
+          const files = [];
+          for (const year of fs.readdirSync(root)) {
+            const yearDir = path.join(root, year);
+            if (!fs.statSync(yearDir).isDirectory()) continue;
+            for (const month of fs.readdirSync(yearDir)) {
+              const monthDir = path.join(yearDir, month);
+              if (!fs.statSync(monthDir).isDirectory()) continue;
+              for (const file of fs.readdirSync(monthDir)) {
+                if (file.endsWith('.json')) files.push(path.join(monthDir, file));
+              }
+            }
+          }
+          const map = new Map();
+          for (const file of files.sort()) {
+            const edition = JSON.parse(fs.readFileSync(file, 'utf8'));
+            for (const [kind, items] of [['entry', edition.entries || []], ['upcoming', edition.upcoming || []]]) {
+              for (const item of items) {
+                const title = item.title || {};
+                if (title.title_zh_status !== 'unavailable') continue;
+                const key = title.title_key || title.title_en || '(missing-key)';
+                const current = map.get(key) || {
+                  titleKey: key,
+                  titleEn: title.title_en || null,
+                  occurrences: [],
+                  kinds: new Set(),
+                  headlines: new Set(),
+                };
+                current.occurrences.push(edition.id);
+                current.kinds.add(kind);
+                if (item.headline) current.headlines.add(item.headline);
+                map.set(key, current);
+              }
+            }
+          }
+          const items = [...map.values()].map((item) => ({
+            titleKey: item.titleKey,
+            titleEn: item.titleEn,
+            occurrenceCount: item.occurrences.length,
+            editions: [...new Set(item.occurrences)],
+            kinds: [...item.kinds],
+            headlines: [...item.headlines],
+          })).sort((a, b) => a.titleKey.localeCompare(b.titleKey));
+          fs.mkdirSync('artifacts', { recursive: true });
+          fs.writeFileSync('artifacts/missing-title-translations.json', JSON.stringify({
+            generatedAt: new Date().toISOString(),
+            editionCount: files.length,
+            uniqueUnavailableTitles: items.length,
+            items,
+          }, null, 2) + '\n');
+          console.log(`Unavailable title translations: ${items.length} unique title(s) across ${files.length} editions.`);
+
+      - name: Upload audit
+        uses: actions/upload-artifact@v6
+        with:
+          name: missing-title-translations
+          path: artifacts/missing-title-translations.json
+          retention-days: 7
