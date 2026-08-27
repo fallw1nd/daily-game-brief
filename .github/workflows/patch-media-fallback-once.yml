@@ -23,27 +23,28 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           path = Path("scripts/enrich-media.mjs")
           text = path.read_text()
 
-          old = '''  const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
-          const intent = kind === "cover"
-            ? "game cover key art"
-            : `${record.headline || "game news"} official screenshot`;
-          '''
-          new = '''  const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
-          const headline = record.headline || "game news";
-          const personLed = /(interview|podcast|developer|designer|producer|director|采访|专访|访谈|播客|制作人|导演|设计师|开发者|编剧|创意总监|艺术总监)/i.test(headline);
-          const intent = kind === "cover"
-            ? "game cover key art"
-            : personLed
-              ? `${headline} interview developer designer producer portrait photo`
-              : `${headline} official screenshot game cover key art`;
-          '''
-          if old not in text:
+          pattern = re.compile(
+              r'  const titleParts = \[record\.title\?\.title_zh_cn, record\.title\?\.title_en\]\.filter\(Boolean\);\n'
+              r'  const intent = kind === "cover"\n'
+              r'    \? "game cover key art"\n'
+              r'    : `\$\{record\.headline \|\| "game news"\} official screenshot`;'
+          )
+          replacement = '''  const titleParts = [record.title?.title_zh_cn, record.title?.title_en].filter(Boolean);
+            const headline = record.headline || "game news";
+            const personLed = /(interview|podcast|developer|designer|producer|director|采访|专访|访谈|播客|制作人|导演|设计师|开发者|编剧|创意总监|艺术总监)/i.test(headline);
+            const intent = kind === "cover"
+              ? "game cover key art"
+              : personLed
+                ? `${headline} interview developer designer producer portrait photo`
+                : `${headline} official screenshot game cover key art`;'''
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
             raise SystemExit("media search intent block not found")
-          text = text.replace(old, new, 1)
 
           old_audit = '  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, editions: [] };'
           new_audit = '  const audit = { generatedAt: new Date().toISOString(), apply: options.apply, webSearchEnabled: Boolean(BRAVE_SEARCH_API_KEY), editions: [] };'
