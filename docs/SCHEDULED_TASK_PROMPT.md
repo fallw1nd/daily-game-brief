@@ -5,8 +5,10 @@ Use this contract for the existing morning and evening ChatGPT tasks. Repository
 ## Input
 
 1. Read `public/data/manifest.json`, `public/data/latest.json`, and `automation/packets/<edition-id>.json` on `automation/state`.
-2. Require finalized packet schema v3, the exact edition ID and fixed Beijing window, and `finalizedAt` at or after the cutoff. The GitHub collection starts at the cutoff, so retry briefly when the packet is not yet present. If it remains unavailable, report the block and stop; the SLA watchdog owns recovery.
-3. If a normal edition already exists, verify it and stop. If an `[自动事实清单]` exists, revise that edition without changing its issue number.
+2. Require finalized packet schema v3, the exact edition ID and fixed Beijing window, and `finalizedAt` at or after the cutoff. The GitHub collection starts at the cutoff, so retry briefly when the packet is not yet present.
+3. If the matching packet is missing at the scheduled cutoff, use the ChatGPT Scheduled task as an independent recovery trigger instead of relying only on GitHub `schedule`: create a one-shot workflow file on `automation/state` whose push trigger dispatches the existing `news-discovery-shadow.yml` workflow on `main` with the matching `period`. The one-shot workflow must do nothing else: it must not publish content, alter the fixed window, run the SLA fallback, or change issue sequencing. Re-read only the matching packet for up to 15 minutes. Delete the one-shot workflow file after the packet becomes available or before stopping. If the packet is still unavailable, report the block and stop; the scheduled SLA watchdog remains the publication recovery owner.
+4. The one-shot recovery workflow is ephemeral operational state. Use an edition-scoped filename such as `.github/workflows/recover-packet-<edition-id>.yml`, trigger only when that exact file is pushed on `automation/state`, dispatch `news-discovery-shadow.yml --ref main -f period=<am|pm>`, and remove the file after use. Never add another long-term Scheduled task or persistent publication workflow for this fallback.
+5. If a normal edition already exists, verify it and stop. If an `[自动事实清单]` exists, revise that edition without changing its issue number.
 
 ## Editorial decision
 
