@@ -61,7 +61,18 @@ function inUpcomingWindow(item, editionDate) {
   return dates.length > 0 && dates.every((date) => Number.isFinite(date) && date >= start && date <= end);
 }
 
-function upcomingEntry(item) {
+function upcomingEntry(item, previous) {
+  const verifiedMedia = previous?.cover?.kind === "cover" && previous.cover.placeholder !== true
+    ? {
+        cover: previous.cover,
+        cover_status: "verified",
+        ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),
+      }
+    : {
+        cover_status: "unavailable",
+        coverNote: "自动交接阶段尚未取得已验证封面，交给异步媒体流程补全。",
+        mediaSources: [item.source],
+      };
   return {
     id: item.id,
     date: item.date,
@@ -71,9 +82,7 @@ function upcomingEntry(item) {
     releaseType: item.releaseType,
     source: item.source,
     note: item.note,
-    cover_status: "unavailable",
-    coverNote: "自动交接阶段尚未取得已验证封面，交给异步媒体流程补全。",
-    mediaSources: [item.source],
+    ...verifiedMedia,
   };
 }
 
@@ -127,7 +136,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const removeIds = new Set(editorial.removeUpcomingIds || []);
   const baseUpcoming = editorial.upcomingMode === "replace" ? [] : (latest.upcoming || []);
   const upcomingMap = new Map(baseUpcoming.filter((item) => !removeIds.has(item.id)).map((item) => [item.id, item]));
-  for (const item of editorial.upcoming || []) upcomingMap.set(item.id, upcomingEntry(item));
+  const previousUpcoming = latest.upcoming || [];
+  for (const item of editorial.upcoming || []) {
+    const previous = previousUpcoming.find((candidate) =>
+      candidate.id === item.id || candidate.title?.title_key === item.titleKey
+    );
+    upcomingMap.set(item.id, upcomingEntry(item, previous));
+  }
   const upcoming = [...upcomingMap.values()].filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
   const generatedAt = beijingNow(now);
