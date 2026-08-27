@@ -22,34 +22,30 @@ jobs:
           fetch-depth: 0
 
       - name: Strengthen title-state validation
-        shell: python
+        shell: node {0}
         run: |
-          from pathlib import Path
-          p = Path('scripts/validate-data.mjs')
-          text = p.read_text()
-          old = '''  if (title.title_zh_status === "unavailable" && title.title_zh_cn) {
-            errors.push(`${context}: unavailable Chinese title must not include title_zh_cn`);
+          const fs = require('fs');
+          const p = 'scripts/validate-data.mjs';
+          let text = fs.readFileSync(p, 'utf8');
+          const marker = '  if (title.title_zh_status === "unavailable" && title.title_zh_cn) {';
+          const start = text.indexOf(marker);
+          if (start < 0) throw new Error('validator marker not found');
+          const blockEnd = text.indexOf('\n  }', start);
+          if (blockEnd < 0) throw new Error('validator block end not found');
+          const insertAt = blockEnd + '\n  }'.length;
+          const guard = '\n  if (title.title_zh_status !== "unavailable" &&\n      (typeof title.title_zh_cn !== "string" || title.title_zh_cn.trim().length === 0)) {\n    errors.push(`${context}: ${title.title_zh_status} requires title_zh_cn`);\n  }';
+          if (!text.includes('requires title_zh_cn')) {
+            text = text.slice(0, insertAt) + guard + text.slice(insertAt);
+            fs.writeFileSync(p, text);
           }
-          '''
-          new = '''  if (title.title_zh_status === "unavailable" && title.title_zh_cn) {
-            errors.push(`${context}: unavailable Chinese title must not include title_zh_cn`);
-          }
-          if (title.title_zh_status !== "unavailable" &&
-              (typeof title.title_zh_cn !== "string" || title.title_zh_cn.trim().length === 0)) {
-            errors.push(`${context}: ${title.title_zh_status} requires title_zh_cn`);
-          }
-          '''
-          if old not in text:
-              raise SystemExit('validator target block not found')
-          p.write_text(text.replace(old, new, 1))
 
-      - name: Install dependencies
+      - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - name: npm ci
+      - name: Install dependencies
         run: npm ci
 
       - name: Backfill registered translations
