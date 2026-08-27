@@ -1,4 +1,4 @@
-name: Retry remaining AM media once
+name: Apply METRO 2039 official fallback once
 
 on:
   push:
@@ -9,13 +9,106 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 jobs:
-  dispatch:
+  enrich:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Retry AM media enrichment
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Add temporary official same-game sources
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const path = 'public/data/archive/2026/08/2026-08-27-am.json';
+          const edition = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const entry = edition.entries.find((item) => item.id === '2026-08-27-am-features-3');
+          if (!entry) throw new Error('METRO 2039 entry not found');
+          fs.writeFileSync('/tmp/metro-original-sources.json', JSON.stringify(entry.sources));
+          entry.sources.push(
+            {
+              label: 'Xbox Wire｜METRO 2039 First Look',
+              url: 'https://news.xbox.com/en-us/2026/04/16/metro-2039-first-look-recap-everything-announced/?ver=3.7.1',
+              kind: 'primary'
+            },
+            {
+              label: 'PlayStation Blog｜METRO 2039 Reveal',
+              url: 'https://blog.playstation.com/2026/04/16/metro-2039-revealed-as-the-post-apocalyptic-shooter-series-returns/',
+              kind: 'primary'
+            },
+            {
+              label: 'Xbox｜METRO 2039',
+              url: 'https://www.xbox.com/en-US/games/metro-2039',
+              kind: 'primary'
+            },
+            {
+              label: 'Steam｜METRO 2039',
+              url: 'https://store.steampowered.com/app/2590240/METRO_2039/',
+              kind: 'primary'
+            }
+          );
+          fs.writeFileSync(path, JSON.stringify(edition, null, 2) + '\n');
+
+      - name: Enrich METRO 2039 media
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: node scripts/enrich-media.mjs --apply --edition=2026-08-27-am
+
+      - name: Restore editorial evidence sources and verify image
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const path = 'public/data/archive/2026/08/2026-08-27-am.json';
+          const edition = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const entry = edition.entries.find((item) => item.id === '2026-08-27-am-features-3');
+          if (!entry) throw new Error('METRO 2039 entry not found');
+          entry.sources = JSON.parse(fs.readFileSync('/tmp/metro-original-sources.json', 'utf8'));
+          if (entry.image_status !== 'verified' || !entry.images?.some((asset) => asset.kind === 'editorial')) {
+            throw new Error('METRO 2039 fallback image was not verified');
+          }
+          fs.writeFileSync(path, JSON.stringify(edition, null, 2) + '\n');
+
+      - name: Validate media-only update
+        run: |
+          npm run check
+          git diff --name-only
+          changed="$(git diff --name-only)"
+          echo "$changed" | grep -qx 'public/data/archive/2026/08/2026-08-27-am.json' || true
+          if echo "$changed" | grep -Ev '^(public/data/archive/2026/08/2026-08-27-am.json|public/media/briefs/2026/08/2026-08-27-am/.*)$' | grep -q .; then
+            echo 'Unexpected files changed:'
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Publish METRO 2039 fallback
+        shell: bash
+        run: |
+          if git diff --quiet -- public/data public/media; then
+            echo 'No media update produced'
+            exit 1
+          fi
+          git config user.name 'daily-game-brief[bot]'
+          git config user.email 'daily-game-brief[bot]@users.noreply.github.com'
+          git add public/data/archive/2026/08/2026-08-27-am.json public/media/briefs/2026/08/2026-08-27-am
+          git commit -m 'chore(media): add METRO 2039 fallback art'
+          git push origin HEAD:main
+
+      - name: Deploy media update
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run media-enrichment.yml --repo "$GITHUB_REPOSITORY" --ref main -f edition_id=2026-08-27-am
+        run: gh workflow run deploy.yml --ref main
