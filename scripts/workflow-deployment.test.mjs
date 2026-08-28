@@ -17,15 +17,21 @@ describe("Pages deployment trigger contract", () => {
     const publisher = await workflow("publish-editorial-decision.yml");
 
     expect(publisher).toContain(
-      "if: steps.publish.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'",
+      "if: steps.publication.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'",
     );
     expect(publisher.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(1);
+    expect(publisher).toContain(
+      "if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success'",
+    );
+    expect(publisher).toContain(
+      "gh workflow run publish-editorial-decision.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}",
+    );
   });
 
   it("media dispatches Pages once only after a media write changes main", async () => {
     const media = await workflow("media-enrichment.yml");
 
-    expect(media).toContain("if: steps.media.outputs.changed == 'true'");
+    expect(media).toContain("if: steps.publication.outputs.changed == 'true'");
     expect(media.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(1);
   });
 
