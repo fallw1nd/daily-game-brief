@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import { dirname, resolve } from "node:path";
 import { stripHtml } from "./lib/news-pipeline.mjs";
 import { selectTitleHintSubjects, validateTitleHintCandidate } from "./lib/title-hints.mjs";
@@ -11,9 +12,30 @@ const MAX_SUBJECTS = Number(process.env.TITLE_HINT_LIMIT || 8);
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const USER_AGENT = "DailyGameBriefTitleBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
 
-function isPrivateIp(address) {
-  return /^(127\.|10\.|0\.|169\.254\.|192\.168\.|::1$|fc|fd|fe80)/i.test(address) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(address);
+function isNonPublicIp(address) {
+  const value = String(address || "").toLowerCase().split("%")[0];
+  if (value.startsWith("::ffff:")) return isNonPublicIp(value.slice(7));
+  const family = isIP(value);
+  if (family === 4) {
+    const [a, b, c] = value.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0 && c === 0) ||
+      (a === 192 && b === 0 && c === 2) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224;
+  }
+  if (family === 6) {
+    return value === "::" || value === "::1" ||
+      /^f[cd]/.test(value) || /^fe[89ab]/.test(value) ||
+      /^ff/.test(value) || /^2001:db8(?::|$)/.test(value);
+  }
+  return true;
 }
 
 async function safeUrl(input) {
@@ -21,7 +43,9 @@ async function safeUrl(input) {
   if (url.protocol !== "https:") throw new Error("only HTTPS title evidence is allowed");
   if (/^(localhost|.+\.local)$/i.test(url.hostname)) throw new Error("local host is not allowed");
   const addresses = await lookup(url.hostname, { all: true });
-  if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("private network target is not allowed");
+  if (!addresses.length || addresses.some(({ address }) => isNonPublicIp(address))) {
+    throw new Error("non-public network target is not allowed");
+  }
   return url;
 }
 
