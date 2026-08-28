@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 async function workflow(name) {
-  return readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+  return readFile(`.github/workflows/${name}`, "utf8");
 }
 
 describe("Pages deployment trigger contract", () => {
