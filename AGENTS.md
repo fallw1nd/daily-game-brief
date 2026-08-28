@@ -41,6 +41,12 @@ Each new v2 story and upcoming game must provide verified media or an explicit u
 
 Storefronts are preferred discovery sources, not shape requirements. After listed sources fail, use configured web image search and accept square, portrait, or landscape covers when the game match and source page are clear. Keep cover credit and `sourceUrl` in data, but do not render a visible source caption on cover art.
 
+## Maintenance Ledger
+
+Use `docs/MAINTENANCE_LOG.md` as the append-only operational improvement ledger. When production behavior, Actions/log review, editorial review, or code inspection reveals a persistent reliability bug, data-quality gap, recurring manual burden, cost issue, or misleading observability, add or update a `MNT-*` entry with discovery date, priority, evidence, status, bounded resolution, objective close criteria, and relevant issue/PR/run links.
+
+Do not delete resolved entries or open duplicate entries for the same root cause. A fix PR must reference the existing maintenance entry and, after merge, update that same entry with the resolution and verification evidence. Code written or a PR merged is not sufficient to mark an issue `resolved`; the entry's stated close criteria must be satisfied.
+
 ## Visual Acceptance
 
 Do not use the Windows browser sandbox for visual QA. Still run data, type, test, and build checks. Hand UI and design changes to the user with a precise checklist covering desktop/narrow layouts, both themes, hierarchy, wrapping, focus states, and content accuracy. Verified media assets follow the automated Editorial Media Contract above.
