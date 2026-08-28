@@ -79,13 +79,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P1
 - **Area:** title resolution / editorial input
-- **Status:** planned
+- **Status:** in_progress
 - **Evidence:** 2026-08-28 AM 初始 editorial decision 将 `Gravhounds`、`Militsioner`、`Whisper of the House`、`FOUNTAINS`、`FINAL FANTASY VII EVER CRISIS` 等多项保持为 `unavailable`；随后 PR [#27](https://github.com/fallw1nd/daily-game-brief/pull/27) 才补入《重力猎犬》《警目如炬》《呓语小镇》《永泉传说》《最终幻想7：永恒危机》等已确认名称。现有 registry 能稳定复用“已经知道的名称”，但首次遇到的新 title 仍可能漏掉已有官方简中名。
 - **Risk:** 新作第一次进入日报时更容易以英文名发布，之后再 backfill，形成不必要的人工返工与 revision。
 - **Proposed resolution:** 在 packet 前加入受限 `titleHints` 阶段：registry miss 时只查询作品名，优先官方简中发行商/平台/商店页；返回候选中文名、status 和证据 URL，不允许借此加入任何事件事实、时间、平台或新候选。ChatGPT 仍负责最终采用 `official_simplified` / `common_translation` / `unavailable`。
 - **Close when:** 新 title 的 hint 有明确 schema 与来源边界；registry hit 不重复查询；至少用本期上述已知案例回归，能够在不扩展事件证据的情况下命中官方名；不存在机器直译自动入库路径。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** [PR #35](https://github.com/fallw1nd/daily-game-brief/pull/35) / commit [`f859315`](https://github.com/fallw1nd/daily-game-brief/commit/f859315491d9420496d4988575db690ef9394b49) 已在 `Final editorial packet` 的 evidence → editorialize 之间加入受限 title-only hint 阶段。只对 registry miss 搜索，复用既有 DeepSeek Responses/Web Search 作为候选来源页发现器；每个接受的页面由代码打开并要求候选中文名逐字出现在正文中，`common_translation` 至少需要两个不同 hostname。输出仅以紧凑 naming evidence 加入 `editorialInput.titleHints`，不自动写入 registry，`suggestedStatus` 只供编辑判断，ChatGPT 仍决定 `official_simplified` / `common_translation` / `unavailable`。hint 来源不得补充事件事实、时间、平台、发行信息、source classification、tracking 或新候选。保持 finalized packet schema v3、editorialInput schema v2 与既有输入预算；未修改 Scheduled Task、固定窗口或 `public/data`。
+- **Verification:** PR #35 最终 Verify run [33161253861](https://github.com/fallw1nd/daily-game-brief/actions/runs/33161253861) 通过完整 `npm run check`。回归覆盖上述五个 2026-08-28 已知名称、registry hit 不重复搜索、未知英文标题才进入 hint、候选中文名必须在已打开页面逐字命中、`common_translation` 双独立 host、拒绝 machine_translation/无证据候选、命中名称可见摘录，以及带可选 `titleHints` 的 finalized packet 仍通过现有 preflight validator。合并后 Pages run [33161354443](https://github.com/fallw1nd/daily-game-brief/actions/runs/33161354443) 成功。尚未人为重跑已发布的 2026-08-28 PM collector，以避免为测试覆盖当前 `automation/state`；等待下一次正常生产出现 registry miss 后观察真实 hint 产出与编辑采用结果，再决定是否满足关闭条件。
 
 ### MNT-20260828-05 — title backfill 后自动生成图片 alt 可能保留旧英文标题
 
