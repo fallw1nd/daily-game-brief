@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { refreshGeneratedEditorialAlts } from "./lib/media-alt.mjs";
 import { getRegisteredTitleTranslation, localizeHeadline, localizeRegisteredTitles } from "./lib/title-translations.mjs";
 
 const archiveRoot = "public/data/archive";
@@ -46,6 +47,11 @@ function localizeEntry(entry, stats) {
     stats.summaries += 1;
     changed = true;
   }
+  const imageAlts = refreshGeneratedEditorialAlts(entry, localizeRegisteredTitles);
+  if (imageAlts) {
+    stats.imageAlts += imageAlts;
+    changed = true;
+  }
   return changed;
 }
 
@@ -63,7 +69,7 @@ function backfillDocument(file, stats) {
   return document;
 }
 
-const makeStats = () => ({ files:0, occurrences:0, keys:new Set(), headlines:0, headlineKeys:new Set(), summaries:0, archiveTitles:0 });
+const makeStats = () => ({ files:0, occurrences:0, keys:new Set(), headlines:0, headlineKeys:new Set(), summaries:0, archiveTitles:0, imageAlts:0 });
 const archiveStats = makeStats();
 const archiveDocs = new Map();
 for (const file of archiveFiles()) { const doc = backfillDocument(file, archiveStats); archiveDocs.set(doc.id, doc); }
@@ -79,6 +85,6 @@ if (fs.existsSync(manifestPath)) {
   }
   if (manifestChanged) fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
-console.log(`Title backfill: ${archiveStats.keys.size} key(s), ${archiveStats.occurrences} title occurrence(s), ${archiveStats.headlines} headline(s), ${archiveStats.summaries} summary(s), ${archiveStats.archiveTitles} archive title(s), ${archiveStats.files} archive file(s).`);
-console.log(`Latest: ${latestStats.occurrences} title(s), ${latestStats.headlines} headline(s), ${latestStats.summaries} summary(s), ${latestStats.archiveTitles} archive title(s), changed=${latestStats.files > 0}.`);
+console.log(`Title backfill: ${archiveStats.keys.size} key(s), ${archiveStats.occurrences} title occurrence(s), ${archiveStats.headlines} headline(s), ${archiveStats.summaries} summary(s), ${archiveStats.archiveTitles} archive title(s), ${archiveStats.imageAlts} generated image alt(s), ${archiveStats.files} archive file(s).`);
+console.log(`Latest: ${latestStats.occurrences} title(s), ${latestStats.headlines} headline(s), ${latestStats.summaries} summary(s), ${latestStats.archiveTitles} archive title(s), ${latestStats.imageAlts} generated image alt(s), changed=${latestStats.files > 0}.`);
 console.log(`Manifest changed=${manifestChanged}.`);
