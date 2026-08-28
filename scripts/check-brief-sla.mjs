@@ -1,12 +1,12 @@
 import { appendFile, readFile } from "node:fs/promises";
-import { plannedWindow } from "./lib/news-pipeline.mjs";
+import { latestDueWindow } from "./lib/news-pipeline.mjs";
 
 const periodArg = process.argv.find((arg) => arg.startsWith("--period="))?.split("=")[1];
 const period = periodArg || process.env.BRIEF_PERIOD;
 if (!new Set(["am", "pm"]).has(period)) throw new Error("Pass --period=am or --period=pm");
 
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
-const expected = plannedWindow(period, now);
+const expected = latestDueWindow(period, now);
 const manifest = JSON.parse(await readFile("public/data/manifest.json", "utf8"));
 const localEdition = manifest.editions.find((edition) => edition.id === expected.id);
 let status = localEdition ? "committed" : "missing";
