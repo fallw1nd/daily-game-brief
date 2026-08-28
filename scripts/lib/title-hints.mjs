@@ -24,6 +24,15 @@ function needsTitleLookup(subjectKey, eventKind) {
   return !getRegisteredTitleTranslation(key, subject);
 }
 
+function excerptAround(text, needle, maxChars = 320) {
+  const value = String(text || "");
+  const index = value.indexOf(needle);
+  if (index < 0) return "";
+  const before = Math.floor((maxChars - needle.length) / 2);
+  const start = Math.max(0, Math.min(index - before, value.length - maxChars));
+  return value.slice(start, start + maxChars).trim();
+}
+
 export function selectTitleHintSubjects(evidence, limit = 8) {
   const seen = new Set();
   const selected = [];
@@ -49,11 +58,12 @@ export function validateTitleHintCandidate(subject, candidate, verifiedSources =
   if (!titleZhCn || !/[\u3400-\u9fff]/u.test(titleZhCn)) return null;
   if (!new Set(["official_simplified", "common_translation"]).has(suggestedStatus)) return null;
 
-  const titleNeedle = normalizeTitleHintText(titleZhCn);
-  const sources = verifiedSources.filter((source) =>
-    source?.url?.startsWith("https://") &&
-    normalizeTitleHintText(source?.pageText).includes(titleNeedle)
-  ).map(({ pageText: _pageText, ...source }) => source);
+  const sources = verifiedSources.flatMap((source) => {
+    const pageText = String(source?.pageText || "");
+    if (!source?.url?.startsWith("https://") || !pageText.includes(titleZhCn)) return [];
+    const { pageText: _pageText, ...safeSource } = source;
+    return [{ ...safeSource, excerpt: excerptAround(pageText, titleZhCn) }];
+  });
   const independentHosts = new Set(sources.map((source) => new URL(source.url).hostname.toLowerCase()));
   if (!sources.length) return null;
   if (suggestedStatus === "common_translation" && independentHosts.size < 2) return null;
@@ -69,7 +79,7 @@ export function validateTitleHintCandidate(subject, candidate, verifiedSources =
       url: source.url,
       hostname: new URL(source.url).hostname.toLowerCase(),
       pageTitle: source.pageTitle || "",
-      excerpt: source.excerpt || "",
+      excerpt: source.excerpt,
     })),
   };
 }
