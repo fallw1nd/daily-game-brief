@@ -92,13 +92,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P2
 - **Area:** media metadata / accessibility / localization
-- **Status:** open
+- **Status:** in_progress
 - **Evidence:** 当前 `2026-08-28-am` 的 `gravhounds` 条目已经改为 `title_zh_cn: "重力猎犬"`、headline 也已经是《重力猎犬》，但同一 verified image 的 `alt` 仍为 `Gravhounds：《Gravhounds》公布……相关配图`。这是 title 修订后媒体元数据没有同步更新的直接实例。
 - **Risk:** 图片加载失败文本、屏幕阅读器文本与正文语言不一致，也违反仓库“meaningful Chinese alt”的媒体契约精神。
 - **Proposed resolution:** 对系统自动生成的模板型 alt 建立可识别格式或 provenance；title/headline backfill 时同步重建这类 alt。人工撰写或具有额外视觉描述的信息不得被机械覆盖。
 - **Close when:** 本期已确认 stale alt 被修正；测试区分 auto-generated 与 manual alt；未来 title backfill 后不存在旧英文主体残留的自动 alt。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** [PR #37](https://github.com/fallw1nd/daily-game-brief/pull/37) / commit [`2e04cc4`](https://github.com/fallw1nd/daily-game-brief/commit/2e04cc4bde91830966697879a0834460475e690c) 已实现后续防复发路径：新增 `scripts/lib/media-alt.mjs` 识别当前系统生成的 editorial alt 模板，并在 `titles:backfill` 完成 title/headline/summary 本地化后同步刷新。只有现有 `kind: "editorial"` alt 经既有标题本地化后精确等于当前自动模板时才重建；人工或来源自带的视觉描述、cover alt 均不覆盖。未修改 Scheduled Task、固定窗口、schema、title/fact/time status 或历史生产数据。
+- **Verification:** PR #37 最终 Verify run [33163086458](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163086458) 通过完整检查；回归覆盖真实 `Gravhounds`、`FOUNTAINS` / `Shattered Shape` stale 模板，并验证 manual editorial alt 与 cover alt 保持不变。合并后 Pages run [33163142898](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163142898) 成功。实施过程中曾尝试直接修正 `2026-08-28-am` 历史 JSON，但 diff review 发现同时带入一处无关 cover sourceUrl 变化，因此该数据改动在合并前整体撤销，最终 PR 不包含任何 `public/data` 变更。已发布的已知 stale alt 因而仍未满足本条 `Close when`，本条保持 `in_progress`，后续须通过可独立验证的安全数据路径修正后才能关闭。
 
 ### MNT-20260828-06 — `localizeRegisteredTitles()` 全局字符串替换存在误伤风险
 
