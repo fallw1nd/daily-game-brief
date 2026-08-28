@@ -15,7 +15,7 @@ const eventPatterns = [
   ["update", /\b(?:major update|update|patch|season)\b|重大更新|版本更新|アップデート/i],
   ["dlc", /\b(?:dlc|expansion|add-on)\b|扩展|资料片|追加内容/i],
   ["company", /\b(?:acquisition|acquire|layoff|lawsuit|policy|earnings)\b|收购|裁员|诉讼|政策|财报/i],
-  ["result", /\b(?:winner|champion|award)\b|冠军|获奖|优勝/i],
+  ["result", /\b(?:winner|champion|award)\b|冠军|获奖|優勝/i],
   ["announcement", /\b(?:announce|announced|reveal|revealed|unveil)\b|公布|公开|发表|発表/i],
 ];
 
@@ -261,6 +261,13 @@ export function plannedWindow(period, now = new Date()) {
   const previousDate = `${previousParts.year}-${previousParts.month}-${previousParts.day}`;
   const start = period === "am" ? `${previousDate} 17:00` : `${date} 10:10`;
   return { id: `${date}-${period}`, period, plannedAt: end, windowStart: start, windowEnd: end };
+}
+
+export function latestDueWindow(period, now = new Date()) {
+  const current = plannedWindow(period, now);
+  const currentEndMs = Date.parse(`${current.windowEnd.replace(" ", "T")}:00+08:00`);
+  if (now.getTime() >= currentEndMs) return current;
+  return plannedWindow(period, new Date(currentEndMs - 24 * 60 * 60 * 1000));
 }
 
 export function resemblesAdjacent(candidate, entries) {
