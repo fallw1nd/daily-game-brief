@@ -53,13 +53,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P1
 - **Area:** deployment / workflow orchestration
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 连续两期生产运行已经给出一致矩阵。2026-08-27 PM 正文提交 [`a0a83ae`](https://github.com/fallw1nd/daily-game-brief/commit/a0a83aebda0e842fa0b54a0764c8136f571d9ec6) 对应 Pages run [33061474829](https://github.com/fallw1nd/daily-game-brief/actions/runs/33061474829)，`event=workflow_dispatch`；随后媒体提交 [`746c36d`](https://github.com/fallw1nd/daily-game-brief/commit/746c36d49587d0bb5589df5c11d838a335a2bf35) 对应 Pages run [33061540376](https://github.com/fallw1nd/daily-game-brief/actions/runs/33061540376)，同样为 `workflow_dispatch`。2026-08-28 AM 正文提交 [`210fa1e`](https://github.com/fallw1nd/daily-game-brief/commit/210fa1e19f2c014b00cd654b7814c24241aafafb) 对应 Pages run [33135543262](https://github.com/fallw1nd/daily-game-brief/actions/runs/33135543262)，媒体提交 [`f761fd5`](https://github.com/fallw1nd/daily-game-brief/commit/f761fd5575f6dadb5f3b0c4667dafd3ff3109da9) 对应 Pages run [33135578470](https://github.com/fallw1nd/daily-game-brief/actions/runs/33135578470)，也均为 `workflow_dispatch`；没有观察到这些 `GITHUB_TOKEN` 机器人提交再产生 `push` 型 Deploy。AM 正文 Deploy 被随后媒体提交的 Deploy 通过 `pages` concurrency 取消，属于新 `main` 提交替代旧提交，不是同一 SHA 的双触发。`Brief publication SLA watchdog` 还在“正文已在仓库但线上未恢复”和“degraded fallback 新写入 main”两条恢复分支显式 dispatch Pages。
 - **Risk:** 如果把不同 `main` 写入对应的显式 dispatch 误判为重复并删除，workflow-token 写入将可能不再部署；如果以后同一写入路径真的新增第二个 Pages 请求，又会产生无意义 Actions 与 cancel noise。
 - **Proposed resolution:** 保留现有三类必要路径：外部/人工 `main` push 由 `deploy.yml` 的 `push` 触发；publisher 与 media 的 workflow-token 写入分别在各自成功写入后显式 dispatch；workflow retry 与 SLA deployment recovery 保留显式重部署能力。新增静态契约测试锁定每条路径的触发数量和条件，后续若要移除 dispatch 必须先改变写入凭据或部署编排并同步测试。
 - **Close when:** 触发矩阵与测试覆盖正常 publisher、media、workflow retry、SLA deployment recovery；每次有效 `main` 变化只有一个必要的 Pages 发布链，且 workflow-token push 情况仍能部署。
-- **Resolution:** 调查未发现可安全删除的重复 dispatch；当前实施仅增加触发契约回归测试，不改变生产 workflow、Scheduled Task、固定窗口或生产数据。待 PR Verify、合并和 Pages 验证后关闭。
-- **Verification:** 已核对 2026-08-27 PM 与 2026-08-28 AM 两期真实 Actions 的 event/head SHA；PR Verify 与合并后 Pages 验证待完成。
+- **Resolution:** [PR #31](https://github.com/fallw1nd/daily-game-brief/pull/31) / commit [`dd8bd6b`](https://github.com/fallw1nd/daily-game-brief/commit/dd8bd6bcf5926edb1d28a71178a2c3c0fececae3) 确认不存在可安全删除的同一写入重复 dispatch，并新增 `scripts/workflow-deployment.test.mjs` 锁定外部 `main` push、publisher/幂等 retry、media 与 SLA recovery 的部署触发契约。保留 workflow-token 写入后的显式 Pages dispatch；未修改生产 workflow、Scheduled Task、固定窗口或生产数据。
+- **Verification:** PR #31 最终 Verify run [33158003944](https://github.com/fallw1nd/daily-game-brief/actions/runs/33158003944) 通过完整 `npm run check`；两期生产矩阵确认 publisher/media 的 workflow-token 写入各自通过单一显式 dispatch 部署，没有同 SHA 的 `push` 双触发。合并后 commit `dd8bd6b` 作为外部 `main` push 自动触发 Pages run [33158067630](https://github.com/fallw1nd/daily-game-brief/actions/runs/33158067630)，完整 `Check and build` 与 `Deploy` 成功，证明两类触发职责均可工作，关闭该条目。
 
 ### MNT-20260828-03 — Scheduled Task 缺 packet 时的 preflight 仍可前置
 
