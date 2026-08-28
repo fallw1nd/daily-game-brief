@@ -59,7 +59,7 @@ describe("title hint candidate verification", () => {
       titleZhCn: "示例游戏",
       suggestedStatus: "official_simplified",
       reason: "Official store page uses this title.",
-    }, [source("https://store.example.com/game", "欢迎来到《示例游戏》的官方页面。")]);
+    }, [source("https://store.example.com/game", `${"页面前文。".repeat(80)}欢迎来到《示例游戏》的官方页面。`)]);
 
     expect(hint).toMatchObject({
       titleZhCn: "示例游戏",
@@ -67,6 +67,8 @@ describe("title hint candidate verification", () => {
       sources: [{ hostname: "store.example.com" }],
     });
     expect(hint.sources[0]).not.toHaveProperty("pageText");
+    expect(hint.sources[0].excerpt).toContain("示例游戏");
+    expect(hint.sources[0].excerpt.length).toBeLessThanOrEqual(320);
   });
 
   it("requires two independent verified hosts for a common translation", () => {
