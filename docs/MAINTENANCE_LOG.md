@@ -66,13 +66,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P1
 - **Area:** ChatGPT Scheduled / packet recovery latency
-- **Status:** planned
+- **Status:** in_progress
 - **Evidence:** 2026-08-28 AM 固定截止为 10:10，但正常 GitHub packet schedule 没有及时提供 packet；ChatGPT 独立恢复最终触发 `Final editorial packet` run [33135297994](https://github.com/fallw1nd/daily-game-brief/actions/runs/33135297994)，该 run 在约 10:14:21 开始，约 10:14:32 已把 packet 写入 `automation/state`。collector 本身只需数秒，主要延迟发生在 Scheduled Task 先读取其他状态再判断是否需要 recovery 的阶段。
 - **Risk:** GitHub schedule 缺失时会无意义地增加几分钟开刊延迟，同时消耗更多 ChatGPT 读取/判断步骤。
 - **Proposed resolution:** 将 Scheduled Task 输入阶段拆成极速 preflight：先检查 exact packet 是否存在且合法，再检查 matching collector 是否 queued/in_progress；两者都没有时立即执行已有 edition-scoped one-shot recovery。packet 可用后才读取 manifest/latest/title registry 和完整编辑输入。保持 15 分钟总上限、race guard 与固定窗口不变。
 - **Close when:** 契约文档更新；模拟 packet missing + no active run 时 recovery 在最小读取集合后立即触发；packet present / run active 两条路径不产生重复 collector；生产下一次缺 packet 时记录恢复启动延迟。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** [PR #33](https://github.com/fallw1nd/daily-game-brief/pull/33) / commit [`f121e74`](https://github.com/fallw1nd/daily-game-brief/commit/f121e743deeaadcbe315df12c3d2750eb37edb03) 将 `docs/SCHEDULED_TASK_PROMPT.md` 改为 packet-first preflight，并新增 `scripts/scheduled-task-contract.test.mjs` 锁定 packet present、active collector 与 missing packet recovery 三条路径。随后直接更新现有早报 Scheduled Task `6a86ccc265fc8191a6c72a6bab1cdcea` 与晚报 Scheduled Task `6a86cce353708191be251b6cf545fcc9` 的 prompt：第一阶段只读 exact packet；仅在 packet 缺失/非法时检查 matching collector；packet 可用后才加载 AGENTS / contract / manifest / latest / title registry。未改变任务数量、启用状态、Asia/Shanghai 时区、10:10/17:00 执行时间、固定窗口或生产数据。
+- **Verification:** PR #33 Verify run [33159527832](https://github.com/fallw1nd/daily-game-brief/actions/runs/33159527832) 通过完整 `npm run check`；合并后 Pages run [33159595929](https://github.com/fallw1nd/daily-game-brief/actions/runs/33159595929) 成功。Scheduled 配置回读确认早报仍为 `DTSTART;TZID=Asia/Shanghai:20260821T101000`、晚报仍为 `DTSTART;TZID=Asia/Shanghai:20260821T170000`，两者均 `exact_schedule` 且 `is_enabled=true`。静态契约已满足前置读取与不重复触发条件；仍需等待下一次真实 packet missing 生产事件记录 recovery 启动延迟后才能按 Close when 标记 `resolved`。
 
 ### MNT-20260828-04 — 新作品首次出现时中文名解析仍依赖编辑层临时查询
 
