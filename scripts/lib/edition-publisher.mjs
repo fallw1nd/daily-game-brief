@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { localizeHeadline, resolveTitleTranslation } from "./title-translations.mjs";
+import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -139,8 +139,8 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       id,
       section: decision.section,
       title,
-      headline: localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }),
-      summary: decision.summary,
+      headline: localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })),
+      summary: localizeRegisteredTitles(decision.summary),
       beijingTime: decision.beijingTime || window.windowEnd,
       timeNote: decision.timeNote || "证据只支持日期或窗口归属，未反推未披露的具体时刻。",
       fact_status: decision.factStatus,
@@ -172,7 +172,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
   const leadEntryId = entryByEvent.get(editorial.leadEventKey) || entries[0].id;
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
-  const archiveTitle = localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn });
+  const archiveTitle = localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }));
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")
