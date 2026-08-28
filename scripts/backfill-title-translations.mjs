@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getRegisteredTitleTranslation, localizeHeadline } from "./lib/title-translations.mjs";
+import { getRegisteredTitleTranslation, localizeHeadline, localizeRegisteredTitles } from "./lib/title-translations.mjs";
 
 const archiveRoot = "public/data/archive";
 const latestPath = "public/data/latest.json";
@@ -33,11 +33,17 @@ function backfillTitle(title, stats) {
 
 function localizeEntry(entry, stats) {
   let changed = backfillTitle(entry.title, stats);
-  const next = localizeHeadline(entry.headline, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn });
+  const next = localizeRegisteredTitles(localizeHeadline(entry.headline, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn }));
   if (next !== entry.headline) {
     entry.headline = next;
     stats.headlines += 1;
     stats.headlineKeys.add(entry.title?.title_key || entry.id);
+    changed = true;
+  }
+  const nextSummary = localizeRegisteredTitles(entry.summary);
+  if (nextSummary !== entry.summary) {
+    entry.summary = nextSummary;
+    stats.summaries += 1;
     changed = true;
   }
   return changed;
@@ -50,14 +56,14 @@ function backfillDocument(file, stats) {
   for (const item of document.upcoming || []) changed = backfillTitle(item.title, stats) || changed;
   const lead = (document.entries || []).find((item) => item.id === document.leadEntryId);
   if (lead && document.archiveTitle) {
-    const next = localizeHeadline(document.archiveTitle, { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn });
+    const next = localizeRegisteredTitles(localizeHeadline(document.archiveTitle, { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn }));
     if (next !== document.archiveTitle) { document.archiveTitle = next; stats.archiveTitles += 1; changed = true; }
   }
   if (changed) { fs.writeFileSync(file, `${JSON.stringify(document, null, 2)}\n`); stats.files += 1; }
   return document;
 }
 
-const makeStats = () => ({ files:0, occurrences:0, keys:new Set(), headlines:0, headlineKeys:new Set(), archiveTitles:0 });
+const makeStats = () => ({ files:0, occurrences:0, keys:new Set(), headlines:0, headlineKeys:new Set(), summaries:0, archiveTitles:0 });
 const archiveStats = makeStats();
 const archiveDocs = new Map();
 for (const file of archiveFiles()) { const doc = backfillDocument(file, archiveStats); archiveDocs.set(doc.id, doc); }
@@ -73,6 +79,6 @@ if (fs.existsSync(manifestPath)) {
   }
   if (manifestChanged) fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
-console.log(`Title backfill: ${archiveStats.keys.size} key(s), ${archiveStats.occurrences} title occurrence(s), ${archiveStats.headlines} headline(s), ${archiveStats.archiveTitles} archive title(s), ${archiveStats.files} archive file(s).`);
-console.log(`Latest: ${latestStats.occurrences} title(s), ${latestStats.headlines} headline(s), ${latestStats.archiveTitles} archive title(s), changed=${latestStats.files > 0}.`);
+console.log(`Title backfill: ${archiveStats.keys.size} key(s), ${archiveStats.occurrences} title occurrence(s), ${archiveStats.headlines} headline(s), ${archiveStats.summaries} summary(s), ${archiveStats.archiveTitles} archive title(s), ${archiveStats.files} archive file(s).`);
+console.log(`Latest: ${latestStats.occurrences} title(s), ${latestStats.headlines} headline(s), ${latestStats.summaries} summary(s), ${latestStats.archiveTitles} archive title(s), changed=${latestStats.files > 0}.`);
 console.log(`Manifest changed=${manifestChanged}.`);

@@ -38,6 +38,19 @@ function titlePairs(titleEn, titleZhCn) {
   return [[titleEn.trim(), titleZhCn.trim()]];
 }
 
+export function localizeRegisteredTitles(text) {
+  if (typeof text !== "string" || !text) return text;
+  const pairs = Object.values(titleTranslations).flatMap((item) => {
+    const chinese = typeof item.titleZhCn === "string" ? item.titleZhCn.trim() : "";
+    if (!chinese) return [];
+    return (item.titleEnAliases || []).map((english) => [String(english).trim(), chinese]);
+  }).filter(([english, chinese]) => english && chinese && english !== chinese)
+    .sort((a, b) => b[0].length - a[0].length);
+  let localized = text;
+  for (const [english, chinese] of pairs) localized = localized.split(english).join(chinese);
+  return localized;
+}
+
 export function localizeHeadline(headline, { titleEn = null, titleZhCn = null } = {}) {
   if (typeof headline !== "string" || !headline || !titleZhCn) return headline;
   let localized = headline;

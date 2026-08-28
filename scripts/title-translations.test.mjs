@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { localizeHeadline, resolveTitleTranslation } from "./lib/title-translations.mjs";
+import {
+  getRegisteredTitleTranslation,
+  localizeHeadline,
+  localizeRegisteredTitles,
+  resolveTitleTranslation,
+} from "./lib/title-translations.mjs";
 
 describe("Chinese title translation fallback", () => {
   it("uses a registered title when editorial output is unavailable", () => {
@@ -41,18 +46,40 @@ describe("Chinese title translation fallback", () => {
     });
   });
 
-it("resolves a registered alias even when the generated title key differs", () => {
-  expect(resolveTitleTranslation({ titleKey: "generated-key-that-differs", titleZhCn: null, titleZhStatus: "unavailable", titleEn: "Alien Isolation 2" })).toMatchObject({
-    titleZhCn: "异形：隔离 2", titleZhStatus: "official_simplified", source: "registry",
+  it("resolves a registered alias even when the generated title key differs", () => {
+    expect(resolveTitleTranslation({
+      titleKey: "generated-key-that-differs",
+      titleZhCn: null,
+      titleZhStatus: "unavailable",
+      titleEn: "Alien Isolation 2",
+    })).toMatchObject({
+      titleZhCn: "异形：隔离 2",
+      titleZhStatus: "official_simplified",
+      source: "registry",
+    });
+  });
+
+  it("localizes exact and combined English game subjects in headlines", () => {
+    expect(localizeHeadline("《Fallout 76》首次开放测试", {
+      titleEn: "Fallout 76",
+      titleZhCn: "辐射76",
+    })).toBe("《辐射76》首次开放测试");
+    expect(localizeHeadline("Capcom公开《Mega Man: Dual Override》与《Dragon’s Dogma 2: Dark Arisen》试玩", {
+      titleEn: "Mega Man: Dual Override / Dragon’s Dogma 2: Dark Arisen",
+      titleZhCn: "洛克人：双重超控 / 龙之信条2：黑暗觉者",
+    })).toBe("Capcom公开《洛克人：双重超控》与《龙之信条2：黑暗觉者》试玩");
   });
 });
 
-it("localizes exact and combined English game subjects in headlines", () => {
-  expect(localizeHeadline("《Fallout 76》首次开放测试", { titleEn: "Fallout 76", titleZhCn: "辐射76" })).toBe("《辐射76》首次开放测试");
-  expect(localizeHeadline("Capcom公开《Mega Man: Dual Override》与《Dragon’s Dogma 2: Dark Arisen》试玩", {
-    titleEn: "Mega Man: Dual Override / Dragon’s Dogma 2: Dark Arisen",
-    titleZhCn: "洛克人：双重超控 / 龙之信条2：黑暗觉者",
-  })).toBe("Capcom公开《洛克人：双重超控》与《龙之信条2：黑暗觉者》试玩");
-});
+describe("registered title copy localization", () => {
+  it("resolves the supplied current-edition titles", () => {
+    expect(getRegisteredTitleTranslation("whisper-of-the-house", "Whisper of the House")?.titleZhCn).toBe("呓语小镇");
+    expect(getRegisteredTitleTranslation("gravhounds", "Gravhounds")?.titleZhCn).toBe("重力猎犬");
+    expect(getRegisteredTitleTranslation("militsioner", "Militsioner")?.titleZhCn).toBe("警目如炬");
+  });
 
+  it("localizes secondary game and DLC names inside body copy", () => {
+    expect(localizeRegisteredTitles("《FOUNTAINS》推出 Shattered Shape DLC")).toBe("《永泉传说》推出 破碎之形 DLC");
+    expect(localizeRegisteredTitles("FINAL FANTASY VII EVER CRISIS 更新")).toBe("最终幻想7：永恒危机 更新");
+  });
 });
