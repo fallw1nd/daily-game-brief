@@ -40,13 +40,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P0
 - **Area:** scheduling / SLA / packet collection
-- **Status:** open
+- **Status:** resolved
 - **Evidence:** `Brief publication SLA watchdog` 的 PM cron 配置为 `35 9 * * *`（北京时间 17:35），但 run [33110883167](https://github.com/fallw1nd/daily-game-brief/actions/runs/33110883167) 实际到 2026-08-28 03:56 左右才启动。workflow 仍正确识别 `period=pm`，但 `scripts/check-brief-sla.mjs` 使用 runner 实际 `new Date()` 调用 `plannedWindow(period, now)`，因此把这次迟到的 2026-08-27 PM 检查算成了尚未到截止时间的 `2026-08-28-pm`。随后产生了错误 incident [#26](https://github.com/fallw1nd/daily-game-brief/issues/26)。`scripts/editorialize.mjs` 的 cutoff guard 阻止了未来期 packet 被提前 finalized，因此生产数据未被污染。
 - **Risk:** 任何只传 `period`、再按 runner 实际日期计算窗口的 schedule 入口都可能在严重延迟并跨日时漂移期次；不只 SLA，`Final editorial packet` 也属于同类风险。当前 cutoff 校验能阻止部分污染，但会产生假报警、无效恢复和未来期错误尝试。
 - **Proposed resolution:** 抽出统一的“最近一个已经到期的固定窗口”解析逻辑，例如 `latestDueWindow(period, now)`，schedule 入口不得用“当前自然日 + period”直接推断 edition。手动 `workflow_dispatch` 仍应使用显式 edition/period 契约。
 - **Close when:** 增加跨午夜和长延迟测试；例如北京时间 2026-08-28 03:56 执行 `pm` 必须解析为 `2026-08-27-pm`，不得创建或恢复 `2026-08-28-pm`；AM/PM 正常时点与手动 dispatch 回归通过；生产至少一次迟到/模拟迟到验证不再产生未来期 incident。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** [PR #29](https://github.com/fallw1nd/daily-game-brief/pull/29) / commit [`855f7b7`](https://github.com/fallw1nd/daily-game-brief/commit/855f7b7b335948077f86231724a58a181b4d3885) 增加统一 `latestDueWindow(period, now)`，并让 `scripts/check-brief-sla.mjs` 与 `scripts/collect-news.mjs` 共同使用“最近一个已经到期的同 period 固定窗口”。未修改 cron、Scheduled Task、固定窗口、生产数据或 schema。
+- **Verification:** PR Verify run [33150626972](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150626972) 通过。回归测试用原事故时间（北京时间 2026-08-28 03:56）确认 `pm` 解析为 `2026-08-27-pm`，并覆盖 AM 精确截止、PM 正常 SLA 时点和截止前不得选择未来 PM edition；合并后的 Pages run [33150718591](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150718591) 完整 `Check and build` 与 `Deploy` 均成功。错误 incident #26 由该旧逻辑产生，修复验证后关闭。
 
 ### MNT-20260828-02 — Pages 下游触发是否存在可消除的重复执行
 
