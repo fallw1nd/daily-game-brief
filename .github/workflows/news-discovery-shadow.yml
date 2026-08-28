@@ -66,6 +66,11 @@ jobs:
       - name: Build bounded evidence packages
         run: node scripts/build-evidence.mjs
 
+      - name: Build title-only hints
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: node scripts/build-title-hints.mjs
+
       - name: Build bounded editorial request
         run: node scripts/editorialize.mjs
 
@@ -78,6 +83,7 @@ jobs:
             artifacts/news-candidates.json
             artifacts/news-shadow-report.json
             artifacts/news-evidence.json
+            artifacts/title-hints.json
             artifacts/event-ledger.json
             artifacts/editorial-packet.json
           if-no-files-found: error
@@ -91,6 +97,7 @@ jobs:
             node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const report = require('./artifacts/news-shadow-report.json');
           const evidence = require('./artifacts/news-evidence.json');
+          const titleHints = require('./artifacts/title-hints.json');
           const ledger = require('./artifacts/event-ledger.json');
           console.log('## Final editorial packet');
           console.log(`- Window: ${report.window.windowStart} — ${report.window.windowEnd} Asia/Shanghai`);
@@ -98,8 +105,9 @@ jobs:
           console.log(`- Candidates: ${report.totals.candidates} total; A=${report.totals.tierA}; B=${report.totals.tierB}`);
           console.log(`- Adjacent matches removed before review: ${report.totals.adjacentMatches}`);
           console.log(`- Evidence packages: ${evidence.totals.packages}; primary + independent=${evidence.totals.primaryPlusIndependent}; limited pages=${evidence.totals.limitedPages}`);
+          console.log(`- Title hints: registry misses=${titleHints.registryMisses}; verified=${titleHints.hints.length}; limited=${titleHints.limited.length}`);
           console.log(`- Ledger: ${ledger.totals.events} retained events; recurring=${ledger.totals.recurring}`);
-          console.log('- The finalized packet does not modify archives or publish content.');
+          console.log('- Title hint sources are naming evidence only; the finalized packet does not modify archives or publish content.');
           NODE
           fi
 
