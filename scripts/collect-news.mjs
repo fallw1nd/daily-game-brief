@@ -1,10 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
+  latestDueWindow,
   mergeCandidates,
   parseFeed,
   parseHtmlLinks,
-  plannedWindow,
   resemblesAdjacent,
 } from "./lib/news-pipeline.mjs";
 
@@ -23,7 +23,7 @@ if (!new Set(["am", "pm"]).has(period)) {
 const config = JSON.parse(await readFile(CONFIG_PATH, "utf8"));
 const latest = JSON.parse(await readFile(LATEST_PATH, "utf8"));
 const referenceNow = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
-const window = plannedWindow(period, referenceNow);
+const window = latestDueWindow(period, referenceNow);
 
 async function fetchSource(source) {
   if (!source.url.startsWith("https://")) throw new Error("only HTTPS sources are allowed");

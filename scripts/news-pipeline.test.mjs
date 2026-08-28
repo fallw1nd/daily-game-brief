@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  latestDueWindow,
   mergeCandidates,
   eventIdentity,
   parseFeed,
@@ -112,6 +113,33 @@ describe("low-token news discovery pipeline", () => {
       id: "2026-08-26-pm",
       windowStart: "2026-08-26 10:10",
       windowEnd: "2026-08-26 17:00",
+    });
+  });
+
+  it("resolves a cross-midnight delayed PM runner to the latest due PM edition", () => {
+    const delayed = new Date("2026-08-27T19:56:36.000Z");
+    expect(latestDueWindow("pm", delayed)).toMatchObject({
+      id: "2026-08-27-pm",
+      windowStart: "2026-08-27 10:10",
+      windowEnd: "2026-08-27 17:00",
+    });
+  });
+
+  it("keeps normal cutoff and post-cutoff runs on the current Beijing edition", () => {
+    expect(latestDueWindow("am", new Date("2026-08-28T02:10:00.000Z"))).toMatchObject({
+      id: "2026-08-28-am",
+      windowEnd: "2026-08-28 10:10",
+    });
+    expect(latestDueWindow("pm", new Date("2026-08-28T09:35:00.000Z"))).toMatchObject({
+      id: "2026-08-28-pm",
+      windowEnd: "2026-08-28 17:00",
+    });
+  });
+
+  it("never selects a future same-period edition before its cutoff", () => {
+    expect(latestDueWindow("pm", new Date("2026-08-28T07:00:00.000Z"))).toMatchObject({
+      id: "2026-08-27-pm",
+      windowEnd: "2026-08-27 17:00",
     });
   });
 
