@@ -2,10 +2,26 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const contract = await readFile("docs/SCHEDULED_TASK_PROMPT.md", "utf8");
+const architecture = await readFile("docs/AUTOMATION_ARCHITECTURE.md", "utf8");
 const inputSection = contract.split("## Editorial decision")[0];
 const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
 
 describe("scheduled task fast packet preflight contract", () => {
+  it("separates editorial handoff time from the fixed evidence cutoff", () => {
+    expect(contract).toContain("morning ChatGPT task starts at **10:20 Asia/Shanghai**");
+    expect(contract).toContain("evening ChatGPT task starts at **17:10 Asia/Shanghai**");
+    expect(contract).toContain("fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**");
+    expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");
+    expect(contract).toContain("SLA watchdog remains 10:45/17:35");
+
+    expect(architecture).toContain("**10:20/17:10 Asia/Shanghai ChatGPT tasks**");
+    expect(architecture).toContain("The ten-minute separation is intentional");
+    expect(architecture).toContain("It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows");
+
+    expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
+    expect(packetWorkflow).toContain('- cron: "0 9 * * *"');
+  });
+
   it("checks the exact packet before loading full editorial context", () => {
     const exactPacket = inputSection.indexOf("The first GitHub read for an edition must be only `automation/packets/<edition-id>.json`");
     const fullContext = inputSection.indexOf("After a usable packet is available, read current `main`");
