@@ -2,6 +2,8 @@
 
 Use this contract for the existing morning and evening ChatGPT tasks. Repository schemas and validators are authoritative.
 
+Operational timing is deliberately separated from the evidence cutoff. The morning ChatGPT task starts at **10:20 Asia/Shanghai** and the evening ChatGPT task starts at **17:10 Asia/Shanghai**. These are editorial handoff start times only. Canonical `plannedAt`, edition identity, and fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**; the ten-minute buffer must never widen either evidence window or admit post-cutoff information. `Final editorial packet` remains scheduled at the fixed 10:10/17:00 cutoffs, while the SLA watchdog remains 10:45/17:35.
+
 ## Input
 
 1. Run a fast packet preflight before loading the full editorial context. The first GitHub read for an edition must be only `automation/packets/<edition-id>.json` on `automation/state`. Do not read `AGENTS.md`, this contract, `public/data/manifest.json`, `public/data/latest.json`, `config/title-translations.json`, or other editorial inputs before this preflight finishes.
