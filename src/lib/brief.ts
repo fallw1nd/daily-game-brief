@@ -12,14 +12,25 @@ export function entriesForSection(
   return entries.filter((entry) => entry.section === section);
 }
 
+function beijingMinuteTimestamp(value: string): number {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value)) return NaN;
+  return Date.parse(`${value.replace(" ", "T")}:00+08:00`);
+}
+
 export function isEntryInsideEditionWindow(
   entry: BriefEntry,
   edition: BriefEdition,
 ): boolean {
   if (entry.entry_flags.includes("supplement")) return false;
+  const eventTime = entry.timeEvidenceAt
+    ? Date.parse(entry.timeEvidenceAt)
+    : beijingMinuteTimestamp(entry.beijingTime);
+  const windowStart = beijingMinuteTimestamp(edition.windowStart);
+  const windowEnd = beijingMinuteTimestamp(edition.windowEnd);
   return (
-    entry.beijingTime > edition.windowStart &&
-    entry.beijingTime <= edition.windowEnd
+    [eventTime, windowStart, windowEnd].every(Number.isFinite) &&
+    eventTime > windowStart &&
+    eventTime <= windowEnd
   );
 }
 
