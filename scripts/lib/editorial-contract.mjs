@@ -187,7 +187,7 @@ export const editorialSchema = {
   },
   required: [
     "contractVersion", "editionId", "archiveTitle", "leadEventKey", "decisions", "upcomingMode", "removeUpcomingIds",
-    "upcoming", "locales", "checkedExtra", "limitedExtra", "editorialNote",
+    "upcoming", "checkedExtra", "limitedExtra", "editorialNote",
   ],
 };
 
@@ -266,7 +266,7 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
     usedChars += size;
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 2,
     window: evidence.window,
     adjacentEdition: evidence.adjacentEdition,
     packages,
@@ -367,6 +367,5 @@ export function validateEditorialOutput(output, input) {
     }
   }
   for (const eventKey of allowedKeys) if (!seen.has(eventKey)) errors.push(`missing decision for ${eventKey}`);
-  errors.push(...validateEnglishEditorialLocale(output));
   return errors;
 }
