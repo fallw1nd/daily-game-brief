@@ -35,18 +35,18 @@
 
 ## Open / planned issues
 
-### MNT-20260828-01 — 延迟 cron 跨日后按 runner 日期错算 edition
+### MNT-20260828-01 — period-only 入口按 runner 时刻错算 edition
 
 - **Discovered:** 2026-08-28
 - **Priority:** P0
 - **Area:** scheduling / SLA / packet collection
-- **Status:** resolved
-- **Evidence:** `Brief publication SLA watchdog` 的 PM cron 配置为 `35 9 * * *`（北京时间 17:35），但 run [33110883167](https://github.com/fallw1nd/daily-game-brief/actions/runs/33110883167) 实际到 2026-08-28 03:56 左右才启动。workflow 仍正确识别 `period=pm`，但 `scripts/check-brief-sla.mjs` 使用 runner 实际 `new Date()` 调用 `plannedWindow(period, now)`，因此把这次迟到的 2026-08-27 PM 检查算成了尚未到截止时间的 `2026-08-28-pm`。随后产生了错误 incident [#26](https://github.com/fallw1nd/daily-game-brief/issues/26)。`scripts/editorialize.mjs` 的 cutoff guard 阻止了未来期 packet 被提前 finalized，因此生产数据未被污染。
-- **Risk:** 任何只传 `period`、再按 runner 实际日期计算窗口的 schedule 入口都可能在严重延迟并跨日时漂移期次；不只 SLA，`Final editorial packet` 也属于同类风险。当前 cutoff 校验能阻止部分污染，但会产生假报警、无效恢复和未来期错误尝试。
-- **Proposed resolution:** 抽出统一的“最近一个已经到期的固定窗口”解析逻辑，例如 `latestDueWindow(period, now)`，schedule 入口不得用“当前自然日 + period”直接推断 edition。手动 `workflow_dispatch` 仍应使用显式 edition/period 契约。
-- **Close when:** 增加跨午夜和长延迟测试；例如北京时间 2026-08-28 03:56 执行 `pm` 必须解析为 `2026-08-27-pm`，不得创建或恢复 `2026-08-28-pm`；AM/PM 正常时点与手动 dispatch 回归通过；生产至少一次迟到/模拟迟到验证不再产生未来期 incident。
-- **Resolution:** [PR #29](https://github.com/fallw1nd/daily-game-brief/pull/29) / commit [`855f7b7`](https://github.com/fallw1nd/daily-game-brief/commit/855f7b7b335948077f86231724a58a181b4d3885) 增加统一 `latestDueWindow(period, now)`，并让 `scripts/check-brief-sla.mjs` 与 `scripts/collect-news.mjs` 共同使用“最近一个已经到期的同 period 固定窗口”。未修改 cron、Scheduled Task、固定窗口、生产数据或 schema。
-- **Verification:** PR Verify run [33150626972](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150626972) 通过。回归测试用原事故时间（北京时间 2026-08-28 03:56）确认 `pm` 解析为 `2026-08-27-pm`，并覆盖 AM 精确截止、PM 正常 SLA 时点和截止前不得选择未来 PM edition；合并后的 Pages run [33150718591](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150718591) 完整 `Check and build` 与 `Deploy` 均成功。错误 incident #26 由该旧逻辑产生，修复验证后关闭。
+- **Status:** in_progress
+- **Evidence:** `Brief publication SLA watchdog` 的 PM cron 配置为 `35 9 * * *`（北京时间 17:35），但 run [33110883167](https://github.com/fallw1nd/daily-game-brief/actions/runs/33110883167) 实际到 2026-08-28 03:56 左右才启动。workflow 仍正确识别 `period=pm`，但 `scripts/check-brief-sla.mjs` 使用 runner 实际 `new Date()` 调用 `plannedWindow(period, now)`，因此把这次迟到的 2026-08-27 PM 检查算成了尚未到截止时间的 `2026-08-28-pm`。随后产生了错误 incident [#26](https://github.com/fallw1nd/daily-game-brief/issues/26)。`scripts/editorialize.mjs` 的 cutoff guard 阻止了未来期 packet 被提前 finalized，因此生产数据未被污染。2026-08-29 AM 再次暴露同一根因的另一侧：ChatGPT 一次性恢复在固定 10:10 截止前启动 `Final editorial packet` run [33228209388](https://github.com/fallw1nd/daily-game-brief/actions/runs/33228209388)，run 于北京时间约 10:08:48 开始且所有步骤最终成功，但 `workflow_dispatch` 只传 `period=am`，`scripts/collect-news.mjs` 因而按当时的 `latestDueWindow()` 选择最近已到期的 `2026-08-28-am`。持久化日志明确提交了 `chore(automation): persist 2026-08-28-am editorial packet`，而 `automation/packets/2026-08-29-am.json` 始终不存在，导致 2026-08-29 早报在 15 分钟上限后停止。该次恢复没有改动 `main` 或生产数据。
+- **Risk:** 任何只传 `period`、再按 runner 实际日期/时刻计算窗口的入口都可能在严重延迟、跨日或截止前抖动时漂移期次。静态 cutoff 校验能阻止部分错误发布，但不能保证 recovery 生成的是请求的 exact edition；结果可能是假成功、错误 state packet、空跑和漏期。
+- **Proposed resolution:** schedule 入口继续使用统一 `latestDueWindow(period, now)`，用于吸收 GitHub cron 延迟；manual/recovery `workflow_dispatch` 必须支持并优先使用显式 `edition + period`，且两者必须一致。为兼容尚未更新的现有 period-only recovery prompt，dispatch 仅可锁定 runner 当天同 period 的计划 edition：若距离其 cutoff 不超过五分钟则等待到截止再采集，若更早则显式失败，绝不回退到前一天。新 recovery 契约一律传 exact edition。
+- **Close when:** 原跨午夜迟到 cron 回归仍解析为最近已到期 edition；北京时间 2026-08-29 10:08:48 的 period-only AM recovery 锁定 `2026-08-29-am` 并等待截止，不得写 `2026-08-28-am`；显式 edition 在跨日迟到时仍保持原目标；period/edition 不一致和明显过早调用 fail closed；完整 Verify 通过；恢复链至少一次用 exact edition 或安全 legacy fallback 生成正确生产 packet 后再标记 `resolved`。
+- **Resolution:** [PR #29](https://github.com/fallw1nd/daily-game-brief/pull/29) / commit [`855f7b7`](https://github.com/fallw1nd/daily-game-brief/commit/855f7b7b335948077f86231724a58a181b4d3885) 先为 schedule/SLA 路径增加统一 `latestDueWindow(period, now)`；2026-08-29 生产复发证明 manual recovery 的 exact-edition 部分并未完成，因此本条重新打开。当前修复分支 `fix/mnt-20260828-01-recovery-edition` 正在补齐 `workflow_dispatch` 的 edition 绑定与 pre-cutoff guard；未修改固定 cron、Scheduled Task 配置、生产数据或 schema。
+- **Verification:** PR #29 Verify run [33150626972](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150626972) 与 Pages run [33150718591](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150718591) 均成功，但 2026-08-29 run [33228209388](https://github.com/fallw1nd/daily-game-brief/actions/runs/33228209388) 证明原关闭条件只覆盖了迟到 schedule，未覆盖 early manual recovery，因此原 `resolved` 状态撤回。新修复的 CI 与生产验证待补。
 
 ### MNT-20260828-02 — Pages 下游触发是否存在可消除的重复执行
 
