@@ -165,6 +165,19 @@
 - **Resolution:** pending.
 - **Verification:** pending.
 
+### MNT-20260829-01 — verified 边界分钟丢失秒级精度
+
+- **Discovered:** 2026-08-29
+- **Priority:** P0
+- **Area:** editorial handoff / time validation / fixed windows
+- **Status:** in_progress
+- **Evidence:** 2026-08-29 AM 补发的 publisher run [33236844373](https://github.com/fallw1nd/daily-game-brief/actions/runs/33236844373) 在构建后被 `validate:data` 拒绝，报 `2026-08-29-am-releases-2: verified event time falls outside the fixed window`。该事件选中来源的原始 `publishedAt` 为 `2026-08-28T09:00:11Z`，即北京时间 17:00:11，实际满足 AM 窗口 `(前一日17:00, 当日10:10]`；但 editorial/public `beijingTime` 仅保留到分钟，序列化为 `2026-08-28 17:00` 后被验证器按 17:00:00 处理，错误落在排除边界。最终补发只能暂时降级为 `time_unverified` 才完成发布。
+- **Risk:** exclusive start 后首 59 秒的合法事件会被误拒；如果粗暴放行整个边界分钟，则又会错误接纳 exact-start 事件以及 inclusive end 后 1–59 秒的越界事件，直接破坏固定窗口。
+- **Proposed resolution:** 保持 `beijingTime` 分钟级展示兼容；对 `verified` 且位于 start/end 边界分钟的决策，只从该条实际选中的 opened source `publishedAt` 自动导出唯一秒级证据，并由 publisher 持久化为可选 `timeEvidenceAt`。提交验证和最终数据验证用精确 instant 约束 `(windowStart, windowEnd]`；只有分钟精度或存在多义性的边界证据不得标 `verified`，继续使用 `time_unverified`。
+- **Close when:** 回归覆盖 AM/PM exclusive start、inclusive end、真实 17:00:11 事故、minute-only 边界与 `time_unverified`；完整 Verify 与合并后 Pages 成功；不改固定窗口、期号、历史 archive 或既有时间状态。
+- **Resolution:** [PR #43](https://github.com/fallw1nd/daily-game-brief/pull/43) in progress：新增受信任的 `timeEvidenceAt` 边界证据路径，不扩大时间窗口，不要求 ChatGPT 自行填写秒数。
+- **Verification:** PR #43 首轮 Verify run [33241512305](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241512305) 已通过完整 `npm run check`；最终合并验证待补。
+
 ---
 
 ## Resolved baseline from recent changes
