@@ -77,6 +77,19 @@ describe("English locale infrastructure", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("does not invent a release type when Canonical has none", () => {
+    const canonical = canonicalEdition();
+    delete canonical.entries[0].releaseType;
+    const overlay = validOverlay(canonical);
+    overlay.factsDigest = factsDigest(canonical);
+    overlay.canonicalCopyDigest = canonicalCopyDigest(canonical);
+    overlay.localeDigest = localeDigest(overlay);
+    const result = validateEnglishOverlay(canonical, overlay);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(overlay.entries[0].releaseTypeLabel).toBeUndefined();
+  });
+
   it("rejects stale facts while treating Chinese copy-only edits as a warning", () => {
     const canonical = canonicalEdition();
     const overlay = validOverlay(canonical);
