@@ -84,6 +84,38 @@ describe("brief integrity", () => {
     ).toBe(true);
   });
 
+  it("uses second-precision evidence inside a boundary display minute", () => {
+    const base = edition.entries[0];
+    expect(
+      isEntryInsideEditionWindow(
+        {
+          ...base,
+          beijingTime: edition.windowStart,
+          timeEvidenceAt: "2026-08-28T09:00:11.000Z",
+        },
+        {
+          ...edition,
+          windowStart: "2026-08-28 17:00",
+          windowEnd: "2026-08-29 10:10",
+        },
+      ),
+    ).toBe(true);
+    expect(
+      isEntryInsideEditionWindow(
+        {
+          ...base,
+          beijingTime: "2026-08-29 17:00",
+          timeEvidenceAt: "2026-08-29T09:00:01.000Z",
+        },
+        {
+          ...edition,
+          windowStart: "2026-08-29 10:10",
+          windowEnd: "2026-08-29 17:00",
+        },
+      ),
+    ).toBe(false);
+  });
+
   it("searches Chinese names, English names, and platforms", () => {
     expect(searchEntries(edition.entries, "乐园追放")).toHaveLength(1);
     expect(searchEntries(edition.entries, "Chronoscript")).toHaveLength(1);

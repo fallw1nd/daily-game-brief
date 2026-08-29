@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
+import {
+  isBoundaryMinute,
+  resolveSelectedTimeEvidence,
+  verifiedWindowTimeError,
+} from "./time-window.mjs";
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -130,6 +135,18 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     if (!packetItem && !(decision.additionalSources || []).length) throw new Error(`included ${decision.eventKey} has no packet evidence`);
     const sources = sourcesFor(decision, packetItem);
     if (!sources.length) throw new Error(`included ${decision.eventKey} has no selected source`);
+    const boundaryMinute = decision.timeStatus === "verified" && isBoundaryMinute(decision.beijingTime, window);
+    const timeEvidenceAt = boundaryMinute ? resolveSelectedTimeEvidence(decision, packetItem) : null;
+    if (boundaryMinute) {
+      const timeError = verifiedWindowTimeError({
+        beijingTime: decision.beijingTime,
+        timeEvidenceAt,
+        windowStart: window.windowStart,
+        windowEnd: window.windowEnd,
+        requireExactBoundary: true,
+      });
+      if (timeError) throw new Error(`included ${decision.eventKey}: ${timeError}`);
+    }
     const index = counters.get(decision.section) || 0;
     counters.set(decision.section, index + 1);
     const id = `${window.id}-${decision.section}-${index}`;
@@ -142,6 +159,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       headline: localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })),
       summary: localizeRegisteredTitles(decision.summary),
       beijingTime: decision.beijingTime || window.windowEnd,
+      ...(timeEvidenceAt ? { timeEvidenceAt } : {}),
       timeNote: decision.timeNote || "证据只支持日期或窗口归属，未反推未披露的具体时刻。",
       fact_status: decision.factStatus,
       time_status: decision.timeStatus,

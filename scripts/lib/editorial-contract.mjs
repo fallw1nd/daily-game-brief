@@ -1,3 +1,9 @@
+import {
+  isBoundaryMinute,
+  resolveSelectedTimeEvidence,
+  verifiedWindowTimeError,
+} from "./time-window.mjs";
+
 const sections = ["releases", "reviews", "news", "industry", "features", "rumors", "observations"];
 const factStatuses = ["official", "media_relay_official", "media_report", "multi_source_verified", "unconfirmed"];
 const timeStatuses = ["verified", "date_only", "time_unverified", "uncertain"];
@@ -218,6 +224,17 @@ export function validateEditorialOutput(output, input) {
       }
       if (!(item.sourceIndexes || []).length && !(item.additionalSources || []).length) {
         errors.push(`${context}: include requires a selected source`);
+      }
+      if (item.timeStatus === "verified" && isBoundaryMinute(item.beijingTime, input.window)) {
+        const timeEvidenceAt = resolveSelectedTimeEvidence(item, evidenceItem);
+        const timeError = verifiedWindowTimeError({
+          beijingTime: item.beijingTime,
+          timeEvidenceAt,
+          windowStart: input.window?.windowStart,
+          windowEnd: input.window?.windowEnd,
+          requireExactBoundary: true,
+        });
+        if (timeError) errors.push(`${context}: ${timeError}`);
       }
     }
     if (item.factStatus === "unconfirmed" && item.tracking !== true) {

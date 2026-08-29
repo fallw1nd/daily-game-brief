@@ -64,6 +64,7 @@ export interface BriefEntry {
   headline: string;
   summary: string;
   beijingTime: string;
+  timeEvidenceAt?: string;
   timeNote: string;
   fact_status: FactStatus;
   time_status: TimeStatus;
