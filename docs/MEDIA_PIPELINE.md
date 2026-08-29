@@ -52,7 +52,7 @@ Run npm run media:audit for a read-only report or npm run media:enrich for the l
 - writes to public/media/briefs/YYYY/MM/<edition-id>/;
 - records a specific unavailable reason instead of forcing a mismatch.
 
-The editorial publisher dispatches the workflow for the exact edition immediately after publication. Scheduled runs at 10:35 and 17:25 Asia/Shanghai remain as idempotent recovery checks. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
+The editorial publisher dispatches the workflow for the exact edition immediately after publication. Scheduled runs at 11:10 and 18:00 Asia/Shanghai are idempotent recovery checks after the widened SLA window; they do not replace or delay the publisher-triggered exact-edition enrichment. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
 
 ## DeepSeek search configuration
 
