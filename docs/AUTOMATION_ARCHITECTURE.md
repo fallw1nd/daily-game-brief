@@ -1,6 +1,6 @@
 # Programmatic Brief Automation
 
-GitHub Actions prepares bounded evidence and deterministic state. The existing ChatGPT tasks perform the editorial decision and submit a structured handoff.
+GitHub Actions prepares bounded evidence and deterministic state. The existing ChatGPT tasks perform the evidence-bounded editorial decision and submit a structured bilingual handoff; trusted code on `main` remains the only production publisher.
 
 ## Reliability boundary
 
@@ -11,16 +11,19 @@ Code owns deterministic work:
 - URL normalization, candidate deduplication, and adjacent-edition comparison;
 - source/time/media/schema validation;
 - media download, conversion, and caching;
-- atomic Git publication, deployment checks, retries, and SLA incidents.
+- Canonical entry identity, issue numbering, digest calculation, English Overlay validation, and explicit locale availability state;
+- atomic Git publication, deployment checks, retries, locale repair, and SLA incidents.
 
-The existing ChatGPT scheduled tasks own only evidence-bounded work:
+The existing ChatGPT scheduled tasks own only evidence-bounded editorial work:
 
 - candidate prioritization after deterministic scoring;
-- concise Chinese headline and summary drafting;
+- concise Simplified Chinese headline, summary, verification, and time-note drafting;
+- a language-neutral `sharedFactFrame` for every included event;
+- natural English presentation copy from the same selected evidence and shared fact boundary when it can be completed safely;
 - structured `fact_status`, `time_status`, and `tracking` suggestions;
 - careful wording for rumors, disputes, interviews, and legal reports.
 
-The model must never calculate issue numbers, mutate manifests directly, download media, or decide that a failed deployment succeeded.
+The model must never calculate issue numbers, final entry IDs, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`; mutate manifests directly; download media; invent facts for English; or decide that a failed deployment succeeded. English is a presentation layer: an incomplete or invalid English draft must not suppress an otherwise valid Simplified Chinese Canonical edition.
 
 ## Components
 
@@ -28,6 +31,7 @@ The model must never calculate issue numbers, mutate manifests directly, downloa
 
 - `scripts/validate-data.mjs` enforces fixed windows, enums, primary-source requirements, source independence for `multi_source_verified`, tracking for unconfirmed entries, the next-15-day range, detailed audits, and byte-identical latest/archive data.
 - `scripts/validate-editorial-packet.mjs` rejects stale or malformed finalized packets before either ChatGPT or the SLA watchdog treats them as usable. It checks packet/input schema versions, mode, exact edition/period/planned time/window, `coverageThrough`, and post-cutoff finalization.
+- `scripts/validate-locales.mjs` and the English Overlay validator enforce stable Canonical identities, fact digests, copy digests, locale digests, complete English presentation fields, and explicit unavailable states without making English a Canonical fact gate.
 - Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
 - `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
 
@@ -38,7 +42,8 @@ The model must never calculate issue numbers, mutate manifests directly, downloa
 1. `config/news-sources.json` is the curated source registry.
 2. `scripts/collect-news.mjs` reads RSS and list pages without opening article bodies.
 3. Candidates are normalized, scored, compared with the adjacent edition, and split into A/B/C review levels.
-4. The artifact records every limited source so coverage failures remain visible.
+4. `scripts/build-evidence.mjs` records declared/detected source-language metadata together with the bounded evidence text; language metadata guides presentation only and never upgrades factual authority.
+5. The artifact records every limited source so coverage failures remain visible.
 
 Artifacts and the persistent state branch measure:
 
@@ -52,19 +57,39 @@ Artifacts and the persistent state branch measure:
 
 ### Evidence extraction and ledger
 
-`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
+`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, source-language metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
 
 ### ChatGPT editorial handoff
 
-`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the strict decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The ChatGPT task may wait briefly for this same-time GitHub job, but it performs no supplemental discovery.
+`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the active `contractVersion: 2` decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The ChatGPT task may wait briefly for this same-time GitHub job, but it performs no supplemental event discovery.
 
 A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. A packet that exists but is stale, pre-cutoff, malformed, or tied to the wrong fixed window is treated as missing for recovery purposes. The ChatGPT task first avoids racing any matching queued/in-progress collection run; otherwise it may use its edition-scoped one-shot recovery trigger to dispatch the existing collector.
 
+For every included decision, `sharedFactFrame` is the language-neutral boundary for subject title key, dates, times, numbers, platforms, people/entities, versions, and proper terms. Simplified Chinese Canonical copy and `locales.en` must stay inside this frame. English is independently edited rather than sentence-by-sentence translated; official English terminology is preferred when opened English evidence provides it. When complete English copy cannot be produced safely, the task omits `locales.en` instead of weakening or changing the Canonical decision.
+
+### Canonical data and English Overlay
+
+The Simplified Chinese edition under `public/data/archive/YYYY/MM/<edition-id>.json`, plus `latest.json` and `manifest.json`, remains the sole fact authority. English is stored separately under `public/data/locales/en/archive/YYYY/MM/<edition-id>.json` as a presentation Overlay that references Canonical identities and contains no independent fact-status, time-status, tracking, source URL, platform, date, issue, or ordering authority.
+
+The trusted publisher binds the editorial `eventKey` handoff to final Canonical `entryId` values after the edition is built. It then computes:
+
+- `factsDigest` from the stable Canonical fact projection;
+- `canonicalCopyDigest` from Simplified Chinese presentation copy;
+- `localeDigest` from the English Overlay presentation payload.
+
+A stale `factsDigest` makes the English Overlay unavailable. A changed Simplified Chinese copy digest is observable but does not by itself imply factual staleness. `public/data/locales/en/index.json` is generated state describing which Canonical editions have a valid English Overlay and which are explicitly unavailable.
+
 ### Idempotent publisher
 
-`scripts/publish-editorial-decision.mjs` validates the structured decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
+`scripts/publish-editorial-decision.mjs` validates the structured Canonical decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without Canonical mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
 The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>` and stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all edition identities and cutoff coverage, performs the complete check, and publishes the result.
+
+Normal publication has three observable locale outcomes:
+
+- **bilingual** — Canonical publication and a valid English Overlay are committed together;
+- **Chinese-first degraded** — Canonical publication succeeds while English is recorded as machine-readable unavailable because the English draft is missing or invalid;
+- **locale repair** — a later trusted `locale-repair` run may add/replace only English Overlay/availability state. The workflow guards hashes of the Canonical archive, `latest.json`, and `manifest.json` so repair cannot silently mutate factual data.
 
 Publication is concurrency-safe against other `main` writers. If a push is rejected because `main` advanced after the edition was built, the workflow resets to the current `origin/main`, rebuilds the same committed editorial decision, reruns the full repository check, and retries up to three times. This preserves concurrent media changes instead of rebasing a stale generated `latest.json` over them. If a validated publication workflow still fails, the original push-triggered run queues at most one `workflow_dispatch` retry for the same committed decision. The retry path is semantically idempotent: an edition that already reached `main` is detected as `already-exists`, keeps its issue number, and can still re-dispatch Pages/media and finish ledger feedback.
 
@@ -80,7 +105,7 @@ The watchdog then uses `scripts/build-degraded-decision.mjs` only when an editio
 
 ### Observation and refinement
 
-Keep the 10:10/17:00 ChatGPT tasks enabled as the normal publisher. Review omission audits, source health, degraded fallbacks, and media outcomes for seven consecutive days, then tune the deterministic source registry and thresholds without expanding the prompt.
+Keep the existing 10:10/17:00 ChatGPT tasks enabled as the normal editorial handoff. Before exposing a public English route, observe real bilingual AM/PM production outputs and confirm that the Canonical edition remains correct when English succeeds, degrades, or is later repaired. Review omission audits, source health, degraded fallbacks, locale outcomes, and media outcomes before widening the public surface.
 
 ## Operational states
 
@@ -88,11 +113,11 @@ Every due edition must end in one observable state:
 
 `collecting → verifying → drafted → committed → deployed`
 
-or:
+with the locale state independently observable as `available` or `unavailable`.
 
-`degraded` — publishable facts completed; optional media or a noncritical source failed.
+`degraded` — publishable Canonical facts completed; optional media, English presentation, or a noncritical source failed.
 
-`failed` — archive missing, source contract invalid, commit rejected, or deployment not visible; an incident is opened and the fixed window is retained for recovery.
+`failed` — archive missing, Canonical source contract invalid, commit rejected, or deployment not visible; an incident is opened and the fixed window is retained for recovery.
 
 Silent disappearance is never a valid state.
 
@@ -112,6 +137,7 @@ npm run brief:degraded-decision
 npm run brief:sla:am
 npm run brief:sla:pm
 npm run validate:data
+npm run validate:locales
 npm run check
 ```
 
