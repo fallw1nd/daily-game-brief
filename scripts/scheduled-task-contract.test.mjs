@@ -37,4 +37,11 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(packetWorkflow).toContain("node scripts/resolve-packet-dispatch.mjs");
     expect(packetWorkflow).toContain('BRIEF_NOW="${{ steps.edition.outputs.reference_now }}"');
   });
+
+  it("prefers official mainland terminology for Chinese games without expanding event evidence", () => {
+    expect(contract).toContain("official mainland-China Simplified Chinese channel or site");
+    expect(contract).toContain("visible version subtitles, characters/agents, classes/professions, named modes/mechanics");
+    expect(contract).toContain("terminology-only lookup");
+    expect(contract).toContain("Neither lookup may introduce a new event, fact, time, platform, release claim, source classification, tracking decision, or candidate.");
+  });
 });
