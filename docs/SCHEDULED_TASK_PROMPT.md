@@ -32,12 +32,21 @@ Use this contract for the existing morning and evening ChatGPT tasks. Repository
 
 The finalized packet is the complete evidence source for event content. Do not perform supplemental event discovery or add events outside it; only the narrow title-name lookup described above is allowed.
 
+## Bilingual handoff — active
+
+1. New normal submissions must use `contractVersion:2` and every `include` decision must contain a complete `sharedFactFrame`. The frame is the language-neutral fact boundary shared by Simplified Chinese and English: subject title key, dates, times, numbers, platforms, people/entities, versions and proper terms. It must not contain presentation-only wording or facts that exist in only one language version.
+2. Produce `locales.en` whenever a complete English presentation can be written from the same selected evidence and `sharedFactFrame`. English copy is an independent editorial rendering, not a sentence-by-sentence translation of Chinese. Prefer official English terminology from opened English primary evidence when available; otherwise render the same verified facts naturally in English without enlarging the fact boundary.
+3. `locales.en.entries` follows included decision order and binds by `eventKey`; `locales.en.upcoming` follows submitted upcoming order and binds by `upcomingId`. Morning English archive titles start with `Morning Brief |`; evening titles start with `Evening Brief |`. Required English copy must not use Chinese body text as fallback.
+4. Do not calculate or invent final `entryId`, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`. The trusted publisher binds final Canonical IDs and computes all digests after the Canonical edition is built.
+5. English is non-blocking. If a complete valid `locales.en` draft cannot be produced within the verified fact boundary, omit `locales.en` rather than weakening, changing, or suppressing the Canonical Chinese editorial decision. The trusted publisher must still publish the Canonical edition and record English as machine-readable `unavailable`; a later `locale-repair` may repair English without changing Canonical archive/latest/manifest bytes.
+6. English-only validation problems are presentation failures, not fact-verification failures. `sharedFactFrame`, source selection, time/window rules, issue sequencing, tracking and all Canonical fields remain hard gates.
+
 ## Handoff
 
 1. Create or reuse `automation/editorial/<edition-id>` from current `main`.
 2. Commit only the complete decision to `automation/inbox/<edition-id>.json`.
 3. Report the edition ID and included/excluded/review counts after the decision commit succeeds, then stop. Publication, validation, deployment, and incidents are handled by GitHub Actions.
 
-The trusted publisher validates the committed decision against the exact finalized packet. If a validated publication run fails, the workflow queues at most one `workflow_dispatch` retry for the same committed decision. Each publication attempt may rebuild from the latest `main` up to three times when another writer advances `main`; this retry must never create a new issue number or alter the fixed edition window.
+The trusted publisher validates the committed Canonical decision against the exact finalized packet. English Overlay validation runs after the Canonical decision clears its hard gates. If a validated publication run fails, the workflow queues at most one `workflow_dispatch` retry for the same committed decision. Each publication attempt may rebuild from the latest `main` up to three times when another writer advances `main`; this retry must never create a new issue number or alter the fixed edition window.
 
-Publication, validation, deployment, ledger feedback, SLA recovery, and media enrichment are workflow responsibilities.
+Publication, bilingual Overlay validation/degradation, validation, deployment, ledger feedback, SLA recovery, and media enrichment are workflow responsibilities.
