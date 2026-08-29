@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import EnglishApp from "./EnglishApp";
 import "./styles.css";
+import "./locale.css";
 
 function LocaleSwitch({ english }: { english: boolean }) {
   const [target, setTarget] = React.useState<HTMLElement | null>(null);
@@ -25,7 +26,7 @@ function LocaleSwitch({ english }: { english: boolean }) {
 
   return createPortal(
     <a
-      className="theme-toggle interaction-state"
+      className="locale-toggle theme-toggle interaction-state"
       href={href}
       aria-label={english ? "切换到简体中文" : "Switch to English"}
       title={english ? "简体中文" : "English"}
