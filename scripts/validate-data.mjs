@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { verifiedWindowTimeError } from "./lib/time-window.mjs";
 
 const dataRoot = resolve("public/data");
 const errors = [];
@@ -240,12 +241,14 @@ function validateEdition(edition, path) {
     if (entry.fact_status === "unconfirmed" && entry.tracking !== true) {
       errors.push(`${context}: unconfirmed entries must remain tracking:true`);
     }
-    const entryTime = beijingTimestamp(entry.beijingTime);
-    if (entry.time_status === "verified" &&
-        !entry.entry_flags?.includes("supplement") &&
-        Number.isFinite(entryTime) && Number.isFinite(windowStart) && Number.isFinite(windowEnd) &&
-        (entryTime <= windowStart || entryTime > windowEnd)) {
-      errors.push(`${context}: verified event time falls outside the fixed window`);
+    if (entry.time_status === "verified" && !entry.entry_flags?.includes("supplement")) {
+      const timeError = verifiedWindowTimeError({
+        beijingTime: entry.beijingTime,
+        timeEvidenceAt: entry.timeEvidenceAt,
+        windowStart: edition.windowStart,
+        windowEnd: edition.windowEnd,
+      });
+      if (timeError) errors.push(`${context}: ${timeError}`);
     }
     if (requiresImages) {
       const hasImage =
