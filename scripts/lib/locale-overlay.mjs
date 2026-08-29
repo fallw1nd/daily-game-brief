@@ -127,7 +127,7 @@ function validateEntries(canonical, overlay, errors) {
     } else if (item.regionLabel !== undefined) {
       requiredEnglish(item.regionLabel, `${context}.regionLabel`, errors);
     }
-    if (!programmaticReleaseTypeLabel(canonicalEntry.releaseType)) {
+    if (programmaticReleaseTypeLabel(canonicalEntry.releaseType) === null) {
       requiredEnglish(item.releaseTypeLabel, `${context}.releaseTypeLabel`, errors);
     } else if (item.releaseTypeLabel !== undefined) {
       requiredEnglish(item.releaseTypeLabel, `${context}.releaseTypeLabel`, errors);
@@ -165,7 +165,7 @@ function validateUpcoming(canonical, overlay, errors) {
     if (seen.has(overlayKey)) errors.push(`${context}: duplicate upcoming identity`);
     seen.add(overlayKey);
     if (!programmaticRegionLabel(canonicalItem.region)) requiredEnglish(item.regionLabel, `${context}.regionLabel`, errors);
-    if (!programmaticReleaseTypeLabel(canonicalItem.releaseType)) requiredEnglish(item.releaseTypeLabel, `${context}.releaseTypeLabel`, errors);
+    if (programmaticReleaseTypeLabel(canonicalItem.releaseType) === null) requiredEnglish(item.releaseTypeLabel, `${context}.releaseTypeLabel`, errors);
     if (!programmaticSourceLabel(canonicalItem.source?.label)) requiredEnglish(item.sourceLabel, `${context}.sourceLabel`, errors);
     if (canonicalItem.cover && item.coverAlt !== undefined) requiredEnglish(item.coverAlt, `${context}.coverAlt`, errors);
   }
