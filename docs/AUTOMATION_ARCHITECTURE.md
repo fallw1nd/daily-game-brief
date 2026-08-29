@@ -37,7 +37,7 @@ The model must never calculate issue numbers, final entry IDs, `factsDigest`, `c
 
 ### Final-window discovery
 
-`Final editorial packet` starts at the fixed 10:10/17:00 Asia/Shanghai cutoffs and captures the complete edition window. It does not alter archives.
+`Final editorial packet` starts at the fixed 10:10/17:00 Asia/Shanghai cutoffs and captures the complete edition window. It does not alter archives. These times are evidence cutoffs and packet-start times, not the ChatGPT editorial task invocation times.
 
 1. `config/news-sources.json` is the curated source registry.
 2. `scripts/collect-news.mjs` reads RSS and list pages without opening article bodies.
@@ -61,7 +61,11 @@ Artifacts and the persistent state branch measure:
 
 ### ChatGPT editorial handoff
 
-`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing 10:10/17:00 ChatGPT tasks. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the active `contractVersion: 2` decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The ChatGPT task may wait briefly for this same-time GitHub job, but it performs no supplemental event discovery.
+`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing **10:20/17:10 Asia/Shanghai ChatGPT tasks**. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the active `contractVersion: 2` decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`.
+
+The ten-minute separation is intentional: GitHub closes the AM/PM evidence windows and starts `Final editorial packet` at 10:10/17:00, then the ChatGPT editorial handoff starts at 10:20/17:10. This buffer gives packet generation normal queue/runtime headroom. It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows, and it must never admit information published after 10:10/17:00 into that edition.
+
+Normally the finalized packet should already exist when ChatGPT begins. If it does not, the task follows the packet-first preflight contract: wait only for a proven matching queued/in-progress collector, otherwise use the exact-edition one-shot recovery path. It performs no supplemental event discovery.
 
 A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. A packet that exists but is stale, pre-cutoff, malformed, or tied to the wrong fixed window is treated as missing for recovery purposes. The ChatGPT task first avoids racing any matching queued/in-progress collection run; otherwise it may use its edition-scoped one-shot recovery trigger to dispatch the existing collector.
 
@@ -105,7 +109,7 @@ The watchdog then uses `scripts/build-degraded-decision.mjs` only when an editio
 
 ### Observation and refinement
 
-Keep the existing 10:10/17:00 ChatGPT tasks enabled as the normal editorial handoff. Before exposing a public English route, observe real bilingual AM/PM production outputs and confirm that the Canonical edition remains correct when English succeeds, degrades, or is later repaired. Review omission audits, source health, degraded fallbacks, locale outcomes, and media outcomes before widening the public surface.
+Keep the existing **10:20/17:10 ChatGPT tasks** enabled as the normal editorial handoff. Treat 10:10/17:00 as immutable evidence cutoffs and packet-start times, not ChatGPT invocation times. Review real AM/PM production outputs for packet availability at handoff start, omission audits, source health, degraded fallbacks, locale outcomes, media outcomes, and SLA behavior before tightening or widening any timing again.
 
 ## Operational states
 
