@@ -1,0 +1,33 @@
+name: Cleanup 2026-08-29-pm branches
+
+on:
+  push:
+    branches:
+      - automation/state
+    paths:
+      - .github/workflows/one-shot-cleanup-2026-08-29-pm.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged and temporary branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ref in \
+            heads/fix/mnt-20260829-03-packet-matching \
+            heads/automation/editorial/2026-08-29-pm \
+            heads/docs/mnt-20260829-03-resolution; do
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/$ref" >/dev/null 2>&1; then
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/$ref"
+              echo "deleted $ref"
+            else
+              echo "already absent $ref"
+            fi
+          done
