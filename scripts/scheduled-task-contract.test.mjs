@@ -5,6 +5,8 @@ const contract = await readFile("docs/SCHEDULED_TASK_PROMPT.md", "utf8");
 const architecture = await readFile("docs/AUTOMATION_ARCHITECTURE.md", "utf8");
 const inputSection = contract.split("## Editorial decision")[0];
 const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
+const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");
+const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");
 
 describe("scheduled task fast packet preflight contract", () => {
   it("separates editorial handoff time from the fixed evidence cutoff", () => {
@@ -12,14 +14,23 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(contract).toContain("evening ChatGPT task starts at **17:10 Asia/Shanghai**");
     expect(contract).toContain("fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**");
     expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");
-    expect(contract).toContain("SLA watchdog remains 10:45/17:35");
+    expect(contract).toContain("Never derive the edition date from the task's actual execution calendar date alone");
+    expect(contract).toContain("most recent already-due fixed window for this task's period");
+    expect(contract).toContain("otherwise use the previous day's PM");
+    expect(contract).toContain("SLA watchdog runs at 11:00/17:50");
+    expect(contract).toContain("Scheduled media recovery runs later at 11:10/18:00");
 
     expect(architecture).toContain("**10:20/17:10 Asia/Shanghai ChatGPT tasks**");
     expect(architecture).toContain("The ten-minute separation is intentional");
     expect(architecture).toContain("It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows");
+    expect(architecture).toContain("most recent already-due fixed cutoff for that period");
 
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
     expect(packetWorkflow).toContain('- cron: "0 9 * * *"');
+    expect(slaWorkflow).toContain('- cron: "0 3 * * *"');
+    expect(slaWorkflow).toContain('- cron: "50 9 * * *"');
+    expect(mediaWorkflow).toContain('- cron: "10 3 * * *"');
+    expect(mediaWorkflow).toContain('- cron: "0 10 * * *"');
   });
 
   it("checks the exact packet before loading full editorial context", () => {
