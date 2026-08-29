@@ -14,6 +14,8 @@ Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `
 
 A broadly used community or playful Chinese name may be selected when found on the open web; mark it `common_translation`, never official.
 
+For games with an official mainland-China Simplified Chinese channel or site, visible Chinese copy must use the official mainland Simplified Chinese terminology when available, not an overseas-source translation. This applies beyond the game title to named version subtitles, characters/agents, classes/professions, modes, mechanics, and other proper in-game terms. When the event packet is based on a foreign-language or overseas source, a narrow terminology-only lookup against an official mainland Simplified Chinese source is allowed to normalize wording; it must not add event facts, times, platforms, release claims, source classification, tracking decisions, or candidates.
+
 ## Permanent Editorial Hierarchy
 
 Treat the product as news, never a marketing landing page. Keep this type language stable across themes:

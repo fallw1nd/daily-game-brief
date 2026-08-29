@@ -178,6 +178,19 @@
 - **Resolution:** [PR #43](https://github.com/fallw1nd/daily-game-brief/pull/43) / commit [`47d8411`](https://github.com/fallw1nd/daily-game-brief/commit/47d841169c6d099c6dadf73a223a7d3eb2e3a64f) 已新增受信任的 `timeEvidenceAt` 边界证据路径：`beijingTime` 继续只承担分钟级展示；边界分钟的 `verified` 决策由代码从实际选中的 opened source 自动导出唯一秒级 `publishedAt`，publisher 持久化 exact evidence，提交校验、最终数据校验与前端 window helper 均按 `(windowStart, windowEnd]` 精确判定。分钟级或多义边界证据 fail closed，可安全保留 `time_unverified`。未修改固定 10:10/17:00 窗口、期号、历史 archive、Scheduled Task 或生产数据。
 - **Verification:** PR #43 最终 head `4d2c5aa` 的 Verify run [33241793194](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241793194) 通过完整 `npm run check`。回归覆盖真实事故 `2026-08-28T09:00:11Z`、AM/PM exclusive start、PM inclusive end、minute-only 边界 fail closed、`time_unverified` fallback，以及消费端 `isEntryInsideEditionWindow()` 对 exact evidence 的一致处理。合并后 Pages run [33241850641](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241850641) 的 append-only guard、`Check and build`、Upload artifact 与 Deploy 全部成功；关闭条件满足。
 
+### MNT-20260829-02 — 海外事件源未回查中国游戏官方简中术语
+
+- **Discovered:** 2026-08-29
+- **Priority:** P1
+- **Area:** editorial localization / mainland Chinese terminology
+- **Status:** in_progress
+- **Evidence:** 当前 `2026-08-29-am` 的《绝区零》3.2 条目虽然游戏名已是 `official_simplified`，正文却沿用海外二手来源写成版本名 `Their Secret Histories`、职业 `Armorer/装甲师`、角色 `Claret/Roxy`；中国大陆官方简中命名应为版本“她与她的隐秘往事”、职业“锋御”、角色“克拉蕾/洛克茜”。说明现有规则只约束游戏标题，没有约束中国游戏的版本名、职业/角色等可见术语。
+- **Risk:** 面向中国大陆读者的简报会出现官方已有中文名却仍使用英文或海外直译的情况，造成事实表达不专业、搜索与读者认知不一致，并持续产生人工纠错。
+- **Proposed resolution:** 对拥有中国大陆官方简中渠道的游戏，正文可见专名优先采用大陆官方简中命名；当 finalized packet 来自海外/外语来源时，仅允许增加受限 terminology-only 核验来统一版本副标题、角色/代理人、职业、模式与机制名，不得借此新增或改变事件事实、时间、平台、发行主张、来源分类、tracking 或候选。当前《绝区零》条目以 revision 方式只修正文案、alt 与相关说明，不改期号、窗口、fact/time status 或事件来源。
+- **Close when:** `2026-08-29-am` archive 与 latest 同步使用“她与她的隐秘往事”“锋御”“克拉蕾”“洛克茜”；Scheduled/editorial contract 与数据规范明确 mainland terminology-only 边界并有回归测试；完整 Verify 与合并后 Pages 成功，且无无关生产数据变化。
+- **Resolution:** pending.
+- **Verification:** pending.
+
 ---
 
 ## Resolved baseline from recent changes

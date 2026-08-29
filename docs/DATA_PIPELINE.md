@@ -30,6 +30,12 @@ A title hint is naming evidence only. Its source pages must not be used to add o
 
 Never machine-translate, literally translate, or invent a Chinese title merely to fill the field. A narrow open-web lookup is allowed solely to determine the game name and its status; it must not introduce new event facts, times, platforms, release claims, or candidates outside the finalized editorial packet. The publisher applies the registry again before serialization so a known translation is not lost when an editorial decision mistakenly leaves the title unavailable. Historical title-field corrections use `npm run titles:backfill`; the command fills currently unavailable title fields without overwriting an existing official/common translation, then normalizes visible story headlines and lead archive titles so a resolved Chinese game name does not remain English in display copy. The original English name stays in `title_en` metadata.
 
+### Mainland Simplified Chinese terminology
+
+For a game with an official mainland-China Simplified Chinese channel or site, visible Chinese copy must prefer that official mainland terminology for named version subtitles, characters/agents, classes/professions, modes, mechanics, and other proper in-game terms. Overseas media translations or literal English-to-Chinese renderings must not override an available mainland official term. This rule is separate from the cumulative game-title registry because version and system terminology can be release-specific.
+
+If the finalized event evidence is foreign-language or overseas media, the editor may perform a narrow terminology-only lookup against an official mainland Simplified Chinese source. That lookup may normalize wording only: it must not add or change event facts, times, platforms, release claims, source classification, tracking decisions, or candidate events. A terminology source does not upgrade `fact_status` or become event evidence unless it independently supports the event claim under the normal source rules.
+
 Before committing, the task should run or request the equivalent of:
 
 ```bash
