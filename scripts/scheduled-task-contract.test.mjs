@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const contract = await readFile("docs/SCHEDULED_TASK_PROMPT.md", "utf8");
 const inputSection = contract.split("## Editorial decision")[0];
+const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
 
 describe("scheduled task fast packet preflight contract", () => {
   it("checks the exact packet before loading full editorial context", () => {
@@ -27,5 +28,13 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(inputSection).toContain("only when the matching packet is missing/invalid and there is no current-period collection run queued/in progress, or the matching collection run has failed/cancelled");
     expect(inputSection).toContain("Re-read only the matching packet for up to 15 minutes total from task start.");
     expect(inputSection).toContain("The one-shot workflow must do nothing else");
+  });
+
+  it("pins recovery to the exact edition and guards pre-cutoff dispatch", () => {
+    expect(inputSection).toContain("-f period=<am|pm> -f edition=<edition-id>");
+    expect(inputSection).toContain("more than five minutes before its cutoff fails visibly");
+    expect(packetWorkflow).toMatch(/\n\s+edition:\n\s+description: Exact edition ID for recovery/);
+    expect(packetWorkflow).toContain("node scripts/resolve-packet-dispatch.mjs");
+    expect(packetWorkflow).toContain('BRIEF_NOW="${{ steps.edition.outputs.reference_now }}"');
   });
 });
