@@ -170,13 +170,13 @@
 - **Discovered:** 2026-08-29
 - **Priority:** P0
 - **Area:** editorial handoff / time validation / fixed windows
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 2026-08-29 AM 补发的 publisher run [33236844373](https://github.com/fallw1nd/daily-game-brief/actions/runs/33236844373) 在构建后被 `validate:data` 拒绝，报 `2026-08-29-am-releases-2: verified event time falls outside the fixed window`。该事件选中来源的原始 `publishedAt` 为 `2026-08-28T09:00:11Z`，即北京时间 17:00:11，实际满足 AM 窗口 `(前一日17:00, 当日10:10]`；但 editorial/public `beijingTime` 仅保留到分钟，序列化为 `2026-08-28 17:00` 后被验证器按 17:00:00 处理，错误落在排除边界。最终补发只能暂时降级为 `time_unverified` 才完成发布。
 - **Risk:** exclusive start 后首 59 秒的合法事件会被误拒；如果粗暴放行整个边界分钟，则又会错误接纳 exact-start 事件以及 inclusive end 后 1–59 秒的越界事件，直接破坏固定窗口。
 - **Proposed resolution:** 保持 `beijingTime` 分钟级展示兼容；对 `verified` 且位于 start/end 边界分钟的决策，只从该条实际选中的 opened source `publishedAt` 自动导出唯一秒级证据，并由 publisher 持久化为可选 `timeEvidenceAt`。提交验证和最终数据验证用精确 instant 约束 `(windowStart, windowEnd]`；只有分钟精度或存在多义性的边界证据不得标 `verified`，继续使用 `time_unverified`。
 - **Close when:** 回归覆盖 AM/PM exclusive start、inclusive end、真实 17:00:11 事故、minute-only 边界与 `time_unverified`；完整 Verify 与合并后 Pages 成功；不改固定窗口、期号、历史 archive 或既有时间状态。
-- **Resolution:** [PR #43](https://github.com/fallw1nd/daily-game-brief/pull/43) in progress：新增受信任的 `timeEvidenceAt` 边界证据路径，不扩大时间窗口，不要求 ChatGPT 自行填写秒数。
-- **Verification:** PR #43 首轮 Verify run [33241512305](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241512305) 已通过完整 `npm run check`；最终合并验证待补。
+- **Resolution:** [PR #43](https://github.com/fallw1nd/daily-game-brief/pull/43) / commit [`47d8411`](https://github.com/fallw1nd/daily-game-brief/commit/47d841169c6d099c6dadf73a223a7d3eb2e3a64f) 已新增受信任的 `timeEvidenceAt` 边界证据路径：`beijingTime` 继续只承担分钟级展示；边界分钟的 `verified` 决策由代码从实际选中的 opened source 自动导出唯一秒级 `publishedAt`，publisher 持久化 exact evidence，提交校验、最终数据校验与前端 window helper 均按 `(windowStart, windowEnd]` 精确判定。分钟级或多义边界证据 fail closed，可安全保留 `time_unverified`。未修改固定 10:10/17:00 窗口、期号、历史 archive、Scheduled Task 或生产数据。
+- **Verification:** PR #43 最终 head `4d2c5aa` 的 Verify run [33241793194](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241793194) 通过完整 `npm run check`。回归覆盖真实事故 `2026-08-28T09:00:11Z`、AM/PM exclusive start、PM inclusive end、minute-only 边界 fail closed、`time_unverified` fallback，以及消费端 `isEntryInsideEditionWindow()` 对 exact evidence 的一致处理。合并后 Pages run [33241850641](https://github.com/fallw1nd/daily-game-brief/actions/runs/33241850641) 的 append-only guard、`Check and build`、Upload artifact 与 Deploy 全部成功；关闭条件满足。
 
 ---
 
