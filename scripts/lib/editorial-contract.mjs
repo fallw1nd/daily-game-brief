@@ -10,10 +10,63 @@ const timeStatuses = ["verified", "date_only", "time_unverified", "uncertain"];
 const titleZhStatuses = ["official_simplified", "official_traditional", "common_translation", "unavailable"];
 const entryFlags = ["supplement", "rumor", "time_uncertain", "platform_difference", "region_difference"];
 
+const sharedFactFrameSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    subjectTitleKey: { type: ["string", "null"] },
+    dates: { type: "array", items: { type: "string" } },
+    times: { type: "array", items: { type: "string" } },
+    numbers: { type: "array", items: { type: "string" } },
+    platforms: { type: "array", items: { type: "string" } },
+    peopleAndEntities: { type: "array", items: { type: "string" } },
+    versionsAndTerms: { type: "array", items: { type: "string" } },
+  },
+  required: ["subjectTitleKey", "dates", "times", "numbers", "platforms", "peopleAndEntities", "versionsAndTerms"],
+};
+
+const englishEntryDraftSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    eventKey: { type: "string" },
+    headline: { type: "string" },
+    summary: { type: "string" },
+    verification: { type: "string" },
+    timeNote: { type: "string" },
+    regionLabel: { type: ["string", "null"] },
+    releaseTypeLabel: { type: ["string", "null"] },
+    sourceLabels: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: { sourceIndex: { type: "integer", minimum: 0 }, label: { type: "string" } },
+        required: ["sourceIndex", "label"],
+      },
+    },
+  },
+  required: ["eventKey", "headline", "summary", "verification", "timeNote", "regionLabel", "releaseTypeLabel", "sourceLabels"],
+};
+
+const englishUpcomingDraftSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    upcomingId: { type: "string" },
+    regionLabel: { type: ["string", "null"] },
+    releaseTypeLabel: { type: ["string", "null"] },
+    sourceLabel: { type: ["string", "null"] },
+    coverAlt: { type: ["string", "null"] },
+  },
+  required: ["upcomingId", "regionLabel", "releaseTypeLabel", "sourceLabel", "coverAlt"],
+};
+
 export const editorialSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    contractVersion: { type: "integer", enum: [2] },
     editionId: { type: "string" },
     archiveTitle: { type: "string" },
     leadEventKey: { type: "string" },
@@ -57,11 +110,13 @@ export const editorialSchema = {
               required: ["label", "url", "kind"],
             },
           },
+          sharedFactFrame: sharedFactFrameSchema,
         },
         required: [
           "eventKey", "decision", "section", "titleKey", "titleZhCn", "titleEn", "titleZhStatus",
           "headline", "summary", "factStatus", "timeStatus", "entryFlags", "tracking", "verification", "reason",
           "beijingTime", "timeNote", "platforms", "region", "releaseType", "sourceIndexes", "additionalSources",
+          "sharedFactFrame",
         ],
       },
     },
@@ -97,41 +152,66 @@ export const editorialSchema = {
         required: ["id", "date", "titleKey", "titleZhCn", "titleEn", "titleZhStatus", "platforms", "region", "releaseType", "source", "note"],
       },
     },
+    locales: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        en: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            schemaVersion: { type: "integer", enum: [1] },
+            locale: { type: "string", enum: ["en"] },
+            archiveTitle: { type: "string" },
+            entries: { type: "array", items: englishEntryDraftSchema },
+            upcoming: { type: "array", items: englishUpcomingDraftSchema },
+            sourceReport: {
+              type: ["object", "null"],
+              additionalProperties: false,
+              properties: {
+                checked: { type: "array", items: { type: "string" } },
+                limited: { type: "array", items: { type: "string" } },
+                note: { type: "string" },
+              },
+              required: ["checked", "limited", "note"],
+            },
+          },
+          required: ["schemaVersion", "locale", "archiveTitle", "entries", "upcoming", "sourceReport"],
+        },
+      },
+      required: ["en"],
+    },
     checkedExtra: { type: "array", items: { type: "string" } },
     limitedExtra: { type: "array", items: { type: "string" } },
     editorialNote: { type: "string" },
   },
   required: [
-    "editionId", "archiveTitle", "leadEventKey", "decisions", "upcomingMode", "removeUpcomingIds",
-    "upcoming", "checkedExtra", "limitedExtra", "editorialNote",
+    "contractVersion", "editionId", "archiveTitle", "leadEventKey", "decisions", "upcomingMode", "removeUpcomingIds",
+    "upcoming", "locales", "checkedExtra", "limitedExtra", "editorialNote",
   ],
 };
 
 export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) {
   const packages = [];
   let usedChars = 0;
-  const activeTracking = Object.values(ledger?.events || {})
-    .filter((item) => item.tracking?.active === true);
+  const activeTracking = Object.values(ledger?.events || {}).filter((item) => item.tracking?.active === true);
   const activeKeys = new Set(activeTracking.map((item) => item.eventKey));
-  const evidenceItems = [...(evidence.packages || [])].sort((a, b) =>
-    Number(activeKeys.has(b.eventKey)) - Number(activeKeys.has(a.eventKey))
-  );
+  const evidenceItems = [...(evidence.packages || [])].sort((a, b) => Number(activeKeys.has(b.eventKey)) - Number(activeKeys.has(a.eventKey)));
   const itemsWithOpenedEvidence = new Set(evidenceItems.filter((item) =>
     (item.sources || []).some((source) => source.status === "opened" && source.evidenceText)
   ).map((item) => item.eventKey));
-  const trackingQueue = activeTracking.filter((item) => !itemsWithOpenedEvidence.has(item.eventKey))
-    .map((item) => ({
-      eventKey: item.eventKey,
-      eventKind: item.eventKind,
-      subjectKey: item.subjectKey,
-      lastHeadline: item.lastHeadline,
-      firstSeenAt: item.firstSeenAt,
-      lastSeenAt: item.lastSeenAt,
-      lastDecisionEdition: item.lastDecisionEdition,
-      lastDecisionAt: item.lastDecisionAt,
-      reason: item.tracking.reason,
-      sourceUrls: item.sourceUrls || [],
-    }));
+  const trackingQueue = activeTracking.filter((item) => !itemsWithOpenedEvidence.has(item.eventKey)).map((item) => ({
+    eventKey: item.eventKey,
+    eventKind: item.eventKind,
+    subjectKey: item.subjectKey,
+    lastHeadline: item.lastHeadline,
+    firstSeenAt: item.firstSeenAt,
+    lastSeenAt: item.lastSeenAt,
+    lastDecisionEdition: item.lastDecisionEdition,
+    lastDecisionAt: item.lastDecisionAt,
+    reason: item.tracking.reason,
+    sourceUrls: item.sourceUrls || [],
+  }));
   for (const item of trackingQueue) usedChars += JSON.stringify(item).length;
   if (usedChars > maxChars) throw new Error("active tracking queue exceeds the editorial input budget");
 
@@ -148,6 +228,10 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
         publishedAt: source.publishedAt,
         canonicalUrl: source.canonicalUrl,
         imageUrl: source.imageUrl,
+        declaredLanguage: source.declaredLanguage || "und",
+        detectedLanguage: source.detectedLanguage || "und",
+        languageConfidence: source.languageConfidence || "low",
+        languageBasis: source.languageBasis || "unavailable",
         evidenceText: source.evidenceText,
       }];
     });
@@ -182,7 +266,7 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
     usedChars += size;
   }
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     window: evidence.window,
     adjacentEdition: evidence.adjacentEdition,
     packages,
@@ -196,18 +280,50 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
   };
 }
 
+function hasSubstantialChinese(value) {
+  if (typeof value !== "string") return false;
+  const chars = [...value];
+  const cjk = chars.filter((char) => /[\u3400-\u9fff]/u.test(char)).length;
+  return cjk >= 4 && cjk / Math.max(chars.length, 1) > 0.15;
+}
+
+export function validateEnglishEditorialLocale(output) {
+  const errors = [];
+  if (output?.contractVersion !== 2) return errors;
+  const en = output?.locales?.en;
+  if (!en || en.schemaVersion !== 1 || en.locale !== "en") return ["contractVersion 2 requires locales.en schemaVersion=1 and locale=en"];
+  const included = (output.decisions || []).filter((item) => item.decision === "include");
+  const includedKeys = included.map((item) => item.eventKey);
+  const entryKeys = (en.entries || []).map((item) => item.eventKey);
+  if (entryKeys.length !== includedKeys.length || entryKeys.some((key, index) => key !== includedKeys[index])) {
+    errors.push("locales.en.entries must cover included decisions in canonical decision order");
+  }
+  const upcomingIds = (output.upcoming || []).map((item) => item.id);
+  const localeUpcomingIds = (en.upcoming || []).map((item) => item.upcomingId);
+  if (localeUpcomingIds.length !== upcomingIds.length || localeUpcomingIds.some((id, index) => id !== upcomingIds[index])) {
+    errors.push("locales.en.upcoming must cover submitted upcoming items in order");
+  }
+  const requiredText = [en.archiveTitle, ...(en.entries || []).flatMap((item) => [item.headline, item.summary, item.verification, item.timeNote])];
+  if (requiredText.some((value) => typeof value !== "string" || !value.trim())) errors.push("English locale required text must be non-empty");
+  if (requiredText.some(hasSubstantialChinese)) errors.push("English locale required text must not contain substantial Chinese fallback copy");
+  const prefix = output.editionId?.endsWith("-pm") ? "Evening Brief |" : "Morning Brief |";
+  if (!String(en.archiveTitle || "").startsWith(prefix)) errors.push(`locales.en.archiveTitle must start with ${prefix}`);
+  if (en.sourceReport !== null && en.sourceReport !== undefined) {
+    if (!Array.isArray(en.sourceReport.checked) || !Array.isArray(en.sourceReport.limited) || typeof en.sourceReport.note !== "string") {
+      errors.push("locales.en.sourceReport must be complete when present");
+    }
+  }
+  return errors;
+}
+
 export function validateEditorialOutput(output, input) {
   const errors = [];
   if (!output || !Array.isArray(output.decisions)) return ["output.decisions must be an array"];
-  const allowedKeys = new Set([
-    ...input.packages.map((item) => item.eventKey),
-    ...(input.trackingQueue || []).map((item) => item.eventKey),
-  ]);
+  const allowedKeys = new Set([...input.packages.map((item) => item.eventKey), ...(input.trackingQueue || []).map((item) => item.eventKey)]);
   const seen = new Set();
   for (const [index, item] of output.decisions.entries()) {
     const context = `decisions[${index}]`;
-    const isLastMinute = String(item.eventKey || "").startsWith("last-minute:") &&
-      Array.isArray(item.additionalSources) && item.additionalSources.length > 0;
+    const isLastMinute = String(item.eventKey || "").startsWith("last-minute:") && Array.isArray(item.additionalSources) && item.additionalSources.length > 0;
     if (!allowedKeys.has(item.eventKey) && !isLastMinute) errors.push(`${context}: unknown eventKey`);
     if (seen.has(item.eventKey)) errors.push(`${context}: duplicate eventKey`);
     seen.add(item.eventKey);
@@ -219,52 +335,38 @@ export function validateEditorialOutput(output, input) {
       }
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
       const validIndexes = new Set((evidenceItem?.sources || []).map((source) => source.sourceIndex));
-      if ((item.sourceIndexes || []).some((sourceIndex) => !validIndexes.has(sourceIndex))) {
-        errors.push(`${context}: sourceIndexes contains an unavailable source`);
-      }
-      if (!(item.sourceIndexes || []).length && !(item.additionalSources || []).length) {
-        errors.push(`${context}: include requires a selected source`);
-      }
+      if ((item.sourceIndexes || []).some((sourceIndex) => !validIndexes.has(sourceIndex))) errors.push(`${context}: sourceIndexes contains an unavailable source`);
+      if (!(item.sourceIndexes || []).length && !(item.additionalSources || []).length) errors.push(`${context}: include requires a selected source`);
       if (item.timeStatus === "verified" && isBoundaryMinute(item.beijingTime, input.window)) {
         const timeEvidenceAt = resolveSelectedTimeEvidence(item, evidenceItem);
-        const timeError = verifiedWindowTimeError({
-          beijingTime: item.beijingTime,
-          timeEvidenceAt,
-          windowStart: input.window?.windowStart,
-          windowEnd: input.window?.windowEnd,
-          requireExactBoundary: true,
-        });
+        const timeError = verifiedWindowTimeError({ beijingTime: item.beijingTime, timeEvidenceAt, windowStart: input.window?.windowStart, windowEnd: input.window?.windowEnd, requireExactBoundary: true });
         if (timeError) errors.push(`${context}: ${timeError}`);
       }
+      if (output.contractVersion === 2) {
+        const frame = item.sharedFactFrame;
+        if (!frame || !Array.isArray(frame.dates) || !Array.isArray(frame.times) || !Array.isArray(frame.numbers) || !Array.isArray(frame.platforms) || !Array.isArray(frame.peopleAndEntities) || !Array.isArray(frame.versionsAndTerms)) {
+          errors.push(`${context}: contractVersion 2 include requires a complete sharedFactFrame`);
+        } else {
+          if (frame.subjectTitleKey !== item.titleKey) errors.push(`${context}: sharedFactFrame.subjectTitleKey must match titleKey`);
+          if (JSON.stringify(frame.platforms) !== JSON.stringify(item.platforms || [])) errors.push(`${context}: sharedFactFrame.platforms must match canonical platform decision`);
+        }
+      }
     }
-    if (item.factStatus === "unconfirmed" && item.tracking !== true) {
-      errors.push(`${context}: unconfirmed requires tracking=true`);
-    }
-    if (item.decision === "needs_review" && item.tracking !== true) {
-      errors.push(`${context}: needs_review requires tracking=true`);
-    }
+    if (item.factStatus === "unconfirmed" && item.tracking !== true) errors.push(`${context}: unconfirmed requires tracking=true`);
+    if (item.decision === "needs_review" && item.tracking !== true) errors.push(`${context}: needs_review requires tracking=true`);
     if (item.factStatus === "official") {
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
-      const selectedPrimary = (evidenceItem?.sources || []).some((source) =>
-        (item.sourceIndexes || []).includes(source.sourceIndex) && source.kind === "primary"
-      ) || (item.additionalSources || []).some((source) => source.kind === "primary");
-      if (!selectedPrimary) {
-        errors.push(`${context}: official requires opened primary evidence`);
-      }
+      const selectedPrimary = (evidenceItem?.sources || []).some((source) => (item.sourceIndexes || []).includes(source.sourceIndex) && source.kind === "primary") || (item.additionalSources || []).some((source) => source.kind === "primary");
+      if (!selectedPrimary) errors.push(`${context}: official requires opened primary evidence`);
     }
     if (item.factStatus === "multi_source_verified") {
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
-      const selected = (evidenceItem?.sources || []).filter((source) =>
-        (item.sourceIndexes || []).includes(source.sourceIndex)
-      );
-      const independentSources = new Set([...selected, ...(item.additionalSources || [])]
-        .filter((source) => source.kind !== "discovery")
-        .map((source) => source.independenceKey || new URL(source.canonicalUrl || source.url).hostname));
+      const selected = (evidenceItem?.sources || []).filter((source) => (item.sourceIndexes || []).includes(source.sourceIndex));
+      const independentSources = new Set([...selected, ...(item.additionalSources || [])].filter((source) => source.kind !== "discovery").map((source) => source.independenceKey || new URL(source.canonicalUrl || source.url).hostname));
       if (independentSources.size < 2) errors.push(`${context}: multi_source_verified requires two independent opened sources`);
     }
   }
-  for (const eventKey of allowedKeys) {
-    if (!seen.has(eventKey)) errors.push(`missing decision for ${eventKey}`);
-  }
+  for (const eventKey of allowedKeys) if (!seen.has(eventKey)) errors.push(`missing decision for ${eventKey}`);
+  errors.push(...validateEnglishEditorialLocale(output));
   return errors;
 }
