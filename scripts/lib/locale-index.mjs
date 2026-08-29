@@ -2,6 +2,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { factsDigest } from "./locale-digest.mjs";
 import { validateEnglishOverlay } from "./locale-overlay.mjs";
+import { localeArchivePath, localeStatusPath } from "./bilingual-publisher.mjs";
 
 const dataRoot = resolve("public/data");
 
@@ -9,15 +10,38 @@ async function exists(path) {
   try { await access(path); return true; } catch { return false; }
 }
 
-function localePathFor(item) {
-  const [year, month] = item.date.split("-");
-  return `locales/en/archive/${year}/${month}/${item.id}.json`;
-}
-
 function unavailableReason(code, errors = []) {
   if (code === "overlay-missing") return "English version has not been prepared for this edition.";
   if (code === "overlay-stale") return "English version is temporarily unavailable because its verified fact boundary is stale.";
   return `English version is temporarily unavailable because locale validation failed${errors.length ? `: ${errors.join("; ")}` : "."}`;
+}
+
+async function persistedUnavailableStatus(item, digest) {
+  const statusFile = resolve(dataRoot, localeStatusPath(item.id));
+  if (!(await exists(statusFile))) return null;
+  try {
+    const status = JSON.parse(await readFile(statusFile, "utf8"));
+    if (
+      status?.schemaVersion !== 1 ||
+      status?.locale !== "en" ||
+      status?.editionId !== item.id ||
+      typeof status?.reasonCode !== "string" ||
+      typeof status?.summary !== "string" ||
+      typeof status?.observedAt !== "string"
+    ) {
+      return { invalid: true, reasonCode: "status-invalid", summary: "Persisted English availability status is invalid." };
+    }
+    if (status.factsDigest !== digest) {
+      return { invalid: true, reasonCode: "status-stale", summary: "Persisted English availability status is stale for current canonical facts." };
+    }
+    return status;
+  } catch (error) {
+    return {
+      invalid: true,
+      reasonCode: "status-invalid-json",
+      summary: `Persisted English availability status is unreadable: ${error instanceof Error ? error.message : "invalid JSON"}`,
+    };
+  }
 }
 
 export async function buildEnglishLocaleIndex({ write = true } = {}) {
@@ -27,17 +51,38 @@ export async function buildEnglishLocaleIndex({ write = true } = {}) {
   for (const item of manifest.editions ?? []) {
     const canonical = JSON.parse(await readFile(resolve(dataRoot, item.path), "utf8"));
     const digest = factsDigest(canonical);
-    const relativePath = localePathFor(item);
+    const relativePath = localeArchivePath(item.id);
     const overlayFile = resolve(dataRoot, relativePath);
     if (!(await exists(overlayFile))) {
-      editions.push({
-        editionId: item.id,
-        status: "unavailable",
-        reasonCode: "overlay-missing",
-        summary: unavailableReason("overlay-missing"),
-        observedAt: manifest.updatedAt,
-        factsDigest: digest,
-      });
+      const persisted = await persistedUnavailableStatus(item, digest);
+      if (persisted?.invalid) {
+        editions.push({
+          editionId: item.id,
+          status: "unavailable",
+          reasonCode: persisted.reasonCode,
+          summary: persisted.summary,
+          observedAt: manifest.updatedAt,
+          factsDigest: digest,
+        });
+      } else if (persisted) {
+        editions.push({
+          editionId: item.id,
+          status: "unavailable",
+          reasonCode: persisted.reasonCode,
+          summary: persisted.summary,
+          observedAt: persisted.observedAt,
+          factsDigest: digest,
+        });
+      } else {
+        editions.push({
+          editionId: item.id,
+          status: "unavailable",
+          reasonCode: "overlay-missing",
+          summary: unavailableReason("overlay-missing"),
+          observedAt: manifest.updatedAt,
+          factsDigest: digest,
+        });
+      }
       continue;
     }
     let overlay;
