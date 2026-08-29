@@ -13,18 +13,18 @@ describe("Pages deployment trigger contract", () => {
     expect(deploy).toMatch(/\n\s*workflow_dispatch:\s*\n/);
   });
 
-  it("publisher dispatches Pages once for a changed publication or an idempotent workflow retry", async () => {
+  it("publisher dispatches Pages for changed data and idempotent publish retries without widening locale repair", async () => {
     const publisher = await workflow("publish-editorial-decision.yml");
 
     expect(publisher).toContain(
-      "if: steps.publication.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'",
+      "if: steps.publication.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && steps.submission.outputs.mode == 'publish')",
     );
     expect(publisher.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(1);
     expect(publisher).toContain(
       "if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success'",
     );
     expect(publisher).toContain(
-      "gh workflow run publish-editorial-decision.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}",
+      "gh workflow run publish-editorial-decision.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }} -f publication_mode=publish",
     );
   });
 

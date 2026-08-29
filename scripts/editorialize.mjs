@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.mjs";
+import {
+  legacyCompatibleEditorialInput,
+  legacyCompatibleEditorialSchema,
+} from "./lib/editorial-compat.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
@@ -27,7 +31,9 @@ const eligibleTitleHints = (titleHintReport?.hints || []).filter((hint) =>
 const titleHintReserve = eligibleTitleHints.length ? JSON.stringify(eligibleTitleHints).length : 0;
 if (titleHintReserve >= MAX_INPUT_CHARS) throw new Error("title hints exceed the editorial input budget");
 
-const editorialInput = buildEditorialInput(evidence, MAX_INPUT_CHARS - titleHintReserve, ledger);
+const editorialInput = legacyCompatibleEditorialInput(
+  buildEditorialInput(evidence, MAX_INPUT_CHARS - titleHintReserve, ledger),
+);
 const packetSubjects = new Set(editorialInput.packages
   .map((item) => String(item.subjectKey || "").trim().toLocaleLowerCase("en-US"))
   .filter(Boolean));
@@ -70,7 +76,7 @@ const packet = {
   coverageThrough: editorialInput.window.windowEnd,
   mode: "chatgpt-handoff",
   instructions,
-  outputSchema: editorialSchema,
+  outputSchema: legacyCompatibleEditorialSchema(editorialSchema),
   editorialInput,
 };
 await mkdir(dirname(PACKET_PATH), { recursive: true });

@@ -22,7 +22,7 @@ export interface GameTitle {
 export interface BriefEntry {
   id: string; section: SectionKey; title: GameTitle; headline: string; summary: string; beijingTime: string; timeEvidenceAt?: string; timeNote: string;
   fact_status: FactStatus; time_status: TimeStatus; entry_flags: EntryFlag[]; platforms: string[]; region: string; releaseType?: string; sources: SourceLink[];
-  verification: string; tracking?: boolean; imageSeed: string; images?: ImageAsset[]; image_status?: ImageAvailabilityStatus; imageNote?: string;
+  verification: string; tracking?: boolean; sharedFactFrameDigest?: string; imageSeed: string; images?: ImageAsset[]; image_status?: ImageAvailabilityStatus; imageNote?: string;
 }
 export interface UpcomingEntry {
   id: string; date: string; title: GameTitle; platforms: string[]; region: string; releaseType: string; source: SourceLink; mediaSources?: SourceLink[]; note: string;

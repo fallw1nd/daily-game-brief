@@ -2,9 +2,7 @@ export const FACTS_PROJECTION_VERSION = 1;
 export const UPCOMING_KEY_VERSION = 1;
 
 export function stableJson(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableJson(item === undefined ? null : item)).join(",")}]`;
-  }
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item === undefined ? null : item)).join(",")}]`;
   if (value && typeof value === "object") {
     const keys = Object.keys(value).filter((key) => value[key] !== undefined).sort();
     return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
@@ -55,11 +53,8 @@ export function factsProjection(edition, sharedFactFrameDigests = {}) {
       region: entry.region ?? null,
       releaseType: entry.releaseType ?? null,
       tracking: entry.tracking === true,
-      sources: (entry.sources ?? []).map((source) => ({
-        url: source.url,
-        kind: source.kind,
-      })),
-      sharedFactFrameDigest: sharedFactFrameDigests[entry.id] ?? null,
+      sources: (entry.sources ?? []).map((source) => ({ url: source.url, kind: source.kind })),
+      sharedFactFrameDigest: entry.sharedFactFrameDigest ?? sharedFactFrameDigests[entry.id] ?? null,
     })),
     upcoming: (edition.upcoming ?? []).map((item) => ({
       upcomingKey: upcomingKey(edition.id, item),
@@ -77,18 +72,8 @@ export function factsProjection(edition, sharedFactFrameDigests = {}) {
 export function canonicalCopyProjection(edition) {
   return {
     archiveTitle: edition.archiveTitle ?? null,
-    entries: (edition.entries ?? []).map((entry) => ({
-      id: entry.id,
-      headline: entry.headline ?? "",
-      summary: entry.summary ?? "",
-      verification: entry.verification ?? "",
-      timeNote: entry.timeNote ?? "",
-    })),
-    sourceReport: edition.sourceReport ? {
-      checked: edition.sourceReport.checked ?? [],
-      limited: edition.sourceReport.limited ?? [],
-      note: edition.sourceReport.note ?? "",
-    } : null,
+    entries: (edition.entries ?? []).map((entry) => ({ id: entry.id, headline: entry.headline ?? "", summary: entry.summary ?? "", verification: entry.verification ?? "", timeNote: entry.timeNote ?? "" })),
+    sourceReport: edition.sourceReport ? { checked: edition.sourceReport.checked ?? [], limited: edition.sourceReport.limited ?? [], note: edition.sourceReport.note ?? "" } : null,
   };
 }
 

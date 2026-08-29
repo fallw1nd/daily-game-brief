@@ -11,6 +11,10 @@ function sha256(value) {
   return `sha256:${createHash("sha256").update(stableJson(value), "utf8").digest("hex")}`;
 }
 
+export function projectionDigest(value) {
+  return sha256(value);
+}
+
 export function factsDigest(edition, sharedFactFrameDigests = {}) {
   return sha256(factsProjection(edition, sharedFactFrameDigests));
 }

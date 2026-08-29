@@ -1,22 +1,12 @@
-import { createHash } from "node:crypto";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 import {
   isBoundaryMinute,
   resolveSelectedTimeEvidence,
   verifiedWindowTimeError,
 } from "./time-window.mjs";
+import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";
 
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function editorialDecisionDigest(editorial) {
-  return createHash("sha256").update(stableJson(editorial)).digest("hex");
-}
+export { editorialDecisionDigest };
 
 function beijingNow(now) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
@@ -123,7 +113,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     latest.sourceReport?.note?.includes("正常ChatGPT定时任务未在SLA前完成")
   );
   if (existingManifestItem && !degradedEdition) {
-    return { status: "already-exists", edition: null, manifest, decisionDigest };
+    return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
   const prefix = window.period === "am" ? "早报｜" : "晚报｜";
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
@@ -170,6 +160,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       verification: decision.verification,
       entry_flags: decision.entryFlags,
       tracking: decision.tracking,
+      ...(decision.sharedFactFrame ? { sharedFactFrameDigest: projectionDigest(decision.sharedFactFrame) } : {}),
       imageSeed: decision.titleKey,
       image_status: "unavailable",
       imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",
@@ -181,9 +172,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const upcomingMap = new Map(baseUpcoming.filter((item) => !removeIds.has(item.id)).map((item) => [item.id, item]));
   const previousUpcoming = latest.upcoming || [];
   for (const item of editorial.upcoming || []) {
-    const previous = previousUpcoming.find((candidate) =>
-      candidate.id === item.id || candidate.title?.title_key === item.titleKey
-    );
+    const previous = previousUpcoming.find((candidate) => candidate.id === item.id || candidate.title?.title_key === item.titleKey);
     upcomingMap.set(item.id, upcomingEntry(item, previous));
   }
   const upcoming = [...upcomingMap.values()].filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
@@ -246,6 +235,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     decisionDigest,
     edition,
     archivePath: path,
+    entryIdsByEvent: Object.fromEntries(entryByEvent),
     manifest: {
       ...manifest,
       updatedAt: generatedAt,

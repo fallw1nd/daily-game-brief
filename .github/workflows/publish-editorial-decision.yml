@@ -9,9 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       edition_id:
-        description: Exact edition ID whose committed editorial decision should be retried
+        description: Exact edition ID whose committed editorial decision should be published or repaired
         required: true
         type: string
+      publication_mode:
+        description: Trusted publisher mode
+        required: true
+        default: publish
+        type: choice
+        options:
+          - publish
+          - locale-repair
 
 permissions:
   contents: write
@@ -48,13 +56,19 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             edition="${{ inputs.edition_id }}"
+            mode="${{ inputs.publication_mode }}"
             branch="automation/editorial/$edition"
           else
             branch="$GITHUB_REF_NAME"
             edition="${branch#automation/editorial/}"
+            mode="publish"
           fi
           if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm)$ ]] || [ "$branch" != "automation/editorial/$edition" ]; then
             echo "Invalid editorial branch or edition: $branch / $edition"
+            exit 1
+          fi
+          if [ "$mode" != "publish" ] && [ "$mode" != "locale-repair" ]; then
+            echo "Invalid publication mode: $mode"
             exit 1
           fi
           mkdir -p artifacts
@@ -65,6 +79,7 @@ jobs:
           git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
           echo "edition=$edition" >> "$GITHUB_OUTPUT"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "decided_at=$decided_at" >> "$GITHUB_OUTPUT"
 
       - name: Validate evidence-bounded submission
@@ -73,38 +88,53 @@ jobs:
           EDITORIAL_BRANCH: ${{ steps.submission.outputs.branch }}
         run: node scripts/validate-editorial-submission.mjs
 
-      - name: Build and validate edition
+      - name: Build and validate publication
         id: build
+        env:
+          PUBLICATION_MODE: ${{ steps.submission.outputs.mode }}
         shell: bash
         run: |
           git pull --ff-only origin main
           node scripts/publish-editorial-decision.mjs
           npm run check
 
-      - name: Publish edition atomically
+      - name: Publish atomically
         id: publication
+        env:
+          PUBLICATION_MODE: ${{ steps.submission.outputs.mode }}
         shell: bash
         run: |
           edition="${{ steps.submission.outputs.edition }}"
+          mode="${{ steps.submission.outputs.mode }}"
           git config user.name "daily-game-brief[bot]"
           git config user.email "daily-game-brief[bot]@users.noreply.github.com"
 
-          record_feedback() {
+          record_result() {
             feedback_eligible="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).feedbackEligible")"
+            locale_status="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).localeStatus || 'unresolved'")"
+            locale_reason="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).localeReasonCode || ''")"
+            publication_status="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).status || 'unresolved'")"
             echo "feedback_eligible=$feedback_eligible" >> "$GITHUB_OUTPUT"
+            echo "locale_status=$locale_status" >> "$GITHUB_OUTPUT"
+            echo "locale_reason=$locale_reason" >> "$GITHUB_OUTPUT"
+            echo "publication_status=$publication_status" >> "$GITHUB_OUTPUT"
           }
 
           for attempt in 1 2 3; do
             if git diff --quiet -- public/data; then
-              record_feedback
+              record_result
               echo "changed=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
             git add public/data
-            git commit -m "content(brief): publish $edition"
+            if [ "$mode" = "locale-repair" ]; then
+              git commit -m "fix(i18n): repair English locale for $edition"
+            else
+              git commit -m "content(brief): publish $edition"
+            fi
             if git push origin HEAD:main; then
-              record_feedback
+              record_result
               echo "changed=true" >> "$GITHUB_OUTPUT"
               echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
               exit 0
@@ -114,24 +144,44 @@ jobs:
               break
             fi
 
-            echo "main advanced during publication; rebuilding $edition from current main (attempt $((attempt + 1))/3)"
+            echo "main advanced during publication; rebuilding $edition/$mode from current main (attempt $((attempt + 1))/3)"
             git fetch origin main
             git reset --hard origin/main
-            node scripts/publish-editorial-decision.mjs
+            PUBLICATION_MODE="$mode" node scripts/publish-editorial-decision.mjs
             npm run check
           done
 
-          echo "Failed to publish $edition after three rebuild attempts"
+          echo "Failed to publish $edition/$mode after three rebuild attempts"
           exit 1
 
-      - name: Trigger Pages and edition-specific media workflows
-        if: steps.publication.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
+      - name: Record degraded English incident
+        if: steps.publication.outputs.locale_status == 'unavailable'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh workflow run deploy.yml --ref main
-          gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}
+          edition="${{ steps.submission.outputs.edition }}"
+          reason="${{ steps.publication.outputs.locale_reason }}"
+          title="English locale degraded: $edition"
+          body="Canonical Simplified Chinese publication succeeded, but the English presentation overlay was rejected or missing.\n\n- Edition: **$edition**\n- Reason: **$reason**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe canonical archive remains authoritative. Repair must use the trusted publisher's locale-repair mode and must not modify canonical publication files."
+          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Trigger Pages deployment
+        if: steps.publication.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && steps.submission.outputs.mode == 'publish')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main
+
+      - name: Trigger edition-specific media workflow
+        if: steps.submission.outputs.mode == 'publish' && (steps.publication.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}
 
       - name: Write editorial outcomes to persistent ledger
         id: ledger_feedback
@@ -172,7 +222,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh workflow run publish-editorial-decision.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}
+          gh workflow run publish-editorial-decision.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }} -f publication_mode=publish
           echo "Queued one idempotent workflow_dispatch retry for ${{ steps.submission.outputs.edition }}." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report publication failure
@@ -182,7 +232,7 @@ jobs:
         shell: bash
         run: |
           title="Editorial publication failed: ${{ steps.submission.outputs.edition || github.ref_name }}"
-          body="The evidence-bounded editorial submission failed before a verified publication.\n\n- Branch: **${{ steps.submission.outputs.branch || github.ref_name }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n- Automatic retry: **${{ github.event_name == 'workflow_dispatch' && 'already consumed' || 'requested when validation succeeded' }}**\n\nThe fixed editorial window and issue numbering must be preserved during recovery."
+          body="The evidence-bounded editorial submission failed before a verified publication.\n\n- Branch: **${{ steps.submission.outputs.branch || github.ref_name }}**\n- Mode: **${{ steps.submission.outputs.mode || 'unresolved' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n- Automatic retry: **${{ github.event_name == 'workflow_dispatch' && 'already consumed' || 'requested when validation succeeded' }}**\n\nThe fixed editorial window and issue numbering must be preserved during recovery."
           existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
@@ -199,7 +249,11 @@ jobs:
             echo "- Edition: ${{ steps.submission.outputs.edition || 'unresolved' }}"
             echo "- Decision branch: ${{ steps.submission.outputs.branch || github.ref_name }}"
             echo "- Trigger: ${{ github.event_name }}"
-            echo "- Data changed: ${{ steps.publication.outputs.changed || 'false' }}"
+            echo "- Mode: ${{ steps.submission.outputs.mode || 'unresolved' }}"
+            echo "- Publication status: ${{ steps.publication.outputs.publication_status || 'unresolved' }}"
+            echo "- Canonical/data changed: ${{ steps.publication.outputs.changed || 'false' }}"
+            echo "- English locale: ${{ steps.publication.outputs.locale_status || 'unresolved' }}"
+            echo "- English reason: ${{ steps.publication.outputs.locale_reason || 'none' }}"
             echo "- Main commit: ${{ steps.publication.outputs.commit || 'unchanged' }}"
             echo "- Ledger updated: ${{ steps.ledger_feedback.outputs.updated || 'false' }}"
           } >> "$GITHUB_STEP_SUMMARY"

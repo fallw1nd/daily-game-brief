@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 import { buildEnglishLocaleIndex } from "./lib/locale-index.mjs";
 
 const index = await buildEnglishLocaleIndex({ write: false });
-const invalid = index.editions.filter((item) => item.reasonCode && item.reasonCode !== "overlay-missing");
+const allowedUnavailable = new Set([
+  "overlay-missing",
+  "editorial-overlay-missing",
+  "editorial-overlay-invalid",
+]);
+const invalid = index.editions.filter((item) => item.reasonCode && !allowedUnavailable.has(item.reasonCode));
 if (invalid.length) {
   throw new Error(`Locale validation failed:\n- ${invalid.map((item) => `${item.editionId}: ${item.reasonCode} — ${item.summary}`).join("\n- ")}`);
 }
