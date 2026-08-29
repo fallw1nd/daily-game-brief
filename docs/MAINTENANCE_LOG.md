@@ -183,13 +183,13 @@
 - **Discovered:** 2026-08-29
 - **Priority:** P1
 - **Area:** editorial localization / mainland Chinese terminology
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 当前 `2026-08-29-am` 的《绝区零》3.2 条目虽然游戏名已是 `official_simplified`，正文却沿用海外二手来源写成版本名 `Their Secret Histories`、职业 `Armorer/装甲师`、角色 `Claret/Roxy`；中国大陆官方简中命名应为版本“她与她的隐秘往事”、职业“锋御”、角色“克拉蕾/洛克茜”。说明现有规则只约束游戏标题，没有约束中国游戏的版本名、职业/角色等可见术语。
 - **Risk:** 面向中国大陆读者的简报会出现官方已有中文名却仍使用英文或海外直译的情况，造成事实表达不专业、搜索与读者认知不一致，并持续产生人工纠错。
 - **Proposed resolution:** 对拥有中国大陆官方简中渠道的游戏，正文可见专名优先采用大陆官方简中命名；当 finalized packet 来自海外/外语来源时，仅允许增加受限 terminology-only 核验来统一版本副标题、角色/代理人、职业、模式与机制名，不得借此新增或改变事件事实、时间、平台、发行主张、来源分类、tracking 或候选。当前《绝区零》条目以 revision 方式只修正文案、alt 与相关说明，不改期号、窗口、fact/time status 或事件来源。
 - **Close when:** `2026-08-29-am` archive 与 latest 同步使用“她与她的隐秘往事”“锋御”“克拉蕾”“洛克茜”；Scheduled/editorial contract 与数据规范明确 mainland terminology-only 边界并有回归测试；完整 Verify 与合并后 Pages 成功，且无无关生产数据变化。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** [PR #45](https://github.com/fallw1nd/daily-game-brief/pull/45) / commit [`bb67102`](https://github.com/fallw1nd/daily-game-brief/commit/bb6710203b9178598a304f05226c78119c81f1a8) 已将 `2026-08-29-am` 正文与 upcoming 中《绝区零》3.2 的可见术语统一为中国大陆官方简中命名：版本“她与她的隐秘往事”、职业“锋御”、角色“克拉蕾/洛克茜”，并同步修正图片 alt 与 sourceReport 说明。与此同时在 `AGENTS.md`、`docs/DATA_PIPELINE.md`、`docs/SCHEDULED_TASK_PROMPT.md` 建立 mainland terminology-only 规则：海外/外语事件源可额外查中国大陆官方简中来源来统一版本副标题、角色/代理人、职业、模式和机制等专名，但不得据此新增事件事实、时间、平台、发行主张、来源分类、tracking 或候选。未修改期号、固定窗口、fact/time status、事件来源分类、manifest、schema 或 Scheduled Task 配置。
+- **Verification:** PR #45 Verify run [33242651626](https://github.com/fallw1nd/daily-game-brief/actions/runs/33242651626) 通过完整 `npm run check`；PR diff 仅包含两份同版生产 JSON、三份规则/契约文档、契约测试与本维护账本，archive/latest 的《绝区零》修订保持一致。合并后 Pages run [33242690995](https://github.com/fallw1nd/daily-game-brief/actions/runs/33242690995) 的 append-only guard、`Check and build`、Upload artifact 与 Deploy 全部成功。中国大陆官方《绝区零》3.2 前瞻明确使用版本名“她与她的隐秘往事”和角色名“克拉蕾/洛克茜”；本次编辑纠错同时采用官方简中职业名“锋御”。关闭条件满足。
 
 ---
 
