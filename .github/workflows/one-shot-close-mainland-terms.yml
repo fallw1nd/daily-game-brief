@@ -1,0 +1,59 @@
+name: One-shot close mainland terminology maintenance item
+
+on:
+  push:
+    branches:
+      - automation/state
+    paths:
+      - .github/workflows/one-shot-close-mainland-terms.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ledger branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/mnt-20260829-01-resolution
+          fetch-depth: 0
+
+      - name: Close MNT-20260829-02
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("docs/MAINTENANCE_LOG.md")
+          text = path.read_text(encoding="utf-8")
+          start = text.index("### MNT-20260829-02 —")
+          end = text.index("\n---\n\n## Resolved baseline", start)
+          section = text[start:end]
+          assert "- **Status:** in_progress" in section
+          assert "- **Resolution:** pending." in section
+          assert "- **Verification:** pending." in section
+          section = section.replace("- **Status:** in_progress", "- **Status:** resolved", 1)
+          section = section.replace(
+              "- **Resolution:** pending.",
+              "- **Resolution:** [PR #45](https://github.com/fallw1nd/daily-game-brief/pull/45) / commit [`bb67102`](https://github.com/fallw1nd/daily-game-brief/commit/bb6710203b9178598a304f05226c78119c81f1a8) 已将 `2026-08-29-am` 正文与 upcoming 中《绝区零》3.2 的可见术语统一为中国大陆官方简中命名：版本“她与她的隐秘往事”、职业“锋御”、角色“克拉蕾/洛克茜”，并同步修正图片 alt 与 sourceReport 说明。与此同时在 `AGENTS.md`、`docs/DATA_PIPELINE.md`、`docs/SCHEDULED_TASK_PROMPT.md` 建立 mainland terminology-only 规则：海外/外语事件源可额外查中国大陆官方简中来源来统一版本副标题、角色/代理人、职业、模式和机制等专名，但不得据此新增事件事实、时间、平台、发行主张、来源分类、tracking 或候选。未修改期号、固定窗口、fact/time status、事件来源分类、manifest、schema 或 Scheduled Task 配置。",
+              1,
+          )
+          section = section.replace(
+              "- **Verification:** pending.",
+              "- **Verification:** PR #45 Verify run [33242651626](https://github.com/fallw1nd/daily-game-brief/actions/runs/33242651626) 通过完整 `npm run check`；PR diff 仅包含两份同版生产 JSON、三份规则/契约文档、契约测试与本维护账本，archive/latest 的《绝区零》修订保持一致。合并后 Pages run [33242690995](https://github.com/fallw1nd/daily-game-brief/actions/runs/33242690995) 的 append-only guard、`Check and build`、Upload artifact 与 Deploy 全部成功。中国大陆官方《绝区零》3.2 前瞻明确使用版本名“她与她的隐秘往事”和角色名“克拉蕾/洛克茜”；本次编辑纠错同时采用官方简中职业名“锋御”。关闭条件满足。",
+              1,
+          )
+          path.write_text(text[:start] + section + text[end:], encoding="utf-8")
+          PY
+          git diff --check
+          git diff -- docs/MAINTENANCE_LOG.md
+
+      - name: Commit ledger
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/MAINTENANCE_LOG.md
+          git commit -m "docs(maintenance): close MNT-20260829-02"
+          git push origin HEAD:docs/mnt-20260829-01-resolution
