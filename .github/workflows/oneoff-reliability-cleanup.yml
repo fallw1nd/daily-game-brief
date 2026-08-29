@@ -63,12 +63,23 @@ jobs:
               decl = 'const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");\n'
               s = s.replace(decl, decl + 'const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");\nconst mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");\n', 1)
           anchor = '    expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");\n'
-          extra = '    expect(contract).toContain("Never derive the edition date from the task\\'s actual execution calendar date alone");\n    expect(contract).toContain("most recent already-due fixed window for this task\\'s period");\n    expect(contract).toContain("otherwise use the previous day\\'s PM");\n'
+          extra = """    expect(contract).toContain("Never derive the edition date from the task's actual execution calendar date alone");
+    expect(contract).toContain("most recent already-due fixed window for this task's period");
+    expect(contract).toContain("otherwise use the previous day's PM");
+"""
           if "Never derive the edition date" not in s:
+              if anchor not in s:
+                  raise SystemExit("scheduled test timing anchor missing")
               s = s.replace(anchor, anchor + extra, 1)
           cron_anchor = '    expect(packetWorkflow).toContain(\'- cron: "0 9 * * *"\');\n'
-          cron_extra = '    expect(slaWorkflow).toContain(\'- cron: "0 3 * * *"\');\n    expect(slaWorkflow).toContain(\'- cron: "50 9 * * *"\');\n    expect(mediaWorkflow).toContain(\'- cron: "10 3 * * *"\');\n    expect(mediaWorkflow).toContain(\'- cron: "0 10 * * *"\');\n'
+          cron_extra = """    expect(slaWorkflow).toContain('- cron: \"0 3 * * *\"');
+    expect(slaWorkflow).toContain('- cron: \"50 9 * * *\"');
+    expect(mediaWorkflow).toContain('- cron: \"10 3 * * *\"');
+    expect(mediaWorkflow).toContain('- cron: \"0 10 * * *\"');
+"""
           if "slaWorkflow).toContain" not in s:
+              if cron_anchor not in s:
+                  raise SystemExit("scheduled test cron anchor missing")
               s = s.replace(cron_anchor, cron_anchor + cron_extra, 1)
           test.write_text(s)
 
