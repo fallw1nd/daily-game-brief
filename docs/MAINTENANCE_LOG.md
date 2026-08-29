@@ -226,3 +226,19 @@
 - **Resolution:** PR / commit / design decision after implementation.
 - **Verification:** tests, Actions run, production edition, online result.
 ```
+
+## MNT-20260829-03 — 晚报误认延迟早报 collector 并在单次失败后自停
+
+- **Discovered:** 2026-08-29
+- **Priority:** P1
+- **Area:** Scheduled task / packet recovery / Actions concurrency / task lifecycle
+- **Status:** resolved
+- **Evidence:** 2026-08-29 晚报等待 `automation/packets/2026-08-29-pm.json` 15 分钟后停止，并把原晚报 Scheduled Task 暂停。其认定为“matching collector”的 `Final editorial packet` run [33244366704](https://github.com/fallw1nd/daily-game-brief/actions/runs/33244366704) 实际是严重延迟执行的 AM cron：日志明确按 `10 2 * * *` 选择 `period=am`，最终持久化 `2026-08-29-am`，不可能生成 PM packet。原 workflow 同时让 AM/PM 共用 `news-discovery-state` concurrency group，延迟的相反时段 run 也存在互相取消风险。
+- **Risk:** Scheduled Task 若按实际启动时间或“接近当前截止时间”把相反时段的延迟 run 当作 matching，会错误抑制 exact-edition recovery，造成当期 packet 永久缺失；而单次失败后自停长期任务会把一次事故扩大成后续每日持续漏跑。
+- **Root cause:** matching collector 缺少可在 job 启动前验证的目标 period/edition 身份，ChatGPT preflight 约束也未明确禁止用 `created_at` / `run_started_at` / 当前时钟推断 period；同时任务生命周期契约没有禁止单次故障修改长期 Scheduled Task 的 enabled 状态。Actions 侧 AM/PM 还共享同一个 concurrency group。
+- **Resolution:** [PR #47](https://github.com/fallw1nd/daily-game-brief/pull/47) / commit [`deee843`](https://github.com/fallw1nd/daily-game-brief/commit/deee84349004c804d58df5f2a9318abfb2937f7a) 为 `Final editorial packet` 增加目标 period/edition 可见的 run name，并把 collector concurrency 按 AM/PM 隔离；`docs/SCHEDULED_TASK_PROMPT.md` 规定只有目标 period/edition 被明确证明时才算 matching，禁止按实际运行时间猜测，无法证明或相反时段的 run 必须视为 non-matching 并允许 exact-edition recovery；同时明确任何单期 packet/recovery/validation/publication 故障都不得 disable、pause、改名或改时间两个长期 Scheduled Task。两个实际 ChatGPT 任务提示词已同步该规则，原晚报任务 `6a86cce353708191be251b6cf545fcc9` 已恢复启用，仍为每天17:00 Asia/Shanghai，早报任务保持10:10启用，没有新增长期任务。
+- **Recovery:** edition-scoped recovery 以 `period=pm` + `edition=2026-08-29-pm` 精确触发 `Final editorial packet` run [33250011711](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250011711)，成功生成 schema v3 的 `automation/packets/2026-08-29-pm.json`；随后按 finalized packet 提交完整编辑决定，trusted publisher run [33250378016](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250378016) 成功发布第18期，主发布 commit [`3c143c2`](https://github.com/fallw1nd/daily-game-brief/commit/3c143c26e729be84dbd3cfa391a48d51288255ca)。媒体流程 run [33250414256](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250414256) 成功，并以 commit [`418f2bb`](https://github.com/fallw1nd/daily-game-brief/commit/418f2bb2935b182fbc7ee7fb5f53226c496da97c) 为3条正文补齐已验证图片。
+- **Close when:** matching-run 规则与 AM/PM concurrency 有回归测试；修复 PR Verify 成功；缺失 PM packet 通过 exact-edition 路径恢复且正常 publisher 发布；Pages 部署成功；线上 latest/archive/manifest/search-index 与本期媒体均完成实际 HTTP 验收；两个长期 Scheduled Task 均保持启用；一次性 recovery/verification workflow 和维护工作分支全部清理。
+- **Verification:** PR #47 Verify run [33250085760](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250085760) 成功。最终 Pages run [33250441905](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250441905) 成功部署 media commit `418f2bb`。一次性生产验收 run [33250559581](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250559581) 从 GitHub runner 直接请求线上资源，确认 `latest.json`、manifest 末项和 archive 均为 `2026-08-29-pm` / issue 18，latest 与 archive byte-identical，`search-index.json` 含3条本期正文记录，3张本期正文图片均返回 HTTP 200。原 recovery workflow 与 live-verification workflow 均已从 `automation/state` 删除；早报/晚报两个长期 Scheduled Task 均已确认 `is_enabled:true`。关闭条件满足。
+
+---
