@@ -2,7 +2,11 @@
 
 Use this contract for the existing morning and evening ChatGPT tasks. Repository schemas and validators are authoritative.
 
-Operational timing is deliberately separated from the evidence cutoff. The morning ChatGPT task starts at **10:20 Asia/Shanghai** and the evening ChatGPT task starts at **17:10 Asia/Shanghai**. These are editorial handoff start times only. Canonical `plannedAt`, edition identity, and fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**; the ten-minute buffer must never widen either evidence window or admit post-cutoff information. `Final editorial packet` remains scheduled at the fixed 10:10/17:00 cutoffs, while the SLA watchdog remains 10:45/17:35.
+Operational timing is deliberately separated from the evidence cutoff. The morning ChatGPT task starts at **10:20 Asia/Shanghai** and the evening ChatGPT task starts at **17:10 Asia/Shanghai**. These are editorial handoff start times only. Canonical `plannedAt`, edition identity, and fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**; the ten-minute buffer must never widen either evidence window or admit post-cutoff information. `Final editorial packet` remains scheduled at the fixed 10:10/17:00 cutoffs, while the SLA watchdog runs at 11:00/17:50. Scheduled media recovery runs later at 11:10/18:00; normal publisher-triggered media enrichment remains immediate.
+
+## Target edition resolution
+
+Never derive the edition date from the task's actual execution calendar date alone. Resolve the target as the most recent already-due fixed window for this task's period in `Asia/Shanghai`: for AM, use today's `YYYY-MM-DD-am` only when Beijing time is at or after 10:10, otherwise use the previous day's AM; for PM, use today's `YYYY-MM-DD-pm` only when Beijing time is at or after 17:00, otherwise use the previous day's PM. This rule exists so a delayed task that starts after midnight still targets the window that actually reached cutoff. The target's `plannedAt`, `windowStart`, `windowEnd`, and `coverageThrough` remain fixed and never follow the delayed runtime. If a normal Canonical edition for that exact target already exists, verify it and stop rather than advancing to a future not-yet-due edition.
 
 ## Input
 
