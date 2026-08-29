@@ -60,4 +60,13 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(contract).toContain("terminology-only lookup");
     expect(contract).toContain("Neither lookup may introduce a new event, fact, time, platform, release claim, source classification, tracking decision, or candidate.");
   });
+
+  it("activates the bilingual handoff without making English a Canonical publication gate", () => {
+    expect(contract).toContain("New normal submissions must use `contractVersion:2`");
+    expect(contract).toContain("every `include` decision must contain a complete `sharedFactFrame`");
+    expect(contract).toContain("English is non-blocking");
+    expect(contract).toContain("omit `locales.en` rather than weakening, changing, or suppressing the Canonical Chinese editorial decision");
+    expect(contract).toContain("record English as machine-readable `unavailable`");
+    expect(contract).toContain("Do not calculate or invent final `entryId`, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`");
+  });
 });

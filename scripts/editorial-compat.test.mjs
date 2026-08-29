@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildEditorialInput, editorialSchema, validateEditorialOutput } from "./lib/editorial-contract.mjs";
 import {
-  legacyCompatibleEditorialInput,
-  legacyCompatibleEditorialSchema,
-} from "./lib/editorial-compat.mjs";
+  buildEditorialInput,
+  editorialSchema,
+  validateEditorialOutput,
+  validateEnglishEditorialLocale,
+} from "./lib/editorial-contract.mjs";
 
 const evidence = {
   window: {
@@ -38,7 +39,7 @@ const evidence = {
   }],
 };
 
-function legacyDecision() {
+function baseDecision() {
   return {
     editionId: "2026-08-30-am",
     archiveTitle: "早报｜Example Game 公布",
@@ -76,32 +77,54 @@ function legacyDecision() {
   };
 }
 
-describe("bilingual publisher compatibility envelope", () => {
-  it("keeps the finalized packet input at schema v2 while preserving additive language metadata", () => {
-    const nextInput = buildEditorialInput(evidence);
-    expect(nextInput.schemaVersion).toBe(3);
-    const compatible = legacyCompatibleEditorialInput(nextInput);
-    expect(compatible.schemaVersion).toBe(2);
-    expect(compatible.packages[0].sources[0].detectedLanguage).toBe("en");
+function sharedFactFrame() {
+  return {
+    subjectTitleKey: "example-game",
+    dates: [],
+    times: [],
+    numbers: [],
+    platforms: ["PC"],
+    peopleAndEntities: ["Publisher"],
+    versionsAndTerms: [],
+  };
+}
+
+describe("bilingual Scheduled Task cutover contract", () => {
+  it("keeps finalized packet input at schema v2 while preserving source-language metadata", () => {
+    const input = buildEditorialInput(evidence);
+    expect(input.schemaVersion).toBe(2);
+    expect(input.packages[0].sources[0].detectedLanguage).toBe("en");
   });
 
-  it("makes bilingual handoff fields optional until the Scheduled Task cutover", () => {
-    const compatibleSchema = legacyCompatibleEditorialSchema(editorialSchema);
-    expect(compatibleSchema.required).not.toContain("contractVersion");
-    expect(compatibleSchema.required).not.toContain("locales");
-    expect(compatibleSchema.properties.decisions.items.required).not.toContain("sharedFactFrame");
+  it("requires contractVersion 2 and sharedFactFrame but keeps locales optional for Chinese-first degradation", () => {
+    expect(editorialSchema.required).toContain("contractVersion");
+    expect(editorialSchema.required).not.toContain("locales");
+    expect(editorialSchema.properties.decisions.items.required).toContain("sharedFactFrame");
   });
 
-  it("continues to accept the existing Chinese-only editorial decision", () => {
-    const input = legacyCompatibleEditorialInput(buildEditorialInput(evidence));
-    expect(validateEditorialOutput(legacyDecision(), input)).toEqual([]);
+  it("keeps pre-cutover Chinese-only handoffs publishable for queued/idempotent retries", () => {
+    const input = buildEditorialInput(evidence);
+    expect(validateEditorialOutput(baseDecision(), input)).toEqual([]);
   });
 
-  it("enforces shared facts and English copy once contractVersion 2 is explicitly selected", () => {
-    const input = legacyCompatibleEditorialInput(buildEditorialInput(evidence));
-    const bilingual = { ...legacyDecision(), contractVersion: 2 };
-    const errors = validateEditorialOutput(bilingual, input);
-    expect(errors).toContain("decisions[0]: contractVersion 2 include requires a complete sharedFactFrame");
-    expect(errors).toContain("contractVersion 2 requires locales.en schemaVersion=1 and locale=en");
+  it("requires the shared fact frame when contractVersion 2 is selected", () => {
+    const input = buildEditorialInput(evidence);
+    const bilingual = { ...baseDecision(), contractVersion: 2 };
+    expect(validateEditorialOutput(bilingual, input)).toContain(
+      "decisions[0]: contractVersion 2 include requires a complete sharedFactFrame",
+    );
+  });
+
+  it("does not let missing English block a valid Canonical decision", () => {
+    const input = buildEditorialInput(evidence);
+    const bilingual = {
+      ...baseDecision(),
+      contractVersion: 2,
+      decisions: [{ ...baseDecision().decisions[0], sharedFactFrame: sharedFactFrame() }],
+    };
+    expect(validateEditorialOutput(bilingual, input)).toEqual([]);
+    expect(validateEnglishEditorialLocale(bilingual)).toEqual([
+      "contractVersion 2 requires locales.en schemaVersion=1 and locale=en",
+    ]);
   });
 });

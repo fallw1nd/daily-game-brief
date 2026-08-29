@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const workflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
+const editorialize = await readFile("scripts/editorialize.mjs", "utf8");
 
 describe("final editorial packet workflow", () => {
   it("collects at both fixed Beijing cutoffs", () => {
@@ -22,5 +23,13 @@ describe("final editorial packet workflow", () => {
     expect(workflow).toContain("run: node scripts/build-title-hints.mjs");
     expect(workflow).toContain("artifacts/title-hints.json");
     expect(workflow).toContain("Title hint sources are naming evidence only");
+  });
+
+  it("emits the active bilingual contract while keeping English non-blocking", () => {
+    expect(editorialize).toContain('"输出 contractVersion=2。');
+    expect(editorialize).toContain("每个 include 决定必须填写完整 sharedFactFrame");
+    expect(editorialize).toContain("如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en");
+    expect(editorialize).toContain("outputSchema: editorialSchema");
+    expect(editorialize).not.toContain("legacyCompatibleEditorialSchema");
   });
 });
