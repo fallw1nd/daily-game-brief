@@ -10,13 +10,14 @@ beforeAll(async () => {
 });
 
 describe("search index v2", () => {
-  it("generates the bilingual-ready schema without inventing unavailable English copy", () => {
+  it("includes English copy only when a validated English Overlay exists", () => {
     expect(searchIndex.schemaVersion).toBe(2);
     expect(Array.isArray(searchIndex.items)).toBe(true);
     const item = searchIndex.items.find((entry) => entry.entryId === "2026-08-21-pm-news-0");
-    expect(item.availableLocales).toEqual(["zh-CN"]);
+    expect(item.availableLocales).toEqual(["zh-CN", "en"]);
     expect(item.copy["zh-CN"].headline).toBeTruthy();
-    expect(item.copy).not.toHaveProperty("en");
+    expect(item.copy.en?.headline).toBeTruthy();
+    expect(item.copy.en?.summary).toBeTruthy();
   });
 
   it("preserves true tracking flags for archive search results", () => {
