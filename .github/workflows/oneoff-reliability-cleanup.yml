@@ -16,7 +16,7 @@ jobs:
         with:
           ref: fix/reliability-buffer-cleanup
           fetch-depth: 0
-      - name: Apply bounded reliability cleanup
+      - name: Update docs, tests, and maintenance ledger
         shell: bash
         run: |
           python3 - <<'PY'
@@ -29,30 +29,24 @@ jobs:
                   raise SystemExit(f"missing expected text in {path}: {old[:80]!r}")
               p.write_text(s.replace(old, new))
 
-          # Scheduled contract: no wall-clock execution-date binding; widen SLA only, not evidence windows.
           replace(
               "docs/SCHEDULED_TASK_PROMPT.md",
               "`Final editorial packet` remains scheduled at the fixed 10:10/17:00 cutoffs, while the SLA watchdog remains 10:45/17:35.",
               "`Final editorial packet` remains scheduled at the fixed 10:10/17:00 cutoffs, while the SLA watchdog runs at 11:00/17:50. Scheduled media recovery runs later at 11:10/18:00; normal publisher-triggered media enrichment remains immediate."
           )
+          p = Path("docs/SCHEDULED_TASK_PROMPT.md")
+          s = p.read_text()
           marker = "## Input\n\n"
           addition = (
               "## Target edition resolution\n\n"
               "Never derive the edition date from the task's actual execution calendar date alone. Resolve the target as the most recent already-due fixed window for this task's period in `Asia/Shanghai`: for AM, use today's `YYYY-MM-DD-am` only when Beijing time is at or after 10:10, otherwise use the previous day's AM; for PM, use today's `YYYY-MM-DD-pm` only when Beijing time is at or after 17:00, otherwise use the previous day's PM. This rule exists so a delayed task that starts after midnight still targets the window that actually reached cutoff. The target's `plannedAt`, `windowStart`, `windowEnd`, and `coverageThrough` remain fixed and never follow the delayed runtime. If a normal Canonical edition for that exact target already exists, verify it and stop rather than advancing to a future not-yet-due edition.\n\n"
           )
-          p = Path("docs/SCHEDULED_TASK_PROMPT.md")
-          s = p.read_text()
           if addition not in s:
               if marker not in s:
                   raise SystemExit("scheduled contract input marker missing")
-              s = s.replace(marker, addition + marker, 1)
-              p.write_text(s)
+              p.write_text(s.replace(marker, addition + marker, 1))
 
-          replace(
-              "docs/AUTOMATION_ARCHITECTURE.md",
-              "The 10:45/17:35 SLA watchdog first restores the matching packet",
-              "The 11:00/17:50 SLA watchdog first restores the matching packet"
-          )
+          replace("docs/AUTOMATION_ARCHITECTURE.md", "The 10:45/17:35 SLA watchdog first restores the matching packet", "The 11:00/17:50 SLA watchdog first restores the matching packet")
           arch = Path("docs/AUTOMATION_ARCHITECTURE.md")
           s = arch.read_text()
           needle = "Normally the finalized packet should already exist when ChatGPT begins."
@@ -60,65 +54,32 @@ jobs:
           if insert not in s:
               if needle not in s:
                   raise SystemExit("architecture handoff marker missing")
-              s = s.replace(needle, insert + needle, 1)
-              arch.write_text(s)
+              arch.write_text(s.replace(needle, insert + needle, 1))
 
-          # SLA: give the editorial task 40 minutes from nominal start before degraded fallback.
-          replace(".github/workflows/brief-sla-watchdog.yml", "# 10:45 and 17:35 Asia/Shanghai; avoids relying on a single edition trigger.", "# 11:00 and 17:50 Asia/Shanghai; leaves normal editorial publication headroom before fallback.")
-          replace(".github/workflows/brief-sla-watchdog.yml", '- cron: "45 2 * * *"', '- cron: "0 3 * * *"')
-          replace(".github/workflows/brief-sla-watchdog.yml", '- cron: "35 9 * * *"', '- cron: "50 9 * * *"')
-          replace(".github/workflows/brief-sla-watchdog.yml", 'github.event.schedule }}" = "45 2 * * *"', 'github.event.schedule }}" = "0 3 * * *"')
-
-          # Scheduled media is only a recovery pass; move it after SLA. Explicit publisher dispatch remains immediate.
-          replace(".github/workflows/media-enrichment.yml", "# 10:35 and 17:25 Asia/Shanghai (UTC+8)", "# 11:10 and 18:00 Asia/Shanghai (UTC+8); scheduled recovery only")
-          replace(".github/workflows/media-enrichment.yml", '- cron: "35 2 * * *"', '- cron: "10 3 * * *"')
-          replace(".github/workflows/media-enrichment.yml", '- cron: "25 9 * * *"', '- cron: "0 10 * * *"')
-
-          # Contract tests lock the split between evidence cutoff, editorial start, SLA, and media recovery.
           test = Path("scripts/scheduled-task-contract.test.mjs")
           s = test.read_text()
           s = s.replace('expect(contract).toContain("SLA watchdog remains 10:45/17:35");', 'expect(contract).toContain("SLA watchdog runs at 11:00/17:50");')
-          anchor = 'expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");\n'
-          extra = (
-              '    expect(contract).toContain("Never derive the edition date from the task\'s actual execution calendar date alone");\n'
-              '    expect(contract).toContain("most recent already-due fixed window for this task\'s period");\n'
-              '    expect(contract).toContain("otherwise use the previous day\'s PM");\n'
-          )
-          if extra not in s:
-              if anchor not in s:
-                  raise SystemExit("scheduled contract test anchor missing")
-              s = s.replace(anchor, anchor + extra, 1)
-          old_decl = 'const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");\n'
-          new_decl = old_decl + 'const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");\nconst mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");\n'
           if 'const slaWorkflow' not in s:
-              s = s.replace(old_decl, new_decl, 1)
+              decl = 'const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");\n'
+              s = s.replace(decl, decl + 'const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");\nconst mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");\n', 1)
+          anchor = '    expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");\n'
+          extra = '    expect(contract).toContain("Never derive the edition date from the task\\'s actual execution calendar date alone");\n    expect(contract).toContain("most recent already-due fixed window for this task\\'s period");\n    expect(contract).toContain("otherwise use the previous day\\'s PM");\n'
+          if "Never derive the edition date" not in s:
+              s = s.replace(anchor, anchor + extra, 1)
           cron_anchor = '    expect(packetWorkflow).toContain(\'- cron: "0 9 * * *"\');\n'
-          cron_extra = (
-              '    expect(slaWorkflow).toContain(\'- cron: "0 3 * * *"\');\n'
-              '    expect(slaWorkflow).toContain(\'- cron: "50 9 * * *"\');\n'
-              '    expect(mediaWorkflow).toContain(\'- cron: "10 3 * * *"\');\n'
-              '    expect(mediaWorkflow).toContain(\'- cron: "0 10 * * *"\');\n'
-          )
-          if cron_extra not in s:
-              if cron_anchor not in s:
-                  raise SystemExit("cron test anchor missing")
+          cron_extra = '    expect(slaWorkflow).toContain(\'- cron: "0 3 * * *"\');\n    expect(slaWorkflow).toContain(\'- cron: "50 9 * * *"\');\n    expect(mediaWorkflow).toContain(\'- cron: "10 3 * * *"\');\n    expect(mediaWorkflow).toContain(\'- cron: "0 10 * * *"\');\n'
+          if "slaWorkflow).toContain" not in s:
               s = s.replace(cron_anchor, cron_anchor + cron_extra, 1)
           test.write_text(s)
 
-          # Historical backfill was one-off migration machinery; overlays/data remain untouched.
-          Path(".github/workflows/historical-english-backfill.yml").unlink()
-
-          # Record the two reliability findings without claiming production closure before the next real AM/PM run.
           log = Path("docs/MAINTENANCE_LOG.md")
           s = log.read_text()
           if "MNT-20260830-01" not in s:
-              entry = '''\n## MNT-20260830-01 — Scheduled Task 延迟跨日时按执行日可能错期\n\n- **Discovered:** 2026-08-30\n- **Priority:** P0\n- **Area:** Scheduled task / edition resolution\n- **Status:** in_progress\n- **Evidence:** 长期任务原 prompt 将目标 edition 直接绑定为“任务执行日”的 AM/PM；若计划 17:10 的 PM 因平台延迟到次日 00:xx 才启动，会把目标误写为次日 PM，尽管次日 17:00 尚未到 cutoff。\n- **Risk:** 跨日延迟可再次造成 wrong-edition packet lookup/recovery，重现已修过的 runner-time drift 类故障。\n- **Proposed resolution:** 目标 edition 按 `Asia/Shanghai` 同 period 最近一个已经到 cutoff 的固定窗口解析；不得只看实际执行日期。Scheduled prompt 只保留启动/恢复骨架，详细编辑规则继续以仓库实时契约为唯一来源。\n- **Close when:** 契约测试覆盖午夜后 PM 与 cutoff 前 AM/PM；两个长期 Scheduled Task prompt 已同步；至少一次真实延迟或正常生产确认目标 edition 正确。\n- **Resolution:** pending PR.\n- **Verification:** pending.\n\n## MNT-20260830-02 — Buffered handoff 后 SLA 与 media recovery 仍过早\n\n- **Discovered:** 2026-08-30\n- **Priority:** P1\n- **Area:** scheduling / SLA / media recovery\n- **Status:** in_progress\n- **Evidence:** ChatGPT 正常启动已调整为 10:20/17:10，但 SLA 仍在 10:45/17:35；历史 last_run_time 显示 Scheduled Task 可能出现十余分钟平台延迟，导致 SLA 在正常编辑尚未完成时触发 degraded fallback。media scheduled recovery 仍在 10:35/17:25，可能在正文尚未发布时对上一期做无意义空跑。\n- **Risk:** 正常稿与 degraded fallback 竞跑，增加同一期 revision 抖动；media recovery 增加无效 Actions 成本。\n- **Proposed resolution:** SLA 放宽为 11:00/17:50；scheduled media recovery 后移到 11:10/18:00。publisher 对 exact edition 的即时 media dispatch 保持不变，因此正常图片补齐不被延迟。\n- **Close when:** workflow cron 与文档/测试一致；Verify/Pages 成功；至少一轮真实 AM/PM 在新时序下正常发布且未被过早 fallback 抢跑。\n- **Resolution:** pending PR.\n- **Verification:** pending.\n'''
-              s += entry
+              s += '''\n## MNT-20260830-01 — Scheduled Task 延迟跨日时按执行日可能错期\n\n- **Discovered:** 2026-08-30\n- **Priority:** P0\n- **Area:** Scheduled task / edition resolution\n- **Status:** in_progress\n- **Evidence:** 长期任务原 prompt 将目标 edition 直接绑定为“任务执行日”的 AM/PM；若 PM 因平台延迟到次日 00:xx 才启动，会错误跳到次日尚未到 cutoff 的 PM。\n- **Risk:** 跨日延迟可再次造成 wrong-edition packet lookup/recovery。\n- **Proposed resolution:** 目标 edition 按 `Asia/Shanghai` 同 period 最近一个已经到 cutoff 的固定窗口解析；Scheduled prompt 只保留启动/恢复骨架，详细编辑规则以仓库实时契约为唯一来源。\n- **Close when:** 契约测试与两个实际 Scheduled Task prompt 已同步；至少一轮真实生产确认目标 edition 正确。\n- **Resolution:** implementation prepared in reliability cleanup PR.\n- **Verification:** waiting for PR Verify and next real production run.\n\n## MNT-20260830-02 — Buffered handoff 后 SLA 与 media recovery 仍过早\n\n- **Discovered:** 2026-08-30\n- **Priority:** P1\n- **Area:** scheduling / SLA / media recovery\n- **Status:** in_progress\n- **Evidence:** ChatGPT 已调整为 10:20/17:10，但 SLA 仍为 10:45/17:35；Scheduled Task 曾出现十余分钟延迟。media scheduled recovery 仍在 10:35/17:25，可能在正文尚未发布时空跑。\n- **Risk:** 正常稿与 degraded fallback 竞跑；media recovery 增加无效 Actions 成本。\n- **Proposed resolution:** SLA 放宽为 11:00/17:50；scheduled media recovery 后移到 11:10/18:00；publisher 的 exact-edition 即时 media dispatch 不变。\n- **Close when:** workflow cron、文档和测试一致；Verify/Pages 成功；至少一轮真实 AM/PM 未被过早 fallback 抢跑。\n- **Resolution:** implementation prepared in reliability cleanup PR.\n- **Verification:** waiting for PR Verify and next real production run.\n'''
               log.write_text(s)
           PY
-          rm .github/workflows/oneoff-reliability-cleanup.yml
           git config user.name "daily-game-brief[bot]"
           git config user.email "daily-game-brief[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix(automation): harden buffered brief handoff"
+          git add docs scripts/scheduled-task-contract.test.mjs
+          git commit -m "docs(automation): harden delayed handoff contract"
           git push origin HEAD:fix/reliability-buffer-cleanup
