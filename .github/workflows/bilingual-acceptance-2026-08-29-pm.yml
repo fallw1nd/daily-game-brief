@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout trusted current main
+      - name: Checkout proposed trusted fix
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: fix/i18n-upcoming-bootstrap
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -253,7 +253,7 @@ jobs:
           EDITORIAL_BRANCH: automation/editorial/2026-08-29-pm
         run: node scripts/validate-editorial-submission.mjs
 
-      - name: Rebuild evening edition with current trusted publisher
+      - name: Rebuild evening edition with proposed trusted publisher
         env:
           BRIEF_NOW: 2026-08-29T11:25:18.043Z
           PUBLICATION_MODE: publish
@@ -266,13 +266,14 @@ jobs:
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
           import { factsDigest, canonicalCopyDigest, localeDigest } from './scripts/lib/locale-digest.mjs';
 
           const generated = JSON.parse(readFileSync('public/data/archive/2026/08/2026-08-29-pm.json', 'utf8'));
           const production = JSON.parse(readFileSync('artifacts/production-target.json', 'utf8'));
           const result = JSON.parse(readFileSync('artifacts/publication-result.json', 'utf8'));
-          const overlay = JSON.parse(readFileSync('public/data/locales/en/archive/2026/08/2026-08-29-pm.json', 'utf8'));
+          const overlayPath = 'public/data/locales/en/archive/2026/08/2026-08-29-pm.json';
+          const overlay = existsSync(overlayPath) ? JSON.parse(readFileSync(overlayPath, 'utf8')) : null;
           const localeIndex = JSON.parse(readFileSync('public/data/locales/en/index.json', 'utf8'));
           const localeItem = (localeIndex.editions || []).find((item) => item.id === generated.id || item.editionId === generated.id);
 
@@ -287,23 +288,25 @@ jobs:
             entryCount: generated.entries?.length === production.entries?.length,
             factsMatchProduction: generatedFacts === productionFacts,
             canonicalCopyMatchesProduction: generatedCopy === productionCopy,
-            englishAvailable: result.localeStatus === 'available',
-            englishCoversAllEntries: overlay.entries?.length === generated.entries?.length,
-            overlayFactsBound: overlay.factsDigest === generatedFacts,
-            overlayCopyBound: overlay.canonicalCopyDigest === generatedCopy,
-            overlayDigestValid: overlay.localeDigest === localeDigest(overlay),
+            englishAvailable: result.localeStatus === 'available' && Boolean(overlay),
+            englishCoversAllEntries: overlay?.entries?.length === generated.entries?.length,
+            overlayFactsBound: overlay?.factsDigest === generatedFacts,
+            overlayCopyBound: overlay?.canonicalCopyDigest === generatedCopy,
+            overlayDigestValid: Boolean(overlay) && overlay.localeDigest === localeDigest(overlay),
             localeIndexAvailable: localeItem?.status === 'available',
           };
           const report = {
             editionId: generated.id,
             issueNumber: generated.issueNumber,
             canonicalEntries: generated.entries?.length || 0,
-            englishEntries: overlay.entries?.length || 0,
+            englishEntries: overlay?.entries?.length || 0,
             publicationStatus: result.status,
             localeStatus: result.localeStatus,
+            localeReasonCode: result.localeReasonCode || null,
+            localeSummary: result.localeSummary || null,
             factsDigest: generatedFacts,
             canonicalCopyDigest: generatedCopy,
-            localeDigest: overlay.localeDigest,
+            localeDigest: overlay?.localeDigest || null,
             checks,
             allPassed: Object.values(checks).every(Boolean),
             safety: {
