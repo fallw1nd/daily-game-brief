@@ -1,0 +1,75 @@
+name: Historical English backfill
+
+on:
+  push:
+    branches:
+      - "feat/english-public-backfill"
+    paths:
+      - "scripts/backfill-english-locales.mjs"
+      - ".github/workflows/historical-english-backfill.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: historical-english-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout backfill branch
+        uses: actions/checkout@v7
+        with:
+          ref: feat/english-public-backfill
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate validated historical English overlays
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: node scripts/backfill-english-locales.mjs
+
+      - name: Validate locales and repository
+        run: npm run check
+
+      - name: Guard Canonical publication paths
+        shell: bash
+        run: |
+          if ! git diff --quiet origin/main -- public/data/archive public/data/latest.json public/data/manifest.json; then
+            echo "Historical English backfill changed Canonical publication files."
+            git diff --stat origin/main -- public/data/archive public/data/latest.json public/data/manifest.json
+            exit 1
+          fi
+
+      - name: Commit English Overlay data to backfill branch
+        shell: bash
+        run: |
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add public/data/locales/en/archive public/data/locales/en/status 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No English Overlay changes to commit."
+            exit 0
+          fi
+          git commit -m "content(i18n): backfill historical English overlays"
+          git push origin HEAD:feat/english-public-backfill
+
+      - name: Upload backfill audit
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: historical-english-backfill-${{ github.run_id }}
+          path: artifacts/english-backfill-summary.json
+          if-no-files-found: warn
+          retention-days: 14
