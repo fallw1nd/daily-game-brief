@@ -28,7 +28,7 @@ describe("thin scheduled-task orchestration contract", () => {
     expect(blob).toBeGreaterThan(state);
     expect(contract).toContain("`editorial.status` of `pending` or `invalid`");
     expect(contract).toContain("durable `validationErrors` and `submissionSha`");
-    expect(contract).toContain("Fix only those errors and consequential consistency in the same edition");
+    expect(contract).toContain("same edition with the same immutable `packetBlobSha`");
     expect(contract).toContain("Never rediscover events, change packet, or advance");
     expect(contract).toContain("Copy it unchanged to `packetBlobSha`");
     expect(contract).toContain("Never skip backlog or derive identity from runtime");
