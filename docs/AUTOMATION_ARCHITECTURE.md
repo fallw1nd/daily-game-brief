@@ -65,11 +65,13 @@ Artifacts and the persistent state branch measure:
 
 The ten-minute separation is intentional: GitHub closes the AM/PM evidence windows and starts `Final editorial packet` at 10:10/17:00, then the ChatGPT editorial handoff starts at 10:20/17:10. This buffer gives packet generation normal queue/runtime headroom. It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows, and it must never admit information published after 10:10/17:00 into that edition.
 
-A delayed ChatGPT invocation resolves its target from the most recent already-due fixed cutoff for that period, never from the delayed execution date alone. This prevents a post-midnight PM run from jumping to the next day's not-yet-due PM edition.
+Each due edition has one durable record at `automation/status/<edition-id>.json`. It records the fixed identity and window, the finalized packet's Git blob SHA, editorial submission/validation acknowledgement, publication commit, deployment result, and independent English/media availability. All writers update this record through bounded compare-and-retry pushes to `automation/state`; mutable `latest-am.json` / `latest-pm.json` pointers are convenience views, never identity authorities.
 
-Normally the finalized packet should already exist when ChatGPT begins. If it does not, the task follows the packet-first preflight contract: wait only for a proven matching queued/in-progress collector, otherwise use the exact-edition one-shot recovery path. It performs no supplemental event discovery.
+A delayed ChatGPT invocation selects the oldest already-due state for its period whose packet is acknowledged, editorial state is pending, and publication is not committed. It never derives identity from the delayed execution date, skips backlog, or advances to a future window.
 
-A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. A packet that exists but is stale, pre-cutoff, malformed, or tied to the wrong fixed window is treated as missing for recovery purposes. The ChatGPT task first avoids racing any matching queued/in-progress collection run; otherwise it may use its edition-scoped one-shot recovery trigger to dispatch the existing collector.
+The ChatGPT task reads the state first, restores the packet by the acknowledged blob SHA, copies that SHA to top-level `packetBlobSha`, and submits only the editorial decision. It never polls Actions, creates workflow files, dispatches packet recovery, or writes recovery state. Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions. A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`.
+
+After packet persistence, `Final editorial packet` waits until the fixed 11:00/17:50 publication SLA and dispatches `Brief publication SLA watchdog` with the exact edition. The cron remains a redundant wake-up, while `scripts/resolve-due-edition.mjs` always selects the oldest unpublished due window. Thus a delayed or skipped schedule cannot silently advance past backlog.
 
 For every included decision, `sharedFactFrame` is the language-neutral boundary for subject title key, dates, times, numbers, platforms, people/entities, versions, and proper terms. Simplified Chinese Canonical copy and `locales.en` must stay inside this frame. English is independently edited rather than sentence-by-sentence translated; official English terminology is preferred when opened English evidence provides it. When complete English copy cannot be produced safely, the task omits `locales.en` instead of weakening or changing the Canonical decision.
 
@@ -105,7 +107,7 @@ After the edition dispatches, the publisher writes every structured decision bac
 
 Active tracking records are mandatory editorial input. When fresh opened evidence exists, the event is prioritized in the normal package list; otherwise a compact `trackingQueue` reminder carries its last decision, reason, source URLs, and dates. The ChatGPT task must explicitly continue or close every reminder. Tracking reminders count against the same 120,000-character budget and fail visibly rather than disappearing when the budget cannot contain them.
 
-The 11:00/17:50 SLA watchdog first restores the matching packet from `automation/state` and validates the complete finalized-packet contract, not only the edition ID. If the packet is missing, stale, malformed, or pre-cutoff while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet is preserved back to the state branch on a best-effort basis and remains usable locally even if that persistence races another run.
+The 11:00/17:50 SLA watchdog first restores the matching packet blob acknowledged by `automation/status/<edition-id>.json` and validates the complete finalized-packet contract, not only the edition ID. If the packet is missing, stale, malformed, or pre-cutoff while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet and its acknowledgement are committed with the same bounded compare-and-retry rule; publication does not proceed from an unacknowledged recovery packet.
 
 The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. Its `main` publication uses the same rebuild-on-current-main retry principle for up to three attempts. If the repository already contains the edition but Pages is still unhealthy, the watchdog re-dispatches Pages rather than treating the absence of a new data diff as sufficient recovery. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
 
@@ -115,11 +117,15 @@ Keep the existing **10:20/17:10 ChatGPT tasks** enabled as the normal editorial 
 
 ## Operational states
 
-Every due edition must end in one observable state:
+Every due edition has independently observable lanes:
 
-`collecting → verifying → drafted → committed → deployed`
+- packet: `pending → ready | failed`;
+- editorial: `pending → submitted → valid | invalid`, or `timed_out`;
+- publication: `pending → committed | failed`;
+- deployment: `pending → deployed | failed`;
+- English and media: independent `pending`, `available`, `partial`, or `unavailable` states.
 
-with the locale state independently observable as `available` or `unavailable`.
+The normal publisher may commit only an exact `valid` submission bound to the acknowledged packet blob. The degraded publisher may commit only under the GitHub-owned timeout/recovery path. Invalid submissions remain durable machine state and do not disappear into logs.
 
 `degraded` — publishable Canonical facts completed; optional media, English presentation, or a noncritical source failed.
 

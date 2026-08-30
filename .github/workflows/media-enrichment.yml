@@ -103,6 +103,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy.yml --ref main
 
+      - name: Acknowledge nonblocking media lane
+        if: always()
+        shell: bash
+        run: |
+          edition="${{ steps.publication.outputs.edition || inputs.edition_id }}"
+          if [ -z "$edition" ]; then
+            edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
+          fi
+          if [ "${{ steps.publication.outcome }}" = "success" ] && [ -f artifacts/media-audit.json ]; then
+            IFS='|' read -r status reason < <(EDITION_ID="$edition" node -e '
+              const fs = require("fs");
+              const audit = JSON.parse(fs.readFileSync("artifacts/media-audit.json", "utf8"));
+              const results = (audit.editions.find((item) => item.id === process.env.EDITION_ID)?.results || []);
+              const unresolved = results.filter((item) => item.status !== "applied").length;
+              const applied = results.filter((item) => item.status === "applied").length;
+              const status = unresolved === 0 ? "available" : applied > 0 ? "partial" : "unavailable";
+              process.stdout.write(`${status}|applied-${applied}-unresolved-${unresolved}`);
+            ')
+          else
+            status="unavailable"
+            reason="media-workflow-failed"
+          fi
+          bash scripts/update-edition-state-branch.sh \
+            "$edition" media-status \
+            --status="$status" \
+            --reason="$reason"
+
       - name: Summarize media publication
         if: always()
         shell: bash

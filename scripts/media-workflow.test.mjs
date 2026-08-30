@@ -10,6 +10,9 @@ describe("media publication workflow", () => {
     expect(workflow).toContain("git push origin HEAD:main");
     expect(workflow).toContain("gh workflow run deploy.yml --ref main");
     expect(workflow).not.toContain("gh pr create");
+    expect(workflow).toContain("Acknowledge nonblocking media lane");
+    expect(workflow).toContain('"$edition" media-status');
+    expect(workflow).toContain('status = unresolved === 0 ? "available" : applied > 0 ? "partial" : "unavailable"');
     expect(workflow).not.toContain("automation/media-");
   });
 

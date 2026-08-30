@@ -30,13 +30,13 @@ function nullableDecision(item, reason) {
   };
 }
 
-export function buildDegradedDecision(packet) {
+export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
   const input = packet.editorialInput;
   const packageDecisions = input.packages.map((item) => {
     const opened = item.sources.filter((source) => source.status === "opened" && source.kind !== "discovery");
     const primary = opened.filter((source) => source.kind === "primary");
     const independent = new Set(opened.map((source) => source.independenceKey || new URL(source.url).hostname));
-    const eligible = item.tier === "A" && item.timeRelation === "window" && (primary.length > 0 || independent.size >= 2);
+    const eligible = item.publishability !== "requires_subject_identity" && item.subjectKey && item.tier === "A" && item.timeRelation === "window" && (primary.length > 0 || independent.size >= 2);
     if (!eligible) return nullableDecision(item, "无AI兜底只收录窗口内、A级且具一手或两家独立来源的事实。");
     const evidence = opened.map((source) => source.evidenceText).find(Boolean);
     if (!evidence) return nullableDecision(item, "来源已打开但没有可用正文证据。");
@@ -55,6 +55,10 @@ export function buildDegradedDecision(packet) {
       timeNote: eventTime ? "来源发布时间已换算为北京时间并处于固定窗口。" : "来源未披露可验证的具体时刻，仅确认属于本期窗口。",
       platforms: [], region: "全球", releaseType: item.eventKind,
       sourceIndexes: opened.map((source) => source.sourceIndex), additionalSources: [],
+      sharedFactFrame: {
+        subjectTitleKey: slug(titleName), dates: [], times: eventTime ? [eventTime] : [], numbers: [],
+        platforms: [], peopleAndEntities: [], versionsAndTerms: [],
+      },
     };
   });
   const trackingDecisions = (input.trackingQueue || []).map((item) => ({
@@ -71,11 +75,13 @@ export function buildDegradedDecision(packet) {
   const prefix = input.window.period === "am" ? "早报｜" : "晚报｜";
   const leadName = included[0].titleEn || "自动事实清单";
   return {
+    contractVersion: 2,
+    packetBlobSha,
     editionId: input.window.id,
     archiveTitle: Array.from(`${prefix}${leadName}`).slice(0, 40).join(""),
     leadEventKey: included[0].eventKey,
     decisions,
-    upcomingMode: "inherit_and_patch",
+    upcomingMode: input.window.period === "am" ? "replace" : "inherit_and_patch",
     removeUpcomingIds: [], upcoming: [],
     checkedExtra: ["无AI缺期兜底：仅使用已经打开的证据页"],
     limitedExtra: ["本期为自动事实清单，未执行中文编辑、传闻判断或最后15分钟人工式补查。"],

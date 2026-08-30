@@ -15,13 +15,17 @@ on:
           - am
           - pm
 
+      edition:
+        description: Exact edition ID for manual verification
+        required: true
+        type: string
 permissions:
   contents: write
   issues: write
   actions: write
 
 concurrency:
-  group: brief-sla-watchdog-${{ github.event.schedule || inputs.period }}
+  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '0 3 * * *' && 'am' || 'pm') }}
   cancel-in-progress: true
 
 jobs:
@@ -40,41 +44,60 @@ jobs:
         with:
           node-version: 22
 
-      - name: Select fixed edition period
+      - name: Select immutable due edition
         id: edition
         shell: bash
         run: |
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             period="${{ inputs.period }}"
-          elif [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
-            period="am"
+            node scripts/resolve-packet-dispatch.mjs \
+              --period="$period" \
+              --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
           else
-            period="pm"
+            if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
+              period="am"
+            else
+              period="pm"
+            fi
+            state_dir="$RUNNER_TEMP/sla-state-selection"
+            git worktree add --detach "$state_dir" origin/automation/state
+            node scripts/resolve-due-edition.mjs \
+              --period="$period" \
+              --purpose=publication \
+              --status-root="$state_dir/automation/status" >> "$GITHUB_OUTPUT"
+            git worktree remove --force "$state_dir"
           fi
           echo "period=$period" >> "$GITHUB_OUTPUT"
 
       - name: Check repository and deployed manifest
         id: sla
-        run: node scripts/check-brief-sla.mjs --period=${{ steps.edition.outputs.period }}
+        run: node scripts/check-brief-sla.mjs --period=${{ steps.edition.outputs.period }} --edition=${{ steps.edition.outputs.edition }}
 
-      - name: Restore matching editorial packet
+      - name: Restore acknowledged immutable packet
         id: packet
         shell: bash
         run: |
           mkdir -p artifacts
-          git fetch origin automation/state:refs/remotes/origin/automation/state || true
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state || true
           git show "origin/automation/state:automation/ledger/events.json" > artifacts/event-ledger-previous.json 2>/dev/null || true
-          if git show "origin/automation/state:automation/packets/latest-${{ steps.edition.outputs.period }}.json" > artifacts/editorial-packet.json 2>/dev/null; then
-            if node scripts/validate-editorial-packet.mjs \
-              --edition=${{ steps.sla.outputs.expected }} \
-              --period=${{ steps.edition.outputs.period }}; then
-              echo "available=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "available=false" >> "$GITHUB_OUTPUT"
-              echo "Packet exists but is stale or invalid; recovery will rebuild it." >> "$GITHUB_STEP_SUMMARY"
-            fi
+          edition="${{ steps.edition.outputs.edition }}"
+          packet_sha="$(git show "origin/automation/state:automation/status/$edition.json" 2>/dev/null | node -e 'let text=""; process.stdin.on("data", value => text += value).on("end", () => { try { process.stdout.write(JSON.parse(text).packet.blobSha || ""); } catch {} });')"
+          if [[ "$packet_sha" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$packet_sha^{blob}"; then
+            git cat-file blob "$packet_sha" > artifacts/editorial-packet.json
+          elif git show "origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json 2>/dev/null; then
+            packet_sha="$(git hash-object artifacts/editorial-packet.json)"
+          else
+            packet_sha=""
+          fi
+          if [ -n "$packet_sha" ] && node scripts/validate-editorial-packet.mjs \
+            --edition="$edition" \
+            --period=${{ steps.edition.outputs.period }}; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "packet_blob_sha=$packet_sha" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Exact packet is missing, stale, or invalid; GitHub recovery owns the rebuild." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Rebuild a missing, stale, or invalid packet
@@ -83,7 +106,7 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
+          BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
           node scripts/update-event-ledger.mjs
           node scripts/build-evidence.mjs
           node scripts/editorialize.mjs
@@ -92,35 +115,44 @@ jobs:
             --period=${{ steps.edition.outputs.period }}
           echo "available=true" >> "$GITHUB_OUTPUT"
 
-      - name: Preserve recovered packet and ledger
+      - name: Preserve recovered packet and acknowledgement
         if: steps.recovery.outputs.available == 'true'
-        continue-on-error: true
         shell: bash
         run: |
-          state_dir="$RUNNER_TEMP/automation-state-recovery"
           packet="$RUNNER_TEMP/editorial-packet.json"
           ledger="$RUNNER_TEMP/event-ledger.json"
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
-          git fetch origin automation/state:refs/remotes/origin/automation/state || true
-          if git show-ref --verify --quiet refs/remotes/origin/automation/state; then
-            git worktree add --detach "$state_dir" origin/automation/state
-          else
-            git worktree add -b automation-state-recovery "$state_dir" origin/main
-          fi
-          edition_id="${{ steps.sla.outputs.expected }}"
+          edition_id="${{ steps.edition.outputs.edition }}"
           period="${{ steps.edition.outputs.period }}"
-          mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
-          cp "$packet" "$state_dir/automation/packets/$edition_id.json"
-          cp "$packet" "$state_dir/automation/packets/latest-$period.json"
-          cp "$ledger" "$state_dir/automation/ledger/events.json"
-          git -C "$state_dir" config user.name "daily-game-brief[bot]"
-          git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
-          git -C "$state_dir" add automation/packets automation/ledger/events.json
-          if ! git -C "$state_dir" diff --cached --quiet; then
-            git -C "$state_dir" commit -m "chore(automation): recover $edition_id packet"
-            git -C "$state_dir" push origin HEAD:automation/state
-          fi
+          success=false
+          for attempt in 1 2 3; do
+            state_dir="$RUNNER_TEMP/sla-packet-state-$attempt"
+            git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+            git worktree add --detach "$state_dir" origin/automation/state
+            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
+            cp "$packet" "$state_dir/automation/packets/$edition_id.json"
+            cp "$packet" "$state_dir/automation/packets/latest-$period.json"
+            cp "$ledger" "$state_dir/automation/ledger/events.json"
+            node scripts/record-edition-state.mjs \
+              --state-root="$state_dir" \
+              --edition="$edition_id" \
+              --event=packet-ready \
+              --packet="$packet" \
+              --run-id="${{ github.run_id }}"
+            git -C "$state_dir" config user.name "daily-game-brief[bot]"
+            git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
+            git -C "$state_dir" add automation/packets automation/ledger/events.json "automation/status/$edition_id.json"
+            if git -C "$state_dir" diff --cached --quiet; then
+              success=true
+            else
+              git -C "$state_dir" commit -m "chore(automation): recover $edition_id packet acknowledgement"
+              if git -C "$state_dir" push origin HEAD:automation/state; then success=true; fi
+            fi
+            git worktree remove --force "$state_dir"
+            if [ "$success" = "true" ]; then break; fi
+          done
+          if [ "$success" != "true" ]; then exit 1; fi
 
       - name: Resolve usable packet
         id: packet_ready
@@ -184,6 +216,30 @@ jobs:
           echo "Failed to publish degraded $edition after three rebuild attempts"
           exit 1
 
+      - name: Acknowledge degraded publication
+        if: steps.fallback.outputs.published == 'true'
+        shell: bash
+        run: |
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.edition.outputs.edition }}" editorial-timeout
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.edition.outputs.edition }}" publication-committed \
+            --main-sha="${{ steps.fallback.outputs.commit }}" \
+            --source=degraded
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.edition.outputs.edition }}" locale-status \
+            --status=unavailable \
+            --reason=editorial-overlay-missing
+
+      - name: Record degraded publication failure state
+        if: steps.fallback.outcome == 'failure'
+        shell: bash
+        run: |
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.edition.outputs.edition }}" editorial-timeout
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.edition.outputs.edition }}" publication-failed \
+            --error="SLA degraded publisher failed"
       - name: Write degraded outcomes to persistent ledger
         id: ledger_feedback
         if: steps.fallback.outputs.published == 'true'

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -61,3 +61,24 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Acknowledge deployment outcome
+        if: always()
+        shell: bash
+        run: |
+          edition="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('public/data/latest.json','utf8')); process.stdout.write(data.editionId || data.id || '')")"
+          if [ -z "$edition" ]; then
+            echo "Unable to resolve deployed edition from public/data/latest.json"
+            exit 1
+          fi
+          if [ "${{ steps.deployment.outcome }}" = "success" ]; then
+            bash scripts/update-edition-state-branch.sh \
+              "$edition" deployment-succeeded \
+              --main-sha="${{ github.sha }}" \
+              --deployment-url="${{ steps.deployment.outputs.page_url }}"
+          else
+            bash scripts/update-edition-state-branch.sh \
+              "$edition" deployment-failed \
+              --main-sha="${{ github.sha }}" \
+              --error="GitHub Pages deployment failed"
+          fi

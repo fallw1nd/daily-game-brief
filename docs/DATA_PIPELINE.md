@@ -6,19 +6,19 @@ The website reads `public/data/latest.json` at runtime. Every published Canonica
 
 ## ChatGPT task handoff
 
-The scheduled ChatGPT task does **not** write archive/latest/manifest directly. It consumes the exact finalized packet from `automation/state`, applies the live editorial contract, and commits only one structured decision to `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`.
+The scheduled ChatGPT task does **not** write archive/latest/manifest or recovery state. It selects the oldest acknowledged pending edition from `automation/status/`, consumes the exact finalized packet by the state's immutable Git blob SHA, applies the live editorial contract, and commits only one structured decision to `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`.
 
 For new normal submissions:
 
 1. use `contractVersion: 2`;
-2. output exactly one `include`, `exclude`, or `needs_review` decision for every packet item;
+2. copy the state's exact packet SHA to top-level `packetBlobSha`, then output exactly one `include`, `exclude`, or `needs_review` decision for every packet item;
 3. give every included event a complete language-neutral `sharedFactFrame` covering the subject title key, dates, times, numbers, platforms, people/entities, versions, and proper terms supported by the selected evidence;
 4. draft the Simplified Chinese Canonical presentation under the existing Chinese editorial rules;
 5. produce `locales.en` from the same decisions and `sharedFactFrame` when a complete English presentation can be written safely;
 6. never calculate issue numbers, final `entryId`, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`; trusted publisher code owns those values;
 7. if English cannot be completed without uncertainty or fact drift, omit `locales.en` rather than weakening or suppressing the Simplified Chinese Canonical decision.
 
-The task stops after the editorial handoff commit succeeds. `.github/workflows/publish-editorial-decision.yml` restores the exact packet, validates the Canonical evidence contract, builds the edition, computes identities/digests, resolves English availability, runs `npm run check`, and publishes atomically. A pre-cutover Chinese-only handoff remains accepted for queued/idempotent retries, but newly generated packets expose the active bilingual contract.
+The task stops after the editorial handoff commit succeeds. `.github/workflows/publish-editorial-decision.yml` restores the packet by `packetBlobSha`, records submitted/valid/invalid state, validates the complete schema and Canonical evidence contract, builds the edition, computes identities/digests, resolves English availability, runs `npm run check`, and publishes atomically. Normal pre-cutover or stale submissions are rejected; `locale-repair` remains a narrowly scoped compatibility path that cannot mutate Canonical bytes.
 
 ## Canonical edition contract
 

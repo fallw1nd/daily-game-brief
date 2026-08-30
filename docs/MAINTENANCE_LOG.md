@@ -242,3 +242,16 @@
 - **Verification:** PR #47 Verify run [33250085760](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250085760) 成功。最终 Pages run [33250441905](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250441905) 成功部署 media commit `418f2bb`。一次性生产验收 run [33250559581](https://github.com/fallw1nd/daily-game-brief/actions/runs/33250559581) 从 GitHub runner 直接请求线上资源，确认 `latest.json`、manifest 末项和 archive 均为 `2026-08-29-pm` / issue 18，latest 与 archive byte-identical，`search-index.json` 含3条本期正文记录，3张本期正文图片均返回 HTTP 200。原 recovery workflow 与 live-verification workflow 均已从 `automation/state` 删除；早报/晚报两个长期 Scheduled Task 均已确认 `is_enabled:true`。关闭条件满足。
 
 ---
+
+## MNT-20260830-01 — 跨调度器缺少逐期耐久回执与单一恢复责任
+
+- **Discovered:** 2026-08-30
+- **Priority:** P0
+- **Area:** scheduling / orchestration / publication identity / observability
+- **Status:** in_progress
+- **Evidence:** 从零审计确认两个外部 ChatGPT Scheduled Tasks 与八个 GitHub schedules 之间只通过 mutable packet path、分支观察和运行日志协作；没有逐期 packet blob、editorial validation、publication commit、deployment result 的共同耐久状态。旧 ChatGPT prompt 还允许自行检查 Actions 并动态创建 one-shot workflow，形成两个恢复 owner。`latest-am.json` / `latest-pm.json` 与 runner 实际时间都可能让迟到执行绑定错误期次，invalid submission 也只在失败日志中可见。
+- **Risk:** cron 延迟、跨日、重复执行、并发 push、旧分支提交或部分成功会造成漏期、错期、重复恢复或“内容已提交但下游不知道”的 split-brain；可选英文/媒体失败还可能被误认为 Canonical 发布失败。
+- **Proposed resolution:** 在 `automation/status/<edition-id>.json` 建立 schema v1 状态机，用 Git blob SHA 绑定 finalized packet，用 submission/main SHA 绑定验证与发布；所有 state 写入使用三次 fetch/rebuild/push；GitHub Actions 独占 packet/degraded recovery，ChatGPT 只消费最旧 pending state 并提交 `contractVersion:2 + packetBlobSha`；collector 成功后延迟 dispatch exact-edition SLA，cron 只作冗余唤醒；英文和媒体保持独立非阻塞 lane。
+- **Close when:** 状态机/积压/迟到/重复/错误 SHA/invalid/degraded/locale/media 场景测试通过；完整 `npm run check` 通过；两个现有 ChatGPT task prompt 同步到新 contract 且保持启用；至少一组真实 AM/PM 生产运行写出 packet、editorial、publication、deployment 终态并验证 Pages；确认没有第三个长期任务、动态 workflow 或遗留 recovery 分支。
+- **Resolution:** `codex/production-reliability-state-machine` 已实现代码、workflow 与仓库内 canonical prompt；等待提交、生产配置同步及真实运行验证。
+- **Verification:** 本地新增 23 个状态/积压场景测试并通过；完整检查与生产证据 pending，因此不得标记 resolved。

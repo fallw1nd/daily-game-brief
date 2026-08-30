@@ -50,6 +50,8 @@ if (Date.parse(generatedAt) < Date.parse(cutoffAt)) {
   throw new Error(`Cannot finalize ${editorialInput.window.id} before ${cutoffAt}`);
 }
 const instructions = [
+  "Read automation/status/<edition-id>.json and copy packet.blobSha exactly into top-level packetBlobSha. The publisher resolves and verifies this immutable Git blob; never infer it from a mutable branch HEAD.",
+  "A candidate with publishability=requires_subject_identity cannot be included under the current contract. Exclude it or mark needs_review; never invent titleKey/titleEn from its headline.",
   "你是游戏行业简报编辑。事件事实只能依据证据包判断，不得补写证据中没有的事实。",
   "输出 contractVersion=2。每个事件给出 include、exclude 或 needs_review；A级事实也必须满足来源与时间要求。",
   "每个 include 决定必须填写完整 sharedFactFrame；它是中英文共同的事实边界，subjectTitleKey、日期、时刻、数字、平台、人物/机构、版本/专名只能来自已选证据与该决定本身，不得加入任何语言版本独有的新事实。",
