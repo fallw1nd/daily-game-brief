@@ -67,9 +67,9 @@ The ten-minute separation is intentional: GitHub closes the AM/PM evidence windo
 
 Each due edition has one durable record at `automation/status/<edition-id>.json`. It records the fixed identity and window, the finalized packet's Git blob SHA, editorial submission/validation acknowledgement, publication commit, deployment result, and independent English/media availability. All writers update this record through bounded compare-and-retry pushes to `automation/state`; mutable `latest-am.json` / `latest-pm.json` pointers are convenience views, never identity authorities.
 
-A delayed ChatGPT invocation selects the oldest already-due state for its period whose packet is acknowledged, editorial state is pending, and publication is not committed. It never derives identity from the delayed execution date, skips backlog, or advances to a future window.
+A delayed ChatGPT invocation selects the oldest already-due state for its period whose packet is acknowledged, publication is not committed, and editorial state is `pending` or `invalid`. `pending` starts a new decision. `invalid` is a bounded repair: the task reads durable `validationErrors` and the prior `submissionSha`, then corrects that decision for the same edition against the same acknowledged packet blob. It never rediscovers events, swaps packets, skips backlog, or advances to a later window. `submitted` and `valid` are already owned by the GitHub publication lane; `timed_out` is owned by the GitHub SLA lane, so none of those states are eligible for ChatGPT editing.
 
-The ChatGPT task reads the state first, restores the packet by the acknowledged blob SHA, copies that SHA to top-level `packetBlobSha`, and submits only the editorial decision. It never polls Actions, creates workflow files, dispatches packet recovery, or writes recovery state. Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions. A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`.
+The ChatGPT task reads the state first, restores the packet by the acknowledged blob SHA, copies that SHA to top-level `packetBlobSha`, and submits only the editorial decision. It never polls Actions, creates workflow files, dispatches packet recovery, or writes recovery state. Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions. A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. After that preflight, the task reads current `main` manifest/latest and the referenced archive. A normal Canonical edition is authoritative even when `automation/state` lags: the task verifies it and stops before drafting or committing. Only a missing Canonical or an existing `[自动事实清单]` can proceed, and the latter remains a same-edition, same-issue revision.
 
 After packet persistence, `Final editorial packet` waits until the fixed 11:00/17:50 publication SLA and dispatches `Brief publication SLA watchdog` with the exact edition. The cron remains a redundant wake-up, while `scripts/resolve-due-edition.mjs` always selects the oldest unpublished due window. Thus a delayed or skipped schedule cannot silently advance past backlog.
 
@@ -91,7 +91,7 @@ A stale `factsDigest` makes the English Overlay unavailable. A changed Simplifie
 
 `scripts/publish-editorial-decision.mjs` validates the structured Canonical decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without Canonical mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
 
-The ChatGPT task never needs a repository shell. It writes only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>` and stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all edition identities and cutoff coverage, performs the complete check, and publishes the result.
+Only after packet preflight and the current-`main` Canonical idempotency check may the ChatGPT task create `automation/editorial/<edition-id>` and write `automation/inbox/<edition-id>.json`; it stops after the commit succeeds. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all edition identities and cutoff coverage, performs the complete check, and publishes the result.
 
 Normal publication has three observable locale outcomes:
 
@@ -120,12 +120,12 @@ Keep the existing **10:20/17:10 ChatGPT tasks** enabled as the normal editorial 
 Every due edition has independently observable lanes:
 
 - packet: `pending → ready | failed`;
-- editorial: `pending → submitted → valid | invalid`, or `timed_out`;
+- editorial: `pending → submitted → valid | invalid`, with `invalid → submitted` for same-packet repair, or GitHub-owned `timed_out`;
 - publication: `pending → committed | failed`;
 - deployment: `pending → deployed | failed`;
 - English and media: independent `pending`, `available`, `partial`, or `unavailable` states.
 
-The normal publisher may commit only an exact `valid` submission bound to the acknowledged packet blob. The degraded publisher may commit only under the GitHub-owned timeout/recovery path. Invalid submissions remain durable machine state and do not disappear into logs.
+The normal publisher may commit only an exact `valid` submission bound to the acknowledged packet blob. The degraded publisher may commit only under the GitHub-owned timeout/recovery path. Invalid submissions retain machine-readable `validationErrors` and the rejected `submissionSha`; a correction replaces only the submission SHA while preserving edition and packet identity. `submitted`, `valid`, and `timed_out` cannot be reopened by a new ChatGPT submission.
 
 `degraded` — publishable Canonical facts completed; optional media, English presentation, or a noncritical source failed.
 

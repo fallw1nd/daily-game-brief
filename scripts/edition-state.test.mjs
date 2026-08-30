@@ -38,6 +38,30 @@ function validState() {
   });
 }
 
+function readyStateFor(targetEditionId) {
+  return applyEditionStateEvent(createEditionState(targetEditionId), "packet-ready", {
+    editionId: targetEditionId,
+    packetBlobSha: packetSha,
+    runId: "100",
+    at: `${targetEditionId.slice(0, 10)}T02:11:00.000Z`,
+  });
+}
+
+function submittedStateFor(targetEditionId) {
+  return applyEditionStateEvent(readyStateFor(targetEditionId), "editorial-submitted", {
+    packetBlobSha: packetSha,
+    submissionSha,
+  });
+}
+
+function invalidStateFor(targetEditionId) {
+  return applyEditionStateEvent(submittedStateFor(targetEditionId), "editorial-invalid", {
+    packetBlobSha: packetSha,
+    submissionSha,
+    validationErrors: ["decision.packages[0].reason is required"],
+  });
+}
+
 describe("durable per-edition state machine", () => {
   it("creates a valid immutable fixed-window state", () => {
     const state = createEditionState(editionId);
@@ -95,6 +119,41 @@ describe("durable per-edition state machine", () => {
     });
     expect(state.editorial.status).toBe("invalid");
     expect(state.editorial.validationErrors).toEqual(["missing field", "wrong edition"]);
+  });
+
+  it("accepts a corrected invalid decision only against the same immutable packet", () => {
+    const invalid = applyEditionStateEvent(submittedState(), "editorial-invalid", {
+      packetBlobSha: packetSha,
+      submissionSha,
+      validationErrors: ["missing field"],
+    });
+    const repaired = applyEditionStateEvent(invalid, "editorial-submitted", {
+      packetBlobSha: packetSha,
+      submissionSha: "6".repeat(40),
+    });
+    expect(repaired.editorial).toMatchObject({
+      status: "submitted",
+      packetBlobSha: packetSha,
+      submissionSha: "6".repeat(40),
+      validationErrors: [],
+    });
+    expect(() => applyEditionStateEvent(invalid, "editorial-submitted", {
+      packetBlobSha: "4".repeat(40),
+      submissionSha: "6".repeat(40),
+    })).toThrow("does not match the durable packet acknowledgement");
+  });
+
+  it("keeps GitHub-owned publication and SLA states out of repeat editing", () => {
+    const nextSubmissionSha = "6".repeat(40);
+    expect(() => applyEditionStateEvent(submittedState(), "editorial-submitted", { packetBlobSha: packetSha, submissionSha: nextSubmissionSha }))
+      .toThrow("GitHub publication lane");
+    expect(() => applyEditionStateEvent(validState(), "editorial-submitted", { packetBlobSha: packetSha, submissionSha: nextSubmissionSha }))
+      .toThrow("GitHub publication lane");
+    const timedOut = applyEditionStateEvent(readyState(), "editorial-timeout");
+    expect(() => applyEditionStateEvent(timedOut, "editorial-submitted", { packetBlobSha: packetSha, submissionSha: nextSubmissionSha }))
+      .toThrow("GitHub SLA lane");
+    expect(() => applyEditionStateEvent(timedOut, "packet-ready", { packetBlobSha: "4".repeat(40) }))
+      .toThrow("cannot replace a packet after editorial consumption");
   });
 
   it("acknowledges validation only for the exact submitted commit", () => {
@@ -176,6 +235,44 @@ describe("oldest-due edition compensation", () => {
     ] };
     const result = resolveDueEdition({ period: "am", now, manifest: published, purpose: "publication" });
     expect(result.window.id).toBe("2026-08-29-am");
+  });
+
+  it("selects the oldest invalid editorial state and exposes its durable repair context", () => {
+    const invalid = invalidStateFor("2026-08-28-am");
+    const states = {
+      "2026-08-28-am": invalid,
+      "2026-08-29-am": readyStateFor("2026-08-29-am"),
+    };
+    const manifestAheadOfState = { editions: [
+      ...manifest.editions,
+      { id: "2026-08-28-am", date: "2026-08-28", period: "am", issueNumber: 11 },
+    ] };
+    const result = resolveDueEdition({ period: "am", now, manifest: manifestAheadOfState, states, purpose: "editorial" });
+    expect(result).toMatchObject({
+      needed: true,
+      window: { id: "2026-08-28-am" },
+      editorialMode: "repair-invalid",
+      packetBlobSha: packetSha,
+      submissionSha,
+      validationErrors: ["decision.packages[0].reason is required"],
+    });
+  });
+
+  it("does not select submitted, valid, timed-out, or committed editorial lanes", () => {
+    const valid = applyEditionStateEvent(submittedStateFor("2026-08-28-am"), "editorial-valid", {
+      packetBlobSha: packetSha,
+      submissionSha,
+    });
+    const timedOut = applyEditionStateEvent(readyStateFor("2026-08-29-am"), "editorial-timeout");
+    const committed = applyEditionStateEvent(timedOut, "publication-committed", { mainSha, source: "degraded" });
+    const states = {
+      "2026-08-27-am": submittedStateFor("2026-08-27-am"),
+      "2026-08-28-am": valid,
+      "2026-08-29-am": committed,
+      "2026-08-30-am": readyStateFor("2026-08-30-am"),
+    };
+    const result = resolveDueEdition({ period: "am", now, manifest, states, purpose: "editorial" });
+    expect(result).toMatchObject({ needed: true, window: { id: "2026-08-30-am" }, editorialMode: "new-decision" });
   });
 });
   it("requires the timeout acknowledgement before degraded publication", () => {

@@ -105,7 +105,7 @@ export function applyEditionStateEvent(current, event, data = {}) {
 
   if (event === "packet-ready") {
     assertSha(data.packetBlobSha, "packetBlobSha");
-    if (["submitted", "invalid", "valid"].includes(state.editorial.status) && state.packet.blobSha !== data.packetBlobSha) throw new Error("cannot replace a packet after editorial consumption");
+    if (["submitted", "invalid", "valid", "timed_out"].includes(state.editorial.status) && state.packet.blobSha !== data.packetBlobSha) throw new Error("cannot replace a packet after editorial consumption");
     if (state.packet.status === "ready" && state.packet.blobSha === data.packetBlobSha) return state;
     state.packet = { status: "ready", blobSha: data.packetBlobSha, producerRunId: runId, completedAt: at };
     state.editorial.packetBlobSha = data.packetBlobSha;
@@ -123,6 +123,8 @@ export function applyEditionStateEvent(current, event, data = {}) {
     requirePacket(state, data.packetBlobSha);
     assertSha(data.submissionSha, "submissionSha");
     if (state.editorial.submissionSha === data.submissionSha && state.editorial.status !== "pending") return state;
+    if (["submitted", "valid"].includes(state.editorial.status)) throw new Error("editorial submission is already owned by the GitHub publication lane");
+    if (state.editorial.status === "timed_out") throw new Error("timed-out editorial work is owned by the GitHub SLA lane");
     state.editorial = { status: "submitted", packetBlobSha: data.packetBlobSha, submissionSha: data.submissionSha, validationErrors: [], updatedAt: at };
     return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha });
   }

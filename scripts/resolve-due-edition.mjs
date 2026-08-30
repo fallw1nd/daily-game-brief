@@ -2,6 +2,7 @@ import { appendFile, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
 import { latestDueWindow, plannedWindow } from "./lib/news-pipeline.mjs";
 
 function dateRange(start, end) {
@@ -14,15 +15,35 @@ function dateRange(start, end) {
 
 export function resolveDueEdition({ period, now = new Date(), manifest, states = {}, purpose = "publication" }) {
   if (!new Set(["am", "pm"]).has(period)) throw new Error("period must be am or pm");
-  if (!new Set(["packet", "publication"]).has(purpose)) throw new Error("purpose must be packet or publication");
+  if (!new Set(["packet", "editorial", "publication"]).has(purpose)) throw new Error("purpose must be packet, editorial, or publication");
   const latestDue = latestDueWindow(period, now);
+  const cutoff = (window) => Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);
+  if (purpose === "editorial") {
+    const candidate = Object.values(states)
+      .map((state) => ({ state, window: expectedEditorialWindow(state?.editionId) }))
+      .filter(({ state, window }) => window
+        && window.period === period
+        && cutoff(window) <= now.getTime()
+        && state.packet?.status === "ready"
+        && state.publication?.status !== "committed"
+        && ["pending", "invalid"].includes(state.editorial?.status))
+      .sort((left, right) => cutoff(left.window) - cutoff(right.window))[0];
+    return {
+      window: candidate?.window || latestDue,
+      needed: Boolean(candidate),
+      purpose,
+      editorialMode: candidate ? (candidate.state.editorial.status === "invalid" ? "repair-invalid" : "new-decision") : null,
+      packetBlobSha: candidate?.state.packet.blobSha || null,
+      submissionSha: candidate?.state.editorial.status === "invalid" ? candidate.state.editorial.submissionSha : null,
+      validationErrors: candidate?.state.editorial.status === "invalid" ? (candidate.state.editorial.validationErrors || []) : [],
+    };
+  }
   const published = new Set((manifest?.editions || []).map((item) => item.id));
   const lastPublished = [...(manifest?.editions || [])].sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0)).at(-1);
   const startDate = lastPublished?.date || latestDue.id.slice(0, 10);
   const lastPublishedWindow = lastPublished
     ? plannedWindow(lastPublished.period, new Date(`${lastPublished.date}T12:00:00+08:00`))
     : null;
-  const cutoff = (window) => Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);
   const candidates = dateRange(startDate, latestDue.id.slice(0, 10))
     .map((date) => plannedWindow(period, new Date(`${date}T12:00:00+08:00`)))
     .filter((window) => cutoff(window) <= now.getTime() && (!lastPublishedWindow || cutoff(window) > cutoff(lastPublishedWindow)));
