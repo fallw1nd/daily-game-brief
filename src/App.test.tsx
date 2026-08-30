@@ -207,8 +207,33 @@ describe("brief page regression", () => {
     expect(stories).toHaveLength(edition.entries.length);
     for (const story of stories) {
       expect(story.id).not.toBe("");
-      expect(story.querySelector(".media-slot--editorial > img")).not.toBeNull();
+      expect(story.querySelector(".media-slot--editorial .media-slot__visual > img")).not.toBeNull();
       expect(story.querySelector(".story-identity__primary")).not.toBeNull();
+    }
+  });
+
+  it("assigns lead, department-feature, and standard evidence image roles", () => {
+    expect(document.querySelector(".lead-story .media-slot--role-lead")).not.toBeNull();
+
+    const sections = [...document.querySelectorAll<HTMLElement>(".editorial-section")];
+    for (const section of sections) {
+      const stories = [...section.querySelectorAll<HTMLElement>(".story-row")];
+      if (stories.length === 0) continue;
+      expect(stories[0].querySelector(".media-slot--role-feature")).not.toBeNull();
+      for (const story of stories.slice(1)) {
+        expect(story.querySelector(".media-slot--role-standard")).not.toBeNull();
+      }
+    }
+  });
+
+  it("keeps secondary focus as a numbered typographic index without repeated media", () => {
+    const focusItems = [...document.querySelectorAll<HTMLElement>(".focus-item")];
+
+    expect(focusItems.length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".focus-item .media-slot")).toHaveLength(0);
+    for (const item of focusItems) {
+      expect(item.querySelector(".focus-item__rank")?.textContent).toMatch(/^0\d$/);
+      expect(item.querySelector(".focus-item__copy > strong")).not.toBeNull();
     }
   });
 
@@ -219,7 +244,7 @@ describe("brief page regression", () => {
 
     expect(upcomingGames).toHaveLength(edition.upcoming.length);
     for (const game of upcomingGames) {
-      expect(game.querySelector(".media-slot--cover > img")).not.toBeNull();
+      expect(game.querySelector(".media-slot--cover.media-slot--role-cover .media-slot__visual > img")).not.toBeNull();
       expect(game.querySelector(".media-slot--cover figcaption")).toBeNull();
     }
   });

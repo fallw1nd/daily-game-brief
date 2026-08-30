@@ -55,12 +55,22 @@ Approved accent families are orange, cobalt, jade, violet, and rose. An accent i
 
 Normal text must reach 4.5:1 against every surface where it appears. Large text and meaningful component boundaries require 3:1. Status must also use text, icon, border, or position and never rely on color alone.
 
+Accent has a density budget: use at most one strong accent boundary within a component group. Default containers and ordinary media use neutral borders. Full accent borders are reserved for pending states, keyboard focus, and current selection. Decorative accent appears only when it explains hierarchy: the lead spine, section rule, first-story number or image crop mark, active archive rail, or interactive state.
+
+Token architecture remains intentionally small and three-layered:
+
+1. Primitive tokens hold neutral, paper, ink, and approved accent source values.
+2. Semantic tokens expose page, surface, text, border, accent, focus, typography, spacing, layout, and motion roles.
+3. Components consume semantic roles. Transitional aliases may remain while older selectors are migrated, but new component rules must not depend on a named hue such as orange.
+
+The shared spacing rhythm is 4, 8, 12, 16, 24, 32, 48, and 64px. Component internals use the lower half, content groups use 16–32px, and section separation uses 48–64px. The system may use an optical exception only when the component has a clear editorial reason.
+
 ## 4. Layout, Density, and Reflow
 
 The content width is capped at 1420px with 24px desktop and 12px mobile side gutters. Group stories with rules, columns, alignment, and spacing instead of large rounded cards.
 
-- Desktop: editorial columns may be asymmetric when the content benefits.
-- Up to 1180px: secondary focus content balances into at most two columns.
+- Desktop: the lead uses an asymmetric text-first editorial split; its verified image is the only strong media frame in the focus desk.
+- Secondary focus stories form a continuous numbered headline index, whether there are one or four items.
 - Up to 820px: primary content becomes one column; evidence follows its story.
 - Up to 390px: controls, titles, media, and metadata must remain readable without page-level horizontal scrolling.
 - At 320 CSS px or 400% zoom: only intentionally scrollable local regions may scroll horizontally.
@@ -74,11 +84,13 @@ The system is square-edged. Containers use 0px radius; compact editorial labels 
 Verified media uses an offset-print registration language:
 
 - Lead media: accent frame, inset keyline, one registration corner, restrained offset shadow.
-- Full story media: quieter frame and corner.
-- Focus thumbnail and cover: border only or the quietest keyline.
+- First story in each department: full-width neutral print plate, one small crop mark, and an external caption rail.
+- Remaining story media: inset to 88% on desktop, alternately aligned to create a measured evidence rhythm; it returns to full width on narrow screens.
+- Covers: neutral paper plinth with restrained baseline shadow; no decorative registration corner.
+- Secondary focus stories are typographic strips and do not repeat thumbnails.
 - Missing media: neutral border with no stronger decoration than verified media.
 
-Frames never alter the source aspect ratio. News defaults to 16:9. Covers preserve square, portrait, or landscape. Real credits remain functional, not decorative. Caption text is at least 10px and wraps without covering an excessive part of the image.
+Frames never alter the source aspect ratio. News defaults to 16:9. Covers preserve square, portrait, or landscape. Real credits remain functional, not decorative. Editorial captions sit outside the image, remain at least 10px, wrap safely, and never obscure source pixels.
 
 Upcoming covers use three explicit display rails based on the verified aspect field:
 
@@ -118,6 +130,8 @@ No control label wraps on desktop. Source links, captions, and footer actions re
 
 Motion intensity is 3 of 10. It communicates hierarchy, feedback, or a state change.
 
+The shared hierarchy is 120ms micro feedback, 180ms component transitions, 240ms section transitions, and at most 320ms for the lead media entrance. Standard, enter, and exit easing are semantic tokens. Entrance movement is limited to 4–8px.
+
 Allowed motion:
 
 - One-time masthead and section entrance.
@@ -126,7 +140,7 @@ Allowed motion:
 - Image hover scale up to 1.022.
 - Link arrow translation up to 4px.
 
-Do not use continuous ambient loops, parallax, scroll hijacking, or animated body copy. Animate only transform and opacity where possible. Every nonessential transition becomes instant under prefers-reduced-motion.
+Do not use continuous ambient loops, parallax, scroll hijacking, animated body copy, or per-row reveals across long news lists. Animate only transform and opacity where possible. Every nonessential transition becomes instant under prefers-reduced-motion.
 
 ## 9. Bilingual and Content States
 

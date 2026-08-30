@@ -8,6 +8,8 @@ The site is a Vite, React, and TypeScript application. UI code lives in `src/`, 
 
 Use two-space indentation. Name components and types in `PascalCase`, functions and variables in `camelCase`, and routes/assets in `kebab-case`. Preserve boundary fields such as `fact_status`, `time_status`, and `title_key`. Tests must cover Beijing-time windows, continuous issue numbering, adjacent-edition deduplication, title/source rules, append-only archives, keyboard focus, reduced motion, WCAG AA contrast, and 390px layouts. Use Conventional Commits, for example `feat(brief): add evening window calculation`. PRs must state verification commands, schema impact, archive checks, linked issues, and responsive screenshots for UI work.
 
+默认不新增 hash、冻结 contract、baseline 或 gate。只有能说明一个具体失败场景，并说明 Git、版本号、主键、事务、唯一约束、类型和普通测试为什么不足时，才允许加入。不要为了简化而删除已有安全措施。门禁只放在不可逆、跨系统、安全或正式发布边界。前置检查不得挤掉真正的代码执行、模拟或测量。
+
 ## Content & Source Rules
 
 Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `official` without opening a primary source, machine-translate game titles, renumber issues, or delete historical editions. Keep rumors structurally distinct and preserve uncertainty in display copy. Visual decisions belong to `DESIGN.md` and the `gpt-taste` skill.

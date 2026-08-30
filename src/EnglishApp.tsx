@@ -141,12 +141,14 @@ function uniqueEntries(entries: Array<BriefEntry | undefined>): BriefEntry[] {
 function EditorialImage({
   asset,
   kind,
+  presentation = kind === "cover" ? "cover" : "standard",
   title,
   unavailableNote,
   eager = false,
 }: {
   asset?: ImageAsset;
   kind: "editorial" | "cover";
+  presentation?: "lead" | "feature" | "standard" | "cover";
   title: string;
   unavailableNote?: string;
   eager?: boolean;
@@ -158,14 +160,17 @@ function EditorialImage({
   useEffect(() => setFailed(false), [requested]);
   const isPlaceholder = !asset || asset.placeholder === true || failed;
   return (
-    <figure className={`media-slot media-slot--${kind} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")}`}>
-      <img
-        src={failed ? fallback : requested}
-        alt={isPlaceholder ? `${title}: no verified image available` : asset.alt}
-        loading={eager ? "eager" : "lazy"}
-        fetchPriority={eager ? "high" : "auto"}
-        onError={() => setFailed(true)}
-      />
+    <figure className={`media-slot media-slot--${kind} media-slot--role-${presentation} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")}`}>
+      <span className="media-slot__visual">
+        <img
+          src={failed ? fallback : requested}
+          alt={isPlaceholder ? `${title}: no verified image available` : asset.alt}
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
+          onError={() => setFailed(true)}
+        />
+        {isPlaceholder && <span className="media-pending" title={unavailableNote}>No verified image</span>}
+      </span>
       {!isPlaceholder && kind === "editorial" && (
         <figcaption>
           <span>{asset.credit}</span>
@@ -174,7 +179,6 @@ function EditorialImage({
           </a>
         </figcaption>
       )}
-      {isPlaceholder && <span className="media-pending" title={unavailableNote}>No verified image</span>}
     </figure>
   );
 }
@@ -220,7 +224,7 @@ function StoryIdentity({ entry }: { entry: BriefEntry }) {
 function LeadStory({ entry }: { entry: BriefEntry }) {
   return (
     <article className="lead-story" id={"lead-" + entry.id}>
-      <EditorialImage asset={entry.images?.[0]} kind="editorial" title={storyTitle(entry)} unavailableNote={entry.imageNote} eager />
+      <EditorialImage asset={entry.images?.[0]} kind="editorial" presentation="lead" title={storyTitle(entry)} unavailableNote={entry.imageNote} eager />
       <div className="lead-story__body">
         <div className="story-kicker">
           <time>{entry.beijingTime}</time>
@@ -240,7 +244,6 @@ function FocusItem({ entry, rank }: { entry: BriefEntry; rank: number }) {
   return (
     <a className="focus-item" href={"#" + entry.id}>
       <span className="focus-item__rank">{String(rank).padStart(2, "0")}</span>
-      <EditorialImage asset={entry.images?.[0]} kind="editorial" title={storyTitle(entry)} unavailableNote={entry.imageNote} />
       <span className="focus-item__copy">
         <small>{storyTitle(entry)}</small>
         <strong>{entry.headline}</strong>
@@ -268,7 +271,7 @@ function StoryRow({ entry, index }: { entry: BriefEntry; index: number }) {
         </div>
       </div>
       <aside className="story-row__support">
-        <EditorialImage asset={entry.images?.[0]} kind="editorial" title={storyTitle(entry)} unavailableNote={entry.imageNote} />
+        <EditorialImage asset={entry.images?.[0]} kind="editorial" presentation={index === 0 ? "feature" : "standard"} title={storyTitle(entry)} unavailableNote={entry.imageNote} />
         <div className="story-row__evidence">
           <SourceLinks sources={entry.sources} />
           <details><summary>Verification</summary><p>{entry.verification}</p></details>
@@ -312,7 +315,7 @@ function UpcomingItem({ item }: { item: UpcomingEntry }) {
   const title = item.title.title_en;
   return (
     <article className="upcoming-item">
-      <EditorialImage asset={item.cover} kind="cover" title={title} unavailableNote={item.coverNote} />
+      <EditorialImage asset={item.cover} kind="cover" presentation="cover" title={title} unavailableNote={item.coverNote} />
       <div className="upcoming-item__body">
         <time>{item.date}</time>
         <h3>{title}</h3>

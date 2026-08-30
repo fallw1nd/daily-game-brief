@@ -31,13 +31,13 @@ describe("pending marker layout", () => {
 });
 
 describe("focus desk layout", () => {
-  it("fills the desktop row according to the actual number of secondary focus stories", () => {
-    expect(localeStyles).toMatch(/\.focus-list\s*\{[^}]*repeat\(auto-fit,\s*minmax\(min\(100%,\s*260px\),\s*1fr\)\)/s);
+  it("uses one continuous secondary-focus index for every story count", () => {
+    expect(localeStyles).toMatch(/\.focus-list\s*\{[^}]*grid-template-columns:\s*1fr/s);
+    expect(localeStyles).not.toContain(":has(");
   });
 
-  it("keeps the medium layout balanced for one or three secondary stories", () => {
-    expect(localeStyles).toMatch(/@media \(max-width: 1180px\)[\s\S]*?\.focus-list:has\(> \.focus-item:only-child\)[^}]*grid-template-columns:\s*1fr/s);
-    expect(localeStyles).toMatch(/\.focus-list:has\(> \.focus-item:nth-child\(3\):last-child\) > \.focus-item:last-child\s*\{[^}]*grid-column:\s*1 \/ -1/s);
+  it("keeps the medium layout as a single typographic strip", () => {
+    expect(localeStyles).toMatch(/@media \(max-width: 1180px\)[\s\S]*?\.focus-list\s*\{[^}]*grid-template-columns:\s*1fr/s);
   });
 
   it("keeps focus cards single-column on narrow screens", () => {
@@ -53,26 +53,56 @@ describe("editorial decoration hierarchy", () => {
     expect(styles).toMatch(/:root\[data-theme="light"\][\s\S]*?--accent-frame:/);
   });
 
-  it("frames media with a square accent keyline and registration corner", () => {
-    expect(styles).toMatch(/\.media-slot\s*\{[^}]*border:\s*1px solid var\(--accent-frame\)/s);
-    expect(styles).toMatch(/\.media-slot::before\s*\{[^}]*border:\s*1px solid rgba\(var\(--accent-rgb\),\s*\.2\)/s);
-    expect(styles).toMatch(/\.media-slot::after\s*\{[^}]*border-top:\s*2px solid var\(--accent\)[^}]*border-right:\s*2px solid var\(--accent\)/s);
+  it("reserves the accent frame and registration corner for lead media", () => {
+    expect(styles).toMatch(/\.media-slot__visual\s*\{[^}]*border:\s*1px solid var\(--border\)/s);
+    expect(styles).toMatch(/\.media-slot__visual::before\s*\{[^}]*border:\s*1px solid transparent[^}]*opacity:\s*0/s);
+    expect(styles).toMatch(/\.lead-story > \.media-slot \.media-slot__visual\s*\{[^}]*border-color:\s*var\(--accent-frame\)/s);
+    expect(styles).toMatch(/\.lead-story > \.media-slot \.media-slot__visual::before\s*\{[^}]*border-color:\s*rgba\(var\(--accent-rgb\),\s*\.2\)[^}]*opacity:\s*1/s);
+    expect(styles).toMatch(/\.lead-story > \.media-slot \.media-slot__visual::after\s*\{[^}]*opacity:\s*1/s);
   });
 
-  it("keeps status, source and neutral fact labels visually distinct", () => {
+  it("assigns distinct editorial roles without changing news image ratios", () => {
+    expect(styles).toMatch(/\.media-slot--role-feature \.media-slot__visual\s*\{[^}]*box-shadow:/s);
+    expect(styles).toMatch(/\.media-slot--role-feature \.media-slot__visual::after\s*\{[^}]*opacity:\s*\.72/s);
+    expect(styles).toMatch(/\.media-slot--role-standard\s*\{[^}]*width:\s*min\(88%,\s*360px\)[^}]*justify-self:\s*end/s);
+    expect(styles).toMatch(/\.story-list > \.story-row:nth-child\(even\) \.media-slot--role-standard\s*\{[^}]*justify-self:\s*start/s);
+    expect(styles).toMatch(/\.media-slot figcaption\s*\{[^}]*position:\s*relative[^}]*border-top:\s*1px solid var\(--border\)[^}]*background:\s*transparent/s);
+    expect(styles).toMatch(/\.media-slot--role-feature figcaption\s*\{[^}]*border-left:\s*2px solid var\(--accent-hairline\)/s);
+    expect(englishApp).toContain('className="media-slot__visual"');
+  });
+
+  it("uses accent rails for evidence labels without boxing ordinary facts", () => {
     expect(styles).toMatch(/\.status-mark\s*\{[^}]*border:\s*1px solid currentColor/s);
-    expect(styles).toMatch(/\.source-list a span\s*\{[^}]*border:\s*1px solid var\(--accent-hairline\)/s);
-    expect(styles).toMatch(/\.story-facts > span:not\(\.pending-mark\):not\(\.status-mark\)\s*\{[^}]*border-left:\s*2px solid var\(--accent-hairline\)[^}]*background:\s*transparent/s);
+    expect(styles).toMatch(/\.source-list a span\s*\{[^}]*border:\s*0[^}]*border-left:\s*2px solid var\(--accent-hairline\)[^}]*background:\s*transparent/s);
+    expect(styles).toMatch(/\.story-facts > span:not\(\.pending-mark\):not\(\.status-mark\)\s*\{[^}]*border:\s*0[^}]*border-left:\s*1px solid var\(--border\)[^}]*background:\s*transparent/s);
+  });
+
+  it("builds hierarchy with one lead spine and one filled first-story number", () => {
+    expect(styles).toMatch(/\.lead-desk::before\s*\{[^}]*width:\s*3px[^}]*background:\s*var\(--accent\)/s);
+    expect(styles).toMatch(/\.lead-story\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1\.25fr\) minmax\(360px,\s*\.75fr\)/s);
+    expect(styles).toMatch(/\.story-list > \.story-row:first-child \.story-row__number\s*\{[^}]*color:\s*var\(--on-accent\)[^}]*background:\s*var\(--accent\)/s);
+    expect(styles).toMatch(/\.story-row__support\s*\{[^}]*border-left:\s*1px solid var\(--border\)/s);
+  });
+
+  it("reserves in-flow clearance between accent rails and text", () => {
+    expect(styles).toContain("--accent-rail-clearance: 12px");
+    expect(styles).toMatch(/\.focus-item\s*\{[^}]*padding:\s*var\(--space-4\) var\(--space-4\) var\(--space-4\) var\(--accent-rail-clearance\)/s);
+    expect(styles).toMatch(/\.story-row\s*\{[^}]*padding:\s*var\(--space-6\) 0 var\(--space-6\) var\(--accent-rail-clearance\)/s);
+    expect(styles).toMatch(/\.archive-list > a\s*\{[^}]*padding:\s*10px 0 10px var\(--accent-rail-clearance\)/s);
+    expect(styles).toMatch(/\.archive-search-results > a\s*\{[^}]*padding:\s*18px 0 18px var\(--accent-rail-clearance\)/s);
+    expect(styles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.focus-item\s*\{[^}]*padding-left:\s*var\(--accent-rail-clearance\)/s);
+    expect(styles).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.story-row\s*\{[^}]*padding:\s*20px 0 20px var\(--accent-rail-clearance\)/s);
   });
 });
 
 describe("calendar cover rails and edition navigation", () => {
   it("preserves the three verified cover families without cropping", () => {
-    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-square\s*\{[^}]*aspect-ratio:\s*1/s);
-    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-portrait\s*\{[^}]*aspect-ratio:\s*57 \/ 80/s);
-    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-landscape\s*\{[^}]*aspect-ratio:\s*16 \/ 9/s);
+    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-square \.media-slot__visual\s*\{[^}]*aspect-ratio:\s*1/s);
+    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-portrait \.media-slot__visual\s*\{[^}]*aspect-ratio:\s*57 \/ 80/s);
+    expect(styles).toMatch(/\.media-slot--cover\.media-slot--aspect-landscape \.media-slot__visual\s*\{[^}]*aspect-ratio:\s*16 \/ 9/s);
     expect(styles).toMatch(/\.media-slot--cover img\s*\{[^}]*object-fit:\s*contain/s);
     expect(styles).toMatch(/\.media-slot--cover:hover img\s*\{[^}]*transform:\s*none/s);
+    expect(styles).toMatch(/\.media-slot--role-cover \.media-slot__visual\s*\{[^}]*padding:\s*var\(--space-2\)[^}]*background:\s*var\(--surface-2\)[^}]*box-shadow:/s);
     expect(styles).not.toMatch(/\.upcoming-item\s*\{[^}]*min-height:/s);
   });
 
@@ -120,7 +150,7 @@ describe("accessible theme and interaction tokens", () => {
   });
 
   it("provides two-layer focus and minimum inline target sizes", () => {
-    expect(styles).toMatch(/:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus-ring\)[^}]*box-shadow:\s*0 0 0 1px var\(--focus-gap\)/s);
+    expect(styles).toMatch(/:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--color-focus\)[^}]*box-shadow:\s*0 0 0 1px var\(--focus-gap\)/s);
     expect(styles).toMatch(/\.read-link\s*\{[^}]*min-height:\s*24px/s);
     expect(styles).toMatch(/\.source-list a\s*\{[^}]*min-height:\s*24px/s);
     expect(styles).toMatch(/details summary\s*\{[^}]*min-height:\s*24px/s);
@@ -135,6 +165,24 @@ describe("accessible theme and interaction tokens", () => {
     expect(englishApp).toContain('className="accent-picker"');
     expect(englishApp).toContain('window.localStorage.setItem("brief-accent", accent)');
   });
+
+  it("uses shared semantic typography, spacing, and motion tokens", () => {
+    expect(styles).toContain("--font-size-h1:");
+    expect(styles).toContain("--font-size-headline:");
+    expect(styles).toContain("--space-1: 4px");
+    expect(styles).toContain("--space-16: 64px");
+    expect(styles).toContain("--motion-micro: 120ms");
+    expect(styles).toContain("--motion-component: 180ms");
+    expect(styles).toContain("--motion-section: 240ms");
+    expect(styles).toMatch(/\.edition-masthead h1\s*\{[^}]*font-size:\s*var\(--font-size-h1\)/s);
+    expect(styles).toMatch(/\.story-row h3\s*\{[^}]*font-size:\s*var\(--font-size-headline\)/s);
+  });
+
+  it("keeps narrow topbar controls operable and adds pressed feedback", () => {
+    expect(styles).toMatch(/@media \(max-width: 390px\)[\s\S]*?\.menu-button span\s*\{[^}]*display:\s*none/s);
+    expect(styles).toMatch(/\.interaction-state:active[\s\S]*?transform:\s*translateY\(1px\)/s);
+    expect(styles).toMatch(/\.read-link:focus-visible svg\s*\{[^}]*translateX\(4px\)/s);
+  });
 });
 
 describe("shared editorial motion", () => {
@@ -143,5 +191,7 @@ describe("shared editorial motion", () => {
     expect(editorialMotion).toContain(".lead-story > .media-slot");
     expect(editorialMotion).toContain(".section-header");
     expect(editorialMotion).toContain("clearProps:");
+    expect(editorialMotion).toContain("y: 8");
+    expect(editorialMotion).not.toContain('toArray<HTMLElement>(".reveal-row")');
   });
 });

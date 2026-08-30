@@ -153,12 +153,14 @@ function editionHref(editionId: string, entryId = "top"): string {
 function EditorialImage({
   asset,
   kind,
+  presentation = kind === "cover" ? "cover" : "standard",
   title,
   unavailableNote,
   eager = false,
 }: {
   asset?: ImageAsset;
   kind: "editorial" | "cover";
+  presentation?: "lead" | "feature" | "standard" | "cover";
   title: string;
   unavailableNote?: string;
   eager?: boolean;
@@ -172,17 +174,24 @@ function EditorialImage({
 
   return (
     <figure
-      className={`media-slot media-slot--${kind} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${
+      className={`media-slot media-slot--${kind} media-slot--role-${presentation} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${
         asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")
       }`}
     >
-      <img
-        src={failed ? fallback : requested}
-        alt={isPlaceholder ? title + "：暂无可核实配图" : asset.alt}
-        loading={eager ? "eager" : "lazy"}
-        fetchPriority={eager ? "high" : "auto"}
-        onError={() => setFailed(true)}
-      />
+      <span className="media-slot__visual">
+        <img
+          src={failed ? fallback : requested}
+          alt={isPlaceholder ? title + "：暂无可核实配图" : asset.alt}
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
+          onError={() => setFailed(true)}
+        />
+        {isPlaceholder && (
+          <span className="media-pending" title={unavailableNote}>
+            暂无可核实配图
+          </span>
+        )}
+      </span>
       {!isPlaceholder && kind === "editorial" && (
         <figcaption>
           <span>{asset.credit}</span>
@@ -190,11 +199,6 @@ function EditorialImage({
             图源<ArrowUpRight aria-hidden="true" />
           </a>
         </figcaption>
-      )}
-      {isPlaceholder && (
-        <span className="media-pending" title={unavailableNote}>
-          暂无可核实配图
-        </span>
       )}
     </figure>
   );
@@ -251,6 +255,7 @@ function LeadStory({ entry }: { entry: BriefEntry }) {
       <EditorialImage
         asset={entry.images?.[0]}
         kind="editorial"
+        presentation="lead"
         title={storyTitle(entry)}
         unavailableNote={entry.imageNote}
         eager
@@ -276,12 +281,6 @@ function FocusItem({ entry, rank }: { entry: BriefEntry; rank: number }) {
   return (
     <a className="focus-item" href={"#" + entry.id}>
       <span className="focus-item__rank">{String(rank).padStart(2, "0")}</span>
-      <EditorialImage
-        asset={entry.images?.[0]}
-        kind="editorial"
-        title={storyTitle(entry)}
-        unavailableNote={entry.imageNote}
-      />
       <span className="focus-item__copy">
         <small>{storyTitle(entry)}</small>
         <strong>{entry.headline}</strong>
@@ -317,6 +316,7 @@ function StoryRow({ entry, index }: { entry: BriefEntry; index: number }) {
         <EditorialImage
           asset={entry.images?.[0]}
           kind="editorial"
+          presentation={index === 0 ? "feature" : "standard"}
           title={storyTitle(entry)}
           unavailableNote={entry.imageNote}
         />
@@ -373,6 +373,7 @@ function UpcomingItem({ item }: { item: UpcomingEntry }) {
       <EditorialImage
         asset={item.cover}
         kind="cover"
+        presentation="cover"
         title={title}
         unavailableNote={item.coverNote}
       />
