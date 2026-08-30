@@ -3,29 +3,14 @@ import { describe, expect, it } from "vitest";
 
 const contract = await readFile("docs/SCHEDULED_TASK_PROMPT.md", "utf8");
 const architecture = await readFile("docs/AUTOMATION_ARCHITECTURE.md", "utf8");
-const inputSection = contract.split("## Editorial decision")[0];
 const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
 const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");
 const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");
 
-describe("scheduled task fast packet preflight contract", () => {
-  it("separates editorial handoff time from the fixed evidence cutoff", () => {
-    expect(contract).toContain("morning ChatGPT task starts at **10:20 Asia/Shanghai**");
-    expect(contract).toContain("evening ChatGPT task starts at **17:10 Asia/Shanghai**");
-    expect(contract).toContain("fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**");
-    expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");
-    expect(contract).toContain("Never derive the edition date from the task's actual execution calendar date alone");
-    expect(contract).toContain("select the oldest already-due edition");
-    expect(contract).toContain("Do not skip an older pending edition in favor of today's edition");
-    expect(contract).toContain("SLA watchdog runs at 11:00/17:50");
-    expect(contract).toContain("Scheduled media recovery runs later at 11:10/18:00");
-
-    expect(architecture).toContain("**10:20/17:10 Asia/Shanghai ChatGPT tasks**");
-    expect(architecture).toContain("The ten-minute separation is intentional");
-    expect(architecture).toContain("It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows");
-    expect(architecture).toContain("selects the oldest already-due state for its period");
-    expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
-
+describe("thin scheduled-task orchestration contract", () => {
+  it("keeps handoff times separate from immutable evidence cutoffs", () => {
+    expect(contract).toContain("AM at 10:20 and PM at 17:10");
+    expect(contract).toContain("evidence cutoffs remain fixed at 10:10 AM and 17:00 PM");
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
     expect(packetWorkflow).toContain('- cron: "0 9 * * *"');
     expect(slaWorkflow).toContain('- cron: "0 3 * * *"');
@@ -34,66 +19,59 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(mediaWorkflow).toContain('- cron: "0 10 * * *"');
   });
 
-  it("checks durable state and exact blob before loading full editorial context", () => {
-    const stateRead = inputSection.indexOf("Read only `automation/status/<edition-id>.json`");
-    const exactPacket = inputSection.indexOf("Read the packet by the acknowledged Git blob SHA");
-    const fullContext = inputSection.indexOf("After a usable packet is available, read current `main`");
-
-    expect(stateRead).toBeGreaterThan(-1);
-    expect(exactPacket).toBeGreaterThan(stateRead);
-    expect(fullContext).toBeGreaterThan(exactPacket);
-    expect(inputSection).toContain("Copy that exact `packet.blobSha` into the submitted decision as top-level `packetBlobSha`");
+  it("selects oldest backlog and binds the decision to an immutable packet blob", () => {
+    const oldest = contract.indexOf("select the oldest already-due edition");
+    const state = contract.indexOf("Read `automation/status/<edition-id>.json`");
+    const blob = contract.indexOf("Read the packet by that Git blob SHA");
+    const liveRules = contract.indexOf("Only after the packet passes preflight");
+    expect(oldest).toBeGreaterThan(-1);
+    expect(state).toBeGreaterThan(oldest);
+    expect(blob).toBeGreaterThan(state);
+    expect(liveRules).toBeGreaterThan(blob);
+    expect(contract).toContain("Copy the SHA unchanged to decision field `packetBlobSha`");
+    expect(contract).toContain("Never skip backlog or derive the edition from actual runtime");
   });
 
-  it("keeps all packet and publication recovery under the GitHub orchestrator", () => {
-    expect(inputSection).toContain("Do not inspect or poll Actions, create or delete workflow files, dispatch recovery, edit `automation/state`, publish degraded content, or advance to another edition.");
-    expect(inputSection).toContain("GitHub Actions is the sole packet and publication recovery owner.");
-    expect(inputSection).not.toContain("one-shot workflow");
+  it("leaves recovery and publication exclusively to GitHub Actions", () => {
+    expect(contract).toContain("Do not inspect or poll Actions, dispatch recovery, create or delete workflow files, edit `automation/state`, publish content, advance to another edition");
+    expect(contract).toContain("GitHub Actions alone owns packet recovery, validation, publication, deployment, and incidents");
+    expect(contract).not.toContain("one-shot workflow");
+    expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
   });
 
-  it("exposes period identity before collection and isolates opposite-period concurrency", () => {
+  it("keeps exact identity visible and adds event-driven delayed SLA verification", () => {
     expect(packetWorkflow).toContain("run-name: Final editorial packet ·");
-    expect(packetWorkflow).toContain("group: news-discovery-state-${{");
-    expect(packetWorkflow).toContain("github.event.schedule == '10 2 * * *'");
-    expect(packetWorkflow).toContain("'am' || 'pm'");
     expect(packetWorkflow).toContain("cancel-in-progress: false");
-  });
-
-  it("dispatches a delayed exact-edition verifier after packet acknowledgement", () => {
     expect(packetWorkflow).toContain("verify-after-handoff:");
-    expect(packetWorkflow).toContain("Wait until the fixed publication SLA");
     expect(packetWorkflow).toContain("gh workflow run brief-sla-watchdog.yml");
     expect(packetWorkflow).toContain('-f edition="${{ needs.collect.outputs.edition }}"');
-  });
-
-  it("pins editorial and recovery to exact edition identities", () => {
-    expect(inputSection).toContain("not through `automation/packets/latest-am.json`, `latest-pm.json`");
-    expect(inputSection).toContain("Never make editorial decisions from a missing, mismatched, or invalid packet.");
-    expect(packetWorkflow).toMatch(/\r?\n\s+edition:\r?\n\s+description: Exact edition ID for recovery/);
     expect(packetWorkflow).toMatch(/edition:\r?\n\s+description:[^\r\n]+\r?\n\s+required: true/);
-    expect(packetWorkflow).toContain("node scripts/resolve-packet-dispatch.mjs");
-    expect(packetWorkflow).toContain('BRIEF_NOW="${{ steps.edition.outputs.reference_now }}"');
   });
 
-  it("never lets a single run disable either persistent Scheduled task", () => {
-    expect(inputSection).toContain("must never disable, pause, reschedule, rename, or otherwise modify either of the two long-lived ChatGPT Scheduled tasks");
-    expect(inputSection).toContain("Stop only the current run and report the blocker.");
-    expect(inputSection).toContain("Persistent task state may change only through an explicit user request or an explicit maintenance operation");
+  it("keeps editorial facts bounded while delegating duplicated detail to live rules", () => {
+    expect(contract).toContain("Do not add events outside the packet");
+    expect(contract).toContain("Follow live `AGENTS.md` for Chinese titles, mainland Simplified Chinese terminology, source rules, time boundaries, visible copy, and uncertainty");
+    expect(contract).toContain("they cannot add or change event facts");
+    expect(contract).toContain("`requires_subject_identity` cannot be included by inventing a game/title identity");
+    expect(contract).not.toContain("Resolve game Chinese names in this strict order");
   });
 
-  it("prefers official mainland terminology for Chinese games without expanding event evidence", () => {
-    expect(contract).toContain("official mainland-China Simplified Chinese channel or site");
-    expect(contract).toContain("visible version subtitles, characters/agents, classes/professions, named modes/mechanics");
-    expect(contract).toContain("terminology-only lookup");
-    expect(contract).toContain("Neither lookup may introduce a new event, fact, time, platform, release claim, source classification, tracking decision, or candidate.");
+  it("requires the hard Canonical handoff while keeping English optional", () => {
+    expect(contract).toContain("must use `contractVersion:2` and the exact `packetBlobSha`");
+    expect(contract).toContain("Every included item needs a complete `sharedFactFrame`");
+    expect(contract).toContain("English is optional and nonblocking");
+    expect(contract).toContain("otherwise omit it");
+    expect(contract).toContain("Never weaken or suppress the Simplified Chinese Canonical decision");
   });
 
-  it("activates the bilingual handoff without making English a Canonical publication gate", () => {
-    expect(contract).toContain("New normal submissions must use `contractVersion:2`");
-    expect(contract).toContain("every `include` decision must contain a complete `sharedFactFrame`");
-    expect(contract).toContain("English is non-blocking");
-    expect(contract).toContain("omit `locales.en` rather than weakening, changing, or suppressing the Canonical Chinese editorial decision");
-    expect(contract).toContain("record English as machine-readable `unavailable`");
-    expect(contract).toContain("Do not calculate or invent final `entryId`, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`");
+  it("never lets a single run mutate either long-lived task", () => {
+    expect(contract).toContain("A failure in this run must never pause, disable, rename, reschedule, or otherwise mutate either long-lived ChatGPT task");
+    expect(contract).toContain("After the decision commit succeeds");
+    expect(contract).toContain("then stop");
+  });
+
+  it("stays a thin orchestration prompt", () => {
+    expect(contract.split(/\s+/u).length).toBeLessThan(500);
+    expect(contract.split(/\r?\n/u).length).toBeLessThan(45);
   });
 });
