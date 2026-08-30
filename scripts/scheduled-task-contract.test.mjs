@@ -70,7 +70,7 @@ describe("scheduled task fast packet preflight contract", () => {
   it("pins recovery to the exact edition and guards pre-cutoff dispatch", () => {
     expect(inputSection).toContain("-f period=<am|pm> -f edition=<edition-id>");
     expect(inputSection).toContain("more than five minutes before its cutoff fails visibly");
-    expect(packetWorkflow).toMatch(/\n\s+edition:\n\s+description: Exact edition ID for recovery/);
+    expect(packetWorkflow).toMatch(/\r?\n\s+edition:\r?\n\s+description: Exact edition ID for recovery/);
     expect(packetWorkflow).toContain("node scripts/resolve-packet-dispatch.mjs");
     expect(packetWorkflow).toContain('BRIEF_NOW="${{ steps.edition.outputs.reference_now }}"');
   });

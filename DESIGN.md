@@ -1,87 +1,162 @@
----
-version: "neuform-top-creators-featured"
-name: "Lumina — Onboarding Architecture"
-description: "Lumina Architecture Onboarding Section is designed for building reusable UI components in modern web projects. Key features include reusable structure, responsive behavior, and production-ready presentation. It is suitable for component libraries and responsive product interfaces."
-colors:
-  primary: "#EA580C"
-  secondary: "#000000"
-  accent: "#D04D09"
-  background: "#000000"
-  surface: "#2C2A28"
-  text-primary: "#FFFFFF"
-  text-secondary: "#A1A1AA"
-  border: "#2C2A28"
-typography:
-  display-lg:
-    fontFamily: "Inter"
-    fontSize: "64px"
-    fontWeight: 500
-    lineHeight: "1.04"
-    letterSpacing: "0"
-  body-md:
-    fontFamily: "JetBrains Mono"
-    fontSize: "16px"
-    fontWeight: 400
-    lineHeight: "1.6"
-  label-md:
-    fontFamily: "JetBrains Mono"
-    fontSize: "12px"
-    fontWeight: 600
-    lineHeight: "1.2"
-spacing:
-  base: "8px"
-  gap: "16px"
-  card-padding: "24px"
-  section-padding: "80px"
-rounded:
-  card: "32px"
-  control: "32px"
-  pill: "9999px"
-components:
-  card:
-    background: "Use the surface token with subtle borders and HTML-matched shadow depth"
-    radius: "Match the declared card radius token"
-  button:
-    background: "Use primary or accent colors for the main action"
-    radius: "Use the control or pill radius based on the source HTML"
----
-# Lumina — Onboarding Architecture
-Source: Neuform Featured templates from top creators. Author: Meng To (@mengto). Views: 238; favorites: 13; remixes: 3.
-Tags: onboarding, animated, threejs, cta, bento, dither, charts, navigation.
-## Overview
-Lumina Architecture Onboarding Section is designed for building reusable UI components in modern web projects. Key features include reusable structure, responsive behavior, and production-ready presentation. It is suitable for component libraries and responsive product interfaces.
+# Editorial Product Design System v3
 
-Lumina Flow OS · Experience Design Modules Kits Thesis Support Replace fragmented workflows with unified paper-soft interfaces. Discover clarity. A production-ready onboarding and form design system built for modern Saa…
-## Composition
-Use the attached HTML reference as the source of truth. Preserve the visible hierarchy, first-screen composition, section rhythm, density, and interaction tone before adapting copy or content.
-Key visible headings include: Lumina; Replace fragmented workflows with unified paper-soft interfaces. Discover clarity.; The friction point.; Five pillars. Seamless adoption.; Contextual Entry; Guided Progression.
-## Colors
-Anchor the default palette in primary #EA580C, secondary #000000, accent #D04D09, background #000000, surface #2C2A28, text-primary #FFFFFF. Keep background, surface, text, and border roles distinct so generated layouts retain the same contrast pattern as the source.
+## 1. Product Direction
 
-The reader may switch the semantic accent without changing hierarchy or content. Approved pairs are orange (#EA580C dark / #B34200 light), cobalt (#7CA5FF / #2457C5), jade (#4DD9A7 / #087A52), violet (#C58AFF / #7537A8), and rose (#FF8FC7 / #B42362). Accent colors belong to issue numbers, active rules, links, focus rings, selection, and small interaction signals. They must not become large reading backgrounds. Text must retain WCAG AA contrast; interactive state must also use shape, movement, underline, or labels rather than color alone.
-## Typography
-Use Inter for display moments and JetBrains Mono for body copy unless the HTML clearly demands a compatible fallback. Labels and technical metadata should use JetBrains Mono or an equivalent mono face. The edition H1 must display the issue's verified `archiveTitle` (for example, `晚报｜本期重磅事实`) rather than the generic `游戏早报` or `游戏晚报`; use the full available width and remain on one line whenever it fits, with natural wrapping and no more than three lines on narrow screens.
+The site is a twice-daily games news brief for repeat readers. It is an editorial product, not a marketing landing page, SaaS dashboard, or portal homepage.
 
-Within a story, the game or product name is a dedicated subject layer before the event headline: 18px desktop / 17px narrow, weight 650, line-height 1.28, with a 3px semantic-accent rule. The event headline remains larger at 22px / 19px. English names and translation status remain mono evidence, not the primary identifier.
-## Layout
-Keep spacing deliberate and stable. Favor the same grid direction, max-width behavior, card density, and responsive stacking seen in the HTML. Do not replace distinctive source structures with generic SaaS sections.
-## Components
-Dashboard, chart, and data panels should preserve their compact operational hierarchy, nested surfaces, and metric emphasis.
-## Motion
-Preserve existing motion cues such as masked reveals, staggered entrance, hover lift, scroll-triggered transitions, and ambient movement. Keep easing smooth and restrained. Rectangular interactive regions use a boundary-aligned state layer plus an inset edge rule on hover or keyboard focus; do not place detached circles or ornaments behind labels. Keep article movement within 4px and entrance durations below 900ms; never animate body copy continuously. All nonessential motion must collapse under prefers-reduced-motion.
+Design priority is fixed:
 
-## Editorial Chrome
-The sticky top bar uses a distinct chrome surface, a short accent signal rail, and a filled issue-number block. The footer alone carries publication ownership on the deepest chrome surface with a narrow accent termination rule; do not insert a duplicate publication-information panel above it. In dark mode, page, navigation, transient interaction layer, and footer must remain visibly distinct without raising body-copy brightness. Keep these regions square-edged and information-dense; do not convert them into floating rounded containers.
+1. Scan speed
+2. Information hierarchy
+3. Reading comfort
+4. Evidence clarity
+5. Motion
+6. Decoration
 
-Top-level navigation is limited to Content, Calendar, and Archive. Content begins below the lead desk; Calendar targets the 15-day release list; Archive targets edition history. The masthead eyebrow is the nonnumeric `DAILY EDITION`; the issue number appears only once in top chrome as `NO.###`. Archive selection rails must reserve horizontal space and never overlap issue or date text.
+Use native CSS, the existing React structure, and Phosphor Icons. Do not import a second component design system. WCAG 2.2 is the accessibility baseline. GOV.UK content patterns, Apple HIG, and IBM Carbon may inform typography, adaptive layout, status semantics, and tokens without importing their visual brands.
 
-The footer itself is the complete about/publication region. Do not render a separate About section, duplicate publication panel, or top-level About navigation item.
-## WebGL & Effects
+Normative references:
 
-If the source includes canvas, WebGL, Three.js, gradients, particles, or atmospheric effects, rebuild them as supporting layers behind the content. Keep effects performant, responsive, and secondary to the interface.
+- WCAG 2.2: https://www.w3.org/TR/WCAG22/
+- GOV.UK typography and layout: https://design-system.service.gov.uk/styles/
+- Apple typography and accessibility: https://developer.apple.com/design/human-interface-guidelines/
+- Carbon color tokens: https://carbondesignsystem.com/elements/color/overview/
 
-## Guardrails
-- Do not flatten the source into a generic card grid.
-- Do not swap the color mode unless the source clearly supports it.
-- Preserve the first viewport signal, focal object, and visual density.
-- Keep buttons, cards, and badges aligned to the same radius and border language.
+## 2. Permanent Editorial Hierarchy
+
+Typography and information roles do not change with theme or accent.
+
+| Role | Use | Desktop | Narrow |
+| --- | --- | --- | --- |
+| L0 | Site chrome and metadata | 12px JetBrains Mono, 600 | 11-12px |
+| L1 | Edition title | 40px Inter, 500, 1.05 | 32px |
+| L2 | Section title | 28px Inter, 600, 1.2 | 24px |
+| L3a | Game, company, or product subject | 18px Inter, 650, 1.28 | 17px |
+| L3 | Story headline | 22px Inter, 600, 1.35 | 19px |
+| Body | Summary | 15.5px Inter, 1.75, max 66ch | same |
+| L4 | Time, source, status, verification | 11-12px JetBrains Mono, 1.5 | minimum 11px |
+
+The subject appears before the event headline. The edition H1 uses archiveTitle, remains full-width, wraps naturally, and is never truncated. English may occupy more lines but must retain the same hierarchy.
+
+## 3. Color and Theme Tokens
+
+Light uses warm paper #F6F1E8 and ink #1A1714. Dark uses #000000 and #FFFFFF as required by the established publication identity. Surfaces must remain distinguishable from the page and from each other.
+
+Every accent exposes separate semantic roles:
+
+- --accent: fills, rules, selection, and decorative signals.
+- --accent-strong: darker companion used for light-theme text.
+- --accent-ink: accent text with AA contrast on every reading and chrome surface.
+- --accent-bright: accent link used over dark image captions.
+- --accent-wash: low-emphasis hover or selection wash.
+- --focus-ring: solid keyboard focus boundary.
+
+Approved accent families are orange, cobalt, jade, violet, and rose. An accent is selected globally and remains consistent for the whole page. It never becomes a large reading background.
+
+Normal text must reach 4.5:1 against every surface where it appears. Large text and meaningful component boundaries require 3:1. Status must also use text, icon, border, or position and never rely on color alone.
+
+## 4. Layout, Density, and Reflow
+
+The content width is capped at 1420px with 24px desktop and 12px mobile side gutters. Group stories with rules, columns, alignment, and spacing instead of large rounded cards.
+
+- Desktop: editorial columns may be asymmetric when the content benefits.
+- Up to 1180px: secondary focus content balances into at most two columns.
+- Up to 820px: primary content becomes one column; evidence follows its story.
+- Up to 390px: controls, titles, media, and metadata must remain readable without page-level horizontal scrolling.
+- At 320 CSS px or 400% zoom: only intentionally scrollable local regions may scroll horizontally.
+
+Do not use clipping to conceal layout errors. Edition facts and evidence wrap rather than truncate. Long English text and user text-spacing overrides must not remove information.
+
+## 5. Shape and Media Language
+
+The system is square-edged. Containers use 0px radius; compact editorial labels may use 2px. Pills and large rounded cards are prohibited.
+
+Verified media uses an offset-print registration language:
+
+- Lead media: accent frame, inset keyline, one registration corner, restrained offset shadow.
+- Full story media: quieter frame and corner.
+- Focus thumbnail and cover: border only or the quietest keyline.
+- Missing media: neutral border with no stronger decoration than verified media.
+
+Frames never alter the source aspect ratio. News defaults to 16:9. Covers preserve square, portrait, or landscape. Real credits remain functional, not decorative. Caption text is at least 10px and wraps without covering an excessive part of the image.
+
+Upcoming covers use three explicit display rails based on the verified aspect field:
+
+- Square: 1:1, typically PSN or Nintendo store artwork.
+- Portrait: 57:80, matching the established physical-cover source family.
+- Landscape: 16:9, with unusually wide storefront headers contained inside the frame.
+
+Cover art always uses object-fit contain; it must never be cropped to imitate another platform format. The rail width changes by category while the text column remains aligned. Calendar rows are content-sized and do not use a fixed minimum height.
+
+## 6. Labels and Evidence
+
+Labels have distinct jobs:
+
+- Pending: explicit accent-outline rectangle.
+- Fact and time status: semantic color, icon, text, and border.
+- Source kind and title status: secondary accent hairline.
+- Platform, region, release date, and ordinary facts: quiet inline metadata with one accent edge, not a fully boxed chip.
+
+Tags describe state and are not buttons. Keep labels short, allow wrapping, and never create a dense wall of equally prominent chips. Search actions use text plus a Phosphor arrow instead of a tag-shaped container.
+
+## 7. Interaction and Focus
+
+Primary navigation is limited to Content, Calendar, and Archive. Theme and accent controls are available in both languages and persist across language changes.
+
+The calendar ends with a two-way edition pager. It shows the neighboring issue number and archive title, uses disabled text at the first or latest boundary, and becomes a single column on narrow screens. English navigation only targets editions with a validated English Overlay.
+
+- Major mobile controls: minimum 44px height.
+- Inline links and disclosure targets: minimum 24px target height or equivalent spacing.
+- Keyboard focus: a two-layer, 2px solid focus ring with a contrasting separation edge.
+- Hover movement: maximum 4px.
+- Active movement: maximum 1px.
+- Focus, hover, selected, unavailable, and expanded states remain distinguishable without color alone.
+
+No control label wraps on desktop. Source links, captions, and footer actions remain keyboard operable.
+
+## 8. Motion
+
+Motion intensity is 3 of 10. It communicates hierarchy, feedback, or a state change.
+
+Allowed motion:
+
+- One-time masthead and section entrance.
+- One-time accent rail scan.
+- Rule reveal.
+- Image hover scale up to 1.022.
+- Link arrow translation up to 4px.
+
+Do not use continuous ambient loops, parallax, scroll hijacking, or animated body copy. Animate only transform and opacity where possible. Every nonessential transition becomes instant under prefers-reduced-motion.
+
+## 9. Bilingual and Content States
+
+Chinese remains the canonical factual layer. English is a presentation overlay and uses the same DOM roles, theme controls, spacing tokens, and responsive behavior.
+
+Explicitly test:
+
+- Long English edition and archive titles.
+- Long game name plus long headline.
+- Missing English overlay.
+- Missing image.
+- Tracking and unconfirmed states.
+- Empty departments.
+- One to four secondary focus stories.
+
+Empty departments are hidden from content and directories. Missing data is described plainly and never filled with promotional or generic AI copy.
+
+## 10. Acceptance Gates
+
+Automated checks must cover:
+
+- TypeScript, tests, data validation, locale validation, and production build.
+- Accent text contrast across page, surface, navigation, and footer.
+- No nowrap or ellipsis on critical edition facts.
+- 24px minimum inline interaction targets.
+- Reduced-motion fallback and no infinite decorative animation.
+- Shared Chinese and English theme and accent controls.
+
+Manual acceptance covers desktop, 820px, and 390px; Chinese and English; light and dark; all five accents; keyboard focus; 200% text; long titles; unavailable states; archive search; and reduced motion.
+
+## 11. Prohibited Patterns
+
+Do not add promotional heroes, slogans, glassmorphism, large gradients, generic bento blocks, decorative status dots, floating circles behind labels, repeated rounded cards, duplicate About sections, infinite animation, hidden overflow used as a layout fix, or a second visual language for English.

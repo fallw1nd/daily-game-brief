@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
+  Archive,
+  CalendarBlank,
   CaretDown,
   CheckCircle,
   List,
   MagnifyingGlass,
   Moon,
+  NewspaperClipping,
+  Palette,
   Sun,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
+import { EditionPager } from "./components/EditionPager";
 import {
   loadArchivedEdition,
   loadBriefManifest,
@@ -22,6 +27,7 @@ import { loadEnglishSearchIndex } from "./data/englishLoader";
 import { entriesForSection, searchArchiveEntries } from "./lib/brief";
 import { projectEnglishEdition } from "./lib/english-render";
 import { validateEnglishOverlayForRender } from "./lib/locale";
+import { useEditorialMotion } from "./lib/useEditorialMotion";
 import type {
   BriefEdition,
   BriefEntry,
@@ -37,6 +43,14 @@ import type {
 
 type Theme = "light" | "dark";
 type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose";
+
+const accentOptions: Array<{ id: Accent; label: string }> = [
+  { id: "orange", label: "Lava orange" },
+  { id: "cobalt", label: "Cobalt" },
+  { id: "jade", label: "Jade" },
+  { id: "violet", label: "Violet" },
+  { id: "rose", label: "Rose" },
+];
 
 const statusLabels: Record<FactStatus, string> = {
   official: "Official",
@@ -144,7 +158,7 @@ function EditorialImage({
   useEffect(() => setFailed(false), [requested]);
   const isPlaceholder = !asset || asset.placeholder === true || failed;
   return (
-    <figure className={`media-slot media-slot--${kind} media-slot--aspect-${asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")}`}>
+    <figure className={`media-slot media-slot--${kind} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")}`}>
       <img
         src={failed ? fallback : requested}
         alt={isPlaceholder ? `${title}: no verified image available` : asset.alt}
@@ -329,8 +343,11 @@ function EnglishUnavailable({ message }: { message: string }) {
 }
 
 export default function EnglishApp() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const accentPickerRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<Theme>(() => preferredTheme());
-  const [accent] = useState<Accent>(() => preferredAccent());
+  const [accent, setAccent] = useState<Accent>(() => preferredAccent());
+  const [accentPickerOpen, setAccentPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [edition, setEdition] = useState<BriefEdition | null>(null);
   const [manifest, setManifest] = useState<BriefManifest | null>(null);
@@ -344,8 +361,33 @@ export default function EnglishApp() {
     document.documentElement.lang = "en";
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.accent = accent;
-    try { window.localStorage.setItem("brief-theme", theme); } catch { /* no-op */ }
+    try {
+      window.localStorage.setItem("brief-theme", theme);
+      window.localStorage.setItem("brief-accent", accent);
+    } catch {
+      // Keep the selected appearance for this session when storage is unavailable.
+    }
   }, [theme, accent]);
+
+  useEffect(() => {
+    if (!accentPickerOpen) return;
+
+    const closeOnPointer = (event: PointerEvent) => {
+      if (!accentPickerRef.current?.contains(event.target as Node)) {
+        setAccentPickerOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccentPickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnPointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accentPickerOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -423,6 +465,8 @@ export default function EnglishApp() {
   const searchResults = useMemo(() => searchArchiveEntries(searchIndex?.entries ?? [], query), [query, searchIndex]);
   const visibleSearchResults = searchResults.slice(0, 100);
 
+  useEditorialMotion(rootRef, edition?.id ?? "english-loading");
+
   if (loadError) return <EnglishUnavailable message={loadError} />;
   if (!edition) return <EnglishUnavailable message="Loading the validated English edition…" />;
 
@@ -452,13 +496,19 @@ export default function EnglishApp() {
     ...(edition.upcoming.length > 0 ? [{ number: upcomingNumber, label: "Calendar", count: edition.upcoming.length, href: "#upcoming" }] : []),
   ];
   const primaryLinks = [
-    { href: "#content", label: "Content" },
-    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "Calendar" }] : []),
-    { href: "#archive", label: "Archive" },
+    { href: "#content", label: "Content", icon: NewspaperClipping },
+    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "Calendar", icon: CalendarBlank }] : []),
+    { href: "#archive", label: "Archive", icon: Archive },
   ];
+  const englishEditionSequence = (manifest?.editions ?? []).filter((item) => englishArchiveTitles.has(item.id));
+  const englishEditionIndex = englishEditionSequence.findIndex((item) => item.id === edition.id);
+  const previousEnglishEdition = englishEditionIndex > 0 ? englishEditionSequence[englishEditionIndex - 1] : undefined;
+  const nextEnglishEdition = englishEditionIndex >= 0 && englishEditionIndex < englishEditionSequence.length - 1
+    ? englishEditionSequence[englishEditionIndex + 1]
+    : undefined;
 
   return (
-    <div className="site-shell" data-theme={theme} data-accent={accent}>
+    <div className="site-shell" data-theme={theme} data-accent={accent} ref={rootRef}>
       <a className="skip-link" href="#today">Skip to today&apos;s brief</a>
       <header className="topbar">
         <a className="brand" href={import.meta.env.BASE_URL + "?lang=en#top"} aria-label="Daily Game Brief home">
@@ -466,6 +516,41 @@ export default function EnglishApp() {
         </a>
         <div className="topbar__edition">
           <span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{edition.date}</span><span>{period.short}</span>
+        </div>
+        <div className="accent-picker" ref={accentPickerRef}>
+          <button
+            className="accent-toggle interaction-state"
+            type="button"
+            aria-label={"Change accent color. Current: " + accentOptions.find((option) => option.id === accent)?.label}
+            aria-expanded={accentPickerOpen}
+            aria-controls="accent-options"
+            onClick={() => setAccentPickerOpen((open) => !open)}
+          >
+            <Palette aria-hidden="true" />
+            <span>Accent</span>
+          </button>
+          <div className="accent-options" id="accent-options" hidden={!accentPickerOpen}>
+            <p>Accent color</p>
+            <div role="radiogroup" aria-label="Choose accent color">
+              {accentOptions.map((option) => (
+                <button
+                  key={option.id}
+                  className={"accent-option accent-option--" + option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={accent === option.id}
+                  onClick={() => {
+                    setAccent(option.id);
+                    setAccentPickerOpen(false);
+                  }}
+                >
+                  <span className="accent-swatch" aria-hidden="true" />
+                  <span>{option.label}</span>
+                  {accent === option.id && <CheckCircle aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <button
           className="theme-toggle interaction-state"
@@ -487,7 +572,12 @@ export default function EnglishApp() {
           {menuOpen ? <X aria-hidden="true" /> : <List aria-hidden="true" />}<span>Menu</span>
         </button>
         <nav id="primary-navigation" className={menuOpen ? "is-open" : ""} aria-label="Primary navigation">
-          {primaryLinks.map((link) => <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>{link.label}</a>)}
+          {primaryLinks.map((link) => (
+            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
+              <link.icon aria-hidden="true" />
+              <span>{link.label}</span>
+            </a>
+          ))}
         </nav>
         <span className="accent-signal" aria-hidden="true" />
       </header>
@@ -498,7 +588,7 @@ export default function EnglishApp() {
             <span>DAILY EDITION</span><h1 id="page-title">{edition.archiveTitle || period.edition}</h1><p>{edition.date.replaceAll("-", ".")} / Beijing Time</p>
           </div>
           <dl className="edition-facts masthead-reveal" aria-label="Edition information">
-            <div><dt>Window</dt><dd>{timeOnly(edition.windowStart)}—{timeOnly(edition.windowEnd)}</dd></div>
+            <div><dt>Window</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div>
             <div><dt>Scheduled</dt><dd>{edition.plannedAt}</dd></div>
             <div><dt>Generated</dt><dd>{edition.generatedAt}</dd></div>
             <div><dt>Next edition</dt><dd>{period.nextTime}</dd></div>
@@ -531,6 +621,23 @@ export default function EnglishApp() {
             <section className="editorial-section upcoming-section" id="upcoming" aria-labelledby="upcoming-title">
               <SectionHeader number={upcomingNumber} title="Releases in the next 15 days" count={edition.upcoming.length} id="upcoming-title" />
               <div className="upcoming-grid">{edition.upcoming.map((item) => <UpcomingItem key={item.id} item={item} />)}</div>
+              <EditionPager
+                ariaLabel="Edition navigation"
+                previousLabel="Previous edition"
+                nextLabel="Next edition"
+                previousBoundary="First available edition"
+                nextBoundary="Latest available edition"
+                previous={previousEnglishEdition ? {
+                  href: editionHref(previousEnglishEdition.id),
+                  issue: "NO." + String(previousEnglishEdition.issueNumber).padStart(3, "0") + " · " + (previousEnglishEdition.period === "am" ? "Morning" : "Evening"),
+                  title: englishArchiveTitles.get(previousEnglishEdition.id) ?? "English edition",
+                } : undefined}
+                next={nextEnglishEdition ? {
+                  href: editionHref(nextEnglishEdition.id),
+                  issue: "NO." + String(nextEnglishEdition.issueNumber).padStart(3, "0") + " · " + (nextEnglishEdition.period === "am" ? "Morning" : "Evening"),
+                  title: englishArchiveTitles.get(nextEnglishEdition.id) ?? "English edition",
+                } : undefined}
+              />
             </section>
           )}
           {edition.sourceReport && (
@@ -566,7 +673,10 @@ export default function EnglishApp() {
                   <a key={item.editionId + item.entryId} href={editionHref(item.editionId, item.entryId)}>
                     <span className="archive-result__issue">NO.{String(item.issueNumber).padStart(3, "0")}<small>{item.date} · {item.period === "am" ? "Morning" : "Evening"}</small></span>
                     <span className="archive-result__copy"><small>{item.titleEn}</small><strong>{item.headline}</strong><PendingMark tracking={item.tracking} /><span className="archive-result__summary">{item.summary}</span></span>
-                    <small>{statusLabels[item.factStatus]} · Open edition</small>
+                    <span className="archive-result__action">
+                      <small>{statusLabels[item.factStatus]}</small>
+                      <span>Open edition<ArrowUpRight aria-hidden="true" /></span>
+                    </span>
                   </a>
                 ))}
                 {searchResults.length === 0 && <p className="empty-line">No matching entry in the validated English archive.</p>}
@@ -584,7 +694,7 @@ export default function EnglishApp() {
                 return available ? (
                   <a key={item.id} className={item.id === edition.id ? "is-current" : ""} href={editionHref(item.id)} aria-current={item.id === edition.id ? "page" : undefined}>
                     <span>NO.{String(item.issueNumber).padStart(3, "0")}</span><time>{item.date}</time><strong>{title}</strong>
-                    <small>{archiveCounts.get(item.id) ?? "—"} stories · {item.generatedAt}</small>
+                    <small>{archiveCounts.get(item.id) ?? "-"} stories · {item.generatedAt}</small>
                     <span>{item.id === edition.id ? "Reading now" : "Open edition"}<ArrowRight aria-hidden="true" /></span>
                   </a>
                 ) : null;
@@ -602,7 +712,7 @@ export default function EnglishApp() {
       <footer className="site-footer">
         <div className="footer-identity"><div className="brand"><span>GAME BRIEF</span><small>DAILY GAME BRIEF</small></div><p>Twice-daily, evidence-checked video-game industry news.</p></div>
         <div className="footer-meta"><span>Edited and maintained by</span><strong>Fallw1nd-津秋</strong><small>Updated at 10:10 / 17:00 Beijing Time</small></div>
-        <div className="footer-metrics" aria-label="Archive scale"><span><strong>{manifest?.editions.length ?? "—"}</strong> editions</span><span><strong>{searchIndex?.entries.length ?? "—"}</strong> searchable stories</span></div>
+        <div className="footer-metrics" aria-label="Archive scale"><span><strong>{manifest?.editions.length ?? "-"}</strong> editions</span><span><strong>{searchIndex?.entries.length ?? "-"}</strong> searchable stories</span></div>
       </footer>
     </div>
   );

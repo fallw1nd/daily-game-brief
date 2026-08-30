@@ -113,6 +113,7 @@ describe("brief page regression", () => {
     expect(document.querySelector("#about")).toBeNull();
     expect(document.querySelector('nav a[href="#about"]')).toBeNull();
     expect([...document.querySelectorAll("nav a")].map((link) => link.textContent)).toEqual(["\u5185\u5bb9", "\u65e5\u5386", "\u5f52\u6863"]);
+    expect(document.querySelectorAll("#primary-navigation a > svg")).toHaveLength(3);
     expect(document.querySelector('nav a[href="#content"]')).not.toBeNull();
     expect(document.querySelector("#content")).not.toBeNull();
     expect(document.querySelector(".edition-masthead__title > span")?.textContent).toBe("DAILY EDITION");
@@ -221,6 +222,24 @@ describe("brief page regression", () => {
       expect(game.querySelector(".media-slot--cover > img")).not.toBeNull();
       expect(game.querySelector(".media-slot--cover figcaption")).toBeNull();
     }
+  });
+
+  it("adds previous and next edition controls below the release calendar", () => {
+    document.body.innerHTML = renderToStaticMarkup(
+      <App initialManifest={manifest} initialTheme="light" />,
+    );
+
+    const pager = document.querySelector<HTMLElement>(".upcoming-section > .edition-pager");
+    expect(pager?.getAttribute("aria-label")).toBe("简报期次导航");
+    expect(pager?.querySelectorAll(".edition-pager__item")).toHaveLength(2);
+    const previous = pager?.querySelector<HTMLAnchorElement>(".edition-pager__item--previous");
+    expect(previous?.textContent).toContain("上一期");
+    expect(previous?.textContent).toContain("NO.001");
+    expect(previous?.getAttribute("href")).toContain("edition=2026-08-21-am");
+    expect(previous?.getAttribute("href")).toContain("#top");
+    const next = pager?.querySelector<HTMLElement>(".edition-pager__item--next");
+    expect(next?.getAttribute("aria-disabled")).toBe("true");
+    expect(next?.textContent).toContain("已是最新一期");
   });
 
   it("lists editions instead of current entries and links search results to source briefs", () => {

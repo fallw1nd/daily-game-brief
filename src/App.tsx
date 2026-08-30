@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useGSAP } from "@gsap/react";
 import {
   ArrowRight,
   ArrowUpRight,
+  Archive,
+  CalendarBlank,
   CaretDown,
   ChatsCircle,
   CheckCircle,
@@ -10,14 +11,14 @@ import {
   List,
   MagnifyingGlass,
   Moon,
+  NewspaperClipping,
   Palette,
   PlayCircle,
   Sun,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { EditionPager } from "./components/EditionPager";
 import { edition as fallbackEdition, sourceReport as fallbackSourceReport } from "./data/brief";
 import {
   loadArchivedEdition,
@@ -29,6 +30,7 @@ import {
   entriesForSection,
   searchArchiveEntries,
 } from "./lib/brief";
+import { useEditorialMotion } from "./lib/useEditorialMotion";
 import type {
   BriefEdition,
   BriefEntry,
@@ -41,8 +43,6 @@ import type {
   SourceLink,
   UpcomingEntry,
 } from "./types";
-
-gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 type Theme = "light" | "dark";
 type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose";
@@ -172,7 +172,7 @@ function EditorialImage({
 
   return (
     <figure
-      className={`media-slot media-slot--${kind} media-slot--aspect-${
+      className={`media-slot media-slot--${kind} ${isPlaceholder ? "media-slot--placeholder" : ""} media-slot--aspect-${
         asset?.aspect ?? (kind === "cover" ? "portrait" : "landscape")
       }`}
     >
@@ -460,6 +460,11 @@ function App({
     ...edition.entries,
   ]).slice(0, 5);
   const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
+  const manifestIndex = manifest?.editions.findIndex((item) => item.id === edition.id) ?? -1;
+  const previousManifestEdition = manifestIndex > 0 ? manifest?.editions[manifestIndex - 1] : undefined;
+  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1
+    ? manifest?.editions[manifestIndex + 1]
+    : undefined;
   const pageTitle = edition.archiveTitle?.trim() ||
     manifestEdition?.archiveTitle?.trim() ||
     `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
@@ -477,9 +482,9 @@ function App({
   ];
 
   const primaryLinks = [
-    { href: "#content", label: "\u5185\u5bb9" },
-    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386" }] : []),
-    { href: "#archive", label: "\u5f52\u6863" },
+    { href: "#content", label: "\u5185\u5bb9", icon: NewspaperClipping },
+    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386", icon: CalendarBlank }] : []),
+    { href: "#archive", label: "\u5f52\u6863", icon: Archive },
   ];
 
   const archiveEditions = useMemo(
@@ -602,31 +607,7 @@ function App({
     });
   }, [edition.id, edition.entries]);
 
-  useGSAP(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    gsap.from(".masthead-reveal", {
-      y: 18,
-      opacity: 0,
-      duration: 0.72,
-      stagger: 0.07,
-      ease: "power3.out",
-    });
-    gsap.from(".accent-signal", {
-      scaleX: 0,
-      duration: 0.86,
-      transformOrigin: "left center",
-      ease: "power3.out",
-    });
-    gsap.utils.toArray<HTMLElement>(".reveal-row").forEach((row) => {
-      gsap.from(row, {
-        y: 20,
-        opacity: 0,
-        duration: 0.55,
-        ease: "power2.out",
-        scrollTrigger: { trigger: row, start: "top 92%", once: true },
-      });
-    });
-  }, { scope: rootRef, dependencies: [edition.id], revertOnUpdate: true });
+  useEditorialMotion(rootRef, edition.id);
 
   return (
     <div className="site-shell" data-theme={theme} data-accent={accent} ref={rootRef}>
@@ -701,7 +682,8 @@ function App({
         <nav id="primary-navigation" className={menuOpen ? "is-open" : ""} aria-label="最高级目录">
           {primaryLinks.map((link) => (
             <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
-              {link.label}
+              <link.icon aria-hidden="true" />
+              <span>{link.label}</span>
             </a>
           ))}
         </nav>
@@ -716,7 +698,7 @@ function App({
             <p>{edition.date.replaceAll("-", ".")} / 北京时间</p>
           </div>
           <dl className="edition-facts masthead-reveal" aria-label="本期基础信息">
-            <div><dt>信息窗口</dt><dd>{timeOnly(edition.windowStart)}—{timeOnly(edition.windowEnd)}</dd></div>
+            <div><dt>信息窗口</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div>
             <div><dt>计划运行</dt><dd>{edition.plannedAt}</dd></div>
             <div><dt>实际生成</dt><dd>{edition.generatedAt}</dd></div>
             <div><dt>下一期</dt><dd>{period.nextTime}</dd></div>
@@ -774,6 +756,23 @@ function App({
               <div className="upcoming-grid">
                 {edition.upcoming.map((item) => <UpcomingItem key={item.id} item={item} />)}
               </div>
+              <EditionPager
+                ariaLabel="简报期次导航"
+                previousLabel="上一期"
+                nextLabel="下一期"
+                previousBoundary="已是最早一期"
+                nextBoundary="已是最新一期"
+                previous={previousManifestEdition ? {
+                  href: editionHref(previousManifestEdition.id),
+                  issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + (previousManifestEdition.period === "am" ? "早报" : "晚报"),
+                  title: archiveEditionTitle(previousManifestEdition),
+                } : undefined}
+                next={nextManifestEdition ? {
+                  href: editionHref(nextManifestEdition.id),
+                  issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + (nextManifestEdition.period === "am" ? "早报" : "晚报"),
+                  title: archiveEditionTitle(nextManifestEdition),
+                } : undefined}
+              />
             </section>
           )}
 
@@ -839,7 +838,10 @@ function App({
                       <PendingMark tracking={item.tracking} />
                       <span className="archive-result__summary">{item.summary}</span>
                     </span>
-                    <small>{statusLabels[item.factStatus]} · 打开原文</small>
+                    <span className="archive-result__action">
+                      <small>{statusLabels[item.factStatus]}</small>
+                      <span>打开原文<ArrowUpRight aria-hidden="true" /></span>
+                    </span>
                   </a>
                 ))}
                 {searchResults.length === 0 && (
@@ -868,7 +870,7 @@ function App({
                   <span>NO.{String(item.issueNumber).padStart(3, "0")}</span>
                   <time>{item.date}</time>
                   <strong>{archiveEditionTitle(item)}</strong>
-                  <small>{archiveCounts.get(item.id) ?? "—"} 条新闻 · {item.generatedAt}</small>
+                  <small>{archiveCounts.get(item.id) ?? "-"} 条新闻 · {item.generatedAt}</small>
                   <span>{item.id === edition.id ? "当前阅读" : "打开本期"}<ArrowRight aria-hidden="true" /></span>
                 </a>
               ))}
@@ -908,8 +910,8 @@ function App({
           <small>北京时间 10:10 / 17:00 更新</small>
         </div>
         <div className="footer-metrics" aria-label="简报归档规模">
-          <span><strong>{manifest?.editions.length ?? "—"}</strong> 期归档</span>
-          <span><strong>{searchIndex?.entries.length ?? "—"}</strong> 条新闻可检索</span>
+          <span><strong>{manifest?.editions.length ?? "-"}</strong> 期归档</span>
+          <span><strong>{searchIndex?.entries.length ?? "-"}</strong> 条新闻可检索</span>
         </div>
         <div className="footer-links">
           <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">
