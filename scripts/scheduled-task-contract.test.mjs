@@ -15,15 +15,16 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(contract).toContain("fixed evidence cutoffs remain **10:10 for AM** and **17:00 for PM**");
     expect(contract).toContain("the ten-minute buffer must never widen either evidence window or admit post-cutoff information");
     expect(contract).toContain("Never derive the edition date from the task's actual execution calendar date alone");
-    expect(contract).toContain("most recent already-due fixed window for this task's period");
-    expect(contract).toContain("otherwise use the previous day's PM");
+    expect(contract).toContain("select the oldest already-due edition");
+    expect(contract).toContain("Do not skip an older pending edition in favor of today's edition");
     expect(contract).toContain("SLA watchdog runs at 11:00/17:50");
     expect(contract).toContain("Scheduled media recovery runs later at 11:10/18:00");
 
     expect(architecture).toContain("**10:20/17:10 Asia/Shanghai ChatGPT tasks**");
     expect(architecture).toContain("The ten-minute separation is intentional");
     expect(architecture).toContain("It does **not** change Canonical `plannedAt`, the edition ID, or the fixed evidence windows");
-    expect(architecture).toContain("most recent already-due fixed cutoff for that period");
+    expect(architecture).toContain("selects the oldest already-due state for its period");
+    expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
 
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
     expect(packetWorkflow).toContain('- cron: "0 9 * * *"');
@@ -33,25 +34,21 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(mediaWorkflow).toContain('- cron: "0 10 * * *"');
   });
 
-  it("checks the exact packet before loading full editorial context", () => {
-    const exactPacket = inputSection.indexOf("The first GitHub read for an edition must be only `automation/packets/<edition-id>.json`");
+  it("checks durable state and exact blob before loading full editorial context", () => {
+    const stateRead = inputSection.indexOf("Read only `automation/status/<edition-id>.json`");
+    const exactPacket = inputSection.indexOf("Read the packet by the acknowledged Git blob SHA");
     const fullContext = inputSection.indexOf("After a usable packet is available, read current `main`");
 
-    expect(exactPacket).toBeGreaterThan(-1);
+    expect(stateRead).toBeGreaterThan(-1);
+    expect(exactPacket).toBeGreaterThan(stateRead);
     expect(fullContext).toBeGreaterThan(exactPacket);
-    expect(inputSection).toContain("Do not read `AGENTS.md`, this contract, `public/data/manifest.json`, `public/data/latest.json`, `config/title-translations.json`, or other editorial inputs before this preflight finishes.");
+    expect(inputSection).toContain("Copy that exact `packet.blobSha` into the submitted decision as top-level `packetBlobSha`");
   });
 
-  it("does not inspect or trigger recovery when the packet is already usable", () => {
-    expect(inputSection).toContain("If the exact packet is usable, skip Actions recovery inspection and continue directly to step 6.");
-  });
-
-  it("waits only for a proven matching collector without creating a duplicate", () => {
-    expect(inputSection).toContain("A run is matching only when its intended period is proven to equal the target period");
-    expect(inputSection).toContain("Never infer the period from `created_at`, `run_started_at`, the current Beijing clock, or proximity to the cutoff.");
-    expect(inputSection).toContain("A severely delayed opposite-period run is not matching and must be ignored; it must not suppress exact-edition recovery.");
-    expect(inputSection).toContain("If the matching current-period run is queued or in progress, do not create a second recovery trigger");
-    expect(inputSection).toContain("Do not load manifest/latest/title registry while waiting.");
+  it("keeps all packet and publication recovery under the GitHub orchestrator", () => {
+    expect(inputSection).toContain("Do not inspect or poll Actions, create or delete workflow files, dispatch recovery, edit `automation/state`, publish degraded content, or advance to another edition.");
+    expect(inputSection).toContain("GitHub Actions is the sole packet and publication recovery owner.");
+    expect(inputSection).not.toContain("one-shot workflow");
   });
 
   it("exposes period identity before collection and isolates opposite-period concurrency", () => {
@@ -59,18 +56,21 @@ describe("scheduled task fast packet preflight contract", () => {
     expect(packetWorkflow).toContain("group: news-discovery-state-${{");
     expect(packetWorkflow).toContain("github.event.schedule == '10 2 * * *'");
     expect(packetWorkflow).toContain("'am' || 'pm'");
+    expect(packetWorkflow).toContain("cancel-in-progress: false");
   });
 
-  it("triggers one-shot recovery only after packet miss and no proven matching collector", () => {
-    expect(inputSection).toContain("only when the matching packet is missing/invalid and there is no proven matching current-period collection run queued/in progress, or the matching collection run has failed/cancelled");
-    expect(inputSection).toContain("Re-read only the matching packet for up to 15 minutes total from task start.");
-    expect(inputSection).toContain("The one-shot workflow must do nothing else");
+  it("dispatches a delayed exact-edition verifier after packet acknowledgement", () => {
+    expect(packetWorkflow).toContain("verify-after-handoff:");
+    expect(packetWorkflow).toContain("Wait until the fixed publication SLA");
+    expect(packetWorkflow).toContain("gh workflow run brief-sla-watchdog.yml");
+    expect(packetWorkflow).toContain('-f edition="${{ needs.collect.outputs.edition }}"');
   });
 
-  it("pins recovery to the exact edition and guards pre-cutoff dispatch", () => {
-    expect(inputSection).toContain("-f period=<am|pm> -f edition=<edition-id>");
-    expect(inputSection).toContain("more than five minutes before its cutoff fails visibly");
+  it("pins editorial and recovery to exact edition identities", () => {
+    expect(inputSection).toContain("not through `automation/packets/latest-am.json`, `latest-pm.json`");
+    expect(inputSection).toContain("Never make editorial decisions from a missing, mismatched, or invalid packet.");
     expect(packetWorkflow).toMatch(/\r?\n\s+edition:\r?\n\s+description: Exact edition ID for recovery/);
+    expect(packetWorkflow).toMatch(/edition:\r?\n\s+description:[^\r\n]+\r?\n\s+required: true/);
     expect(packetWorkflow).toContain("node scripts/resolve-packet-dispatch.mjs");
     expect(packetWorkflow).toContain('BRIEF_NOW="${{ steps.edition.outputs.reference_now }}"');
   });

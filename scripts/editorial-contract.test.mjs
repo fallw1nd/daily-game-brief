@@ -118,3 +118,24 @@ describe("editorial API contract", () => {
     expect(errors).toContain("decisions[0]: needs_review requires tracking=true");
   });
 });
+  it("distinguishes game, entity, and unresolved topic subjects", () => {
+    const company = {
+      ...evidence.packages[0],
+      eventKey: "company-1",
+      eventKind: "company",
+      subjectKey: "example-publisher",
+    };
+    const topic = {
+      ...evidence.packages[0],
+      eventKey: "topic-1",
+      eventKind: "legal-report",
+      subjectKey: null,
+    };
+    const input = buildEditorialInput({ ...evidence, packages: [evidence.packages[0], company, topic] });
+    expect(input.packages.map((item) => item.subject)).toEqual([
+      { kind: "game", key: "example game" },
+      { kind: "entity", key: "example-publisher" },
+      { kind: "topic", key: null },
+    ]);
+    expect(input.packages[2].publishability).toBe("requires_subject_identity");
+  });

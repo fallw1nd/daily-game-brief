@@ -3,6 +3,7 @@ import {
   resolveSelectedTimeEvidence,
   verifiedWindowTimeError,
 } from "./time-window.mjs";
+import { validateJsonSchema } from "./json-schema.mjs";
 
 const sections = ["releases", "reviews", "news", "industry", "features", "rumors", "observations"];
 const factStatuses = ["official", "media_relay_official", "media_report", "multi_source_verified", "unconfirmed"];
@@ -67,6 +68,7 @@ export const editorialSchema = {
   additionalProperties: false,
   properties: {
     contractVersion: { type: "integer", enum: [2] },
+    packetBlobSha: { type: "string", pattern: "^[0-9a-f]{40}$" },
     editionId: { type: "string" },
     archiveTitle: { type: "string" },
     leadEventKey: { type: "string" },
@@ -116,7 +118,6 @@ export const editorialSchema = {
           "eventKey", "decision", "section", "titleKey", "titleZhCn", "titleEn", "titleZhStatus",
           "headline", "summary", "factStatus", "timeStatus", "entryFlags", "tracking", "verification", "reason",
           "beijingTime", "timeNote", "platforms", "region", "releaseType", "sourceIndexes", "additionalSources",
-          "sharedFactFrame",
         ],
       },
     },
@@ -186,7 +187,7 @@ export const editorialSchema = {
     editorialNote: { type: "string" },
   },
   required: [
-    "contractVersion", "editionId", "archiveTitle", "leadEventKey", "decisions", "upcomingMode", "removeUpcomingIds",
+    "contractVersion", "packetBlobSha", "editionId", "archiveTitle", "leadEventKey", "decisions", "upcomingMode", "removeUpcomingIds",
     "upcoming", "checkedExtra", "limitedExtra", "editorialNote",
   ],
 };
@@ -240,6 +241,11 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
       eventKey: item.eventKey,
       eventKind: item.eventKind,
       subjectKey: item.subjectKey,
+      subject: {
+        kind: item.eventKind === "company" ? "entity" : item.subjectKey ? "game" : "topic",
+        key: item.subjectKey || null,
+      },
+      publishability: item.subjectKey ? "direct" : "requires_subject_identity",
       headline: item.headline,
       tier: item.tier,
       score: item.score,
@@ -289,9 +295,9 @@ function hasSubstantialChinese(value) {
 
 export function validateEnglishEditorialLocale(output) {
   const errors = [];
-  if (output?.contractVersion !== 2) return errors;
+  if (output?.contractVersion !== 2 || !output?.locales?.en) return errors;
   const en = output?.locales?.en;
-  if (!en || en.schemaVersion !== 1 || en.locale !== "en") return ["contractVersion 2 requires locales.en schemaVersion=1 and locale=en"];
+  if (en.schemaVersion !== 1 || en.locale !== "en") return ["locales.en must use schemaVersion=1 and locale=en"];
   const included = (output.decisions || []).filter((item) => item.decision === "include");
   const includedKeys = included.map((item) => item.eventKey);
   const entryKeys = (en.entries || []).map((item) => item.eventKey);
@@ -320,11 +326,12 @@ export function validateEditorialOutput(output, input) {
   const errors = [];
   if (!output || !Array.isArray(output.decisions)) return ["output.decisions must be an array"];
   const allowedKeys = new Set([...input.packages.map((item) => item.eventKey), ...(input.trackingQueue || []).map((item) => item.eventKey)]);
+  errors.push(...validateJsonSchema(output, editorialSchema));
+  if (output.contractVersion !== 2) errors.push("output.contractVersion must be 2");
   const seen = new Set();
   for (const [index, item] of output.decisions.entries()) {
     const context = `decisions[${index}]`;
-    const isLastMinute = String(item.eventKey || "").startsWith("last-minute:") && Array.isArray(item.additionalSources) && item.additionalSources.length > 0;
-    if (!allowedKeys.has(item.eventKey) && !isLastMinute) errors.push(`${context}: unknown eventKey`);
+    if (!allowedKeys.has(item.eventKey)) errors.push(`${context}: unknown eventKey`);
     if (seen.has(item.eventKey)) errors.push(`${context}: duplicate eventKey`);
     seen.add(item.eventKey);
     if (!new Set(["include", "exclude", "needs_review"]).has(item.decision)) errors.push(`${context}: invalid decision`);
@@ -336,20 +343,21 @@ export function validateEditorialOutput(output, input) {
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
       const validIndexes = new Set((evidenceItem?.sources || []).map((source) => source.sourceIndex));
       if ((item.sourceIndexes || []).some((sourceIndex) => !validIndexes.has(sourceIndex))) errors.push(`${context}: sourceIndexes contains an unavailable source`);
+      if (evidenceItem?.publishability && evidenceItem.publishability !== "direct") {
+        errors.push(`${context}: candidate requires an explicit subject identity before it can be included`);
+      }
       if (!(item.sourceIndexes || []).length && !(item.additionalSources || []).length) errors.push(`${context}: include requires a selected source`);
       if (item.timeStatus === "verified" && isBoundaryMinute(item.beijingTime, input.window)) {
         const timeEvidenceAt = resolveSelectedTimeEvidence(item, evidenceItem);
         const timeError = verifiedWindowTimeError({ beijingTime: item.beijingTime, timeEvidenceAt, windowStart: input.window?.windowStart, windowEnd: input.window?.windowEnd, requireExactBoundary: true });
         if (timeError) errors.push(`${context}: ${timeError}`);
       }
-      if (output.contractVersion === 2) {
-        const frame = item.sharedFactFrame;
-        if (!frame || !Array.isArray(frame.dates) || !Array.isArray(frame.times) || !Array.isArray(frame.numbers) || !Array.isArray(frame.platforms) || !Array.isArray(frame.peopleAndEntities) || !Array.isArray(frame.versionsAndTerms)) {
-          errors.push(`${context}: contractVersion 2 include requires a complete sharedFactFrame`);
-        } else {
-          if (frame.subjectTitleKey !== item.titleKey) errors.push(`${context}: sharedFactFrame.subjectTitleKey must match titleKey`);
-          if (JSON.stringify(frame.platforms) !== JSON.stringify(item.platforms || [])) errors.push(`${context}: sharedFactFrame.platforms must match canonical platform decision`);
-        }
+      const frame = item.sharedFactFrame;
+      if (!frame || !Array.isArray(frame.dates) || !Array.isArray(frame.times) || !Array.isArray(frame.numbers) || !Array.isArray(frame.platforms) || !Array.isArray(frame.peopleAndEntities) || !Array.isArray(frame.versionsAndTerms)) {
+        errors.push(`${context}: contractVersion 2 include requires a complete sharedFactFrame`);
+      } else {
+        if (frame.subjectTitleKey !== item.titleKey) errors.push(`${context}: sharedFactFrame.subjectTitleKey must match titleKey`);
+        if (JSON.stringify(frame.platforms) !== JSON.stringify(item.platforms || [])) errors.push(`${context}: sharedFactFrame.platforms must match canonical platform decision`);
       }
     }
     if (item.factStatus === "unconfirmed" && item.tracking !== true) errors.push(`${context}: unconfirmed requires tracking=true`);

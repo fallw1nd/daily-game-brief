@@ -17,22 +17,27 @@ on:
           - pm
       edition:
         description: Exact edition ID for recovery, for example 2026-08-29-am
-        required: false
+        required: true
         type: string
 
 permissions:
   contents: write
+  actions: write
 
 # Keep delayed AM and PM collectors independent. A late run from the opposite
 # period must never cancel the collector for the current fixed window.
 concurrency:
   group: news-discovery-state-${{ github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '10 2 * * *' && 'am' || 'pm') }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    outputs:
+      edition: ${{ steps.edition.outputs.edition }}
+      period: ${{ steps.edition.outputs.period }}
+      needed: ${{ steps.edition.outputs.needed }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -44,34 +49,42 @@ jobs:
         with:
           node-version: 22
 
-      - name: Select fixed edition period
+      - name: Select immutable due edition
         id: edition
         shell: bash
         run: |
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+          state_dir="$RUNNER_TEMP/edition-state-selection"
+          git worktree add --detach "$state_dir" origin/automation/state
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             period="${{ inputs.period }}"
             node scripts/resolve-packet-dispatch.mjs \
               --period="$period" \
               --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "10 2 * * *" ]; then
-            period="am"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
           else
-            period="pm"
+            if [ "${{ github.event.schedule }}" = "10 2 * * *" ]; then
+              period="am"
+            else
+              period="pm"
+            fi
+            node scripts/resolve-due-edition.mjs \
+              --period="$period" \
+              --purpose=packet \
+              --status-root="$state_dir/automation/status" >> "$GITHUB_OUTPUT"
           fi
+          git worktree remove --force "$state_dir"
           echo "period=$period" >> "$GITHUB_OUTPUT"
 
       - name: Collect final candidate snapshot
+        if: steps.edition.outputs.needed != 'false'
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" \
-              node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
-          else
-            node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
-          fi
+          BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
 
       - name: Restore previous event ledger
         shell: bash
+        if: steps.edition.outputs.needed != 'false'
         run: |
           mkdir -p artifacts
           git fetch origin automation/state:refs/remotes/origin/automation/state || true
@@ -79,20 +92,24 @@ jobs:
 
       - name: Update persistent event ledger
         run: node scripts/update-event-ledger.mjs
+        if: steps.edition.outputs.needed != 'false'
 
       - name: Build bounded evidence packages
         run: node scripts/build-evidence.mjs
+        if: steps.edition.outputs.needed != 'false'
 
       - name: Build title-only hints
+        if: steps.edition.outputs.needed != 'false'
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: node scripts/build-title-hints.mjs
 
       - name: Build bounded editorial request
         run: node scripts/editorialize.mjs
+        if: steps.edition.outputs.needed != 'false'
 
       - name: Upload candidate evidence
-        if: always()
+        if: steps.edition.outputs.needed != 'false' && always()
         uses: actions/upload-artifact@v6
         with:
           name: news-shadow-${{ steps.edition.outputs.period }}-${{ github.run_id }}
@@ -107,7 +124,7 @@ jobs:
           retention-days: 14
 
       - name: Summarize discovery coverage
-        if: always()
+        if: steps.edition.outputs.needed != 'false' && always()
         shell: bash
         run: |
           if [ -f artifacts/news-shadow-report.json ]; then
@@ -128,28 +145,77 @@ jobs:
           NODE
           fi
 
-      - name: Persist packet and ledger on state branch
+      - name: Persist packet, ledger, and durable acknowledgement
+        id: persist
+        if: steps.edition.outputs.needed != 'false'
         shell: bash
         run: |
           packet="$RUNNER_TEMP/editorial-packet.json"
           ledger="$RUNNER_TEMP/event-ledger.json"
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
-          if git show-ref --verify --quiet refs/remotes/origin/automation/state; then
-            git switch --detach origin/automation/state
-          else
-            git switch -c automation-state-bootstrap
+          edition_id="${{ steps.edition.outputs.edition }}"
+          period="${{ steps.edition.outputs.period }}"
+          success=false
+          for attempt in 1 2 3; do
+            state_dir="$RUNNER_TEMP/packet-state-$attempt"
+            git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+            git worktree add --detach "$state_dir" origin/automation/state
+            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
+            cp "$packet" "$state_dir/automation/packets/$edition_id.json"
+            cp "$packet" "$state_dir/automation/packets/latest-$period.json"
+            cp "$ledger" "$state_dir/automation/ledger/events.json"
+            node scripts/record-edition-state.mjs \
+              --state-root="$state_dir" \
+              --edition="$edition_id" \
+              --event=packet-ready \
+              --packet="$packet" \
+              --run-id="${{ github.run_id }}"
+            git -C "$state_dir" config user.name "daily-game-brief[bot]"
+            git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
+            git -C "$state_dir" add automation/packets automation/ledger/events.json "automation/status/$edition_id.json"
+            if git -C "$state_dir" diff --cached --quiet; then
+              success=true
+            else
+              git -C "$state_dir" commit -m "chore(automation): persist $edition_id packet acknowledgement"
+              if git -C "$state_dir" push origin HEAD:automation/state; then success=true; fi
+            fi
+            git worktree remove --force "$state_dir"
+            if [ "$success" = "true" ]; then break; fi
+          done
+          if [ "$success" != "true" ]; then
+            echo "Failed to persist $edition_id after three compare-and-retry attempts"
+            exit 1
           fi
-          mkdir -p automation/packets automation/ledger
-          edition="${{ steps.edition.outputs.period }}"
-          edition_id="$(node -e 'const fs=require("fs"); const packet=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(packet.editorialInput.window.id)' "$packet")"
-          cp "$packet" "automation/packets/$edition_id.json"
-          cp "$packet" "automation/packets/latest-$edition.json"
-          cp "$ledger" automation/ledger/events.json
-          git config user.name "daily-game-brief[bot]"
-          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
-          git add automation/packets automation/ledger/events.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(automation): persist $edition_id editorial packet"
-            git push origin HEAD:automation/state
-          fi
+
+  verify-after-handoff:
+    needs: collect
+    if: needs.collect.outputs.needed != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Wait until the fixed publication SLA
+        shell: bash
+        env:
+          EDITION_ID: ${{ needs.collect.outputs.edition }}
+          PERIOD: ${{ needs.collect.outputs.period }}
+        run: |
+          delay="$(node -e '
+            const edition = process.env.EDITION_ID;
+            const period = process.env.PERIOD;
+            const date = edition.slice(0, 10);
+            const target = new Date(`${date}T${period === "am" ? "03:00:00" : "09:50:00"}Z`);
+            process.stdout.write(String(Math.max(0, Math.ceil((target.getTime() - Date.now()) / 1000))));
+          ')"
+          echo "Waiting ${delay}s before verifying $EDITION_ID"
+          sleep "$delay"
+
+      - name: Dispatch exact-edition SLA verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh workflow run brief-sla-watchdog.yml \
+            --ref main \
+            -f period="${{ needs.collect.outputs.period }}" \
+            -f edition="${{ needs.collect.outputs.edition }}"

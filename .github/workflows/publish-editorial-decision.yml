@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Restore submitted decision and matching packet
+      - name: Restore submitted decision and immutable packet
         id: submission
         shell: bash
         run: |
@@ -75,18 +75,71 @@ jobs:
           git fetch origin "$branch:refs/remotes/origin/$branch"
           git show "refs/remotes/origin/$branch:automation/inbox/$edition.json" > artifacts/editorial-decisions.json
           decided_at="$(git show -s --format=%cI "refs/remotes/origin/$branch")"
-          git fetch origin automation/state:refs/remotes/origin/automation/state
-          git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
+          submission_sha="$(git rev-parse "refs/remotes/origin/$branch")"
+          packet_sha="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/editorial-decisions.json','utf8')).packetBlobSha || ''")"
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+          if [[ "$packet_sha" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$packet_sha^{blob}"; then
+            git cat-file blob "$packet_sha" > artifacts/editorial-packet.json
+          elif [ "$mode" = "locale-repair" ]; then
+            git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
+            packet_sha="$(git hash-object artifacts/editorial-packet.json)"
+          else
+            echo "Decision does not reference a fetchable immutable packet blob: $packet_sha"
+            exit 1
+          fi
           echo "edition=$edition" >> "$GITHUB_OUTPUT"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "decided_at=$decided_at" >> "$GITHUB_OUTPUT"
+          echo "submission_sha=$submission_sha" >> "$GITHUB_OUTPUT"
+          echo "packet_blob_sha=$packet_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge submitted editorial decision
+        if: steps.submission.outputs.mode == 'publish'
+        shell: bash
+        run: |
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.submission.outputs.edition }}" editorial-submitted \
+            --packet-blob-sha="${{ steps.submission.outputs.packet_blob_sha }}" \
+            --submission-sha="${{ steps.submission.outputs.submission_sha }}"
 
       - name: Validate evidence-bounded submission
         id: validation
+        continue-on-error: true
         env:
           EDITORIAL_BRANCH: ${{ steps.submission.outputs.branch }}
+          PUBLICATION_MODE: ${{ steps.submission.outputs.mode }}
         run: node scripts/validate-editorial-submission.mjs
+
+      - name: Persist machine-readable validation result
+        if: steps.submission.outputs.mode == 'publish' && always()
+        shell: bash
+        run: |
+          if [ "${{ steps.validation.outcome }}" = "success" ]; then
+            event=editorial-valid
+          else
+            event=editorial-invalid
+          fi
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.submission.outputs.edition }}" "$event" \
+            --packet-blob-sha="${{ steps.submission.outputs.packet_blob_sha }}" \
+            --submission-sha="${{ steps.submission.outputs.submission_sha }}" \
+            --validation=artifacts/editorial-validation.json
+
+      - name: Upload editorial validation result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: editorial-validation-${{ steps.submission.outputs.edition }}-${{ github.run_id }}
+          path: artifacts/editorial-validation.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop invalid editorial submission
+        if: steps.validation.outcome != 'success'
+        run: |
+          echo "Editorial decision is invalid; durable editorial.invalid state was recorded."
+          exit 1
 
       - name: Build and validate publication
         id: build
@@ -124,6 +177,7 @@ jobs:
             if git diff --quiet -- public/data; then
               record_result
               echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
@@ -154,6 +208,26 @@ jobs:
           echo "Failed to publish $edition/$mode after three rebuild attempts"
           exit 1
 
+      - name: Acknowledge committed Canonical and locale lane
+        if: steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'success'
+        shell: bash
+        run: |
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.submission.outputs.edition }}" publication-committed \
+            --main-sha="${{ steps.publication.outputs.commit }}" \
+            --source=editorial
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.submission.outputs.edition }}" locale-status \
+            --status="${{ steps.publication.outputs.locale_status }}" \
+            --reason="${{ steps.publication.outputs.locale_reason }}"
+
+      - name: Record publication failure state
+        if: failure() && steps.validation.outcome == 'success' && steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'failure'
+        shell: bash
+        run: |
+          bash scripts/update-edition-state-branch.sh \
+            "${{ steps.submission.outputs.edition }}" publication-failed \
+            --error="trusted publisher failed after validation"
       - name: Record degraded English incident
         if: steps.publication.outputs.locale_status == 'unavailable'
         env:

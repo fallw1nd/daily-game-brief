@@ -96,20 +96,24 @@ describe("bilingual Scheduled Task cutover contract", () => {
     expect(input.packages[0].sources[0].detectedLanguage).toBe("en");
   });
 
-  it("requires contractVersion 2 and sharedFactFrame but keeps locales optional for Chinese-first degradation", () => {
+  it("requires contractVersion 2 while keeping locales optional for Chinese-first degradation", () => {
     expect(editorialSchema.required).toContain("contractVersion");
+    expect(editorialSchema.required).toContain("packetBlobSha");
     expect(editorialSchema.required).not.toContain("locales");
-    expect(editorialSchema.properties.decisions.items.required).toContain("sharedFactFrame");
+    expect(editorialSchema.properties.decisions.items.required).not.toContain("sharedFactFrame");
   });
 
-  it("keeps pre-cutover Chinese-only handoffs publishable for queued/idempotent retries", () => {
+  it("rejects pre-cutover normal handoffs that are not bound to a packet blob", () => {
     const input = buildEditorialInput(evidence);
-    expect(validateEditorialOutput(baseDecision(), input)).toEqual([]);
+    expect(validateEditorialOutput(baseDecision(), input)).toEqual(expect.arrayContaining([
+      "output.contractVersion is required",
+      "output.packetBlobSha is required",
+    ]));
   });
 
   it("requires the shared fact frame when contractVersion 2 is selected", () => {
     const input = buildEditorialInput(evidence);
-    const bilingual = { ...baseDecision(), contractVersion: 2 };
+    const bilingual = { ...baseDecision(), contractVersion: 2, packetBlobSha: "1".repeat(40) };
     expect(validateEditorialOutput(bilingual, input)).toContain(
       "decisions[0]: contractVersion 2 include requires a complete sharedFactFrame",
     );
@@ -120,11 +124,10 @@ describe("bilingual Scheduled Task cutover contract", () => {
     const bilingual = {
       ...baseDecision(),
       contractVersion: 2,
+      packetBlobSha: "1".repeat(40),
       decisions: [{ ...baseDecision().decisions[0], sharedFactFrame: sharedFactFrame() }],
     };
     expect(validateEditorialOutput(bilingual, input)).toEqual([]);
-    expect(validateEnglishEditorialLocale(bilingual)).toEqual([
-      "contractVersion 2 requires locales.en schemaVersion=1 and locale=en",
-    ]);
+    expect(validateEnglishEditorialLocale(bilingual)).toEqual([]);
   });
 });

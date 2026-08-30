@@ -80,7 +80,7 @@ const [latestText, manifestText] = await Promise.all([
 ]);
 const latest = JSON.parse(latestText);
 const manifest = JSON.parse(manifestText);
-const contractErrors = validateEditorialOutput(editorial, packet.editorialInput);
+const contractErrors = PUBLICATION_MODE === "locale-repair" ? [] : validateEditorialOutput(editorial, packet.editorialInput);
 if (contractErrors.length) throw new Error(`Editorial decisions failed evidence validation:\n- ${contractErrors.join("\n- ")}`);
 
 if (PUBLICATION_MODE === "locale-repair") {
@@ -148,16 +148,31 @@ if (result.status === "already-exists") {
     ? JSON.parse(await readFile(resolve("public/data", manifestItem.path), "utf8"))
     : null;
   const feedbackEligible = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  let localeStatus = "unchanged";
+  if (feedbackEligible && editorial.locales?.en) {
+    const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
+    const localePlan = buildEnglishOverlay({
+      canonical: existingEdition,
+      editorial,
+      entryIdsByEvent: deriveEntryIdsByEvent(editorial),
+      previousOverlay: priorOverlay,
+    });
+    if (localePlan.status === "available") {
+      await writeLocalePlan(existingEdition, localePlan);
+      await rebuildGeneratedIndexes();
+      localeStatus = "available";
+    }
+  }
   await writePublicationResult({
     editionId: editorial.editionId,
-    status: result.status,
+    status: localeStatus === "available" ? "already-exists-locale-repaired" : result.status,
     publicationMode: "publish",
     decisionDigest: result.decisionDigest,
     canonicalStatus: "unchanged",
-    localeStatus: "unchanged",
+    localeStatus,
     feedbackEligible,
   });
-  console.log(`${editorial.editionId} already exists; no files changed.`);
+  console.log(`${editorial.editionId} already exists; canonical unchanged; locale=${localeStatus}.`);
   process.exit(0);
 }
 
