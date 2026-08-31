@@ -105,7 +105,7 @@ function upcomingEntry(item, previous) {
   };
 }
 
-export function buildEdition({ packet, editorial, latest, manifest, now = new Date() }) {
+export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false }) {
   const input = packet.editorialInput;
   const window = input.window;
   if (editorial.editionId !== window.id) throw new Error("editorial editionId does not match packet window");
@@ -115,7 +115,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     latest.entries?.some((item) => item.headline?.startsWith("[自动事实清单]")) ||
     latest.sourceReport?.note?.includes("正常ChatGPT定时任务未在SLA前完成")
   );
-  if (existingManifestItem && !degradedEdition) {
+  const authorizedLatestRevision = Boolean(
+    allowSameEditionRevision &&
+    existingManifestItem &&
+    latest.id === window.id &&
+    latest.issueNumber === existingManifestItem.issueNumber
+  );
+  if (existingManifestItem && !degradedEdition && !authorizedLatestRevision) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
   const prefix = archiveTitlePrefix(window.period);

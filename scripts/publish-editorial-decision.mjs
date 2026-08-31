@@ -18,6 +18,7 @@ const PACKET_PATH = resolve(process.env.EDITORIAL_PACKET_PATH || "artifacts/edit
 const DECISION_PATH = resolve(process.env.EDITORIAL_DECISION_PATH || "artifacts/editorial-decisions.json");
 const RESULT_PATH = resolve(process.env.PUBLICATION_RESULT_PATH || "artifacts/publication-result.json");
 const PUBLICATION_MODE = process.env.PUBLICATION_MODE || "publish";
+const SAME_EDITION_REVISION_REASON = "user_authorized_same_edition_revision";
 if (!new Set(["publish", "locale-repair"]).has(PUBLICATION_MODE)) {
   throw new Error(`Unsupported PUBLICATION_MODE: ${PUBLICATION_MODE}`);
 }
@@ -70,6 +71,24 @@ async function writeLocalePlan(canonical, localePlan) {
   await mkdir(dirname(statusFile), { recursive: true });
   await writeFile(statusFile, JSON.stringify(status, null, 2) + "\n");
   await rm(overlayFile, { force: true });
+}
+
+async function hasAuthorizedSameEditionRevision(editorial) {
+  try {
+    const { stdout } = await run("git", [
+      "show",
+      `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`,
+    ]);
+    const state = JSON.parse(stdout);
+    return state.editionId === editorial.editionId &&
+      state.revisionRequest?.status === "open" &&
+      state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON &&
+      state.packet?.status === "ready" &&
+      state.packet?.blobSha === editorial.packetBlobSha &&
+      state.editorial?.packetBlobSha === editorial.packetBlobSha;
+  } catch {
+    return false;
+  }
 }
 
 const packet = JSON.parse(await readFile(PACKET_PATH, "utf8"));
@@ -141,7 +160,8 @@ if (PUBLICATION_MODE === "locale-repair") {
 }
 
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
-const result = buildEdition({ packet, editorial, latest, manifest, now });
+const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
+const result = buildEdition({ packet, editorial, latest, manifest, now, allowSameEditionRevision });
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem

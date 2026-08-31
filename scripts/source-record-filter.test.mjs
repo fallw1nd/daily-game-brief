@@ -17,9 +17,12 @@ describe("source record filters", () => {
     expect(result.records.map((item) => item.headline)).toEqual(["新作ゲームの発売日が正式発表"]);
   });
 
-  it("keeps all configured filtered sources shadow-only", () => {
-    for (const id of Object.keys(filters.sources)) {
+  it("allows a bounded filter to remain attached when a source is selectively promoted", () => {
+    expect(byId.get("4gamer-topics")?.mode).toBe("active");
+    expect(filters.sources["4gamer-topics"]).toBeTruthy();
+    for (const id of ["denfaminico", "pcgamer-news"]) {
       expect(byId.get(id)?.mode).toBe("shadow");
+      expect(filters.sources[id]).toBeTruthy();
     }
   });
 

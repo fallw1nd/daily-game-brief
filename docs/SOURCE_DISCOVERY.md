@@ -25,19 +25,28 @@ Lane selection uses headline semantics plus source capabilities and a source-spe
 
 Substantive interviews, investigations, technical analysis, industry analysis, reviews, and award material may be admitted based on the publication time of that content itself. The underlying background event does not have to occur in the same Daily window. The content must add concrete information; ordinary opinion, recommendation copy, promotion, and repackaged old news remain excluded.
 
-## Phase 1 shadow pool
+## First selectively promoted cohort
 
-- 4Gamer News Topics
-- 4Gamer Interviews
-- 4Gamer Reviews
-- VGC News
-- GAME Watch
-- 電ファミニコゲーマー News
-- 電ファミニコゲーマー Interviews
-- Game Developer
-- PC Gamer
+After six read-only GitHub-hosted runner observations through run `33398534759`, the first bounded cohort is promoted for a formal same-edition production acceptance run:
 
-Where a publisher exposes a stable first-party RSS/Atom feed with publication timestamps, the shadow registry prefers that feed over broad HTML navigation scraping. VGC News, 電ファミ News/Interviews, Game Developer, and PC Gamer therefore use feed endpoints while remaining shadow-only. Separate feeds from the same publisher retain the same `independenceKey` / `publisherFamily`, so splitting discovery lanes never creates false corroboration.
+- 4Gamer News Topics — stable first-party RSS with publication timestamps; the existing source-specific filter continues to remove recurring low-value columns before review.
+- 4Gamer Interviews — stable dedicated RSS for interview/feature discovery.
+- 4Gamer Reviews — stable dedicated RSS for review discovery.
+- VGC News — stable first-party News RSS with publication timestamps and a clean news/industry/rumor discovery role.
+- Game Developer — stable RSS with publication timestamps for industry, development, interview, feature, and technical material.
+
+Promotion means these sources may now enter the production review/evidence pipeline; it does **not** make their stories automatically publishable or official. Every included story still requires opened evidence and the normal editorial admission rules. All three 4Gamer lanes retain the same `independenceKey` / `publisherFamily`, so separate feeds never create false corroboration.
+
+The first formal acceptance rerun deliberately keeps noisier or technically incomplete sources in shadow rather than increasing source count for its own sake.
+
+## Remaining Phase 1 shadow pool
+
+- GAME Watch — listing discovery works, but publication time still needs a safe listing adapter or opened-detail fallback before activation.
+- 電ファミニコゲーマー News — News RSS is stable, but promotional/general-entertainment mix still needs more production sampling.
+- 電ファミニコゲーマー Interviews — the previously configured `/category/interview/feed` did not represent the intended interview archive. Discovery now uses the real `/category/interview` HTML archive and only `/interview/...` article URLs; it remains shadow until this corrected adapter is observed on the runner.
+- PC Gamer — RSS and publication times are stable, but the volume and mixed hardware/opinion/news profile still require conservative sampling.
+
+Where a publisher exposes a stable first-party RSS/Atom feed with publication timestamps, the registry prefers that feed over broad HTML navigation scraping. VGC News, Game Developer, PC Gamer, and 電ファミ News therefore use feed endpoints. Separate feeds from the same publisher retain the same `independenceKey` / `publisherFamily`, so splitting discovery lanes never creates false corroboration.
 
 ## Phase 2 shadow pool
 
@@ -54,15 +63,17 @@ Official award discovery:
 - BAFTA Games Awards Press Room
 - D.I.C.E. Awards / Academy of Interactive Arts & Sciences
 
-These award sources are registered as `official` + `primary`, but remain `shadow` until the production runner confirms stable discovery and usable publication timestamps.
+These award sources are registered as `official` + `primary`, but remain `shadow` until the production runner confirms stable discovery and usable publication timestamps. Current blockers are client-rendered discovery for TGA and runner access restrictions for BAFTA/D.I.C.E.; their primary reliability classification does not override those discovery failures.
 
 ## Shadow contribution metrics
 
-Shadow promotion is based on contribution, not raw article volume. A shadow candidate earns same-window contribution credit only when its listing evidence already supplies a publication time that falls inside the exact edition window. The collector records how many such window-qualified events overlap an active-source event, how many remain unique to the shadow pool, and a per-source overlap rate. Candidates whose listing time is unknown are tracked separately as timestamp/parser health signals and never inflate same-window unique contribution.
+Shadow promotion is based on contribution, not raw article volume. A shadow candidate earns same-window contribution credit only when its listing evidence already supplies a publication time that falls inside the exact edition window. Candidates whose listing time is unknown are tracked separately as timestamp/parser health signals and never inflate same-window contribution.
 
-The durable source-health ledger keeps recent averages of window-qualified, unique, overlapping, and unknown-time candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories, and a source with weak timestamp extraction does not appear productive merely because it exposes a large archive.
+A candidate is counted as **unique** only when its canonical subject identity and material event kind are stable enough to compare safely. If the system cannot establish that identity, the candidate is reported as `identity-unresolved` rather than being treated as unique merely because no active key matched. This conservative rule was added after a real observation showed a Japanese report of an already-covered cancellation being misclassified as unique.
 
-Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Production review remains broader: an active candidate with an unknown listing time can still be investigated and have its time established later from opened evidence. Promotion reviews must consider contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
+The durable source-health ledger keeps recent averages of window-qualified, unique, overlapping, identity-unresolved, and unknown-time candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories, and a source with weak identity or timestamp extraction does not appear productive merely because it exposes a large archive.
+
+Cross-source overlap uses a known canonical title key plus event kind when available. Exact stable fallback keys may prove overlap, but an unresolved identity can never prove uniqueness. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Production review remains broader: an active candidate with an unknown listing time can still be investigated and have its time established later from opened evidence. Promotion reviews must consider contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
 
 ## Read-only observation lane
 
@@ -70,7 +81,7 @@ Cross-source overlap uses a known canonical title key plus event kind when avail
 
 When a shadow listing exposes candidate URLs but no publication time, the observer may run a bounded detail-page timestamp probe. It opens at most two registered candidate URLs per shadow source and at most 30 pages in total, accepts only HTTPS URLs that still match the source registry, and extracts standard article publication metadata such as `article:published_time`, `datePublished`, or `<time datetime>`. Probe output is written to the observation artifact only. It does not modify the candidate list, establish production evidence, upgrade `fact_status`, or grant same-window contribution credit.
 
-A manual observation is useful for parser health, accessibility, candidate yield, active-vs-shadow overlap, and determining whether listing-time gaps can be repaired safely from article metadata. It is not itself a production edition and cannot automatically promote a source. Promotion still requires editorial sampling and, where timing behavior matters, normal Daily collector evidence across appropriate windows.
+A manual observation is useful for parser health, accessibility, candidate yield, active-vs-shadow overlap, and determining whether listing-time gaps can be repaired safely from article metadata. It is not itself a production edition and cannot automatically promote a source. The first promoted cohort therefore proceeds to a user-authorized formal production acceptance rerun before its rollout is treated as fully accepted.
 
 ## Primary-source resolution
 
@@ -86,9 +97,9 @@ Before changing a source from `shadow` to `active`, inspect at least:
 2. Parser stability and publication-time extraction.
 3. Candidate yield and percentage of candidates actually inside the Daily window.
 4. Duplicate rate against existing active sources.
-5. Unique high-value stories that would otherwise have been missed.
+5. Stable-identity high-value stories that would otherwise have been missed; unresolved identities never count as unique.
 6. Noise, promotional content, community submissions, and stale listing entries.
 7. Whether the source should establish evidence (`high`/`primary`) or remain discovery-only.
 8. Whether source-specific filters are needed before activation.
 
-Do not promote sources merely to increase source count. The first activation review should use at least one real Daily collector result from the production runner, and preferably several consecutive runs before changing high-volume or mixed-content sources.
+Do not promote sources merely to increase source count. Prefer small cohorts that can be tested in a real production packet and rolled back independently if their candidate quality is not acceptable.

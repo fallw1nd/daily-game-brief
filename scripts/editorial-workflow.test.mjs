@@ -22,16 +22,19 @@ describe("final editorial packet workflow", () => {
     expect(workflow).not.toContain('EDITION_ID="$edition" node - <<\'NODE\'');
     expect(workflow).toContain("wake.schemaVersion !== 1");
     expect(workflow).toContain('wake.period !== "daily"');
-    expect(workflow).toContain('wake.reason !== "packet_missing_at_handoff"');
+    expect(workflow).toContain('new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"])');
+    expect(workflow).toContain('state.revisionRequest?.status !== "open"');
+    expect(workflow).toContain('state.packet?.status !== "pending"');
     expect(workflow).toContain('--edition="$edition"');
     expect(workflow).toContain("steps.edition.outcome == 'success'");
   });
 
-  it("dispatches exact-edition SLA verification without requiring a checkout", () => {
+  it("dispatches exact-edition SLA verification without requiring a checkout, except for authorized revision", () => {
     expect(workflow).toContain('GH_REPO: ${{ github.repository }}');
     expect(workflow).toContain("gh workflow run brief-sla-watchdog.yml");
     expect(workflow).toContain('-f period="${{ needs.collect.outputs.period }}"');
     expect(workflow).toContain('-f edition="${{ needs.collect.outputs.edition }}"');
+    expect(workflow).toContain("needs.collect.outputs.revision_authorized != 'true'");
   });
 
   it("builds bounded title-only hints after evidence and before editorialization", () => {

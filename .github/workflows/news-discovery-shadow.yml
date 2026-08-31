@@ -21,8 +21,8 @@ on:
         type: string
   push:
     # Daily liveness fallback. The 10:20 ChatGPT task may write one exact-edition
-    # wake file when the acknowledged packet is missing. The wake commit is only
-    # a trigger; GitHub still owns recovery.
+    # wake file when the acknowledged packet is missing. A user-authorized same-edition
+    # revision may use the same exact-edition wake lane, but it never starts the SLA fallback.
     branches:
       - "automation/editorial/*-daily"
     paths:
@@ -44,6 +44,7 @@ jobs:
       edition: ${{ steps.edition.outputs.edition }}
       period: ${{ steps.edition.outputs.period }}
       needed: ${{ steps.edition.outputs.needed }}
+      revision_authorized: ${{ steps.edition.outputs.revision_authorized }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -62,6 +63,7 @@ jobs:
           git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
           state_dir="$RUNNER_TEMP/edition-state-selection"
           git worktree add --detach "$state_dir" origin/automation/state
+          echo "revision_authorized=false" >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             period="${{ inputs.period }}"
             node scripts/resolve-packet-dispatch.mjs \
@@ -78,14 +80,27 @@ jobs:
             wake_path="automation/wake/$edition.json"
             git fetch origin "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/daily-wake-source"
             git show "origin/daily-wake-source:$wake_path" > "$RUNNER_TEMP/daily-wake.json"
-            EDITION_ID="$edition" node -e '
+            wake_reason="$(EDITION_ID="$edition" node -e '
               const fs = require("node:fs");
               const wake = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/daily-wake.json", "utf8"));
               const edition = process.env.EDITION_ID;
-              if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || wake.reason !== "packet_missing_at_handoff") {
+              const allowed = new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"]);
+              if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || !allowed.has(wake.reason)) {
                 throw new Error(`invalid Daily wake payload for ${edition}`);
               }
-            '
+              process.stdout.write(wake.reason);
+            ')"
+            if [ "$wake_reason" = "user_authorized_same_edition_revision" ]; then
+              state_path="$state_dir/automation/status/$edition.json"
+              EDITION_ID="$edition" STATE_PATH="$state_path" node -e '
+                const fs = require("node:fs");
+                const state = JSON.parse(fs.readFileSync(process.env.STATE_PATH, "utf8"));
+                if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.packet?.status !== "pending") {
+                  throw new Error(`durable revision authorization is not open for ${process.env.EDITION_ID}`);
+                }
+              '
+              echo "revision_authorized=true" >> "$GITHUB_OUTPUT"
+            fi
             node scripts/resolve-packet-dispatch.mjs \
               --period="$period" \
               --edition="$edition" >> "$GITHUB_OUTPUT"
@@ -227,7 +242,7 @@ jobs:
 
   verify-after-handoff:
     needs: collect
-    if: needs.collect.outputs.needed != 'false'
+    if: needs.collect.outputs.needed != 'false' && needs.collect.outputs.revision_authorized != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 65
     steps:
