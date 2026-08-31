@@ -37,6 +37,7 @@ import type {
   BriefManifest,
   BriefManifestItem,
   BriefSearchIndex,
+  EditionPeriod,
   FactStatus,
   ImageAsset,
   SectionKey,
@@ -81,10 +82,11 @@ const titleStatusLabels = {
 
 const sourceKindLabels = { primary: "一手", secondary: "补充", discovery: "线索" };
 
-const periodLabels = {
+const periodLabels: Record<EditionPeriod, { edition: string; english: string; nextTime: string; nextEdition: string }> = {
   am: { edition: "早报", english: "MORNING", nextTime: "今日 17:00", nextEdition: "游戏晚报" },
   pm: { edition: "晚报", english: "EVENING", nextTime: "明日 10:10", nextEdition: "游戏早报" },
-} as const;
+  daily: { edition: "日报", english: "DAILY", nextTime: "明日 17:00", nextEdition: "游戏日报" },
+};
 
 const storySectionDefinitions: Array<{
   id: string;
@@ -112,9 +114,9 @@ const timeOnly = (value: string) => value.slice(11);
 const storyTitle = (entry: BriefEntry) =>
   entry.title.title_zh_cn ? "《" + entry.title.title_zh_cn + "》" : entry.title.title_en;
 
+const archivePeriodLabel = (period: EditionPeriod) => periodLabels[period].edition;
 const archiveEditionTitle = (item: BriefManifestItem) =>
-  item.archiveTitle?.trim() ||
-  `${item.period === "am" ? "早报" : "晚报"}｜本期简报`;
+  item.archiveTitle?.trim() || `${archivePeriodLabel(item.period)}｜本期简报`;
 
 function resolveMediaUrl(url: string): string {
   if (/^(https?:|data:|blob:)/.test(url)) return url;
@@ -221,7 +223,6 @@ function PendingMark({ tracking }: Pick<BriefEntry, "tracking">) {
   if (tracking !== true) return null;
   return <span className="pending-mark">{"\u4ecd\u5f85\u786e\u8ba4"}</span>;
 }
-
 
 function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
@@ -342,19 +343,7 @@ function SectionHeader({ number, title, count, id }: { number: string; title: st
   );
 }
 
-function StorySection({
-  id,
-  number,
-  title,
-  entries,
-  note,
-}: {
-  id: string;
-  number: string;
-  title: string;
-  entries: BriefEntry[];
-  note?: string;
-}) {
+function StorySection({ id, number, title, entries, note }: { id: string; number: string; title: string; entries: BriefEntry[]; note?: string }) {
   return (
     <section className="editorial-section" id={id} aria-labelledby={id + "-title"}>
       <SectionHeader number={number} title={title} count={entries.length} id={id + "-title"} />
@@ -370,25 +359,13 @@ function UpcomingItem({ item }: { item: UpcomingEntry }) {
   const title = item.title.title_zh_cn ? "《" + item.title.title_zh_cn + "》" : item.title.title_en;
   return (
     <article className="upcoming-item">
-      <EditorialImage
-        asset={item.cover}
-        kind="cover"
-        presentation="cover"
-        title={title}
-        unavailableNote={item.coverNote}
-      />
+      <EditorialImage asset={item.cover} kind="cover" presentation="cover" title={title} unavailableNote={item.coverNote} />
       <div className="upcoming-item__body">
         <time>{item.date}</time>
         <h3>{title}</h3>
         {item.title.title_zh_cn && <p>{item.title.title_en}</p>}
-        <div>
-          <span>{item.platforms.join(" / ")}</span>
-          <span>{item.releaseType}</span>
-          <span>{item.region}</span>
-        </div>
-        <a href={item.source.url} target="_blank" rel="noreferrer">
-          {item.source.label}<ArrowUpRight aria-hidden="true" />
-        </a>
+        <div><span>{item.platforms.join(" / ")}</span><span>{item.releaseType}</span><span>{item.region}</span></div>
+        <a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>
       </div>
     </article>
   );
@@ -403,14 +380,7 @@ function uniqueEntries(entries: Array<BriefEntry | undefined>): BriefEntry[] {
   });
 }
 
-function App({
-  initialEdition = fallbackEdition,
-  initialManifest = null,
-  initialSearchIndex = null,
-  initialTheme,
-  initialAccent,
-  initialQuery,
-}: AppProps = {}) {
+function App({ initialEdition = fallbackEdition, initialManifest = null, initialSearchIndex = null, initialTheme, initialAccent, initialQuery }: AppProps = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -430,500 +400,89 @@ function App({
 
   const sourceReport = edition.sourceReport ?? fallbackSourceReport;
   const period = periodLabels[edition.period];
-
-  const visibleStorySections = storySectionDefinitions
-    .map((definition) => ({
-      ...definition,
-      entries: entriesForSection(edition.entries, definition.section),
-    }))
-    .filter((section) => section.entries.length > 0)
-    .map((section, index) => ({
-      ...section,
-      number: String(index + 2).padStart(2, "0"),
-    }));
-
+  const visibleStorySections = storySectionDefinitions.map((definition) => ({ ...definition, entries: entriesForSection(edition.entries, definition.section) })).filter((section) => section.entries.length > 0).map((section, index) => ({ ...section, number: String(index + 2).padStart(2, "0") }));
   let nextSectionNumber = visibleStorySections.length + 2;
   const upcomingNumber = String(nextSectionNumber).padStart(2, "0");
   if (edition.upcoming.length > 0) nextSectionNumber += 1;
   const sourceReportNumber = String(nextSectionNumber).padStart(2, "0");
   const archiveNumber = String(nextSectionNumber + 1).padStart(2, "0");
-
-  const sectionsByKey = Object.fromEntries(
-    visibleStorySections.map((section) => [section.section, section.entries]),
-  ) as Partial<Record<SectionKey, BriefEntry[]>>;
+  const sectionsByKey = Object.fromEntries(visibleStorySections.map((section) => [section.section, section.entries])) as Partial<Record<SectionKey, BriefEntry[]>>;
   const featured = entriesForSection(edition.entries, "focus");
-  const focusEntries = uniqueEntries([
-    ...featured,
-    ...(sectionsByKey.news ?? []),
-    ...(sectionsByKey.releases ?? []),
-    ...(sectionsByKey.industry ?? []),
-    ...(sectionsByKey.reviews ?? []),
-    ...edition.entries,
-  ]).slice(0, 5);
+  const focusEntries = uniqueEntries([...featured, ...(sectionsByKey.news ?? []), ...(sectionsByKey.releases ?? []), ...(sectionsByKey.industry ?? []), ...(sectionsByKey.reviews ?? []), ...edition.entries]).slice(0, 5);
   const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
   const manifestIndex = manifest?.editions.findIndex((item) => item.id === edition.id) ?? -1;
   const previousManifestEdition = manifestIndex > 0 ? manifest?.editions[manifestIndex - 1] : undefined;
-  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1
-    ? manifest?.editions[manifestIndex + 1]
-    : undefined;
-  const pageTitle = edition.archiveTitle?.trim() ||
-    manifestEdition?.archiveTitle?.trim() ||
-    `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
-
-  const directoryItems = [
-    ...visibleStorySections.map((section) => ({
-      number: section.number,
-      label: section.label,
-      count: section.entries.length,
-      href: "#" + section.id,
-    })),
-    ...(edition.upcoming.length > 0
-      ? [{ number: upcomingNumber, label: "日历", count: edition.upcoming.length, href: "#upcoming" }]
-      : []),
-  ];
-
-  const primaryLinks = [
-    { href: "#content", label: "\u5185\u5bb9", icon: NewspaperClipping },
-    ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386", icon: CalendarBlank }] : []),
-    { href: "#archive", label: "\u5f52\u6863", icon: Archive },
-  ];
-
-  const archiveEditions = useMemo(
-    () => [...(manifest?.editions ?? [])].reverse(),
-    [manifest],
-  );
-  const archiveCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of searchIndex?.entries ?? []) {
-      counts.set(entry.editionId, (counts.get(entry.editionId) ?? 0) + 1);
-    }
-    return counts;
-  }, [searchIndex]);
-  const visibleArchiveEditions = archiveExpanded
-    ? archiveEditions
-    : archiveEditions.slice(0, 5);
+  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1 ? manifest?.editions[manifestIndex + 1] : undefined;
+  const pageTitle = edition.archiveTitle?.trim() || manifestEdition?.archiveTitle?.trim() || `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
+  const directoryItems = [...visibleStorySections.map((section) => ({ number: section.number, label: section.label, count: section.entries.length, href: "#" + section.id })), ...(edition.upcoming.length > 0 ? [{ number: upcomingNumber, label: "日历", count: edition.upcoming.length, href: "#upcoming" }] : [])];
+  const primaryLinks = [{ href: "#content", label: "\u5185\u5bb9", icon: NewspaperClipping }, ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386", icon: CalendarBlank }] : []), { href: "#archive", label: "\u5f52\u6863", icon: Archive }];
+  const archiveEditions = useMemo(() => [...(manifest?.editions ?? [])].reverse(), [manifest]);
+  const archiveCounts = useMemo(() => { const counts = new Map<string, number>(); for (const entry of searchIndex?.entries ?? []) counts.set(entry.editionId, (counts.get(entry.editionId) ?? 0) + 1); return counts; }, [searchIndex]);
+  const visibleArchiveEditions = archiveExpanded ? archiveEditions : archiveEditions.slice(0, 5);
   const hiddenArchiveCount = Math.max(archiveEditions.length - 5, 0);
-  const searchResults = useMemo(
-    () => searchArchiveEntries(searchIndex?.entries ?? [], query),
-    [query, searchIndex],
-  );
+  const searchResults = useMemo(() => searchArchiveEntries(searchIndex?.entries ?? [], query), [query, searchIndex]);
   const visibleSearchResults = searchResults.slice(0, 100);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    try {
-      window.localStorage.setItem("brief-theme", theme);
-    } catch {
-      // Keep the selected theme for this session when storage is unavailable.
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.dataset.accent = accent;
-    try {
-      window.localStorage.setItem("brief-accent", accent);
-    } catch {
-      // Keep the selected accent for this session when storage is unavailable.
-    }
-  }, [accent]);
-
+  useEffect(() => { document.documentElement.dataset.theme = theme; try { window.localStorage.setItem("brief-theme", theme); } catch {} }, [theme]);
+  useEffect(() => { document.documentElement.dataset.accent = accent; try { window.localStorage.setItem("brief-accent", accent); } catch {} }, [accent]);
   useEffect(() => {
     if (!accentPickerOpen) return;
-
-    const closeOnPointer = (event: PointerEvent) => {
-      if (!accentPickerRef.current?.contains(event.target as Node)) {
-        setAccentPickerOpen(false);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAccentPickerOpen(false);
-    };
-
-    document.addEventListener("pointerdown", closeOnPointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnPointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
+    const closeOnPointer = (event: PointerEvent) => { if (!accentPickerRef.current?.contains(event.target as Node)) setAccentPickerOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setAccentPickerOpen(false); };
+    document.addEventListener("pointerdown", closeOnPointer); document.addEventListener("keydown", closeOnEscape);
+    return () => { document.removeEventListener("pointerdown", closeOnPointer); document.removeEventListener("keydown", closeOnEscape); };
   }, [accentPickerOpen]);
-
   useEffect(() => {
     const controller = new AbortController();
-
     void (async () => {
-      const [latestResult, manifestResult, indexResult] = await Promise.allSettled([
-        loadLatestEdition(controller.signal),
-        loadBriefManifest(controller.signal),
-        loadSearchIndex(controller.signal),
-      ]);
-
+      const [latestResult, manifestResult, indexResult] = await Promise.allSettled([loadLatestEdition(controller.signal), loadBriefManifest(controller.signal), loadSearchIndex(controller.signal)]);
       if (controller.signal.aborted) return;
-
-      if (manifestResult.status === "fulfilled") {
-        setManifest(manifestResult.value);
-      } else {
-        setArchiveError("归档清单暂时无法读取。");
-      }
-
-      if (indexResult.status === "fulfilled") {
-        setSearchIndex(indexResult.value);
-      } else {
-        setArchiveError((current) => current || "跨期搜索索引暂时无法读取。");
-      }
-
-      const latest = latestResult.status === "fulfilled"
-        ? latestResult.value.edition
-        : initialEdition;
+      if (manifestResult.status === "fulfilled") setManifest(manifestResult.value); else setArchiveError("归档清单暂时无法读取。");
+      if (indexResult.status === "fulfilled") setSearchIndex(indexResult.value); else setArchiveError((current) => current || "跨期搜索索引暂时无法读取。");
+      const latest = latestResult.status === "fulfilled" ? latestResult.value.edition : initialEdition;
       const requestedId = new URLSearchParams(window.location.search).get("edition");
-      const requestedItem = manifestResult.status === "fulfilled"
-        ? manifestResult.value.editions.find((item) => item.id === requestedId)
-        : undefined;
-
+      const requestedItem = manifestResult.status === "fulfilled" ? manifestResult.value.editions.find((item) => item.id === requestedId) : undefined;
       if (requestedItem) {
-        try {
-          const archived = await loadArchivedEdition(
-            requestedItem,
-            controller.signal,
-          );
-          if (!controller.signal.aborted) setEdition(archived);
-        } catch {
-          if (!controller.signal.aborted) {
-            setEdition(latest);
-            setArchiveError("指定归档暂时无法读取，已显示最新一期。");
-          }
-        }
-      } else {
-        setEdition(latest);
-      }
+        try { const archived = await loadArchivedEdition(requestedItem, controller.signal); if (!controller.signal.aborted) setEdition(archived); }
+        catch { if (!controller.signal.aborted) { setEdition(latest); setArchiveError("指定归档暂时无法读取，已显示最新一期。"); } }
+      } else setEdition(latest);
     })();
-
     return () => controller.abort();
   }, [initialEdition]);
-
-  useEffect(() => {
-    const target = decodeURIComponent(window.location.hash.slice(1));
-    if (!target || !edition.entries.some((entry) => entry.id === target)) return;
-    window.requestAnimationFrame(() => {
-      document.getElementById(target)?.scrollIntoView({ block: "start" });
-    });
-  }, [edition.id, edition.entries]);
-
+  useEffect(() => { const target = decodeURIComponent(window.location.hash.slice(1)); if (!target || !edition.entries.some((entry) => entry.id === target)) return; window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: "start" })); }, [edition.id, edition.entries]);
   useEditorialMotion(rootRef, edition.id);
 
   return (
     <div className="site-shell" data-theme={theme} data-accent={accent} ref={rootRef}>
       <a className="skip-link" href="#today">跳到今日简报</a>
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="游戏圈动态首页">
-          <span>游戏圈动态</span><small>DAILY GAME BRIEF</small>
-        </a>
-        <div className="topbar__edition">
-          <span>NO.{String(edition.issueNumber).padStart(3, "0")}</span>
-          <span>{edition.date}</span>
-          <span>{period.english}</span>
-        </div>
+        <a className="brand" href="#top" aria-label="游戏圈动态首页"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></a>
+        <div className="topbar__edition"><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{edition.date}</span><span>{period.english}</span></div>
         <div className="accent-picker" ref={accentPickerRef}>
-          <button
-            className="accent-toggle interaction-state"
-            type="button"
-            aria-label={`切换主题强调色，当前为${accentOptions.find((option) => option.id === accent)?.label}`}
-            aria-expanded={accentPickerOpen}
-            aria-controls="accent-options"
-            onClick={() => setAccentPickerOpen((open) => !open)}
-          >
-            <Palette aria-hidden="true" />
-            <span>配色</span>
-          </button>
-          <div className="accent-options" id="accent-options" hidden={!accentPickerOpen}>
-            <p>主题强调色</p>
-            <div role="radiogroup" aria-label="选择主题强调色">
-              {accentOptions.map((option) => (
-                <button
-                  key={option.id}
-                  className={`accent-option accent-option--${option.id}`}
-                  type="button"
-                  role="radio"
-                  aria-checked={accent === option.id}
-                  onClick={() => {
-                    setAccent(option.id);
-                    setAccentPickerOpen(false);
-                  }}
-                >
-                  <span className="accent-swatch" aria-hidden="true" />
-                  <span>{option.label}</span>
-                  {accent === option.id && <CheckCircle aria-hidden="true" />}
-                </button>
-              ))}
-            </div>
-          </div>
+          <button className="accent-toggle interaction-state" type="button" aria-label={`切换主题强调色，当前为${accentOptions.find((option) => option.id === accent)?.label}`} aria-expanded={accentPickerOpen} aria-controls="accent-options" onClick={() => setAccentPickerOpen((open) => !open)}><Palette aria-hidden="true" /><span>配色</span></button>
+          <div className="accent-options" id="accent-options" hidden={!accentPickerOpen}><p>主题强调色</p><div role="radiogroup" aria-label="选择主题强调色">{accentOptions.map((option) => <button key={option.id} className={`accent-option accent-option--${option.id}`} type="button" role="radio" aria-checked={accent === option.id} onClick={() => { setAccent(option.id); setAccentPickerOpen(false); }}><span className="accent-swatch" aria-hidden="true" /><span>{option.label}</span>{accent === option.id && <CheckCircle aria-hidden="true" />}</button>)}</div></div>
         </div>
-        <button
-          className="theme-toggle interaction-state"
-          type="button"
-          aria-label={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
-          title={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"}
-          onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}
-        >
-          {theme === "dark"
-            ? <Sun aria-hidden="true" />
-            : <Moon aria-hidden="true" />}
-          <span>{theme === "dark" ? "日间" : "夜间"}</span>
-        </button>
-        <button
-          className="menu-button interaction-state"
-          type="button"
-          aria-label={menuOpen ? "关闭目录" : "打开目录"}
-          aria-expanded={menuOpen}
-          aria-controls="primary-navigation"
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? <X aria-hidden="true" /> : <List aria-hidden="true" />}
-          <span>目录</span>
-        </button>
-        <nav id="primary-navigation" className={menuOpen ? "is-open" : ""} aria-label="最高级目录">
-          {primaryLinks.map((link) => (
-            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
-              <link.icon aria-hidden="true" />
-              <span>{link.label}</span>
-            </a>
-          ))}
-        </nav>
+        <button className="theme-toggle interaction-state" type="button" aria-label={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"} title={theme === "dark" ? "切换到日间模式" : "切换到夜间模式"} onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}<span>{theme === "dark" ? "日间" : "夜间"}</span></button>
+        <button className="menu-button interaction-state" type="button" aria-label={menuOpen ? "关闭目录" : "打开目录"} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => setMenuOpen((open) => !open)}>{menuOpen ? <X aria-hidden="true" /> : <List aria-hidden="true" />}<span>目录</span></button>
+        <nav id="primary-navigation" className={menuOpen ? "is-open" : ""} aria-label="最高级目录">{primaryLinks.map((link) => <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}><link.icon aria-hidden="true" /><span>{link.label}</span></a>)}</nav>
         <span className="accent-signal" aria-hidden="true" />
       </header>
-
       <main id="top">
-        <section className="edition-masthead" aria-labelledby="page-title">
-          <div className="edition-masthead__title masthead-reveal">
-            <span>DAILY EDITION</span>
-            <h1 id="page-title">{pageTitle}</h1>
-            <p>{edition.date.replaceAll("-", ".")} / 北京时间</p>
-          </div>
-          <dl className="edition-facts masthead-reveal" aria-label="本期基础信息">
-            <div><dt>信息窗口</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div>
-            <div><dt>计划运行</dt><dd>{edition.plannedAt}</dd></div>
-            <div><dt>实际生成</dt><dd>{edition.generatedAt}</dd></div>
-            <div><dt>下一期</dt><dd>{period.nextTime}</dd></div>
-          </dl>
-        </section>
-
-        <section className="lead-desk masthead-reveal" id="today" aria-labelledby="lead-title">
-          <header className="desk-label">
-            <span>01</span><h2 id="lead-title">今日重点</h2><small>EDITOR'S ORDER</small>
-          </header>
-          {focusEntries[0] ? (
-            <div className="lead-grid">
-              <LeadStory entry={focusEntries[0]} />
-              <div className="focus-list">
-                {focusEntries.slice(1).map((entry, index) => (
-                  <FocusItem key={entry.id} entry={entry} rank={index + 2} />
-                ))}
-              </div>
-            </div>
-          ) : <p className="empty-line">本期暂无重点条目。</p>}
-        </section>
-
-        {directoryItems.length > 0 && (
-          <div className="edition-directory" aria-label="本期非空栏目">
-            {directoryItems.map((item) => (
-              <a key={item.href} href={item.href}>
-                <span>{item.number}</span>
-                <strong>{item.label}</strong>
-                <small>{String(item.count).padStart(2, "0")}</small>
-              </a>
-            ))}
-          </div>
-        )}
-
+        <section className="edition-masthead" aria-labelledby="page-title"><div className="edition-masthead__title masthead-reveal"><span>DAILY EDITION</span><h1 id="page-title">{pageTitle}</h1><p>{edition.date.replaceAll("-", ".")} / 北京时间</p></div><dl className="edition-facts masthead-reveal" aria-label="本期基础信息"><div><dt>信息窗口</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div><div><dt>计划运行</dt><dd>{edition.plannedAt}</dd></div><div><dt>实际生成</dt><dd>{edition.generatedAt}</dd></div><div><dt>下一期</dt><dd>{period.nextTime}</dd></div></dl></section>
+        <section className="lead-desk masthead-reveal" id="today" aria-labelledby="lead-title"><header className="desk-label"><span>01</span><h2 id="lead-title">今日重点</h2><small>EDITOR'S ORDER</small></header>{focusEntries[0] ? <div className="lead-grid"><LeadStory entry={focusEntries[0]} /><div className="focus-list">{focusEntries.slice(1).map((entry, index) => <FocusItem key={entry.id} entry={entry} rank={index + 2} />)}</div></div> : <p className="empty-line">本期暂无重点条目。</p>}</section>
+        {directoryItems.length > 0 && <div className="edition-directory" aria-label="本期非空栏目">{directoryItems.map((item) => <a key={item.href} href={item.href}><span>{item.number}</span><strong>{item.label}</strong><small>{String(item.count).padStart(2, "0")}</small></a>)}</div>}
         <div className="edition-content" id="content">
-          {visibleStorySections.map((section) => (
-            <StorySection
-              key={section.id}
-              id={section.id}
-              number={section.number}
-              title={section.title}
-              entries={section.entries}
-              note={section.note}
-            />
-          ))}
-
-          {edition.upcoming.length > 0 && (
-            <section className="editorial-section upcoming-section" id="upcoming" aria-labelledby="upcoming-title">
-              <SectionHeader
-                number={upcomingNumber}
-                title="未来15天发售"
-                count={edition.upcoming.length}
-                id="upcoming-title"
-              />
-              <div className="upcoming-grid">
-                {edition.upcoming.map((item) => <UpcomingItem key={item.id} item={item} />)}
-              </div>
-              <EditionPager
-                ariaLabel="简报期次导航"
-                previousLabel="上一期"
-                nextLabel="下一期"
-                previousBoundary="已是最早一期"
-                nextBoundary="已是最新一期"
-                previous={previousManifestEdition ? {
-                  href: editionHref(previousManifestEdition.id),
-                  issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + (previousManifestEdition.period === "am" ? "早报" : "晚报"),
-                  title: archiveEditionTitle(previousManifestEdition),
-                } : undefined}
-                next={nextManifestEdition ? {
-                  href: editionHref(nextManifestEdition.id),
-                  issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + (nextManifestEdition.period === "am" ? "早报" : "晚报"),
-                  title: archiveEditionTitle(nextManifestEdition),
-                } : undefined}
-              />
-            </section>
-          )}
-
-
-          <section className="editorial-section source-report" id="source-report" aria-labelledby="source-report-title">
-            <SectionHeader
-              number={sourceReportNumber}
-              title="检索记录"
-              count={sourceReport.checked.length}
-              id="source-report-title"
-            />
-            <div>
-              <section><h3>已检查</h3><p>{sourceReport.checked.join(" / ")}</p></section>
-              <section><h3>访问受限</h3><p>{sourceReport.limited.join(" / ") || "无"}</p></section>
-              <p>{sourceReport.note}</p>
-            </div>
-          </section>
+          {visibleStorySections.map((section) => <StorySection key={section.id} id={section.id} number={section.number} title={section.title} entries={section.entries} note={section.note} />)}
+          {edition.upcoming.length > 0 && <section className="editorial-section upcoming-section" id="upcoming" aria-labelledby="upcoming-title"><SectionHeader number={upcomingNumber} title="未来15天发售" count={edition.upcoming.length} id="upcoming-title" /><div className="upcoming-grid">{edition.upcoming.map((item) => <UpcomingItem key={item.id} item={item} />)}</div><EditionPager ariaLabel="简报期次导航" previousLabel="上一期" nextLabel="下一期" previousBoundary="已是最早一期" nextBoundary="已是最新一期" previous={previousManifestEdition ? { href: editionHref(previousManifestEdition.id), issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(previousManifestEdition.period), title: archiveEditionTitle(previousManifestEdition) } : undefined} next={nextManifestEdition ? { href: editionHref(nextManifestEdition.id), issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(nextManifestEdition.period), title: archiveEditionTitle(nextManifestEdition) } : undefined} /></section>}
+          <section className="editorial-section source-report" id="source-report" aria-labelledby="source-report-title"><SectionHeader number={sourceReportNumber} title="检索记录" count={sourceReport.checked.length} id="source-report-title" /><div><section><h3>已检查</h3><p>{sourceReport.checked.join(" / ")}</p></section><section><h3>访问受限</h3><p>{sourceReport.limited.join(" / ") || "无"}</p></section><p>{sourceReport.note}</p></div></section>
         </div>
-
-        <section className="archive-section" id="archive" aria-labelledby="archive-title">
-          <header>
-            <span>{archiveNumber}</span>
-            <div>
-              <h2 id="archive-title">往期早晚报</h2>
-              <p>
-                {manifest
-                  ? "已归档" + manifest.editions.length + "期，可按期次浏览或跨期检索新闻。"
-                  : "正在读取归档清单。"}
-              </p>
-            </div>
-            <label className="search-field">
-              <span>搜索所有期次的游戏、平台或事件</span>
-              <div>
-                <MagnifyingGlass aria-hidden="true" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="输入新闻关键词"
-                />
-              </div>
-            </label>
-          </header>
-
+        <section className="archive-section" id="archive" aria-labelledby="archive-title"><header><span>{archiveNumber}</span><div><h2 id="archive-title">往期简报</h2><p>{manifest ? "已归档" + manifest.editions.length + "期，可按期次浏览或跨期检索新闻。" : "正在读取归档清单。"}</p></div><label className="search-field"><span>搜索所有期次的游戏、平台或事件</span><div><MagnifyingGlass aria-hidden="true" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入新闻关键词" /></div></label></header>
           {archiveError && <p className="archive-status">{archiveError}</p>}
-
-          {query.trim() && (
-            <section className="archive-search" aria-labelledby="archive-search-title">
-              <header className="archive-subhead">
-                <h3 id="archive-search-title">新闻搜索结果</h3>
-                <span>{searchResults.length} 条匹配</span>
-              </header>
-              <div className="archive-search-results" aria-live="polite">
-                {visibleSearchResults.map((item) => (
-                  <a key={item.editionId + item.entryId} href={editionHref(item.editionId, item.entryId)}>
-                    <span className="archive-result__issue">
-                      NO.{String(item.issueNumber).padStart(3, "0")}
-                      <small>{item.date} · {item.period === "am" ? "早报" : "晚报"}</small>
-                    </span>
-                    <span className="archive-result__copy">
-                      <small>{item.titleZhCn || item.titleEn}</small>
-                      <strong>{item.headline}</strong>
-                      <PendingMark tracking={item.tracking} />
-                      <span className="archive-result__summary">{item.summary}</span>
-                    </span>
-                    <span className="archive-result__action">
-                      <small>{statusLabels[item.factStatus]}</small>
-                      <span>打开原文<ArrowUpRight aria-hidden="true" /></span>
-                    </span>
-                  </a>
-                ))}
-                {searchResults.length === 0 && (
-                  <p className="empty-line">所有已归档简报中均无匹配条目。</p>
-                )}
-              </div>
-              {searchResults.length > visibleSearchResults.length && (
-                <p className="archive-status">结果较多，当前显示前100条，请缩小关键词范围。</p>
-              )}
-            </section>
-          )}
-
-          <section className="archive-editions" aria-labelledby="archive-editions-title">
-            <header className="archive-subhead">
-              <h3 id="archive-editions-title">全部期次</h3>
-              <span>{archiveEditions.length} EDITIONS</span>
-            </header>
-            <div className="archive-edition-list" id="archive-edition-list">
-              {visibleArchiveEditions.map((item) => (
-                <a
-                  key={item.id}
-                  className={item.id === edition.id ? "is-current" : ""}
-                  href={editionHref(item.id)}
-                  aria-current={item.id === edition.id ? "page" : undefined}
-                >
-                  <span>NO.{String(item.issueNumber).padStart(3, "0")}</span>
-                  <time>{item.date}</time>
-                  <strong>{archiveEditionTitle(item)}</strong>
-                  <small>{archiveCounts.get(item.id) ?? "-"} 条新闻 · {item.generatedAt}</small>
-                  <span>{item.id === edition.id ? "当前阅读" : "打开本期"}<ArrowRight aria-hidden="true" /></span>
-                </a>
-              ))}
-              {manifest && archiveEditions.length === 0 && (
-                <p className="empty-line">尚无可用归档。</p>
-              )}
-            </div>
-            {hiddenArchiveCount > 0 && (
-              <button
-                className="archive-toggle interaction-state"
-                type="button"
-                aria-expanded={archiveExpanded}
-                aria-controls="archive-edition-list"
-                onClick={() => setArchiveExpanded((expanded) => !expanded)}
-              >
-                <span>
-                  {archiveExpanded
-                    ? "收起，仅看最新5期"
-                    : `展开其余${hiddenArchiveCount}期`}
-                </span>
-                <CaretDown aria-hidden="true" />
-              </button>
-            )}
-          </section>
+          {query.trim() && <section className="archive-search" aria-labelledby="archive-search-title"><header className="archive-subhead"><h3 id="archive-search-title">新闻搜索结果</h3><span>{searchResults.length} 条匹配</span></header><div className="archive-search-results" aria-live="polite">{visibleSearchResults.map((item) => <a key={item.editionId + item.entryId} href={editionHref(item.editionId, item.entryId)}><span className="archive-result__issue">NO.{String(item.issueNumber).padStart(3, "0")}<small>{item.date} · {archivePeriodLabel(item.period)}</small></span><span className="archive-result__copy"><small>{item.titleZhCn || item.titleEn}</small><strong>{item.headline}</strong><PendingMark tracking={item.tracking} /><span className="archive-result__summary">{item.summary}</span></span><span className="archive-result__action"><small>{statusLabels[item.factStatus]}</small><span>打开原文<ArrowUpRight aria-hidden="true" /></span></span></a>)}{searchResults.length === 0 && <p className="empty-line">所有已归档简报中均无匹配条目。</p>}</div>{searchResults.length > visibleSearchResults.length && <p className="archive-status">结果较多，当前显示前100条，请缩小关键词范围。</p>}</section>}
+          <section className="archive-editions" aria-labelledby="archive-editions-title"><header className="archive-subhead"><h3 id="archive-editions-title">全部期次</h3><span>{archiveEditions.length} EDITIONS</span></header><div className="archive-edition-list" id="archive-edition-list">{visibleArchiveEditions.map((item) => <a key={item.id} className={item.id === edition.id ? "is-current" : ""} href={editionHref(item.id)} aria-current={item.id === edition.id ? "page" : undefined}><span>NO.{String(item.issueNumber).padStart(3, "0")}</span><time>{item.date}</time><strong>{archiveEditionTitle(item)}</strong><small>{archiveCounts.get(item.id) ?? "-"} 条新闻 · {item.generatedAt}</small><span>{item.id === edition.id ? "当前阅读" : "打开本期"}<ArrowRight aria-hidden="true" /></span></a>)}{manifest && archiveEditions.length === 0 && <p className="empty-line">尚无可用归档。</p>}</div>{hiddenArchiveCount > 0 && <button className="archive-toggle interaction-state" type="button" aria-expanded={archiveExpanded} aria-controls="archive-edition-list" onClick={() => setArchiveExpanded((expanded) => !expanded)}><span>{archiveExpanded ? "收起，仅看最新5期" : `展开其余${hiddenArchiveCount}期`}</span><CaretDown aria-hidden="true" /></button>}</section>
         </section>
-
       </main>
-
-      <footer className="site-footer">
-        <div className="footer-identity">
-          <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
-          <p>每天两次，整理值得核验的游戏行业动态。</p>
-        </div>
-        <div className="footer-meta">
-          <span>编辑与维护</span>
-          <strong>Fallw1nd-津秋</strong>
-          <small>北京时间 10:10 / 17:00 更新</small>
-        </div>
-        <div className="footer-metrics" aria-label="简报归档规模">
-          <span><strong>{manifest?.editions.length ?? "-"}</strong> 期归档</span>
-          <span><strong>{searchIndex?.entries.length ?? "-"}</strong> 条新闻可检索</span>
-        </div>
-        <div className="footer-links">
-          <a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">
-            <PlayCircle aria-hidden="true" /><span>B站</span>
-          </a>
-          <span><ChatsCircle aria-hidden="true" />微信公众号：芳墨集</span>
-          <a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">
-            <GameController aria-hidden="true" /><span>小黑盒</span>
-          </a>
-        </div>
-      </footer>
+      <footer className="site-footer"><div className="footer-identity"><div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div><p>每天两次，整理值得核验的游戏行业动态。</p></div><div className="footer-meta"><span>编辑与维护</span><strong>Fallw1nd-津秋</strong><small>北京时间 10:10 / 17:00 更新</small></div><div className="footer-metrics" aria-label="简报归档规模"><span><strong>{manifest?.editions.length ?? "-"}</strong> 期归档</span><span><strong>{searchIndex?.entries.length ?? "-"}</strong> 条新闻可检索</span></div><div className="footer-links"><a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer"><PlayCircle aria-hidden="true" /><span>B站</span></a><span><ChatsCircle aria-hidden="true" />微信公众号：芳墨集</span><a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer"><GameController aria-hidden="true" /><span>小黑盒</span></a></div></footer>
     </div>
   );
 }
