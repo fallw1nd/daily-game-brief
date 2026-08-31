@@ -3,10 +3,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
+import { extractExplicitOfficialLinks } from "./lib/primary-resolver.mjs";
 
 const INPUT_PATH = resolve(process.env.NEWS_SHADOW_REPORT_PATH || "artifacts/news-shadow-report.json");
 const OUTPUT_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const SOURCE_CONFIG_PATH = resolve("config/news-sources.json");
+const OFFICIAL_DOMAINS_PATH = resolve("config/official-domains.json");
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
 const MAX_EVIDENCE_CHARS = 4000;
 const MAX_CANDIDATES = Number(process.env.EVIDENCE_CANDIDATE_LIMIT || 30);
@@ -43,7 +45,7 @@ async function fetchHtml(input) {
   if (declared > MAX_HTML_BYTES) throw new Error("HTML exceeds configured limit");
   const html = await response.text();
   if (Buffer.byteLength(html) > MAX_HTML_BYTES) throw new Error("HTML exceeds configured limit");
-  return { html, finalUrl: response.url };
+  return { html, finalUrl: response.url || url.href };
 }
 
 function attributes(tag) {
@@ -106,7 +108,7 @@ function detectLanguage(text) {
 }
 
 function languageMetadata(source, meta, text) {
-  const registry = normalizeLanguage(source?.language || source?.declaredLanguage);
+  const registry = normalizeLanguage(source?.locale || source?.language || source?.declaredLanguage);
   const detected = detectLanguage(text);
   const declaredLanguage = registry !== "und" ? registry : meta.htmlLanguage !== "und" ? meta.htmlLanguage : meta.metadataLanguage;
   const detectedLanguage = detected.language;
@@ -129,9 +131,10 @@ async function mapLimit(items, limit, worker) {
   return output;
 }
 
-const [report, sourceConfig] = await Promise.all([
+const [report, sourceConfig, officialDomains] = await Promise.all([
   readFile(INPUT_PATH, "utf8").then((text) => JSON.parse(text)),
   readFile(SOURCE_CONFIG_PATH, "utf8").then((text) => JSON.parse(text)),
+  readFile(OFFICIAL_DOMAINS_PATH, "utf8").then((text) => JSON.parse(text)),
 ]);
 const sourceById = new Map(sourceConfig.sources.map((source) => [source.id, source]));
 const candidateBudget = selectEvidenceCandidates(report.reviewQueue, MAX_CANDIDATES);
@@ -146,12 +149,14 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
       const { html, finalUrl } = await fetchHtml(appearance.url);
       const meta = metadata(html);
       const text = evidenceText(html, candidate, meta);
+      const kind = ["official", "event"].includes(source?.group) ? "primary" : source?.group === "media" ? "secondary" : "discovery";
+      const primaryCandidates = kind === "primary" ? [] : extractExplicitOfficialLinks(html, finalUrl, officialDomains, 5);
       return {
         status: "opened",
         label: appearance.label,
         url: finalUrl,
         sourceId: appearance.sourceId,
-        kind: ["official", "event"].includes(source?.group) ? "primary" : source?.group === "media" ? "secondary" : "discovery",
+        kind,
         independenceKey: source?.independenceKey || new URL(finalUrl).hostname,
         pageTitle: meta.pageTitle,
         publishedAt: meta.publishedAt,
@@ -159,6 +164,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
         canonicalUrl: meta.canonicalUrl,
         ...languageMetadata(source, meta, text),
         evidenceText: text,
+        primaryCandidates,
       };
     } catch (error) {
       return { status: "limited", label: appearance.label, url: appearance.url, sourceId: appearance.sourceId, error: error.message };
@@ -168,7 +174,33 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
   const hasPrimary = opened.some((source) => source.kind === "primary");
   const independentReliable = new Set(opened.filter((source) => source.kind !== "discovery").map((source) => source.independenceKey));
   const readiness = hasPrimary && independentReliable.size >= 2 ? "primary-plus-independent" : hasPrimary ? "needs-independent-report" : independentReliable.size >= 2 ? "two-media-no-primary" : "needs-more-evidence";
-  return { eventKey: candidate.eventKey, eventKind: candidate.eventKind, subjectKey: candidate.subjectKey, headline: candidate.headline, tier: candidate.tier, score: candidate.score, timeRelation: candidate.timeRelation, readiness, sources };
+  const primaryCandidates = [];
+  const seenPrimary = new Set();
+  for (const item of opened.flatMap((source) => source.primaryCandidates || [])) {
+    if (seenPrimary.has(item.url)) continue;
+    seenPrimary.add(item.url);
+    primaryCandidates.push(item);
+  }
+  return {
+    eventKey: candidate.eventKey,
+    eventKind: candidate.eventKind,
+    subjectKey: candidate.subjectKey,
+    canonicalSubjectKey: candidate.canonicalSubjectKey || null,
+    headline: candidate.headline,
+    tier: candidate.tier,
+    score: candidate.score,
+    scoreSignals: candidate.scoreSignals || null,
+    lane: candidate.lane || "news",
+    publisherFamily: candidate.publisherFamily || null,
+    timeRelation: candidate.timeRelation,
+    readiness,
+    primaryResolution: {
+      status: primaryCandidates.length ? "explicit-links-found" : "none",
+      candidates: primaryCandidates,
+      evidenceUpgradeAllowed: false,
+    },
+    sources,
+  };
 });
 
 const output = {
@@ -176,6 +208,7 @@ const output = {
   generatedAt: new Date().toISOString(),
   window: report.window,
   adjacentEdition: report.adjacentEdition,
+  coverage: report.coverage || null,
   limits: { candidatePackages: MAX_CANDIDATES, sourcesPerCandidate: 3, evidenceCharsPerSource: MAX_EVIDENCE_CHARS },
   totals: {
     ...candidateBudget.telemetry,
@@ -184,6 +217,7 @@ const output = {
     needsIndependentReport: packages.filter((item) => item.readiness === "needs-independent-report").length,
     twoMediaNoPrimary: packages.filter((item) => item.readiness === "two-media-no-primary").length,
     needsMoreEvidence: packages.filter((item) => item.readiness === "needs-more-evidence").length,
+    explicitPrimaryCandidates: packages.reduce((sum, item) => sum + item.primaryResolution.candidates.length, 0),
     limitedPages: packages.flatMap((item) => item.sources).filter((item) => item.status === "limited").length,
   },
   omissions: omittedCandidates,
@@ -192,5 +226,5 @@ const output = {
 
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
-console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
+console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; explicit primary links=${output.totals.explicitPrimaryCandidates}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
 console.log(`Report: ${OUTPUT_PATH}`);

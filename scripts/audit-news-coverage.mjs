@@ -7,7 +7,7 @@ const OUTPUT_PATH = resolve(process.env.NEWS_COVERAGE_AUDIT_PATH || "artifacts/n
 const payload = JSON.parse(await readFile(EVIDENCE_PATH, "utf8"));
 const evidence = payload.editorialInput || payload;
 const id = evidence.window?.id;
-if (!/^\d{4}-\d{2}-\d{2}-(?:am|pm)$/.test(id || "")) throw new Error("evidence window has an invalid edition ID");
+if (!/^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/.test(id || "")) throw new Error("evidence window has an invalid edition ID");
 const [year, month] = id.split("-");
 const archivePath = resolve(`public/data/archive/${year}/${month}/${id}.json`);
 let edition = null;
