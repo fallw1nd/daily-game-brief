@@ -95,7 +95,7 @@ describe("thin scheduled-task orchestration contract", () => {
     expect(contract).toContain("Do not inspect or poll Actions, create/delete workflows, edit `automation/state`, publish, advance editions");
     expect(contract).toContain("the bounded Daily wake file above");
     expect(contract).not.toContain("one-shot workflow");
-    expect(dailyMigration).toContain("The wake commit is only a trigger; GitHub still owns recovery").or.toBeDefined();
+    expect(dailyMigration).toContain("ChatGPT does not collect, build, validate, or publish recovery data itself");
   });
 
   it("keeps exact identity visible and delayed SLA verification event-driven", () => {
