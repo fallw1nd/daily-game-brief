@@ -13,15 +13,18 @@ describe("final editorial packet workflow", () => {
     expect(workflow).not.toContain('cron: "45 8 * * *"');
   });
 
-  it("accepts only an exact Daily editorial-branch wake signal", () => {
+  it("accepts only an exact Daily editorial-branch wake signal with shell-safe validation", () => {
     expect(workflow).toContain('branches:\n      - "automation/editorial/*-daily"');
     expect(workflow).toContain('paths:\n      - "automation/wake/*.json"');
     expect(workflow).toContain('edition="${GITHUB_REF_NAME#automation/editorial/}"');
     expect(workflow).toContain('wake_path="automation/wake/$edition.json"');
+    expect(workflow).toContain('EDITION_ID="$edition" node -e');
+    expect(workflow).not.toContain('EDITION_ID="$edition" node - <<\'NODE\'');
     expect(workflow).toContain("wake.schemaVersion !== 1");
-    expect(workflow).toContain("wake.period !== 'daily'");
-    expect(workflow).toContain("wake.reason !== 'packet_missing_at_handoff'");
+    expect(workflow).toContain('wake.period !== "daily"');
+    expect(workflow).toContain('wake.reason !== "packet_missing_at_handoff"');
     expect(workflow).toContain('--edition="$edition"');
+    expect(workflow).toContain("steps.edition.outcome == 'success'");
   });
 
   it("builds bounded title-only hints after evidence and before editorialization", () => {
