@@ -66,7 +66,7 @@ const sourceKindLabels = { primary: "Primary", secondary: "Secondary", discovery
 const periodLabels: Record<EditionPeriod, { edition: string; short: string; nextTime: string; nextEdition: string; archive: string }> = {
   am: { edition: "Morning Brief", short: "MORNING", nextTime: "Today 17:00", nextEdition: "Evening Brief", archive: "Morning" },
   pm: { edition: "Evening Brief", short: "EVENING", nextTime: "Tomorrow 10:10", nextEdition: "Morning Brief", archive: "Evening" },
-  daily: { edition: "Daily Brief", short: "DAILY", nextTime: "Tomorrow 17:00", nextEdition: "Daily Brief", archive: "Daily" },
+  daily: { edition: "Daily Brief", short: "DAILY", nextTime: "Tomorrow 12:00", nextEdition: "Daily Brief", archive: "Daily" },
 };
 
 const storySectionDefinitions: Array<{
