@@ -1,6 +1,6 @@
 # Scheduled Task Editorial Contract
 
-Use this prompt only for the two existing ChatGPT tasks: AM at 10:20 and PM at 17:10, `Asia/Shanghai`. Handoff time does not change edition identity or the fixed 10:10 AM / 17:00 PM evidence cutoffs. During Daily precutover these production tasks remain unchanged; at formal cutover the existing AM task is converted to Daily at 10:20 and the PM task is disabled. Daily closes evidence at 10:10 and is planned for public release at 12:00.
+Use this prompt only for the two existing ChatGPT tasks: AM at 10:20 and PM at 17:10, `Asia/Shanghai`. Handoff time does not change edition identity or the fixed 10:10 AM / 17:00 PM evidence cutoffs. Precutover production remains unchanged; at formal cutover the AM task becomes Daily at 10:20 and PM is disabled. Daily closes evidence at 10:10 and is planned for public release at 12:00.
 
 ## 1. Resolve input and Canonical state
 
@@ -19,7 +19,7 @@ Do not inspect or poll Actions, dispatch recovery, create or delete workflows, e
 - AM uses `upcomingMode:"replace"`; PM uses `upcomingMode:"inherit_and_patch"`; Daily uses `upcomingMode:"replace"`.
 - Daily uses the immutable evidence window `(previous day 10:10, current day 10:10]`, `plannedAt` current day 12:00. Never add facts first published after 10:10 merely because the editorial task runs at 10:20.
 
-Use `contractVersion:2` and the exact `packetBlobSha`. Each included item needs a complete language-neutral `sharedFactFrame`. Do not invent issue numbers, final entry IDs, or digests.
+Use `contractVersion:2` and the exact `packetBlobSha`. Each included item needs a complete language-neutral `sharedFactFrame`. Do not invent issue numbers, final `entryId`, or digests.
 
 English is optional and nonblocking. Include `locales.en` only when complete natural English stays within the evidence and `sharedFactFrame`; otherwise omit it. Never weaken or suppress Simplified Chinese Canonical because English is missing or invalid.
 
