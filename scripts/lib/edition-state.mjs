@@ -121,10 +121,10 @@ export function applyEditionStateEvent(current, event, data = {}) {
   if (event === "revision-opened") {
     if (!current) throw new Error("same-edition revision requires an existing durable state");
     if (data.reason !== revisionReason) throw new Error("same-edition revision requires explicit user authorization");
+    if (state.revisionRequest?.status === "open") return state;
     if (state.publication.status !== "committed") throw new Error("same-edition revision requires an already committed publication");
     const previousMainSha = state.deployment.mainSha || state.publication.mainSha;
     assertSha(previousMainSha, "previousMainSha");
-    if (state.revisionRequest?.status === "open") return state;
     state.packet = { status: "pending", blobSha: null, producerRunId: null, completedAt: null };
     state.editorial = { status: "pending", packetBlobSha: null, submissionSha: null, validationErrors: [], updatedAt: at };
     state.publication = { status: "pending", mainSha: null, source: null, updatedAt: at, error: null };
