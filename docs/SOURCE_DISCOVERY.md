@@ -57,7 +57,7 @@ These award sources are registered as `official` + `primary`, but remain `shadow
 
 Shadow promotion is based on contribution, not raw article volume. Each real collector run records reviewable shadow events, how many overlap an active-source event, how many remain unique to the shadow pool, and a per-source overlap rate. The durable source-health ledger keeps recent averages of reviewable, unique, and overlapping candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories.
 
-Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path.
+Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Promotion reviews must consider these contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
 
 ## Primary-source resolution
 
