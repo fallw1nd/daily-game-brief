@@ -58,6 +58,26 @@ jobs:
         with:
           path: ./dist
 
+      - name: Hold Daily release until noon
+        shell: bash
+        run: |
+          delay="$(node - <<'NODE'
+          const fs = require('fs');
+          const edition = JSON.parse(fs.readFileSync('public/data/latest.json', 'utf8'));
+          if (edition.period !== 'daily' || typeof edition.plannedAt !== 'string') {
+            process.stdout.write('0');
+            process.exit(0);
+          }
+          const target = Date.parse(`${edition.plannedAt.replace(' ', 'T')}:00+08:00`);
+          if (!Number.isFinite(target)) throw new Error(`Invalid Daily plannedAt: ${edition.plannedAt}`);
+          process.stdout.write(String(Math.max(0, Math.ceil((target - Date.now()) / 1000))));
+          NODE
+          )"
+          if [ "$delay" -gt 0 ]; then
+            echo "Daily release is staged; waiting ${delay}s until plannedAt."
+            sleep "$delay"
+          fi
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
