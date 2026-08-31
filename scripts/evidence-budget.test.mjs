@@ -26,15 +26,25 @@ describe("evidence candidate budget", () => {
     });
   }
 
-  it("uses soft publisher and lane ceilings before filling spare capacity", () => {
+  it("uses a soft publisher ceiling before filling spare capacity", () => {
     const input = [
       ...Array.from({ length: 12 }, (_, index) => ({eventKey:`dominant-${index}`,tier:"B",score:110-index,publisherFamily:"dominant",lane:"news"})),
       ...Array.from({ length: 8 }, (_, index) => ({eventKey:`diverse-${index}`,tier:"B",score:90-index,publisherFamily:`diverse-${index}`,lane:index % 2 ? "industry" : "reviews"})),
     ];
-    const result = selectEvidenceCandidates(input, 12, {publisherCeiling:3,laneCeiling:5});
+    const result = selectEvidenceCandidates(input, 12, {publisherCeiling:3,laneCeiling:20});
     expect(result.selected).toHaveLength(12);
     expect(result.selected.filter((item) => item.eventKey.startsWith("diverse-"))).toHaveLength(8);
     expect(result.telemetry.deferredByPublisherCeiling).toBeGreaterThan(0);
+  });
+
+  it("uses a soft lane ceiling across otherwise diverse publishers", () => {
+    const input = [
+      ...Array.from({ length: 10 }, (_, index) => ({eventKey:`news-${index}`,tier:"B",score:110-index,publisherFamily:`news-p-${index}`,lane:"news"})),
+      ...Array.from({ length: 6 }, (_, index) => ({eventKey:`industry-${index}`,tier:"B",score:90-index,publisherFamily:`industry-p-${index}`,lane:"industry"})),
+    ];
+    const result = selectEvidenceCandidates(input, 10, {publisherCeiling:10,laneCeiling:4});
+    expect(result.selected).toHaveLength(10);
+    expect(result.selected.filter((item) => item.lane === "industry")).toHaveLength(6);
     expect(result.telemetry.deferredByLaneCeiling).toBeGreaterThan(0);
   });
 

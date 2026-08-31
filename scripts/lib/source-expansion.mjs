@@ -5,7 +5,8 @@ const significantKinds = new Set(["delay", "release-date", "launch", "company", 
 
 function addAlias(index, value, titleKey) {
   const normalized = normalizeHeadline(value || "");
-  if (normalized.length < 4) return;
+  const compactLength = normalized.replaceAll(" ", "").length;
+  if (compactLength < 2) return;
   const existing = index.get(normalized);
   if (!existing) index.set(normalized, titleKey);
   else if (existing !== titleKey) index.set(normalized, null);
