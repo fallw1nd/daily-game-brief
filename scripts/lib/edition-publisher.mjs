@@ -207,7 +207,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     sourceReport: {
       checked: ["程序化来源注册表、事件账本与受限证据包", ...(editorial.checkedExtra || [])],
       limited: [...limitedSources, ...(editorial.limitedExtra || [])],
-      checkedGroups: ["官方平台与厂商来源", "中英日综合媒体", "相邻期去重与持续事件账本", "截止前编辑包与最后15分钟补查"],
+      checkedGroups: ["已配置的 active 官方与活动来源", "已配置的 active 中英日媒体与发现源", "相邻期去重与持续事件账本", "固定截止前最终候选与已打开证据包"],
       trackingResults: included.filter((item) => item.tracking).map((item) => `${item.headline}：继续追踪。`),
       excludedMajorCandidates: editorial.decisions.filter((item) => item.decision !== "include").map((item) => `${item.eventKey}：${item.reason}`),
       limitedSources,
