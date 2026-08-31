@@ -14,6 +14,7 @@ import {
   publisherFamily,
   resolveKnownSubjectKey,
 } from "./lib/source-expansion.mjs";
+import { annotateShadowOverlap, summarizeShadowCoverage } from "./lib/shadow-coverage.mjs";
 
 const CONFIG_PATH = resolve("config/news-sources.json");
 const TITLE_REGISTRY_PATH = resolve("config/title-translations.json");
@@ -34,7 +35,6 @@ const [config, latest, titleRegistry] = await Promise.all([
   readFile(TITLE_REGISTRY_PATH, "utf8").then(JSON.parse),
 ]);
 const aliasIndex = buildTitleAliasIndex(titleRegistry);
-const sourceById = new Map(config.sources.map((source) => [source.id, source]));
 const referenceNow = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const window = latestDueWindow(period, referenceNow);
 
@@ -137,9 +137,27 @@ function annotate(records) {
 }
 
 const candidates = annotate(activeRecords);
-const shadowCandidates = annotate(shadowRecords);
+const shadowCandidates = annotateShadowOverlap(candidates, annotate(shadowRecords));
 const reviewable = (candidate) => candidate.tier !== "C" && candidate.timeRelation !== "outside" && !candidate.adjacentMatch;
-const sourceStats = fetched.map(({ records: _records, ...result }) => result);
+const rawSourceStats = fetched.map(({ records: _records, ...result }) => result);
+const shadowCoverage = summarizeShadowCoverage(shadowCandidates, rawSourceStats, reviewable);
+const shadowCoverageById = new Map(shadowCoverage.bySource.map((item) => [item.sourceId, item]));
+const sourceStats = rawSourceStats.map((stat) => {
+  if (stat.mode !== "shadow") return stat;
+  const contribution = shadowCoverageById.get(stat.sourceId) || {
+    reviewableCandidates: 0,
+    uniqueCandidates: 0,
+    overlappingCandidates: 0,
+    overlapRate: 0,
+  };
+  return {
+    ...stat,
+    shadowReviewableCandidates: contribution.reviewableCandidates,
+    shadowUniqueCandidates: contribution.uniqueCandidates,
+    shadowOverlappingCandidates: contribution.overlappingCandidates,
+    shadowOverlapRate: contribution.overlapRate,
+  };
+});
 const healthy = sourceStats.filter((item) => item.status === "ok");
 const activeStats = sourceStats.filter((item) => item.mode === "active");
 const shadowStats = sourceStats.filter((item) => item.mode === "shadow");
@@ -160,6 +178,7 @@ const report = {
     openWebDiscovery: false,
     primaryResolver: "registry-foundation-only",
   },
+  shadowCoverage,
   totals: {
     sources: sourceStats.length,
     activeSources: activeStats.length,
@@ -171,6 +190,9 @@ const report = {
     candidates: candidates.length,
     activeCandidates: candidates.length,
     shadowCandidates: shadowCandidates.length,
+    shadowReviewableCandidates: shadowCoverage.reviewableCandidates,
+    shadowUniqueCandidates: shadowCoverage.uniqueCandidates,
+    shadowOverlappingCandidates: shadowCoverage.overlappingCandidates,
     tierA: candidates.filter((item) => item.tier === "A").length,
     tierB: candidates.filter((item) => item.tier === "B").length,
     shadowTierA: shadowCandidates.filter((item) => item.tier === "A").length,
@@ -188,5 +210,6 @@ await Promise.all([
 ]);
 
 console.log(`News collection: active=${report.totals.activeCandidates} candidates (A=${report.totals.tierA}, B=${report.totals.tierB}); shadow=${report.totals.shadowCandidates} candidates; limited sources=${report.totals.limitedSources}`);
+console.log(`Shadow contribution: reviewable=${report.totals.shadowReviewableCandidates}; unique=${report.totals.shadowUniqueCandidates}; overlaps-active=${report.totals.shadowOverlappingCandidates}; overlap-rate=${report.shadowCoverage.overlapRate.toFixed(3)}`);
 console.log(`Sources: active ${report.totals.healthyActiveSources}/${report.totals.activeSources} healthy; shadow ${report.totals.healthyShadowSources}/${report.totals.shadowSources} healthy`);
 console.log(`Report: ${REPORT_PATH}`);
