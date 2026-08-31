@@ -1,0 +1,94 @@
+name: Shadow source observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      period:
+        description: Edition period used only to derive the comparison window
+        required: true
+        default: daily
+        type: choice
+        options:
+          - daily
+          - am
+          - pm
+      reference_now:
+        description: Optional ISO timestamp for a reproducible observation window
+        required: false
+        type: string
+  push:
+    branches:
+      - 'automation/shadow-observation-*'
+    paths:
+      - 'automation/observation-requests/**'
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect active and shadow sources read-only
+        env:
+          NEWS_CANDIDATES_PATH: artifacts/shadow-observation/news-candidates.json
+          NEWS_SHADOW_REPORT_PATH: artifacts/shadow-observation/news-shadow-report.json
+          DISPATCH_PERIOD: ${{ inputs.period }}
+          DISPATCH_REFERENCE_NOW: ${{ inputs.reference_now }}
+        run: |
+          PERIOD="${DISPATCH_PERIOD:-daily}"
+          if [ -n "${DISPATCH_REFERENCE_NOW:-}" ]; then
+            export BRIEF_NOW="$DISPATCH_REFERENCE_NOW"
+          fi
+          node scripts/collect-news.mjs --period="$PERIOD"
+
+      - name: Summarize shadow contribution
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const report = JSON.parse(await readFile('artifacts/shadow-observation/news-shadow-report.json', 'utf8'));
+          const shadow = (report.sourceStats || []).filter((item) => item.mode === 'shadow');
+          const rows = shadow
+            .sort((a, b) => (b.shadowUniqueCandidates || 0) - (a.shadowUniqueCandidates || 0) || a.sourceId.localeCompare(b.sourceId))
+            .map((item) => `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`);
+          const body = [
+            '# Shadow source observation',
+            '',
+            `Window: ${report.window?.id || 'unknown'} · generated ${report.generatedAt}`,
+            '',
+            `Healthy shadow sources: ${report.totals?.healthyShadowSources ?? 0}/${report.totals?.shadowSources ?? 0}`,
+            `Reviewable shadow candidates: ${report.totals?.shadowReviewableCandidates ?? 0}`,
+            `Unique vs active: ${report.totals?.shadowUniqueCandidates ?? 0}`,
+            `Overlapping active: ${report.totals?.shadowOverlappingCandidates ?? 0}`,
+            `Overall overlap rate: ${Number(report.shadowCoverage?.overlapRate || 0).toFixed(3)}`,
+            '',
+            '| Source | Health | Fetched | Reviewable | Unique | Overlap | Rate | Error |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |',
+            ...rows,
+            '',
+            '> Observation only. This workflow does not write automation state, packets, Canonical data, or publication status.',
+            '',
+          ].join('\n');
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, body);
+          NODE
+
+      - name: Upload observation artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-source-observation-${{ github.run_id }}
+          path: artifacts/shadow-observation/
+          if-no-files-found: error
+          retention-days: 14
