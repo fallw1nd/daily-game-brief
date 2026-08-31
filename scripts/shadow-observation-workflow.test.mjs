@@ -7,6 +7,7 @@ describe("shadow source observation workflow", () => {
   it("is a read-only observation lane", () => {
     expect(workflow).toContain("contents: read");
     expect(workflow).toContain("node scripts/collect-news.mjs");
+    expect(workflow).toContain("node scripts/probe-shadow-published-time.mjs");
     expect(workflow).toContain("actions/upload-artifact@v7");
     expect(workflow).toContain("automation/shadow-observation-*");
     expect(workflow).toContain("automation/observation-requests/**");
@@ -22,6 +23,13 @@ describe("shadow source observation workflow", () => {
     ]) {
       expect(workflow).not.toContain(forbidden);
     }
+  });
+
+  it("keeps the detail timestamp probe bounded and observational", () => {
+    expect(workflow).toContain("SHADOW_DETAIL_MAX_PER_SOURCE: '2'");
+    expect(workflow).toContain("SHADOW_DETAIL_MAX_TOTAL: '30'");
+    expect(workflow).toContain("Detail timestamp probe");
+    expect(workflow).toContain("does not mutate candidates or establish production evidence");
   });
 
   it("makes observation-only status and timestamp confidence explicit", () => {
