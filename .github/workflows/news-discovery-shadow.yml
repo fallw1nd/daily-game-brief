@@ -3,7 +3,6 @@ run-name: Final editorial packet · ${{ github.event_name == 'push' && 'daily-wa
 
 on:
   schedule:
-    # Daily production cutoff: 10:10 Asia/Shanghai.
     - cron: "10 2 * * *"
   workflow_dispatch:
     inputs:
@@ -20,9 +19,6 @@ on:
         required: true
         type: string
   push:
-    # Daily liveness fallback. The 10:20 ChatGPT task may write one exact-edition
-    # wake file when the acknowledged packet is missing. A user-authorized same-edition
-    # revision may use the same exact-edition wake lane, but it never starts the SLA fallback.
     branches:
       - "automation/editorial/*-daily"
     paths:
@@ -56,6 +52,35 @@ jobs:
         with:
           node-version: 22
 
+      - name: Open authorized same-edition revision cycle
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          edition="${GITHUB_REF_NAME#automation/editorial/}"
+          if ! [[ "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-daily$ ]]; then
+            echo "Wake branch does not encode an exact Daily edition: $GITHUB_REF_NAME"
+            exit 1
+          fi
+          wake_path="automation/wake/$edition.json"
+          git fetch origin "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/daily-wake-source"
+          git show "origin/daily-wake-source:$wake_path" > "$RUNNER_TEMP/daily-wake-preflight.json"
+          wake_reason="$(EDITION_ID="$edition" node -e '
+            const fs = require("node:fs");
+            const wake = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/daily-wake-preflight.json", "utf8"));
+            const edition = process.env.EDITION_ID;
+            const allowed = new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"]);
+            if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || !allowed.has(wake.reason)) {
+              throw new Error(`invalid Daily wake payload for ${edition}`);
+            }
+            process.stdout.write(wake.reason);
+          ')"
+          if [ "$wake_reason" = "user_authorized_same_edition_revision" ]; then
+            bash scripts/update-edition-state-branch.sh \
+              "$edition" revision-opened \
+              --reason=user_authorized_same_edition_revision \
+              --actor=user-authorized-acceptance
+          fi
+
       - name: Select immutable due edition
         id: edition
         shell: bash
@@ -66,17 +91,11 @@ jobs:
           echo "revision_authorized=false" >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             period="${{ inputs.period }}"
-            node scripts/resolve-packet-dispatch.mjs \
-              --period="$period" \
-              --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
+            node scripts/resolve-packet-dispatch.mjs --period="$period" --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "push" ]; then
             period="daily"
             edition="${GITHUB_REF_NAME#automation/editorial/}"
-            if ! [[ "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-daily$ ]]; then
-              echo "Wake branch does not encode an exact Daily edition: $GITHUB_REF_NAME"
-              exit 1
-            fi
             wake_path="automation/wake/$edition.json"
             git fetch origin "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/daily-wake-source"
             git show "origin/daily-wake-source:$wake_path" > "$RUNNER_TEMP/daily-wake.json"
@@ -85,9 +104,7 @@ jobs:
               const wake = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/daily-wake.json", "utf8"));
               const edition = process.env.EDITION_ID;
               const allowed = new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"]);
-              if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || !allowed.has(wake.reason)) {
-                throw new Error(`invalid Daily wake payload for ${edition}`);
-              }
+              if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || !allowed.has(wake.reason)) throw new Error(`invalid Daily wake payload for ${edition}`);
               process.stdout.write(wake.reason);
             ')"
             if [ "$wake_reason" = "user_authorized_same_edition_revision" ]; then
@@ -95,22 +112,15 @@ jobs:
               EDITION_ID="$edition" STATE_PATH="$state_path" node -e '
                 const fs = require("node:fs");
                 const state = JSON.parse(fs.readFileSync(process.env.STATE_PATH, "utf8"));
-                if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.packet?.status !== "pending") {
-                  throw new Error(`durable revision authorization is not open for ${process.env.EDITION_ID}`);
-                }
+                if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.packet?.status !== "pending") throw new Error(`durable revision authorization is not open for ${process.env.EDITION_ID}`);
               '
               echo "revision_authorized=true" >> "$GITHUB_OUTPUT"
             fi
-            node scripts/resolve-packet-dispatch.mjs \
-              --period="$period" \
-              --edition="$edition" >> "$GITHUB_OUTPUT"
+            node scripts/resolve-packet-dispatch.mjs --period="$period" --edition="$edition" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
           else
             period="daily"
-            node scripts/resolve-due-edition.mjs \
-              --period="$period" \
-              --purpose=packet \
-              --status-root="$state_dir/automation/status" >> "$GITHUB_OUTPUT"
+            node scripts/resolve-due-edition.mjs --period="$period" --purpose=packet --status-root="$state_dir/automation/status" >> "$GITHUB_OUTPUT"
           fi
           git worktree remove --force "$state_dir"
           echo "period=$period" >> "$GITHUB_OUTPUT"
@@ -118,8 +128,7 @@ jobs:
       - name: Collect final candidate snapshot
         if: steps.edition.outputs.needed != 'false'
         shell: bash
-        run: |
-          BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
+        run: BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
 
       - name: Restore previous automation ledgers
         shell: bash
@@ -217,28 +226,18 @@ jobs:
             cp "$packet" "$state_dir/automation/packets/latest-$period.json"
             cp "$ledger" "$state_dir/automation/ledger/events.json"
             cp "$health" "$state_dir/automation/health/sources.json"
-            node scripts/record-edition-state.mjs \
-              --state-root="$state_dir" \
-              --edition="$edition_id" \
-              --event=packet-ready \
-              --packet="$packet" \
-              --run-id="${{ github.run_id }}"
+            node scripts/record-edition-state.mjs --state-root="$state_dir" --edition="$edition_id" --event=packet-ready --packet="$packet" --run-id="${{ github.run_id }}"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
             git -C "$state_dir" add automation/packets automation/ledger/events.json automation/health/sources.json "automation/status/$edition_id.json"
-            if git -C "$state_dir" diff --cached --quiet; then
-              success=true
-            else
+            if git -C "$state_dir" diff --cached --quiet; then success=true; else
               git -C "$state_dir" commit -m "chore(automation): persist $edition_id packet acknowledgement"
               if git -C "$state_dir" push origin HEAD:automation/state; then success=true; fi
             fi
             git worktree remove --force "$state_dir"
             if [ "$success" = "true" ]; then break; fi
           done
-          if [ "$success" != "true" ]; then
-            echo "Failed to persist $edition_id after three compare-and-retry attempts"
-            exit 1
-          fi
+          if [ "$success" != "true" ]; then exit 1; fi
 
   verify-after-handoff:
     needs: collect
@@ -260,7 +259,6 @@ jobs:
             const target = new Date(`${date}T${targetTime}Z`);
             process.stdout.write(String(Math.max(0, Math.ceil((target.getTime() - Date.now()) / 1000))));
           ')"
-          echo "Waiting ${delay}s before verifying $EDITION_ID"
           sleep "$delay"
 
       - name: Dispatch exact-edition SLA verification
@@ -269,7 +267,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh workflow run brief-sla-watchdog.yml \
-            --ref main \
-            -f period="${{ needs.collect.outputs.period }}" \
-            -f edition="${{ needs.collect.outputs.edition }}"
+          gh workflow run brief-sla-watchdog.yml --ref main -f period="${{ needs.collect.outputs.period }}" -f edition="${{ needs.collect.outputs.edition }}"
