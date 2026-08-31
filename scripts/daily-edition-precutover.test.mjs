@@ -26,8 +26,8 @@ function packetForDaily(editionId) {
   };
 }
 
-describe("Daily Edition precutover compatibility", () => {
-  it("uses a 10:10 evidence cutoff while scheduling the Daily edition for noon", () => {
+describe("Daily Edition production compatibility", () => {
+  it("uses a 10:10 evidence cutoff while scheduling normal Daily editions for noon", () => {
     expect(plannedWindow("daily", new Date("2026-09-01T04:00:00Z"))).toEqual({
       id: "2026-09-01-daily",
       period: "daily",
@@ -44,6 +44,31 @@ describe("Daily Edition precutover compatibility", () => {
     });
   });
 
+  it("bridges the first real Daily strictly after the final published legacy PM", () => {
+    expect(expectedEditorialWindow("2026-08-31-daily")).toEqual({
+      id: "2026-08-31-daily",
+      period: "daily",
+      plannedAt: "2026-08-31 12:00",
+      windowStart: "2026-08-30 17:00",
+      windowEnd: "2026-08-31 10:10",
+    });
+    const manifest = {
+      editions: [{ id: "2026-08-30-pm", date: "2026-08-30", period: "pm", issueNumber: 20 }],
+    };
+    const result = resolveDueEdition({
+      period: "daily",
+      now: new Date("2026-08-31T06:20:00Z"),
+      manifest,
+      purpose: "packet",
+    });
+    expect(result.needed).toBe(true);
+    expect(result.window).toMatchObject({
+      id: "2026-08-31-daily",
+      windowStart: "2026-08-30 17:00",
+      windowEnd: "2026-08-31 10:10",
+    });
+  });
+
   it("makes Daily due at the evidence cutoff rather than the noon publication time", () => {
     expect(latestDueWindow("daily", new Date("2026-09-01T02:09:59Z")).id).toBe("2026-08-31-daily");
     expect(latestDueWindow("daily", new Date("2026-09-01T02:10:00Z")).id).toBe("2026-09-01-daily");
@@ -54,32 +79,10 @@ describe("Daily Edition precutover compatibility", () => {
       editionId: "2026-09-01-daily",
       period: "daily",
     })).toEqual([]);
-  });
-
-  it("cuts over cleanly after the final legacy AM edition without an overlap bridge", () => {
-    const manifest = {
-      editions: [{ id: "2026-08-31-am", date: "2026-08-31", period: "am", issueNumber: 20 }],
-    };
-    const before = resolveDueEdition({
+    expect(validateFinalizedEditorialPacket(packetForDaily("2026-08-31-daily"), {
+      editionId: "2026-08-31-daily",
       period: "daily",
-      now: new Date("2026-09-01T02:09:59Z"),
-      manifest,
-      purpose: "packet",
-    });
-    const atCutoff = resolveDueEdition({
-      period: "daily",
-      now: new Date("2026-09-01T02:10:00Z"),
-      manifest,
-      purpose: "packet",
-    });
-    expect(before.needed).toBe(false);
-    expect(atCutoff.needed).toBe(true);
-    expect(atCutoff.window).toMatchObject({
-      id: "2026-09-01-daily",
-      plannedAt: "2026-09-01 12:00",
-      windowStart: "2026-08-31 10:10",
-      windowEnd: "2026-09-01 10:10",
-    });
+    })).toEqual([]);
   });
 
   it("rolls back from a published Daily into the same-day PM window without gaps", () => {
