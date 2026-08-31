@@ -78,14 +78,14 @@ jobs:
             wake_path="automation/wake/$edition.json"
             git fetch origin "+refs/heads/$GITHUB_REF_NAME:refs/remotes/origin/daily-wake-source"
             git show "origin/daily-wake-source:$wake_path" > "$RUNNER_TEMP/daily-wake.json"
-            EDITION_ID="$edition" node - <<'NODE'
-            const fs = require('node:fs');
-            const wake = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/daily-wake.json', 'utf8'));
-            const edition = process.env.EDITION_ID;
-            if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== 'daily' || wake.reason !== 'packet_missing_at_handoff') {
-              throw new Error(`invalid Daily wake payload for ${edition}`);
-            }
-            NODE
+            EDITION_ID="$edition" node -e '
+              const fs = require("node:fs");
+              const wake = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/daily-wake.json", "utf8"));
+              const edition = process.env.EDITION_ID;
+              if (wake.schemaVersion !== 1 || wake.editionId !== edition || wake.period !== "daily" || wake.reason !== "packet_missing_at_handoff") {
+                throw new Error(`invalid Daily wake payload for ${edition}`);
+              }
+            '
             node scripts/resolve-packet-dispatch.mjs \
               --period="$period" \
               --edition="$edition" >> "$GITHUB_OUTPUT"
@@ -133,7 +133,7 @@ jobs:
         if: steps.edition.outputs.needed != 'false'
 
       - name: Upload candidate evidence
-        if: steps.edition.outputs.needed != 'false' && always()
+        if: steps.edition.outcome == 'success' && steps.edition.outputs.needed != 'false' && always()
         uses: actions/upload-artifact@v6
         with:
           name: news-shadow-${{ steps.edition.outputs.period }}-${{ github.run_id }}
