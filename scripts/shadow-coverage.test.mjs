@@ -7,7 +7,7 @@ const contributionEligible = (candidate) => candidate.tier !== "C" && candidate.
 describe("shadow source contribution", () => {
   it("matches known multilingual subjects by canonical subject and event kind", () => {
     expect(shadowCandidateKey({canonicalSubjectKey:"game-x",eventKind:"announcement",eventKey:"a"}))
-      .toBe("subject:game-x|announcement");
+      .toBe("canonical:game-x|announcement");
     expect(shadowCandidateKey({eventKind:"other",eventKey:"fallback"})).toBe("event:fallback");
   });
 
@@ -26,10 +26,11 @@ describe("shadow source contribution", () => {
     expect(summary.reviewableCandidates).toBe(2);
     expect(summary.uniqueCandidates).toBe(1);
     expect(summary.overlappingCandidates).toBe(1);
+    expect(summary.identityUnresolvedCandidates).toBe(0);
     expect(summary.unknownTimeCandidates).toBe(1);
     expect(summary.overlapRate).toBe(0.5);
-    expect(summary.bySource.find((item) => item.sourceId === "s1")).toMatchObject({reviewableCandidates:2,uniqueCandidates:1,overlappingCandidates:1,unknownTimeCandidates:0});
-    expect(summary.bySource.find((item) => item.sourceId === "s2")).toMatchObject({reviewableCandidates:1,uniqueCandidates:1,overlappingCandidates:0,unknownTimeCandidates:1});
+    expect(summary.bySource.find((item) => item.sourceId === "s1")).toMatchObject({reviewableCandidates:2,uniqueCandidates:1,overlappingCandidates:1,identityUnresolvedCandidates:0,unknownTimeCandidates:0});
+    expect(summary.bySource.find((item) => item.sourceId === "s2")).toMatchObject({reviewableCandidates:1,uniqueCandidates:1,overlappingCandidates:0,identityUnresolvedCandidates:0,unknownTimeCandidates:1});
   });
 
   it("keeps the production review queue broader than shadow contribution metrics", async () => {
