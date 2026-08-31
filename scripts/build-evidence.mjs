@@ -151,13 +151,18 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
       const text = evidenceText(html, candidate, meta);
       const kind = ["official", "event"].includes(source?.group) ? "primary" : source?.group === "media" ? "secondary" : "discovery";
       const primaryCandidates = kind === "primary" ? [] : extractExplicitOfficialLinks(html, finalUrl, officialDomains, 5);
+      const independenceKey = source?.independenceKey || new URL(finalUrl).hostname;
+      const publisherKey = source?.publisherFamily || independenceKey;
+      const observedPrimaryIndependenceKeys = [...new Set(primaryCandidates.map((item) => item.independenceKey).filter(Boolean))];
       return {
         status: "opened",
         label: appearance.label,
         url: finalUrl,
         sourceId: appearance.sourceId,
         kind,
-        independenceKey: source?.independenceKey || new URL(finalUrl).hostname,
+        independenceKey,
+        publisherKey,
+        observedPrimaryIndependenceKeys,
         pageTitle: meta.pageTitle,
         publishedAt: meta.publishedAt,
         imageUrl: meta.imageUrl,
@@ -181,6 +186,8 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
     seenPrimary.add(item.url);
     primaryCandidates.push(item);
   }
+  const publisherKeys = [...new Set(opened.map((source) => source.publisherKey).filter(Boolean))];
+  const observedPrimaryIndependenceKeys = [...new Set(opened.flatMap((source) => source.observedPrimaryIndependenceKeys || []))];
   return {
     eventKey: candidate.eventKey,
     eventKind: candidate.eventKind,
@@ -194,6 +201,12 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
     publisherFamily: candidate.publisherFamily || null,
     timeRelation: candidate.timeRelation,
     readiness,
+    provenanceObservation: {
+      publisherKeys,
+      observedPrimaryIndependenceKeys,
+      affectsCorroboration: false,
+      note: "Observation only: corroboration still uses opened-source independenceKey semantics.",
+    },
     primaryResolution: {
       status: primaryCandidates.length ? "explicit-links-found" : "none",
       candidates: primaryCandidates,
@@ -218,6 +231,7 @@ const output = {
     twoMediaNoPrimary: packages.filter((item) => item.readiness === "two-media-no-primary").length,
     needsMoreEvidence: packages.filter((item) => item.readiness === "needs-more-evidence").length,
     explicitPrimaryCandidates: packages.reduce((sum, item) => sum + item.primaryResolution.candidates.length, 0),
+    observedPrimaryOrigins: new Set(packages.flatMap((item) => item.provenanceObservation.observedPrimaryIndependenceKeys)).size,
     limitedPages: packages.flatMap((item) => item.sources).filter((item) => item.status === "limited").length,
   },
   omissions: omittedCandidates,
@@ -226,5 +240,5 @@ const output = {
 
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
-console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; explicit primary links=${output.totals.explicitPrimaryCandidates}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
+console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; explicit primary links=${output.totals.explicitPrimaryCandidates}; observed primary origins=${output.totals.observedPrimaryOrigins}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
 console.log(`Report: ${OUTPUT_PATH}`);
