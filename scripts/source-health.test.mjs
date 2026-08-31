@@ -11,4 +11,33 @@ describe("source health ledger", () => {
     expect(second.sources.a.successRateRecent).toBe(0.5);
     expect(second.sources.a.averageCandidatesRecent).toBe(2);
   });
+
+  it("persists reviewable, unique, and active-overlap contribution for shadow promotion decisions", () => {
+    const first = updateSourceHealth({generatedAt:"2026-09-01T02:10:00Z",sourceStats:[{
+      sourceId:"deep-media",
+      mode:"shadow",
+      capabilities:["features"],
+      status:"ok",
+      count:10,
+      durationMs:90,
+      shadowReviewableCandidates:4,
+      shadowUniqueCandidates:3,
+      shadowOverlappingCandidates:1,
+    }]});
+    const second = updateSourceHealth({generatedAt:"2026-09-02T02:10:00Z",sourceStats:[{
+      sourceId:"deep-media",
+      mode:"shadow",
+      capabilities:["features"],
+      status:"ok",
+      count:8,
+      durationMs:110,
+      shadowReviewableCandidates:2,
+      shadowUniqueCandidates:1,
+      shadowOverlappingCandidates:1,
+    }]}, first);
+    expect(second.sources["deep-media"].lastUniqueCandidates).toBe(1);
+    expect(second.sources["deep-media"].averageReviewableCandidatesRecent).toBe(3);
+    expect(second.sources["deep-media"].averageUniqueCandidatesRecent).toBe(2);
+    expect(second.sources["deep-media"].overlapRateRecent).toBeCloseTo(2 / 6);
+  });
 });
