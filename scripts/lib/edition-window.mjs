@@ -1,6 +1,15 @@
 const PERIODS = new Set(["am", "pm", "daily"]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Authorized production cutover bridge. The final published legacy edition is
+// 2026-08-30-pm ending at 17:00; the first Daily must start strictly after that
+// cutoff to avoid overlapping already-published PM facts. All later Daily
+// editions use the normal previous-10:10 -> current-10:10 evidence window.
+const FIRST_DAILY_CUTOVER = {
+  editionId: "2026-08-31-daily",
+  windowStart: "2026-08-30 17:00",
+};
+
 function beijingDateParts(now) {
   return Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai",
@@ -50,11 +59,14 @@ export function plannedWindow(period, now = new Date()) {
     };
   }
 
+  const editionId = `${date}-daily`;
   return {
-    id: `${date}-daily`,
+    id: editionId,
     period: "daily",
     plannedAt: `${date} 12:00`,
-    windowStart: `${previousDate} 10:10`,
+    windowStart: editionId === FIRST_DAILY_CUTOVER.editionId
+      ? FIRST_DAILY_CUTOVER.windowStart
+      : `${previousDate} 10:10`,
     windowEnd: `${date} 10:10`,
   };
 }
