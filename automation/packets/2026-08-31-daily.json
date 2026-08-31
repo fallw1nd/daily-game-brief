@@ -1,0 +1,1485 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-08-31T06:38:18.807Z",
+  "finalizedAt": "2026-08-31T06:38:18.807Z",
+  "coverageThrough": "2026-08-31 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "Read automation/status/<edition-id>.json and copy packet.blobSha exactly into top-level packetBlobSha. The publisher resolves and verifies this immutable Git blob; never infer it from a mutable branch HEAD.\nA candidate with publishability=requires_subject_identity cannot be included under the current contract. Exclude it or mark needs_review; never invent titleKey/titleEn from its headline.\n你是游戏行业简报编辑。事件事实只能依据证据包判断，不得补写证据中没有的事实。\n输出 contractVersion=2。每个事件给出 include、exclude 或 needs_review；A级事实也必须满足来源与时间要求。\n每个 include 决定必须填写完整 sharedFactFrame；它是中英文共同的事实边界，subjectTitleKey、日期、时刻、数字、平台、人物/机构、版本/专名只能来自已选证据与该决定本身，不得加入任何语言版本独有的新事实。\n官方状态必须存在已打开的一手来源；只有两家独立可靠来源才可标 multi_source_verified。未确认内容只能进入 rumors，必须 tracking=true，并在标题与摘要中保留不确定性。\n游戏中文名先复用 config/title-translations.json。registry miss 时先检查 editorialInput.titleHints；候选名只可作为作品名称证据。没有可用 titleHint 时，才允许做窄范围 title-only open-web lookup：优先官方简中名称；否则仅采用稳定、广泛使用的 common_translation；两者都没有则保留原名并设 titleZhCn=null、titleZhStatus=unavailable。严禁机器直译或临时自造译名。\ntitleHints 与标题查询绝不能补充事件事实、时间、平台、发行信息、source classification、tracking 决策或新候选。\n对于存在官方中国大陆简体中文渠道/站点的游戏，版本副标题、角色/干员、职业、模式、机制等专名优先采用官方大陆简中写法；术语查询只能规范已经存在于证据中的专名，不能扩展事实。\n中文 headline、summary、verification、timeNote 保持当前中文编辑规范：标题直述事件，摘要写具体信息，verification说明证据边界，不使用宣传语和套话。\n尽力同时生成 locales.en。英文不是逐句翻译中文，而是在完全相同的 include 决定与 sharedFactFrame 内独立写成自然、简洁的英文编辑文案；有英文一手证据时优先参考其正式专名，只有中文证据时可自然转述，但不得改变事实范围。\nlocales.en.entries 必须按 include 决定的顺序，以 eventKey 一一对应；locales.en.upcoming 必须按本次提交的 upcoming 顺序，以 upcomingId 一一对应。英文 archiveTitle：早报以 'Morning Brief |' 开头，晚报以 'Evening Brief |' 开头，日报以 'Daily Brief |' 开头。\n英文 headline、summary、verification、timeNote 必须是完整英文，不得用中文正文作 fallback；sourceReport 若提供必须完整英文，否则设为 null。source label、region/releaseType 等只有需要人工英文显示时才填写对应文案。\n不要计算或填写 factsDigest、canonicalCopyDigest、localeDigest，也不要猜最终 entryId；可信 publisher 会在 Canonical entry ID 确定后绑定并计算 digest。\n英文是非阻塞展示层：如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；绝不能为了让英文通过而削弱、改写或丢弃已验证的中文 Canonical 决定。publisher 会将该期英文明确标记为 unavailable，中文仍正常发布。\n早报必须以 upcomingMode=replace 重建未来15天；晚报使用 inherit_and_patch，只处理新日期变化；日报必须以 upcomingMode=replace 重建未来15天。\n日报 archiveTitle 必须以 '日报｜' 开头；其事实窗口是前一日 10:10 exclusive 至当日 10:10 inclusive，plannedAt 为当日 12:00。10:10 是证据封窗与 packet 起点，12:00 是计划发布时间，不得把 10:10—12:00 之间的新事实补进当期。\n对 packages 与 trackingQueue 中的每个 eventKey 恰好输出一次决定；trackingQueue 无新证据时必须明确继续追踪或关闭。needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-08-31-daily",
+      "period": "daily",
+      "plannedAt": "2026-08-31 12:00",
+      "windowStart": "2026-08-30 17:00",
+      "windowEnd": "2026-08-31 10:10"
+    },
+    "adjacentEdition": "2026-08-30-pm",
+    "packages": [
+      {
+        "eventKey": "99cf306b6b9d29f056d2",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "News and events",
+        "tier": "B",
+        "score": 115,
+        "timeRelation": "unknown",
+        "readiness": "needs-independent-report",
+        "ledger": {
+          "firstSeenAt": "2026-08-27T05:06:50.183Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-27-am",
+            "2026-08-27-pm",
+            "2026-08-28-am",
+            "2026-08-28-pm",
+            "2026-08-29-am",
+            "2026-08-29-pm",
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "聚合页缺少单一事件身份与独立时间证据，不纳入本期。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "nintendo",
+            "label": "Nintendo News",
+            "url": "https://www.nintendo.com/us/whatsnew/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.nintendo.com/us/whatsnew/",
+            "imageUrl": "https://assets.nintendo.com/image/upload/v1643742733/ncom/global/social-share.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Your first stop for Nintendo news and announcements. See what’s new in the world of Nintendo, from site updates to game launches, deals, and more.\nELDEN RING Tarnished Edition is now available for the Nintendo Switch™ 2 system! This version of the game also includes the expansion, “Shadow of the Erdtree,” additional armor, and custom skins for Torrent, your spectral steed. Unravel the mysterie…\nFrom now until Sept. 9 at 11:59 p.m. PT. Go big with deals on hit digital games for the Nintendo Switch™ 2 and Nintendo Switch systems. Shop the full sale on Nintendo Store or Nintendo eShop on your device to purchase and download games so you can s…\nTwo new Nintendo Switch 2 bundles deliver sun-soaked sports, high-speed thrills and extra value\nComplete the DK Challenge and grab a fun physical reward\nPokémon Pokopia Expansion Pass paid DLC: Keep the cozy life going with a brand-new underwater area!\nFire Emblem: Fortune&#x27;s Weave Direct threads together strategic combat with a story of Gods and Heroes only on Nintendo Switch 2\nThe path to becoming Elden Lord begins today!\nBlockbuster Sale: Save big on select digital games!\nThe classic stealth action series returns with METAL GEAR SOLID: MASTER COLLECTION Vol.2"
+          }
+        ]
+      },
+      {
+        "eventKey": "88c2078e5724c0cf7a46",
+        "eventKind": "announcement",
+        "subjectKey": "ウィッチャー3 リマスター",
+        "subject": {
+          "kind": "game",
+          "key": "ウィッチャー3 リマスター"
+        },
+        "publishability": "direct",
+        "headline": "『ウィッチャー3 リマスター』突如発表、9月29日配信へ。HoYoverse発・謎の新作マルチ『Nodus Fall』お披露目。今週の見逃せないゲーム記事7選",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "一篇周度汇总同时拼接多个事件，且缺少可选定的一手来源，不作为单条新闻收录。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260830-464051/",
+            "publishedAt": "2026-08-30T03:54:39+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260830-464051/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464051-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "今週のAUTOMATONにて反響の大きかったゲーム紹介系記事を中心に、7本の記事をピックアップ。今週は『ウィッチャー3 リマスター』のほか、『天地創造』リマスター版や『Dumpster Gang』などが話題となった。\n『ウィッチャー3 リマスター』突如発表、9月29日配信へ。HoYoverse発・謎の新作マルチ『Nodus Fall』お披露目。今週の見逃せないゲーム記事7選\n怪物退治を生業とするウィッチャー、リヴィアのゲラルトを主人公としたオープンワールドRPGのリマスター版。ビジュアルや戦闘システムの強化をはじめとして、スキルツリーの刷新、さらには新フィニッシャーの追加やフォトモードの拡張などがおこなわれるという。加えて、DLC「無情なる心」「血塗られた美酒」が同梱されるとのこと。 （ 記事リンク ）\nクインテットが手がけ、1995年10月に当時のエニックスから発売されたアクションRPGのリマスター版。地表の生命や文明が滅びた地球を舞台として、村を救うため、ひいては地表の生命を呼びさますための冒険に出ることとなる。今回ショーケースイベント「Pixel Arcadia」にて、移植版として正式に発表された。 （ 記事リンク ）\nNintendo Switch 2 / Switchセールに約200本追加。『ロックマン11』が478円、『ライドウ』リマスターや『ガンダムブレイカー4』など最安値級もいろいろ\n傑作アクションRPG『天地創造』リマスター版は“オリジナルの強化版”になると開発者が自信見せる。悪名高き「あのボス」に手が入り、雰囲気守りつつUI/UXも強化\n今週のAUTOMATONにて反響の大きかったゲーム紹介系記事を中心に、7本の記事をピックアップ。第97回目です。\nアライグマになって人間の家に忍び込み、盗みをはたらくゲーム。本作はソロプレイおよび最大4人でのオンライン協力プレイに対応。アライグマは夜間に住民の家に入り込み、金目のものをなんでも盗んでいく。駆除業者に見つかった場合には、反撃することも可能だ。 （ 記事リンク ）\n殺人犯となり事件の証拠である死体を隠滅するゲーム。最大4人までの協力プレイに対応し、プレイヤーは人の目や番犬の鼻を活かした追跡を避けつつ、ぐにゃぐにゃの死体を目的地まで運ぶことになる。 （ 記事リンク ）"
+          }
+        ]
+      },
+      {
+        "eventKey": "4912915db4dd92483c01",
+        "eventKind": "other",
+        "subjectKey": "halloween the game",
+        "subject": {
+          "kind": "game",
+          "key": "halloween the game"
+        },
+        "publishability": "direct",
+        "headline": "新たな非対称PvP殺人鬼ホラー『Halloween: The Game』PS5国内版が発売中止に、CEROレーティングを取得できず。“表現規制して出す”より、世界観を優先",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260831-464132/",
+            "publishedAt": "2026-08-31T01:20:44+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260831-464132/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260831-464132-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "非対称PvPホラーゲーム『Halloween: The Game』について、国内向けPS5版の販売中止が発表された。\n新たな非対称PvP殺人鬼ホラー『Halloween: The Game』PS5国内版が発売中止に、CEROレーティングを取得できず。“表現規制して出す”より、世界観を優先\nパブリッシャーのIllFonicは8月31日、非対称PvPホラーゲーム『 Halloween: The Game 』について、国内向けPS5版の販売を中止すると発表した。CEROレーティングを取得できなかったことを理由としている。なお、PC（Steam/Epic Gamesストア）およびXbox Series X|S向けには、予定通り9月9日に発売される見込みだ。\n『Halloween: The Game』は、ジョン・カーペンター監督によるホラー映画「ハロウィン」を原作とするステルスホラーゲームだ 。同シリーズでおなじみの白塗りのハロウィンマスクを着けた殺人鬼マイケル・マイヤーズと、非対称の戦いが展開される。1対4の非対称PvPモードでは、4人の住民とマイケル・マイヤーズに分かれて対戦。住民側は武器や日用品で武装し、隣人の避難を助けながら、マイケルの襲撃に立ち向かう。また、PvPだけでなく、マイケルの視点で物語を追体験できるシングルプレイモードも実装されるという。\nA statement regarding Halloween: The Game on PS5 in Japan: Halloween: The Game will release in Japan as scheduled on Wednesday, September 9, on XBOX and PC. Unfortunately, our rating for PlayStation has been cancelled in Japan due to our inability to obtain a domestic rating… pic.twitter.com/1tyAdUKkCC\nそんな『Halloween: The Game』について、国内向けPS5版を発売しないことが公式Xアカウントで発表された。発売中止の理由として、CEROレーティングを取得できなかったことを挙げており、生々しい暴力表現やヌード描写が問題になったという。CEROのレーティングには18歳以上を対象とする「CERO：Z」が設けられているが、同カテゴリーにも適合しないと判断された場合はレーティング不可とされ、レーティングを取得できない。\n『Halloween: The Game』は9月9日に、国内向けにはPC（ Steam /Epic Gamesストア）およびXbox Series X|S向けに発売予定。\n巨大化ネコと少女の美麗旅ゲーム『Ylem&#039;s Cat』は「ほぼ全員ネコを飼ってる開発チーム」が放つ、ネコの手借りまくりゲーム。目指すのは『The Outer Wilds』の&ldquo;あの感覚&rdquo;"
+          }
+        ]
+      },
+      {
+        "eventKey": "de2f27010fbfbaa48e74",
+        "eventKind": "announcement",
+        "subjectKey": "crescent tower rising",
+        "subject": {
+          "kind": "game",
+          "key": "crescent tower rising"
+        },
+        "publishability": "direct",
+        "headline": "Crescent Tower: RISING announced for PC",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/08/crescent-tower-rising-announced-for-pc",
+            "publishedAt": "2026-08-31T01:30:11+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/08/crescent-tower-rising-announced-for-pc",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/08/Crescent-Tower-Rising-Ann_08-30-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Publisher AMATA Games and developer Curry Croquette have announced Crescent Tower successor and 8-bit style turn-based RPG Crescent Tower: RISING for PC (Steam). A release date was not announced. I…\nCrescent Tower: RISING announced for PC\nPublisher AMATA Games and developer Curry Croquette have announced Crescent Tower successor and 8-bit style turn-based RPG Crescent Tower: RISING for PC ( Steam ). A release date was not announced. It will support English, French, German, Japanese, Korean, Traditional Chinese, and Simplified Chinese language options.\nNostalgic, yet new&#8212;venture into the 8-bit style RPG, Crescent Tower: RISING .\nThe Tower of the Arc Moon, an unconquered dungeon that appears just once every 50 years in the Imperial Capital Mayirdoam.\nThe Logbook of Bravery, left behind by the man closest to achieving Tower Victory, now inspires others to begin a new adventure.\nHere is an overview of the game, via AMATA Games:\nA legacy of bravery births hope anew&#8212;.\nFeaturing retro graphics and sound that will take you back to the 80s."
+          }
+        ]
+      },
+      {
+        "eventKey": "2395be84fe622654ef87",
+        "eventKind": "launch",
+        "subjectKey": "metro 2039 confirms popular feature for",
+        "subject": {
+          "kind": "game",
+          "key": "metro 2039 confirms popular feature for"
+        },
+        "publishability": "direct",
+        "headline": "Metro 2039 Confirms Popular Feature for Launch",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/metro-2039-karma-system/",
+            "publishedAt": "2026-08-31T01:00:13Z",
+            "canonicalUrl": "https://gamerant.com/metro-2039-karma-system/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/08/metro-2039-helmet-held-in-hands-gameplay-trailer-screenshot.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "4A Games confirms that a fan-favorite feature is returning in Metro 2039 from day one, but with a different approach than previous titles.\nMetro 2039 Confirms Popular Feature for Launch\nMetro 2039 has confirmed the return of its popular Karma system, though the upcoming game will take a different approach to morality to fit the story better. Metro 2039 is the highly anticipated sequel to Metro Exodus , and developer 4A Games has already shared some insight into its gameplay and main story.\nInitially announced in April, Metro 2039 is the next entry in the series set to release in early 2027 for PlayStation 5, Xbox Series X/S, and PC. In this new chapter, all-new protagonist Stranger has to retire from exile and return to the Moscow Metro, which has been taken over by the Novoreich regime. The leader of the unified faction is known as Hunter, who rules with oppression and propaganda. Stranger must now fight the Novoreich as well as his own personal demons. Similar to previous entries, Metro 2039 will include returning enemies, stealth gameplay, weapon customization, limited resources, and a deep story with political hues. Now, the developers have confirmed that another fan-favorite feature is making a comeback.\nGameRant goes hands on with Metro 2039, 4A Games' upcoming entry that brings the series back to its darker, more survival-focused roots.\nMetro 2039 Features Karma System, But Steps Away from Moral Ambiguity\nIn an interview with GamesRadar+ , Metro 2039 executive producer Jon Bloch revealed that the series' Karma system is coming back. However, unlike other Metro games , the approach to morality is going to shift to match the story better. \"Where there was kind of a moral grayness in our previous games, we wanted to make sure that the morality was clear in Metro 2039 ,\" explained Bloch. \"There is no hope, no future – except the one the Führer is promising to bring in.\" The game is going to explore the repercussions of war and take a firmer standpoint against the wrongs of the fascist Novoreich regime.\nBloch reassured that the basis of the Karma system will remain the same in Metro 2039 , meaning that players' actions will have consequences later. The new entry will handle the system slightly differently, though, \"because it needs to serve the story.\" It is unclear how the Karma system will manifest itself in Metro 2039 's gameplay , but since the game's tone is already darker than its predecessors, players' moral choices may be tougher than ever.\nThe Metro series has one of the best Karma systems in video games . Depending on fans' decisions, the main story will have either positive or negative effects. What sets the Metro franchise apart from other titles is how its defining moral choices are not as easy to spot. In Metro Exodus , a faint flash of blue would appear on the screen every time players earned moral points, with the same mechanic present in Metro 2033 and Last Light . However, the games would make it quite hard for fans to notice which decisions led them to each good or bad ending."
+          }
+        ]
+      },
+      {
+        "eventKey": "38373b0c67143dd2feaf",
+        "eventKind": "delay",
+        "subjectKey": "new palworld card game release hit with",
+        "subject": {
+          "kind": "game",
+          "key": "new palworld card game release hit with"
+        },
+        "publishability": "direct",
+        "headline": "New Palworld Card Game Release Hit With Delay",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/palworld-official-card-game-sleeve-set-delay/",
+            "publishedAt": "2026-08-31T02:00:22Z",
+            "canonicalUrl": "https://gamerant.com/palworld-official-card-game-sleeve-set-delay/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/08/palworld-card-game-sleeves-delay.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "A brand-new release coming to the Palworld Official Card Game is being delayed, making fans wait longer for the popular card game&#039;s next new release.\nNew Palworld Card Game Release Hit With Delay\nOne of the next new products coming to the Palworld card game has been delayed, pushing back the release of the Sleeve and Card Set Vol. 1 to October 16. The new accessories and exclusive promo cards will precede the release of Palworld 's second full set.\nThe Palworld Official Card Game made its long-awaited debut in late July to massive fanfare by Pocketpair and Bushiroad. The Dawn of Palpagos set debuted on July 30 as the first set for the game, featuring cards based on a variety of fan-favorite Pals, including Cattiva, Lamball, and Chillet. The expansion was also joined by a pair of Trial Decks aimed at giving players an entry point into the game, each including a fully built 50-card deck and a pack from the Dawn of Palpagos set. Now, with Palworld 's second full set on the horizon, the card game's first official accessories have been pushed back.\nPalworld developer Pocketpair is officially starting to tease the next major update coming to the popular monster-catching survival game.\nPalworld Official Card Game's First Official Accessories Have Been Delayed\nBushiroad confirmed that the Palworld Official Card Game 's Sleeve and Card Set Vol. 1 has been pushed back from its original release date. The product is now scheduled to release on October 16, pushing the release back of the game's first official accessories back two weeks from the originally planned date of October 2. The accessory set includes a pack of 75 card sleeves, each featuring a Pal Sphere design on the back, as well as exclusive promo cards of Cattiva, Depresso, Chillet, Quivern, and Grizzbolt. Bushiroad apologized for the delay and reassured customers that it is \"working behind the scenes\" to release the sleeves as quickly as possible.\nThe Palworld delay comes as the card game has already been targeted by scalpers early in its release. Many fans have reported difficulty trying to find the Palworld card game in local game stores, with resellers buying out stock of the cards. Booster boxes of Dawn of Palpagos have been spotted on sites like eBay for far above MSRP, with Palworld boxes selling for as much as $175 on the secondary market. The biggest chase card from Dawn of Palpagos also boasts a high price tag, with early copies of the all-gold SSS Cattiva selling for thousands of dollars.\nWhile supply issues have plagued the Palworld Official Card Game since its release, Bushiroad has given fans hope for the future of the game. The company officially addressed fans just weeks after the release of the game, commenting on the stock shortages for Dawn of Palpagos. Bushiroad confirmed that additional stock of the Palworld set was already being sent to stores, and the company is planning a 2nd Edition release for Dawn of Palpagos to give even more fans the chance to buy the cards."
+          }
+        ]
+      },
+      {
+        "eventKey": "9de564db03f64c96badd",
+        "eventKind": "other",
+        "subjectKey": "前人未到の地に立つ",
+        "subject": {
+          "kind": "game",
+          "key": "前人未到の地に立つ"
+        },
+        "publishability": "direct",
+        "headline": "「前人未到の地に立つ」ために株で稼ぐ。「狼と香辛料」作者のSF金融青春譚『WORLD END ECONOMiCA』をもう遊んだか",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "内容是既有作品推荐，不是本窗口内发生的新事实。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/special-column/20260830-464075/",
+            "publishedAt": "2026-08-30T05:58:56+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/special-column/20260830-464075/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464075-image1.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "国産Steamタイトルをピックアップして紹介する本連載。6回目となる本稿では『WORLD END ECONOMiCA』を紹介する。\n「前人未到の地に立つ」ために株で稼ぐ。「狼と香辛料」作者のSF金融青春譚『WORLD END ECONOMiCA』をもう遊んだか\n物語の舞台は、人類が月への移民を開始してから16年余りが経過した未来。月面には巨大な都市が築かれ、多くの人々が新天地でそれぞれの夢を追いかけている。主人公は月で生まれ育った少年ハルで、彼の夢は「前人未到の地に立つ」こと。途方もない資金を必要としたハルが目をつけたのは、莫大な富を生み出す一方で、失敗すれば無慈悲に財産を奪われる株取引の世界だった。本作の面白さは、SFと金融という一見すると相性の悪そうな題材を、ハルの「夢」という一点で結びつけた点だ。月面開拓という壮大な舞台設定がありながら、ハルが求めているのは世界を救うことでも人類の未来を変えることでもない。ただ自分が行きたい場所へ行くための金が欲しいという個人的な欲望が、株式市場という巨大なシステムに接続されていく。\nSteamでは日々数多くのゲームがリリースされている一方で、個人や少人数チームによる国産タイトルには大作の話題に隠れながらも、独創的なアイデアや強いこだわりを持つ作品が少なくない。本連載「見逃してない？ 国産Steamタイトル発掘録」では、同人・インディーゲームを中心に、国産Steamタイトルを毎回1本ずつピックアップして魅力を伝えていきたい。\n連載第6回となる本稿では、サークル「Spicy Tails」が手がけるビジュアルノベル『WORLD END ECONOMiCA』を紹介。本作は「狼と香辛料」で知られる支倉凍砂氏がシナリオを担当する、月面を舞台にした全3話のビジュアルノベルだ。2011年に同人作品としてリリースされ、Steam向けには2014年に第1話、2015年に第2話、2016年に第3話が発売。現在は3つのエピソードをまとめたコンプリートバンドルやNintendo Switch版も発売中だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "f322ade3e48de8ea849b",
+        "eventKind": "other",
+        "subjectKey": "天使を殺さないと死ぬ",
+        "subject": {
+          "kind": "game",
+          "key": "天使を殺さないと死ぬ"
+        },
+        "publishability": "direct",
+        "headline": "「天使を殺さないと死ぬ」FPS『サツバツサッキュバス』Steamにてお披露目。呪いの元凶サキュバスに褒められつつ天使にカチコミ、『カルトに厳しいギャル』開発者新作",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260831-464124/",
+            "publishedAt": "2026-08-31T01:07:33+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260831-464124/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260831-464124-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Crush-vAdinは8月29日、『SATSUBATSU SUCCUBUS-サツバツサッキュバス-』のSteamストアページを公開した。\n「天使を殺さないと死ぬ」FPS『サツバツサッキュバス』Steamにてお披露目。呪いの元凶サキュバスに褒められつつ天使にカチコミ、『カルトに厳しいギャル』開発者新作\n個人サークルCrush-vAdinは8月29日、『 SATSUBATSU SUCCUBUS-サツバツサッキュバス- 』のSteamストアページを公開した。対応プラットフォームはPC（Steam）で、今年第4四半期に配信予定だ。\n『サツバツサッキュバス』は、サキュバスに呪われた主人公が天使の施設へと殴り込みをかける、ハイスピードFPSだ。主人公に呪いをかけたのは、通常業務に飽きて刺激を求めるサキュバス「リリン・ゼークチョール」。プレイヤーは「天使を殺しにいかないと死ぬ」という理不尽な呪いを受け、リリンから与えられた身体強化と銃器を手に、天使が支配する夢の領域へとカチコミを仕掛けることになる。\n本作は「超高速サキュバスニホメテモラエールFPS」を掲げており、考える隙を与えないスピーディーな戦闘が特徴だ。武器には、素早く敵を処理できる自動小銃「ASSAULT RIFLE」、軽快な取り回しと強力な近接攻撃を繰り出せる「HANDGUN」、近距離から強烈な一撃を叩き込む「SHOTGUN」が用意されている。ヘッドショットで天使を撃ち抜くだけでなく、近距離では銃床を叩き込む肉弾戦も交えながら、矢継ぎ早に現れる敵を殲滅していく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "4522a87c52464c3c94dc",
+        "eventKind": "other",
+        "subjectKey": "big walk",
+        "subject": {
+          "kind": "game",
+          "key": "big walk"
+        },
+        "publishability": "direct",
+        "headline": "『Big Walk』は一瞬一瞬がフレンドとのかけがえない思い出。『Neon Abyss 2』は初期からかなり見違えた。バイト戦士的には『スプラトゥーン レイダース』はやや物足りなさある。今週のゲーミング",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T13:21:17.908Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "文章是多款游戏的体验随笔，不构成可独立发布的当日事件。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/now-gaming/20260830-464113/",
+            "publishedAt": "2026-08-30T08:56:58+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/now-gaming/20260830-464113/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464113-004.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Now Gamingは毎週日曜日、各ライターがその週にプレイしたゲームについて、ゆるく書きちらすコーナーです。559回目です。\n『Big Walk』は一瞬一瞬がフレンドとのかけがえない思い出。『Neon Abyss 2』は初期からかなり見違えた。バイト戦士的には『スプラトゥーン レイダース』はやや物足りなさある。今週のゲーミング\n『 Big Walk 』をようやくクリアしました。完全クリアはまだですが、ひとまず区切りはついたかたちです。リリースからそれなりに時間が経ちましたが、以下では本作終盤の内容に触れるのでご留意いただければと思います。\n一通りプレイしての感想としては、どこまでも「コミュニケーション」を活かしたつくりがすごい。というか、コミュニケーションこそが『Big Walk』となっている。あくまでパズルはコミュニケーションの呼び水になっている、という印象。相談や提案だけでなく、じゃれあい、雑談……すべてのコミュニケーションを受け入れる余地がある。ゲーム内で昼夜が来るシステムや痒い所に絶妙に手が届かなかったりするアイテム/設備も、こうした視点で見てみるとすべてが「プレイヤー同士のやりとり」へと帰結していく。\nみんなで探検オープンワールド『Big Walk』にて、謎の&ldquo;助っ人プレイヤー&rdquo;との遭遇報告相次ぐ。本当に困った時だけ助けてくれる、&ldquo;伝説のお手伝いさん&rdquo;\nNow Gamingは毎週日曜日、各ライターがその週にプレイしたゲームについて、ゆるく書きちらすコーナーです。559回目です。インフル流行に気を付けたいところ。\n今週は、ローグライクアクションゲーム『 Neon Abyss 2 』が今秋に正式リリースされ、同時にコンソール版も発売されることが発表。ということで久々にプレイしていました。正式リリース時には新規ボスやゲームモードの追加が予定されており、その追加ゲームモードのひとつになるであろう「Storm Raid」が現在ベータテスト中だったので、そちらを少し触っていました。\n通常モードは、多数の部屋で構成されたステージを探索しながら敵と戦う形式ですが、 Storm Raidは探索なし。2つある扉から武器や各種消費アイテムなどの報酬を先に選んで進み、敵と戦ってはその報酬を得て、また扉を選ぶ。『Hades』などに似たスタイルです。ボスを1体倒すと終了で、本作のバトルをサクッと楽しめるモードと言えそうです。一方、本作の魅力である武器強化に関して物足りない印象があり、その辺のバランス調整を今後期待したいところです。 by. Taijiro Yamanaka"
+          }
+        ]
+      },
+      {
+        "eventKey": "b8d3346797ead2da4212",
+        "eventKind": "other",
+        "subjectKey": "ロックマン11",
+        "subject": {
+          "kind": "game",
+          "key": "ロックマン11"
+        },
+        "publishability": "direct",
+        "headline": "『ロックマン11』は85％オフで“ワンコイン切り”。続編絶賛開発中の『ホグワーツ・レガシー』はなんと90％オフの約900円。今週の高割引率PCゲーム",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "内容为一周折扣导购，缺少单一重大事件，且价格具有快速变动风险。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260830-464085/",
+            "publishedAt": "2026-08-30T07:33:02+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260830-464085/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464085-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "本稿ではSteamにてこの1週間でセールが開始されたタイトルのうち、特に割引率の高いゲームに焦点を当てて紹介する。\n『ロックマン11』は85％オフで“ワンコイン切り”。続編絶賛開発中の『ホグワーツ・レガシー』はなんと90％オフの約900円。今週の高割引率PCゲーム\n『 ロックマン11 運命の歯車!! 』 ・アクションゲーム『ロックマン』シリーズのひとつ。任意のタイミングでロックマンのパワーとスピードを大幅に強化できるダブルギア・システムを特徴とし、ショットやジャンプアクションも駆使しながら、平和なロボット社会に襲いかかる悪の科学者Dr.ワイリーの野望を食い止めることを目指す。タイムアタックやチャレンジモードも用意されている。 税込448円/85％オフ（ ストアページ ）\nNintendo Switch 2 / Switchセールに約200本追加。『ロックマン11』が478円、『ライドウ』リマスターや『ガンダムブレイカー4』など最安値級もいろいろ\n『ロックマン11』は85％オフで&ldquo;ワンコイン切り&rdquo;。続編絶賛開発中の『ホグワーツ・レガシー』はなんと90％オフの約900円。今週の高割引率PCゲーム\nPCゲーマーにはおなじみのSteamでは、日々多数のゲームにおいてセールが実施されている。そこで本記事では、この1週間（8月23日〜29日）にセールが開始された作品の中から、注目作をいくつか紹介する。\n本記事ではセール中の作品の中でも、特に割引率の高いお買い得なゲームに焦点を当てている。また記事の最後では、今週発売されローンチセール中の新作も一部紹介。基本的には、ある程度レビュー評価の高いタイトルを優先してピックアップしている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "1850709f1891ce8bbd2f",
+        "eventKind": "other",
+        "subjectKey": "ルーンスケープ ドラゴンワイルズ",
+        "subject": {
+          "kind": "game",
+          "key": "ルーンスケープ ドラゴンワイルズ"
+        },
+        "publishability": "direct",
+        "headline": "オープンワールドサバイバル『ルーンスケープ：ドラゴンワイルズ』初心者攻略｜黒騎士の要塞を攻略、黒騎士装備入手法や夢見石の欠片の進め方を徹底解説！",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T13:21:17.908Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "内容是攻略而非本窗口内的新事件，文中发行信息也不是当日公布。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/guide/20260830-464093/",
+            "publishedAt": "2026-08-30T08:18:50+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/guide/20260830-464093/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464093-image1.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "本稿では、『ルーンスケープ：ドラゴンワイルズ』の「黒騎士の要塞」についての攻略、夢見石の砕けた欠片の集め方などを解説する。\nオープンワールドサバイバル『ルーンスケープ：ドラゴンワイルズ』初心者攻略｜黒騎士の要塞を攻略、黒騎士装備入手法や夢見石の欠片の進め方を徹底解説！\nJagexが手がける『 ルーンスケープ：ドラゴンワイルズ 』は、長寿MMORPG『RuneScape』シリーズの世界観をもとにしたオープンワールドサバイバルクラフトゲームだ。ソロプレイのほか最大4人でのオンライン協力プレイにも対応し、資源を集めて拠点を発展させながら、より強力な装備や魔法を手に入れてドラゴンへ挑んでいく。\n『ルーンスケープ：ドラゴンワイルズ』は、PC（ Steam ）向けに早期アクセス配信中。そして9月15日に正式リリース予定だ。同時にPC（ Epic Gamesストア ）/Nintendo Switch 2/ PS5 / Xbox Series X|S 版も発売される予定となっている。\n2026年7月29日に配信された最新アップデートでは、新スキル「俊敏（Agility）」が実装され、各地のアジリティコースで経験値を獲得できるようになった（ 関連記事 ）。レベルを上げることで空中ダッシュやスタミナ性能、所持重量なども強化され、探索がさらに快適になっている。序盤から挑戦できるコースもあるため、見かけたら積極的に挑戦しておくと、その後の冒険がぐっと楽になるだろう。\n前回の 第4回攻略記事 では、フェルホロウの攻略法や隠し武器「アビスウィップ」の入手法などを紹介した。今回はその続きとして、黒騎士の要塞の攻略法をはじめ、夢見石の砕けた欠片の集め方や、黒騎士装備を作るまでの進め方などを解説する。今回の第5回攻略記事でも要点を中心に紹介し、探索ルートや戦闘の流れなどは動画にも収録しているので、あわせて参考にしてほしい。"
+          }
+        ]
+      },
+      {
+        "eventKey": "37f05f481fb23589139d",
+        "eventKind": "other",
+        "subjectKey": "ドラゴンボール ゲキシン スクアドラ",
+        "subject": {
+          "kind": "game",
+          "key": "ドラゴンボール ゲキシン スクアドラ"
+        },
+        "publishability": "direct",
+        "headline": "ドラゴンボールMOBA『ドラゴンボール ゲキシン スクアドラ』、年末に「見下ろし」から「三人称視点」に変わるリニューアル実施へ。ゲームルールもがっつり変更",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "included",
+          "lastDecision": "include",
+          "lastDecisionReason": "一手公告确认年末改版，二手报道发布时间处于本期固定窗口内，事实与时间均可验证。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260830-464068/",
+            "publishedAt": "2026-08-30T04:59:56+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260830-464068/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464068-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "バンダイナムコエンターテインメントは8月30日、『ドラゴンボール ゲキシン スクアドラ』について、今年の年末にリニューアルを実施すると発表した。ゲームプレイ時の視点変更や、ルールの変更が行われる。\nドラゴンボールMOBA『ドラゴンボール ゲキシン スクアドラ』、年末に「見下ろし」から「三人称視点」に変わるリニューアル実施へ。ゲームルールもがっつり変更\nバンダイナムコエンターテインメントは8月30日、オンライン対戦ゲーム『 ドラゴンボール ゲキシン スクアドラ 』について、今年の年末にリニューアルを実施すると発表した。本作は、PC（Steam）/Nintendo Switch/PS5/PS4/iOS/Android向けに基本プレイ無料にて配信中。\n本作は、「ドラゴンボール」を題材にしたクロスプレイ対応のオンライン対戦ゲームだ。いわゆるMOBA（Multiplayer Online Battle Arena）ジャンルの作品となる。\n『ドラゴンボール ゲキシン スクアドラ』は、4対4で戦うチーム対戦ゲームだ。悟空やベジータ、クリリン、ピッコロ、魔人ブウ、フリーザ、セルなど、原作でおなじみのキャラクターたちが登場。現時点では、各キャラクターは超攻撃特化のダメージ、壁となり味方を守るタンク、援護や妨害と多彩にこなすテクニカルという3つのロールに分類されている。\n本作のバトルは、両陣営の拠点が向かい合ったかたちで配置されたマップでおこない、試合を通じて技を習得したりステータスが強化されたりとキャラクターが進化していく。そして現時点では、4人いる破壊神を突破し、敵陣地の最奥にあるドラゴンボールを獲得することが勝利条件となっている。\n/／ 「ゲキシンルール」説明動画公開！ ＼ ゲキシンルールは、 先に敵陣の最奥にあるドラゴンボールを 手に入れたチームが勝利！ 詳しくは動画でチェック🔍 #ゲキシンスクアドラ #ドラゴンボール #ゲキスク pic.twitter.com/tbhcthWZLQ\n本作は2025年9月にリリースされ、シーズン制にて運営されてきた。そして今回、サービス開始以降に寄せられたフィードバックをもとに、「ドラゴンボール」らしいバトルの迫力と、チームバトルならではの魅力を、さらに多くのプレイヤーへ長く届けていくというビジョンを追求するためとして、今年の年末に予定されているシーズン8にて、リニューアルが実施されることが決定した。"
+          }
+        ]
+      },
+      {
+        "eventKey": "725d904eb995937f5056",
+        "eventKind": "other",
+        "subjectKey": "天地創造",
+        "subject": {
+          "kind": "game",
+          "key": "天地創造"
+        },
+        "publishability": "direct",
+        "headline": "傑作アクションRPG『天地創造』リマスター版は“オリジナルの強化版”になると開発者が自信見せる。悪名高き「あのボス」に手が入り、雰囲気守りつつUI/UXも強化",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "只有单一二手来源，且核心公布发生于更早日期，不在本期重复。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260830-464062/",
+            "publishedAt": "2026-08-30T04:13:21+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260830-464062/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464062-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "『天地創造』リマスター版では、オリジナル版の雰囲気を極力守りつつ、一部では調整なども加えられるようだ。\n傑作アクションRPG『天地創造』リマスター版は“オリジナルの強化版”になると開発者が自信見せる。悪名高き「あのボス」に手が入り、雰囲気守りつつUI/UXも強化\nClear River Gamesは8月25日、ショーケースイベント「Pixel Arcadia」にて『 天地創造 』のPS5/PS4/XBOX Series X|S/XBOX One/PC（Steam/GOG.com）/Nintendo Switch 2/Nintendo Switch版を発表した。本プロジェクトのシニアアドバイザーを務めているMartin Lindell氏にIGNが尋ねたところでは、本作はオリジナルのスーパーファミコン（SFC）版の「強化版」のような位置づけで、現行機向けへの仕様追加や、特定ボスについての変更なども加えられるという。\n『天地創造』オリジナル版は、クインテットが手がけ、1995年10月に当時のエニックス（現・スクウェア・エニックス）から発売されたスーパーファミコン（以下、SFC）向けアクションRPG。本作の舞台となるのは、地表の生命や文明が滅びた地球。主人公のアークは大地の奥底の「地裏」にある村クリスタルホルムで暮らしていた。しかしある日、村に封印されたパンドラの箱を開けたことで、村人たちは凍り付いてしまう。アークは村人たちを救うための村の外へと旅立ち、やがてその冒険を通じて地表の生命を呼びさますことになる。\n『天地創造』はグラフィックやシナリオ、音楽など多角的に人気を博しつつもこれまで移植・リマスターなどが展開されてなかった。しかしこのたびショーケースイベント「Pixel Arcadia」にて、移植版が発表。スクウェア・エニックスからのライセンス提供を受ける“公認”リマスターということで、本作は注目を集めていた（ 関連記事 ）。\n今回『天地創造』リマスター版の開発者によって、「本作が単なる移植/リマスター版ではなく、一部に調整が加えられた“強化版”になる」との自信が示された。なおインタビューでは『ソウルブレイダー』『ガイア幻想紀』、いわゆるクインテット三部作の残りについては、3作品まとめたコレクション的タイトルとすることは考えていなかったとしている。一方で、今回のリリースの成果次第では、残り2作のリマスターについても可能性があると示唆しており、本作リリース後の動向には注目が集まりそうだ。\n『天地創造』の PS5/PS4 / XBOX Series X|S/XBOX One /PC（ Steam / GOG.com ）/Nintendo Switch 2/Nintendo Switch版は2027年にリリース予定だ。\n本作オリジナル版のゲームディレクターは宮崎友好氏が務め、音楽は小林美代子氏と曳地正則氏が担当したほか、古代祐三氏も一部楽曲を手がけた。キャラクターデザインを手がけたのは漫画家の藤原カムイ氏。『ソウルブレイダー』『ガイア幻想紀』とあわせて、ファンからはソウル三部作あるいはクインテット三部作とも呼ばれる作品だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7910044c1ce884ecb95e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "基本プレイ無料『NTE』新実装の「重機仕事」と「ビーチバレー」は、やり込むと結構ガチ。では、“重機ビーチバレー”をやり込むと……？",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "prior-24h-audit",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-30T08:15:35.769Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "稿件以体验和玩法观察为主，证据包没有可独立确认的当日发行事实。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/special-column/20260830-464020/",
+            "publishedAt": "2026-08-30T03:00:01+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/special-column/20260830-464020/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/08/20260830-464020-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "『NTE: Neverness to Everness』のVer.1.3では夏らしいビーチバレーや、重機作業も実装される。そのどちらもやり込みがいのあるコンテンツとなっているだけでなく……？\n基本プレイ無料『NTE』新実装の「重機仕事」と「ビーチバレー」は、やり込むと結構ガチ。では、“重機ビーチバレー”をやり込むと……？\n『 NTE: Neverness to Everness 』（以下、NTE）のVer.1.3では、夏らしいビーチバレーが登場している。\nただし、このバレーは見た目ほど単純ではない。移動はもちろん、レシーブ、スパイク、ジャンプしてのブロックまで基本的に自分で操作。ボールとの位置関係や向き、ボタンを押すタイミングによってモーションや成否まで変わる。気軽なミニゲームかと思いきや、ちゃんと練習しないとなかなか思い通りに動けない、本格派のビーチバレーなのだ。\n今回調査してみたところ、ショベルカーを使えば、その上に乗って相手のスパイクを“足で”止めたり、ネットよりはるか上で何の意味もないブロックを繰り返したり、さらには堂々と相手コートへ侵入したりできることが判明した。ビーチバレーを攻略していたはずなのに、どうしてこうなってしまったのか。\n今回は、Ver.1.3で追加された期間限定イベント「スターズ・バレー」と、工事現場で重機を操る「ビルド・ラッシュ」を紹介。そこからなぜか誕生してしまった“重機ビーチバレー”の様子もお届けする。なお本稿には、一部先行体験コンテンツが含まれるため留意してほしい。\nそんなビーチバレーとはまったく毛色の違う遊びとして、今回「ビルド・ラッシュ」も先行体験することができた。こちらは各地の工事現場へ赴き、重機を操作して仕事をこなしていくシティライフコンテンツだ。\nさらに、バケットを地面へ食い込ませると、その部分が実際に削れる。すくった土はバケットの中に入り、別の場所へこんもり盛ることも可能。しかも削った場所や盛った土にはキャラクターや車が乗れる。これまでの『NTE』ではあまり見られなかった、“地形そのものを変える”遊びとなっている。\nほかにも、大型のダンプカーを轟音とともに走らせたり、壁や柱へ重機で突っ込んで豪快に解体したりと、仕事内容はさまざま。大規模な現場では10分以上かかることもある一方、そのぶん報酬も大きい。一度の仕事で10万ファンス以上を稼げる依頼もあり、単なる重機のお試しコーナーではなく、金策としてもしっかり旨味が用意されている。ビーチバレーに続き、こちらもやけに真面目に作られているのである。\nそして以前弊誌では、そんなバレーにまったく別の攻略法が存在することも紹介した。相手コートにダンプカーを置き、物理的に攻撃を邪魔するというものだ（ 関連記事 ）。ルール無用にもほどがある戦法だが、どうやら重機でできることはそれだけではなかった。"
+          }
+        ]
+      },
+      {
+        "eventKey": "059df26786abad2effec",
+        "eventKind": "release-date",
+        "subjectKey": "ドラゴンズドグマ 2 ダークアリズン",
+        "subject": {
+          "kind": "game",
+          "key": "ドラゴンズドグマ 2 ダークアリズン"
+        },
+        "publishability": "direct",
+        "headline": "『ドラゴンズドグマ 2：ダークアリズン』「皆さんからの声こそが、さまざまな判断の基底に」インタビューからわかったこと。ハードモードは発売日に実装予定。理外の竜以外の強大な存在も【gamescom 2026】",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-29T08:58:18.417Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-29-am",
+            "2026-08-29-pm",
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "采访只有单一二手来源，证据包也不能确认其发布时间属于本期窗口。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202608/85253",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202608/85253",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/85253/thumbnail_MuIn.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "ファン待望の大型追加コンテンツ『ドラゴンズドグマ 2：ダークアリズン』インタビュー。開発陣の中心にいる3人に、本編とは異なる方向性について訊いた。\n『ドラゴンズドグマ 2：ダークアリズン』「皆さんからの声こそが、さまざまな判断の基底に」インタビューからわかったこと。ハードモードは発売日に実装予定。理外の竜以外の強大な存在も【gamescom 2026】\ngamescom 2026に初プレイアブル出展された『ドラゴンズドグマ 2：ダークアリズン』を先行プレイ。極北の地・ノルガンの環境、そして覚者を待ち受ける強力な敵とは……!?\n『ドラゴンズドグマ 2：ダークアリズン』ディレクター。（文中は木下）\n『ドラゴンズドグマ 2：ダークアリズン』プロデューサー。（文中は大山）\n『ドラゴンズドグマ 2：ダークアリズン』プロデューサー。（文中は平林）\n本編から受け継がれている『ドラゴンズドグマ』らしさと、ハクスラによる新たな遊び\n『ドラゴンズドグマ 2：ダークアリズン』インタビュー。追加ストーリーだけで約20時間のボリューム。大型アップデート立ち上げのきっかけについて訊いた。"
+          }
+        ]
+      },
+      {
+        "eventKey": "e7a0a8d137019f084e91",
+        "eventKind": "other",
+        "subjectKey": "ハロウィン ザ ゲーム",
+        "subject": {
+          "kind": "game",
+          "key": "ハロウィン ザ ゲーム"
+        },
+        "publishability": "direct",
+        "headline": "『ハロウィン ザ・ゲーム』CEROレーティングを取得できずPS5版が発売中止に。予約者には返金対応。Xbox/PCでは9月9日発売",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202608/86081",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202608/86081",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/86081/ogp_slie.png?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "新作ホラーゲーム『ハロウィン ザ・ゲーム』プレイステーション5版の発売中止が発表。\n『ハロウィン ザ・ゲーム』CEROレーティングを取得できずPS5版が発売中止に。予約者には返金対応。Xbox/PCでは9月9日発売\n堀井雄二氏『ドラクエ』の40年を語るスペシャルインタビュー。セリフやマップのこだわり、『ドラゴンクエスト』らしさ、ゲームデザイナーとしての転機……歴代ナンバリング開発秘話とともに振り返る\nA statement regarding Halloween: The Game on PS5 in Japan: Halloween: The Game will release in Japan as scheduled on Wednesday, September 9, on XBOX and PC. Unfortunately, our rating for PlayStation has been cancelled in Japan due to our inability to obtain a domestic rating… pic.twitter.com/1tyAdUKkCC\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年08月31日10時〜2026年08月31日11時\nWindows版 | Minecraft (マインクラフト): Java & Bedrock Edition | オンラインコード版"
+          }
+        ]
+      },
+      {
+        "eventKey": "89510237dc29ce14dabc",
+        "eventKind": "announcement",
+        "subjectKey": "xbox series x xbox oneで ディスク版ゲームからデジタル版のプレイ権を得られる新たな取り組みが",
+        "subject": {
+          "kind": "game",
+          "key": "xbox series x xbox oneで ディスク版ゲームからデジタル版のプレイ権を得られる新たな取り組みが"
+        },
+        "publishability": "direct",
+        "headline": "Xbox Series X/Xbox Oneで、ディスク版ゲームからデジタル版のプレイ権を得られる新たな取り組みが発表。まずはInsiderプログラム参加者から提供",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-27T05:06:50.183Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-27-am",
+            "2026-08-27-pm",
+            "2026-08-28-am",
+            "2026-08-28-pm",
+            "2026-08-29-am",
+            "2026-08-29-pm",
+            "2026-08-30-am",
+            "2026-08-30-pm",
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "一手公告发布于8月26日，《Fami通》报道发布于8月27日，均不属于本期窗口。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202608/85704",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202608/85704",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/85704/ogp_tMNG.png?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Xbox Series XとXbox Oneのディスク版ゲームからデジタル版ライセンスが得られるようになる、Xboxの新たな取り組みが発表。\nXbox Series X/Xbox Oneで、ディスク版ゲームからデジタル版のプレイ権を得られる新たな取り組みが発表。まずはInsiderプログラム参加者から提供\nYour physical game library is more than a collection of discs. It holds years of memories and stories worth preserving. Starting next week, XBOX Insiders can unlock a digital entitlement for supported physical games. We’ll start with thousands of titles and add more as we can. pic.twitter.com/XATsa8sjBt\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年08月30日19時〜2026年08月30日20時\n【グッズ】 イーグレットツーミニ専用パドル＆トラックボールコントローラー バイオレットカラー"
+          }
+        ]
+      },
+      {
+        "eventKey": "e5b3997c8cd32ca59931",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Fate/EXTRA Record to be published by Aniplex",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": {
+          "firstSeenAt": "2026-08-31T06:36:53.772Z",
+          "lastSeenAt": "2026-08-31T06:36:53.772Z",
+          "windowsSeen": [
+            "2026-08-31-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/08/fate-extra-record-to-be-published-by-aniplex",
+            "publishedAt": "2026-08-31T02:05:20+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/08/fate-extra-record-to-be-published-by-aniplex",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/08/Fate-EXTRA-Record-Aniplex_08-30-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "html-lang+character-distribution",
+            "evidenceText": "Aniplex will publish Fate/EXTRA remake Fate/EXTRA Record, TYPE-MOON and TYPE-MOON studio BB announced.\nFate/EXTRA Record to be published by Aniplex\nAniplex will publish Fate /EXTRA remake Fate/EXTRA Record , TYPE-MOON and TYPE-MOON studio BB announced .\nTYPE-MOON also said that some changes have been made to the overall development structure of Fate/EXTRA Record , as well as the organizational structure within developer TYPE-MOON studio BB.\nThe current Fate/EXTRA Record official website and Twitter account will close on September 7 at 17:00 JST .\nFate/EXTRA Record has been announced for release on PlayStation 5 , PlayStation 4 , Switch , and PC via Steam.\nThe announcement comes after TYPE-MOON announced back in March that Bandai Namco Entertainment would no longer publish the game.\nThe staff credits on the new official website, which is scheduled to launch in the future, as well as other materials, will be updated to reflect these changes."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 42160,
+      "estimatedInputTokens": 10540,
+      "activeTrackingItems": 0,
+      "candidateItems": 20,
+      "includedItems": 18,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": [],
+      "titleHintItems": 0
+    },
+    "titleHints": []
+  }
+}
