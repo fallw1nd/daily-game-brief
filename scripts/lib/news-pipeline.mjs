@@ -97,7 +97,7 @@ function feedLink(block, base) {
   for (const tag of block.match(/<link\b[^>]*>/gi) || []) {
     const href = tag.match(/href\s*=\s*["']([^"']+)["']/i)?.[1];
     if (href) {
-      try { return canonicalUrl(decodeEntities(href[1]), base); } catch {}
+      try { return canonicalUrl(decodeEntities(href), base); } catch {}
     }
   }
   return "";
