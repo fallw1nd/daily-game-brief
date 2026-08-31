@@ -1,3 +1,4 @@
+import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 import {
   isBoundaryMinute,
@@ -17,12 +18,14 @@ function beijingNow(now) {
 }
 
 function nextEditionAt(window) {
-  if (window.period === "am") return `${window.id.slice(0, 10)} 17:00`;
-  const next = new Date(Date.parse(`${window.id.slice(0, 10)}T00:00:00+08:00`) + 86400000);
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(next);
-  return `${date} 10:10`;
+  return nextEditionAtForPeriod(window.period, window.id.slice(0, 10));
+}
+
+function archiveTitlePrefix(period) {
+  if (period === "am") return "早报｜";
+  if (period === "pm") return "晚报｜";
+  if (period === "daily") return "日报｜";
+  throw new Error(`unsupported edition period ${period}`);
 }
 
 function displayTitle(decision) {
@@ -115,7 +118,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   if (existingManifestItem && !degradedEdition) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
-  const prefix = window.period === "am" ? "早报｜" : "晚报｜";
+  const prefix = archiveTitlePrefix(window.period);
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const counters = new Map();
