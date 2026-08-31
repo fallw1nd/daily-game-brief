@@ -13,11 +13,13 @@ if (!expected) throw new Error("Pass a valid --edition=YYYY-MM-DD-am|pm|daily");
 if (expected.period !== period) throw new Error(`edition ${expected.id} does not match period ${period}`);
 const manifest = JSON.parse(await readFile("public/data/manifest.json", "utf8"));
 const localEdition = manifest.editions.find((edition) => edition.id === expected.id);
-let status = localEdition ? "committed" : "missing";
+const plannedAtMs = Date.parse(`${expected.plannedAt.replace(" ", "T")}:00+08:00`);
+const releasePending = Boolean(localEdition && period === "daily" && now.getTime() < plannedAtMs);
+let status = localEdition ? (releasePending ? "healthy" : "committed") : "missing";
 let onlineLatest = null;
 let onlineError = null;
 
-if (localEdition && process.env.SKIP_ONLINE_CHECK !== "true") {
+if (localEdition && !releasePending && process.env.SKIP_ONLINE_CHECK !== "true") {
   try {
     const url = new URL("https://fallw1nd.github.io/daily-game-brief/data/manifest.json");
     url.searchParams.set("sla", String(Date.now()));
@@ -42,6 +44,7 @@ const result = {
   expectedEdition: expected.id,
   period,
   status,
+  releasePending,
   localLatest: manifest.latest,
   onlineLatest,
   onlineError,
@@ -52,6 +55,7 @@ if (process.env.GITHUB_OUTPUT) {
   await appendFile(process.env.GITHUB_OUTPUT, [
     `status=${status}`,
     `expected=${expected.id}`,
+    `release_pending=${releasePending}`,
     `local_latest=${manifest.latest}`,
     `online_latest=${onlineLatest || ""}`,
   ].join("\n") + "\n");
