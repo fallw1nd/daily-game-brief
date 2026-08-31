@@ -65,7 +65,9 @@ Cross-source overlap uses a known canonical title key plus event kind when avail
 
 `.github/workflows/source-shadow-observation.yml` is the safe maintenance path for collecting real GitHub-hosted runner samples without replaying a production packet. It runs the same registered-source collector with `contents: read`, writes only runner-local artifacts, uploads the observation report, and never persists `automation/state`, finalizes a packet, dispatches SLA recovery, edits Canonical data, or publishes Pages.
 
-A manual observation is useful for parser health, accessibility, candidate yield, and active-vs-shadow overlap. It is not itself a production edition and cannot automatically promote a source. Promotion still requires editorial sampling and, where timing behavior matters, normal Daily collector evidence across appropriate windows.
+When a shadow listing exposes candidate URLs but no publication time, the observer may run a bounded detail-page timestamp probe. It opens at most two registered candidate URLs per shadow source and at most 30 pages in total, accepts only HTTPS URLs that still match the source registry, and extracts standard article publication metadata such as `article:published_time`, `datePublished`, or `<time datetime>`. Probe output is written to the observation artifact only. It does not modify the candidate list, establish production evidence, upgrade `fact_status`, or grant same-window contribution credit.
+
+A manual observation is useful for parser health, accessibility, candidate yield, active-vs-shadow overlap, and determining whether listing-time gaps can be repaired safely from article metadata. It is not itself a production edition and cannot automatically promote a source. Promotion still requires editorial sampling and, where timing behavior matters, normal Daily collector evidence across appropriate windows.
 
 ## Primary-source resolution
 
