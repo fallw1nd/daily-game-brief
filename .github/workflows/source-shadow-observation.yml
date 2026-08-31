@@ -55,15 +55,29 @@ jobs:
           fi
           node scripts/collect-news.mjs --period="$PERIOD"
 
+      - name: Probe bounded shadow detail timestamps
+        env:
+          NEWS_CANDIDATES_PATH: artifacts/shadow-observation/news-candidates.json
+          SHADOW_DETAIL_REPORT_PATH: artifacts/shadow-observation/shadow-detail-time-report.json
+          SHADOW_DETAIL_MAX_PER_SOURCE: '2'
+          SHADOW_DETAIL_MAX_TOTAL: '30'
+        run: node scripts/probe-shadow-published-time.mjs
+
       - name: Summarize shadow contribution
         run: |
           node --input-type=module <<'NODE'
           import { readFile, appendFile } from 'node:fs/promises';
           const report = JSON.parse(await readFile('artifacts/shadow-observation/news-shadow-report.json', 'utf8'));
+          const detail = JSON.parse(await readFile('artifacts/shadow-observation/shadow-detail-time-report.json', 'utf8'));
+          const detailBySource = new Map((detail.bySource || []).map((item) => [item.sourceId, item]));
           const shadow = (report.sourceStats || []).filter((item) => item.mode === 'shadow');
           const rows = shadow
             .sort((a, b) => (b.shadowUniqueCandidates || 0) - (a.shadowUniqueCandidates || 0) || a.sourceId.localeCompare(b.sourceId))
-            .map((item) => `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${item.shadowUnknownTimeCandidates ?? 0} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`);
+            .map((item) => {
+              const probe = detailBySource.get(item.sourceId);
+              const detailCell = probe ? `${probe.resolved}/${probe.attempted}` : '-';
+              return `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${item.shadowUnknownTimeCandidates ?? 0} | ${detailCell} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`;
+            });
           const body = [
             '# Shadow source observation',
             '',
@@ -74,13 +88,15 @@ jobs:
             `Unique vs active: ${report.totals?.shadowUniqueCandidates ?? 0}`,
             `Overlapping active: ${report.totals?.shadowOverlappingCandidates ?? 0}`,
             `Unknown-time shadow candidates: ${report.totals?.shadowUnknownTimeCandidates ?? 0}`,
+            `Detail timestamp probe: ${detail.resolved ?? 0}/${detail.attempted ?? 0} resolved; ${detail.limited ?? 0} limited`,
             `Overall overlap rate: ${Number(report.shadowCoverage?.overlapRate || 0).toFixed(3)}`,
             '',
-            '| Source | Health | Fetched | Window-qualified | Unique | Overlap | Unknown time | Rate | Error |',
-            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
+            '| Source | Health | Fetched | Window-qualified | Unique | Overlap | Unknown time | Detail time | Rate | Error |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
             ...rows,
             '',
-            '> Observation only. Unknown-time candidates are timestamp/parser health signals and do not earn same-window contribution credit.',
+            '> Detail time is a bounded observer-only probe of article publication metadata; it does not mutate candidates or establish production evidence.',
+            '> Unknown-time candidates are timestamp/parser health signals and do not earn same-window contribution credit.',
             '> This workflow does not write automation state, packets, Canonical data, or publication status.',
             '',
           ].join('\n');
