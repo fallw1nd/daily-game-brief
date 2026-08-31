@@ -29,16 +29,33 @@ export function plannedWindow(period, now = new Date()) {
   assertEditionPeriod(period);
   const date = beijingDate(now);
   const previousDate = previousBeijingDate(date);
-  const plannedAt = period === "am" ? `${date} 10:10` : `${date} 17:00`;
-  const windowStart = period === "pm"
-    ? `${date} 10:10`
-    : `${previousDate} 17:00`;
+
+  if (period === "am") {
+    return {
+      id: `${date}-am`,
+      period: "am",
+      plannedAt: `${date} 10:10`,
+      windowStart: `${previousDate} 17:00`,
+      windowEnd: `${date} 10:10`,
+    };
+  }
+
+  if (period === "pm") {
+    return {
+      id: `${date}-pm`,
+      period: "pm",
+      plannedAt: `${date} 17:00`,
+      windowStart: `${date} 10:10`,
+      windowEnd: `${date} 17:00`,
+    };
+  }
+
   return {
-    id: `${date}-${period}`,
-    period,
-    plannedAt,
-    windowStart,
-    windowEnd: plannedAt,
+    id: `${date}-daily`,
+    period: "daily",
+    plannedAt: `${date} 12:00`,
+    windowStart: `${previousDate} 10:10`,
+    windowEnd: `${date} 10:10`,
   };
 }
 
@@ -61,5 +78,5 @@ export function nextEditionAtForPeriod(period, date) {
   assertEditionPeriod(period);
   if (period === "am") return `${date} 17:00`;
   const nextDate = beijingDate(new Date(Date.parse(`${date}T12:00:00+08:00`) + DAY_MS));
-  return period === "pm" ? `${nextDate} 10:10` : `${nextDate} 17:00`;
+  return period === "pm" ? `${nextDate} 10:10` : `${nextDate} 12:00`;
 }
