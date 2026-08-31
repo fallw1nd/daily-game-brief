@@ -63,23 +63,25 @@ jobs:
           const shadow = (report.sourceStats || []).filter((item) => item.mode === 'shadow');
           const rows = shadow
             .sort((a, b) => (b.shadowUniqueCandidates || 0) - (a.shadowUniqueCandidates || 0) || a.sourceId.localeCompare(b.sourceId))
-            .map((item) => `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`);
+            .map((item) => `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${item.shadowUnknownTimeCandidates ?? 0} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`);
           const body = [
             '# Shadow source observation',
             '',
             `Window: ${report.window?.id || 'unknown'} · generated ${report.generatedAt}`,
             '',
             `Healthy shadow sources: ${report.totals?.healthyShadowSources ?? 0}/${report.totals?.shadowSources ?? 0}`,
-            `Reviewable shadow candidates: ${report.totals?.shadowReviewableCandidates ?? 0}`,
+            `Window-qualified shadow candidates: ${report.totals?.shadowReviewableCandidates ?? 0}`,
             `Unique vs active: ${report.totals?.shadowUniqueCandidates ?? 0}`,
             `Overlapping active: ${report.totals?.shadowOverlappingCandidates ?? 0}`,
+            `Unknown-time shadow candidates: ${report.totals?.shadowUnknownTimeCandidates ?? 0}`,
             `Overall overlap rate: ${Number(report.shadowCoverage?.overlapRate || 0).toFixed(3)}`,
             '',
-            '| Source | Health | Fetched | Reviewable | Unique | Overlap | Rate | Error |',
-            '| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |',
+            '| Source | Health | Fetched | Window-qualified | Unique | Overlap | Unknown time | Rate | Error |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
             ...rows,
             '',
-            '> Observation only. This workflow does not write automation state, packets, Canonical data, or publication status.',
+            '> Observation only. Unknown-time candidates are timestamp/parser health signals and do not earn same-window contribution credit.',
+            '> This workflow does not write automation state, packets, Canonical data, or publication status.',
             '',
           ].join('\n');
           await appendFile(process.env.GITHUB_STEP_SUMMARY, body);
