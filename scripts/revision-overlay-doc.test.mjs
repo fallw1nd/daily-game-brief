@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const note = await readFile(new URL("../docs/revision-overlay-note.md", import.meta.url), "utf8");
+const note = await readFile(resolve(process.cwd(), "docs/revision-overlay-note.md"), "utf8");
 
 describe("same-edition revision overlay documentation", () => {
   it("states preservation boundaries", () => {
