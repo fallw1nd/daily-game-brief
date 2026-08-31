@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  latestDueWindow as resolveLatestDueWindow,
+  plannedWindow as resolvePlannedWindow,
+} from "./edition-window.mjs";
 
 const majorPatterns = [
   /\b(?:announce|announced|reveal|revealed|release date|launch|delay|delayed|cancel|cancelled|update|dlc|acquisition|layoff|lawsuit|policy|award|winner|champion)\b/i,
@@ -237,37 +241,11 @@ export function mergeCandidates(records) {
 }
 
 export function plannedWindow(period, now = new Date()) {
-  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(now).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
-  const date = `${parts.year}-${parts.month}-${parts.day}`;
-  const end = period === "am" ? `${date} 10:10` : `${date} 17:00`;
-  const endMs = Date.parse(`${end.replace(" ", "T")}:00+08:00`);
-  const previousParts = Object.fromEntries(dateFormatter.formatToParts(
-    new Date(endMs - 24 * 60 * 60 * 1000),
-  ).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
-  const previousDate = `${previousParts.year}-${previousParts.month}-${previousParts.day}`;
-  const start = period === "am" ? `${previousDate} 17:00` : `${date} 10:10`;
-  return { id: `${date}-${period}`, period, plannedAt: end, windowStart: start, windowEnd: end };
+  return resolvePlannedWindow(period, now);
 }
 
 export function latestDueWindow(period, now = new Date()) {
-  const current = plannedWindow(period, now);
-  const currentEndMs = Date.parse(`${current.windowEnd.replace(" ", "T")}:00+08:00`);
-  if (now.getTime() >= currentEndMs) return current;
-  return plannedWindow(period, new Date(currentEndMs - 24 * 60 * 60 * 1000));
+  return resolveLatestDueWindow(period, now);
 }
 
 export function resemblesAdjacent(candidate, entries) {
