@@ -14,6 +14,8 @@ Use two-space indentation. Name components and types in `PascalCase`, functions 
 
 Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `official` without opening a primary source, machine-translate game titles, renumber issues, or delete historical editions. Keep rumors structurally distinct and preserve uncertainty in display copy. Visual decisions belong to `DESIGN.md` and the `gpt-taste` skill.
 
+Legacy `am` and `pm` keep their existing fixed evidence windows. When `period:"daily"` is enabled by an explicitly authorized production cutover, the Daily edition ID is `YYYY-MM-DD-daily`, its evidence window is `(previous day 10:10, current day 10:10]`, and `plannedAt` is current day 12:00. Facts first published after 10:10 belong to the next Daily edition; the 10:10–12:00 interval is production time, not part of the current fact window. These Daily rules may exist in code before cutover but must not silently change legacy production schedules.
+
 A broadly used community or playful Chinese name may be selected when found on the open web; mark it `common_translation`, never official.
 
 For games with an official mainland-China Simplified Chinese channel or site, visible Chinese copy must use the official mainland Simplified Chinese terminology when available, not an overseas-source translation. This applies beyond the game title to named version subtitles, characters/agents, classes/professions, modes, mechanics, and other proper in-game terms. When the event packet is based on a foreign-language or overseas source, a narrow terminology-only lookup against an official mainland Simplified Chinese source is allowed to normalize wording; it must not add event facts, times, platforms, release claims, source classification, tracking decisions, or candidates.
@@ -33,7 +35,7 @@ Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use war
 
 ## Archive Titles, Themes & Search
 
-Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实` or `晚报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报` or `游戏晚报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
+Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实`, `晚报｜本期重磅事实`, or `日报｜本期重磅事实` according to its `period`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报`, `游戏晚报`, or `游戏日报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
 
 Maintain accessible dark/light themes with persistent keyboard-operable switching. Hide empty departments from content, directories, and top-level links. Archive rows represent editions; cross-edition search links results to their source edition and entry anchor.
 
