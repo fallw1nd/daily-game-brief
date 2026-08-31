@@ -2,8 +2,12 @@ import { appendFile, readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
-import { latestDueWindow, plannedWindow } from "./lib/news-pipeline.mjs";
+import {
+  EDITION_PERIODS,
+  editionWindowForDate,
+  expectedEditorialWindow,
+  latestDueWindow,
+} from "./lib/edition-window.mjs";
 
 function dateRange(start, end) {
   const values = [];
@@ -14,7 +18,7 @@ function dateRange(start, end) {
 }
 
 export function resolveDueEdition({ period, now = new Date(), manifest, states = {}, purpose = "publication" }) {
-  if (!new Set(["am", "pm"]).has(period)) throw new Error("period must be am or pm");
+  if (!EDITION_PERIODS.includes(period)) throw new Error(`period must be one of ${EDITION_PERIODS.join(", ")}`);
   if (!new Set(["packet", "editorial", "publication"]).has(purpose)) throw new Error("purpose must be packet, editorial, or publication");
   const latestDue = latestDueWindow(period, now);
   const cutoff = (window) => Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);
@@ -42,10 +46,10 @@ export function resolveDueEdition({ period, now = new Date(), manifest, states =
   const lastPublished = [...(manifest?.editions || [])].sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0)).at(-1);
   const startDate = lastPublished?.date || latestDue.id.slice(0, 10);
   const lastPublishedWindow = lastPublished
-    ? plannedWindow(lastPublished.period, new Date(`${lastPublished.date}T12:00:00+08:00`))
+    ? editionWindowForDate(lastPublished.date, lastPublished.period)
     : null;
   const candidates = dateRange(startDate, latestDue.id.slice(0, 10))
-    .map((date) => plannedWindow(period, new Date(`${date}T12:00:00+08:00`)))
+    .map((date) => editionWindowForDate(date, period))
     .filter((window) => cutoff(window) <= now.getTime() && (!lastPublishedWindow || cutoff(window) > cutoff(lastPublishedWindow)));
   const target = candidates.find((window) => {
     if (published.has(window.id)) return false;

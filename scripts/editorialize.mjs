@@ -61,11 +61,12 @@ const instructions = [
   "对于存在官方中国大陆简体中文渠道/站点的游戏，版本副标题、角色/干员、职业、模式、机制等专名优先采用官方大陆简中写法；术语查询只能规范已经存在于证据中的专名，不能扩展事实。",
   "中文 headline、summary、verification、timeNote 保持当前中文编辑规范：标题直述事件，摘要写具体信息，verification说明证据边界，不使用宣传语和套话。",
   "尽力同时生成 locales.en。英文不是逐句翻译中文，而是在完全相同的 include 决定与 sharedFactFrame 内独立写成自然、简洁的英文编辑文案；有英文一手证据时优先参考其正式专名，只有中文证据时可自然转述，但不得改变事实范围。",
-  "locales.en.entries 必须按 include 决定的顺序，以 eventKey 一一对应；locales.en.upcoming 必须按本次提交的 upcoming 顺序，以 upcomingId 一一对应。英文 archiveTitle 早报以 'Morning Brief |' 开头，晚报以 'Evening Brief |' 开头。",
+  "locales.en.entries 必须按 include 决定的顺序，以 eventKey 一一对应；locales.en.upcoming 必须按本次提交的 upcoming 顺序，以 upcomingId 一一对应。英文 archiveTitle：AM 以 'Morning Brief |' 开头，PM 以 'Evening Brief |' 开头，Daily 以 'Daily Brief |' 开头。",
   "英文 headline、summary、verification、timeNote 必须是完整英文，不得用中文正文作 fallback；sourceReport 若提供必须完整英文，否则设为 null。source label、region/releaseType 等只有需要人工英文显示时才填写对应文案。",
   "不要计算或填写 factsDigest、canonicalCopyDigest、localeDigest，也不要猜最终 entryId；可信 publisher 会在 Canonical entry ID 确定后绑定并计算 digest。",
   "英文是非阻塞展示层：如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；绝不能为了让英文通过而削弱、改写或丢弃已验证的中文 Canonical 决定。publisher 会将该期英文明确标记为 unavailable，中文仍正常发布。",
-  "早报必须以 upcomingMode=replace 重建未来15天；晚报使用 inherit_and_patch，只处理新日期变化。",
+  "upcomingMode 必须按 packet window period：AM 与 Daily 使用 replace 重建未来15天；PM 使用 inherit_and_patch，只处理新日期变化。",
+  "若 editorialInput.budget.omittedTierA 大于0，视为可观测的预算省略；不要臆造缺失候选，GitHub telemetry 负责暴露这些 eventKey。",
   "对 packages 与 trackingQueue 中的每个 eventKey 恰好输出一次决定；trackingQueue 无新证据时必须明确继续追踪或关闭。needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",
 ].join("\n");
 const packet = {
@@ -80,5 +81,5 @@ const packet = {
 };
 await mkdir(dirname(PACKET_PATH), { recursive: true });
 await writeFile(PACKET_PATH, JSON.stringify(packet, null, 2) + "\n");
-console.log(`Editorial packet: ${editorialInput.packages.length} packages; title hints=${titleHints.length}; estimated reading=${editorialInput.budget.estimatedInputTokens} tokens`);
+console.log(`Editorial packet: ${editorialInput.packages.length} packages; title hints=${titleHints.length}; estimated reading=${editorialInput.budget.estimatedInputTokens} tokens; omitted=${editorialInput.budget.omittedItems || 0}; omitted A=${editorialInput.budget.omittedTierA || 0}`);
 console.log(`Packet: ${PACKET_PATH}`);

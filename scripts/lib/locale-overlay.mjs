@@ -4,6 +4,7 @@ import {
   programmaticReleaseTypeLabel,
   programmaticSourceLabel,
 } from "../../src/lib/locale-dictionary.js";
+import { englishArchiveTitlePrefix } from "./edition-window.mjs";
 import { canonicalCopyDigest, factsDigest, isDigest, localeDigest } from "./locale-digest.mjs";
 
 const TOP_LEVEL_KEYS = new Set([
@@ -190,10 +191,13 @@ export function validateEnglishOverlay(canonical, overlay) {
   if (isDigest(overlay.canonicalCopyDigest) && overlay.canonicalCopyDigest !== expectedCopyDigest) {
     warnings.push("overlay.canonicalCopyDigest differs from current Simplified Chinese presentation");
   }
-  const prefix = canonical.period === "pm" ? "Evening Brief |" : "Morning Brief |";
-  requiredEnglish(overlay.archiveTitle, "overlay.archiveTitle", errors, prefix.length + 2);
-  if (typeof overlay.archiveTitle === "string" && !overlay.archiveTitle.startsWith(prefix)) {
-    errors.push(`overlay.archiveTitle should start with ${prefix}`);
+  let prefix = null;
+  try { prefix = englishArchiveTitlePrefix(canonical.period); } catch { errors.push(`canonical period is unsupported: ${canonical.period}`); }
+  if (prefix) {
+    requiredEnglish(overlay.archiveTitle, "overlay.archiveTitle", errors, prefix.length + 2);
+    if (typeof overlay.archiveTitle === "string" && !overlay.archiveTitle.startsWith(prefix)) {
+      errors.push(`overlay.archiveTitle should start with ${prefix}`);
+    }
   }
   validateEntries(canonical, overlay, errors);
   validateUpcoming(canonical, overlay, errors);

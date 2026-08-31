@@ -4,6 +4,7 @@ run-name: Final editorial packet · ${{ github.event_name == 'workflow_dispatch'
 on:
   schedule:
     # Capture the complete fixed windows at 10:10/17:00 Asia/Shanghai.
+    # Precutover: scheduled production remains legacy AM/PM only.
     - cron: "10 2 * * *"
     - cron: "0 9 * * *"
   workflow_dispatch:
@@ -15,8 +16,9 @@ on:
         options:
           - am
           - pm
+          - daily
       edition:
-        description: Exact edition ID for recovery, for example 2026-08-29-am
+        description: Exact edition ID for recovery, for example 2026-09-01-daily
         required: true
         type: string
 
@@ -24,8 +26,8 @@ permissions:
   contents: write
   actions: write
 
-# Keep delayed AM and PM collectors independent. A late run from the opposite
-# period must never cancel the collector for the current fixed window.
+# Keep delayed collectors independent. Precutover scheduled runs remain AM/PM;
+# manual Daily compatibility uses its own period-scoped durable state group.
 concurrency:
   group: news-discovery-state-${{ github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '10 2 * * *' && 'am' || 'pm') }}
   cancel-in-progress: false
@@ -133,6 +135,7 @@ jobs:
           const evidence = require('./artifacts/news-evidence.json');
           const titleHints = require('./artifacts/title-hints.json');
           const ledger = require('./artifacts/event-ledger.json');
+          const packet = require('./artifacts/editorial-packet.json');
           console.log('## Final editorial packet');
           console.log(`- Window: ${report.window.windowStart} — ${report.window.windowEnd} Asia/Shanghai`);
           console.log(`- Sources: ${report.totals.healthySources}/${report.totals.sources} healthy`);
@@ -141,6 +144,10 @@ jobs:
           console.log(`- Evidence packages: ${evidence.totals.packages}; primary + independent=${evidence.totals.primaryPlusIndependent}; limited pages=${evidence.totals.limitedPages}`);
           console.log(`- Title hints: registry misses=${titleHints.registryMisses}; verified=${titleHints.hints.length}; limited=${titleHints.limited.length}`);
           console.log(`- Ledger: ${ledger.totals.events} retained events; recurring=${ledger.totals.recurring}`);
+          console.log(`- Packet budget: ${packet.editorialInput.budget.usedInputChars}/${packet.editorialInput.budget.maxInputChars}; omitted=${packet.editorialInput.budget.omittedItems || 0}; omitted A=${packet.editorialInput.budget.omittedTierA || 0}`);
+          if ((packet.editorialInput.budget.omittedTierAEventKeys || []).length) {
+            console.log(`- Tier A omitted by budget: ${packet.editorialInput.budget.omittedTierAEventKeys.join(', ')}`);
+          }
           console.log('- Title hint sources are naming evidence only; the finalized packet does not modify archives or publish content.');
           NODE
           fi

@@ -33,6 +33,7 @@ import type {
   BriefEntry,
   BriefManifest,
   BriefSearchIndex,
+  EditionPeriod,
   EnglishLocaleIndex,
   FactStatus,
   ImageAsset,
@@ -62,10 +63,13 @@ const statusLabels: Record<FactStatus, string> = {
 
 const sourceKindLabels = { primary: "Primary", secondary: "Secondary", discovery: "Discovery" };
 
-const periodLabels = {
+const periodLabels: Record<EditionPeriod, { edition: string; short: string; nextTime: string; nextEdition: string }> = {
   am: { edition: "Morning Brief", short: "MORNING", nextTime: "Today 17:00", nextEdition: "Evening Brief" },
   pm: { edition: "Evening Brief", short: "EVENING", nextTime: "Tomorrow 10:10", nextEdition: "Morning Brief" },
-} as const;
+  daily: { edition: "Daily Brief", short: "DAILY", nextTime: "Tomorrow 17:00", nextEdition: "Daily Brief" },
+};
+
+const periodName = (period: EditionPeriod) => periodLabels[period].edition.replace(" Brief", "");
 
 const storySectionDefinitions: Array<{
   id: string;
@@ -474,6 +478,7 @@ export default function EnglishApp() {
   if (!edition) return <EnglishUnavailable message="Loading the validated English edition…" />;
 
   const period = periodLabels[edition.period];
+  const hasDailyHistory = manifest?.editions.some((item) => item.period === "daily") ?? edition.period === "daily";
   const visibleStorySections = storySectionDefinitions
     .map((definition) => ({ ...definition, entries: entriesForSection(edition.entries, definition.section) }))
     .filter((section) => section.entries.length > 0)
@@ -509,6 +514,7 @@ export default function EnglishApp() {
   const nextEnglishEdition = englishEditionIndex >= 0 && englishEditionIndex < englishEditionSequence.length - 1
     ? englishEditionSequence[englishEditionIndex + 1]
     : undefined;
+  const nextEditionDisplay = nextEnglishEdition?.plannedAt || period.nextTime;
 
   return (
     <div className="site-shell" data-theme={theme} data-accent={accent} ref={rootRef}>
@@ -594,7 +600,7 @@ export default function EnglishApp() {
             <div><dt>Window</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div>
             <div><dt>Scheduled</dt><dd>{edition.plannedAt}</dd></div>
             <div><dt>Generated</dt><dd>{edition.generatedAt}</dd></div>
-            <div><dt>Next edition</dt><dd>{period.nextTime}</dd></div>
+            <div><dt>Next edition</dt><dd>{nextEditionDisplay}</dd></div>
           </dl>
         </section>
 
@@ -632,12 +638,12 @@ export default function EnglishApp() {
                 nextBoundary="Latest available edition"
                 previous={previousEnglishEdition ? {
                   href: editionHref(previousEnglishEdition.id),
-                  issue: "NO." + String(previousEnglishEdition.issueNumber).padStart(3, "0") + " · " + (previousEnglishEdition.period === "am" ? "Morning" : "Evening"),
+                  issue: "NO." + String(previousEnglishEdition.issueNumber).padStart(3, "0") + " · " + periodName(previousEnglishEdition.period),
                   title: englishArchiveTitles.get(previousEnglishEdition.id) ?? "English edition",
                 } : undefined}
                 next={nextEnglishEdition ? {
                   href: editionHref(nextEnglishEdition.id),
-                  issue: "NO." + String(nextEnglishEdition.issueNumber).padStart(3, "0") + " · " + (nextEnglishEdition.period === "am" ? "Morning" : "Evening"),
+                  issue: "NO." + String(nextEnglishEdition.issueNumber).padStart(3, "0") + " · " + periodName(nextEnglishEdition.period),
                   title: englishArchiveTitles.get(nextEnglishEdition.id) ?? "English edition",
                 } : undefined}
               />
@@ -674,7 +680,7 @@ export default function EnglishApp() {
               <div className="archive-search-results" aria-live="polite">
                 {visibleSearchResults.map((item) => (
                   <a key={item.editionId + item.entryId} href={editionHref(item.editionId, item.entryId)}>
-                    <span className="archive-result__issue">NO.{String(item.issueNumber).padStart(3, "0")}<small>{item.date} · {item.period === "am" ? "Morning" : "Evening"}</small></span>
+                    <span className="archive-result__issue">NO.{String(item.issueNumber).padStart(3, "0")}<small>{item.date} · {periodName(item.period)}</small></span>
                     <span className="archive-result__copy"><small>{item.titleEn}</small><strong>{item.headline}</strong><PendingMark tracking={item.tracking} /><span className="archive-result__summary">{item.summary}</span></span>
                     <span className="archive-result__action">
                       <small>{statusLabels[item.factStatus]}</small>
@@ -713,8 +719,8 @@ export default function EnglishApp() {
       </main>
 
       <footer className="site-footer">
-        <div className="footer-identity"><div className="brand"><span>GAME BRIEF</span><small>DAILY GAME BRIEF</small></div><p>Twice-daily, evidence-checked video-game industry news.</p></div>
-        <div className="footer-meta"><span>Edited and maintained by</span><strong>Fallw1nd-津秋</strong><small>Updated at 10:10 / 17:00 Beijing Time</small></div>
+        <div className="footer-identity"><div className="brand"><span>GAME BRIEF</span><small>DAILY GAME BRIEF</small></div><p>{hasDailyHistory ? "Daily, evidence-checked video-game industry news." : "Twice-daily, evidence-checked video-game industry news."}</p></div>
+        <div className="footer-meta"><span>Edited and maintained by</span><strong>Fallw1nd-津秋</strong><small>{hasDailyHistory ? "Updated at 17:00 Beijing Time" : "Updated at 10:10 / 17:00 Beijing Time"}</small></div>
         <div className="footer-metrics" aria-label="Archive scale"><span><strong>{manifest?.editions.length ?? "-"}</strong> editions</span><span><strong>{searchIndex?.entries.length ?? "-"}</strong> searchable stories</span></div>
       </footer>
     </div>
