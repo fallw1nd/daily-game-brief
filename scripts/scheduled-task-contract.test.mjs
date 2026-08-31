@@ -21,11 +21,14 @@ describe("thin scheduled-task orchestration contract", () => {
     expect(mediaWorkflow).toContain('- cron: "0 10 * * *"');
   });
 
-  it("adds Daily manual compatibility without cutting over production schedules", () => {
+  it("adds noon Daily compatibility without cutting over production schedules", () => {
     expect(dailyMigration).toContain("precutover compatibility only");
     expect(dailyMigration).toContain("Formal production cutover requires separate explicit authorization");
-    expect(dailyMigration).toContain("previous day 17:00 **exclusive** through current day 17:00 **inclusive**");
-    expect(dailyMigration).toContain("The existing PM ChatGPT task is converted to Daily. The AM task is disabled");
+    expect(dailyMigration).toContain("previous day 10:10 **exclusive** through current day 10:10 **inclusive**");
+    expect(dailyMigration).toContain("`plannedAt`: current day 12:00");
+    expect(dailyMigration).toContain("existing **AM ChatGPT task** is converted to the Daily task");
+    expect(dailyMigration).toContain("existing PM ChatGPT task is disabled");
+    expect(contract).toContain("Daily closes evidence at 10:10 and is planned for public release at 12:00");
     expect(packetWorkflow).toContain("          - daily");
     expect(slaWorkflow).toContain("          - daily");
     expect(mediaWorkflow).toContain("(am|pm|daily)");
@@ -115,7 +118,7 @@ describe("thin scheduled-task orchestration contract", () => {
   });
 
   it("stays a thin orchestration prompt", () => {
-    expect(contract.split(/\s+/u).length).toBeLessThan(500);
-    expect(contract.split(/\r?\n/u).length).toBeLessThan(45);
+    expect(contract.split(/\s+/u).length).toBeLessThan(560);
+    expect(contract.split(/\r?\n/u).length).toBeLessThan(48);
   });
 });
