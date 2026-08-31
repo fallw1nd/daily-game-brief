@@ -85,7 +85,7 @@ const sourceKindLabels = { primary: "一手", secondary: "补充", discovery: "�
 const periodLabels: Record<EditionPeriod, { edition: string; english: string; nextTime: string; nextEdition: string }> = {
   am: { edition: "早报", english: "MORNING", nextTime: "今日 17:00", nextEdition: "游戏晚报" },
   pm: { edition: "晚报", english: "EVENING", nextTime: "明日 10:10", nextEdition: "游戏早报" },
-  daily: { edition: "日报", english: "DAILY", nextTime: "明日 17:00", nextEdition: "游戏日报" },
+  daily: { edition: "日报", english: "DAILY", nextTime: "明日 12:00", nextEdition: "游戏日报" },
 };
 
 const storySectionDefinitions: Array<{
