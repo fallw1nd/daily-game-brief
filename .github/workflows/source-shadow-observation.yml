@@ -76,7 +76,7 @@ jobs:
             .map((item) => {
               const probe = detailBySource.get(item.sourceId);
               const detailCell = probe ? `${probe.resolved}/${probe.attempted}` : '-';
-              return `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${item.shadowUnknownTimeCandidates ?? 0} | ${detailCell} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`;
+              return `| ${item.sourceId} | ${item.status} | ${item.count ?? 0} | ${item.filteredCount ?? 0} | ${item.shadowReviewableCandidates ?? 0} | ${item.shadowUniqueCandidates ?? 0} | ${item.shadowOverlappingCandidates ?? 0} | ${item.shadowUnknownTimeCandidates ?? 0} | ${detailCell} | ${Number(item.shadowOverlapRate || 0).toFixed(3)} | ${item.error || ''} |`;
             });
           const body = [
             '# Shadow source observation',
@@ -84,6 +84,7 @@ jobs:
             `Window: ${report.window?.id || 'unknown'} · generated ${report.generatedAt}`,
             '',
             `Healthy shadow sources: ${report.totals?.healthyShadowSources ?? 0}/${report.totals?.shadowSources ?? 0}`,
+            `Filtered source records: ${report.totals?.filteredRecords ?? 0}`,
             `Window-qualified shadow candidates: ${report.totals?.shadowReviewableCandidates ?? 0}`,
             `Unique vs active: ${report.totals?.shadowUniqueCandidates ?? 0}`,
             `Overlapping active: ${report.totals?.shadowOverlappingCandidates ?? 0}`,
@@ -91,11 +92,12 @@ jobs:
             `Detail timestamp probe: ${detail.resolved ?? 0}/${detail.attempted ?? 0} resolved; ${detail.limited ?? 0} limited`,
             `Overall overlap rate: ${Number(report.shadowCoverage?.overlapRate || 0).toFixed(3)}`,
             '',
-            '| Source | Health | Fetched | Window-qualified | Unique | Overlap | Unknown time | Detail time | Rate | Error |',
-            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
+            '| Source | Health | Fetched | Filtered | Window-qualified | Unique | Overlap | Unknown time | Detail time | Rate | Error |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
             ...rows,
             '',
-            '> Observation only. Detail time is a bounded probe of article publication metadata; it does not mutate candidates or establish production evidence.',
+            '> Observation only. Source filters are bounded editorial-noise exclusions configured per source; they do not promote a source or establish evidence.',
+            '> Detail time is a bounded probe of article publication metadata; it does not mutate candidates or establish production evidence.',
             '> Unknown-time candidates are timestamp/parser health signals and do not earn same-window contribution credit.',
             '> This workflow does not write automation state, packets, Canonical data, or publication status.',
             '',
