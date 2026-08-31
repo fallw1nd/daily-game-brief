@@ -44,7 +44,7 @@ describe("evidence candidate budget", () => {
     ];
     const result = selectEvidenceCandidates(input, 10, {publisherCeiling:10,laneCeiling:4});
     expect(result.selected).toHaveLength(10);
-    expect(result.selected.filter((item) => item.lane === "industry")).toHaveLength(6);
+    expect(result.selected.filter((item) => item.lane === "industry")).toHaveLength(4);
     expect(result.telemetry.deferredByLaneCeiling).toBeGreaterThan(0);
   });
 
