@@ -66,7 +66,7 @@ const instructions = [
   "不要计算或填写 factsDigest、canonicalCopyDigest、localeDigest，也不要猜最终 entryId；可信 publisher 会在 Canonical entry ID 确定后绑定并计算 digest。",
   "英文是非阻塞展示层：如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；绝不能为了让英文通过而削弱、改写或丢弃已验证的中文 Canonical 决定。publisher 会将该期英文明确标记为 unavailable，中文仍正常发布。",
   "早报必须以 upcomingMode=replace 重建未来15天；晚报使用 inherit_and_patch，只处理新日期变化；日报必须以 upcomingMode=replace 重建未来15天。",
-  "日报 archiveTitle 必须以 '日报｜' 开头；其固定窗口是前一日 17:00 exclusive 至当日 17:00 inclusive，不得把日报伪装成晚报或沿用半日窗口。",
+  "日报 archiveTitle 必须以 '日报｜' 开头；其事实窗口是前一日 10:10 exclusive 至当日 10:10 inclusive，plannedAt 为当日 12:00。10:10 是证据封窗与 packet 起点，12:00 是计划发布时间，不得把 10:10—12:00 之间的新事实补进当期。",
   "对 packages 与 trackingQueue 中的每个 eventKey 恰好输出一次决定；trackingQueue 无新证据时必须明确继续追踪或关闭。needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",
 ].join("\n");
 const packet = {
