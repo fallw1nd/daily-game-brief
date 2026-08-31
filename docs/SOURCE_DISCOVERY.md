@@ -59,6 +59,12 @@ Shadow promotion is based on contribution, not raw article volume. Each real col
 
 Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Promotion reviews must consider these contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
 
+## Read-only observation lane
+
+`.github/workflows/source-shadow-observation.yml` is the safe maintenance path for collecting real GitHub-hosted runner samples without replaying a production packet. It runs the same registered-source collector with `contents: read`, writes only runner-local artifacts, uploads the observation report, and never persists `automation/state`, finalizes a packet, dispatches SLA recovery, edits Canonical data, or publishes Pages.
+
+A manual observation is useful for parser health, accessibility, candidate yield, and active-vs-shadow overlap. It is not itself a production edition and cannot automatically promote a source. Promotion still requires editorial sampling and, where timing behavior matters, normal Daily collector evidence across appropriate windows.
+
 ## Primary-source resolution
 
 Opened secondary/discovery pages are scanned only for explicit links to registered official domains. Those links are recorded as resolver candidates. Discovery of a link does **not** mean the primary page has been opened and does not upgrade `fact_status`.
