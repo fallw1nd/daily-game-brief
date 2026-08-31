@@ -24,8 +24,11 @@ describe("shadow source observation workflow", () => {
     }
   });
 
-  it("makes observation-only status explicit", () => {
+  it("makes observation-only status and timestamp confidence explicit", () => {
     expect(workflow).toContain("Observation only");
+    expect(workflow).toContain("Window-qualified shadow candidates");
+    expect(workflow).toContain("Unknown-time shadow candidates");
+    expect(workflow).toContain("Unknown-time candidates are timestamp/parser health signals");
     expect(workflow).toContain("does not write automation state, packets, Canonical data, or publication status");
   });
 });

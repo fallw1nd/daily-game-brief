@@ -55,9 +55,11 @@ These award sources are registered as `official` + `primary`, but remain `shadow
 
 ## Shadow contribution metrics
 
-Shadow promotion is based on contribution, not raw article volume. Each real collector run records reviewable shadow events, how many overlap an active-source event, how many remain unique to the shadow pool, and a per-source overlap rate. The durable source-health ledger keeps recent averages of reviewable, unique, and overlapping candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories.
+Shadow promotion is based on contribution, not raw article volume. A shadow candidate earns same-window contribution credit only when its listing evidence already supplies a publication time that falls inside the exact edition window. The collector records how many such window-qualified events overlap an active-source event, how many remain unique to the shadow pool, and a per-source overlap rate. Candidates whose listing time is unknown are tracked separately as timestamp/parser health signals and never inflate same-window unique contribution.
 
-Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Promotion reviews must consider these contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
+The durable source-health ledger keeps recent averages of window-qualified, unique, overlapping, and unknown-time candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories, and a source with weak timestamp extraction does not appear productive merely because it exposes a large archive.
+
+Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path. Production review remains broader: an active candidate with an unknown listing time can still be investigated and have its time established later from opened evidence. Promotion reviews must consider contribution metrics together with parser health and editorial sampling; no single threshold automatically promotes a source.
 
 ## Read-only observation lane
 

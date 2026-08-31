@@ -12,6 +12,7 @@ export function updateSourceHealth(report, previous = {schemaVersion:1,sources:{
       reviewableCount: Number(stat.shadowReviewableCandidates || 0),
       uniqueCount: Number(stat.shadowUniqueCandidates || 0),
       overlapCount: Number(stat.shadowOverlappingCandidates || 0),
+      unknownTimeCount: Number(stat.shadowUnknownTimeCandidates || 0),
     }].slice(-maxRecent);
     const successes = recent.filter((item) => item.status === "ok");
     const counts = recent.map((item) => item.count || 0);
@@ -19,6 +20,7 @@ export function updateSourceHealth(report, previous = {schemaVersion:1,sources:{
     const reviewableCounts = recent.map((item) => item.reviewableCount || 0);
     const uniqueCounts = recent.map((item) => item.uniqueCount || 0);
     const overlapCounts = recent.map((item) => item.overlapCount || 0);
+    const unknownTimeCounts = recent.map((item) => item.unknownTimeCount || 0);
     const reviewableTotal = reviewableCounts.reduce((sum, value) => sum + value, 0);
     const overlapTotal = overlapCounts.reduce((sum, value) => sum + value, 0);
     sources[stat.sourceId] = {
@@ -33,11 +35,13 @@ export function updateSourceHealth(report, previous = {schemaVersion:1,sources:{
       lastReviewableCandidates: Number(stat.shadowReviewableCandidates || 0),
       lastUniqueCandidates: Number(stat.shadowUniqueCandidates || 0),
       lastOverlappingCandidates: Number(stat.shadowOverlappingCandidates || 0),
+      lastUnknownTimeCandidates: Number(stat.shadowUnknownTimeCandidates || 0),
       successRateRecent: recent.length ? successes.length / recent.length : 0,
       averageCandidatesRecent: recent.length ? counts.reduce((sum, value) => sum + value, 0) / recent.length : 0,
       averageReviewableCandidatesRecent: recent.length ? reviewableTotal / recent.length : 0,
       averageUniqueCandidatesRecent: recent.length ? uniqueCounts.reduce((sum, value) => sum + value, 0) / recent.length : 0,
       averageOverlapCandidatesRecent: recent.length ? overlapTotal / recent.length : 0,
+      averageUnknownTimeCandidatesRecent: recent.length ? unknownTimeCounts.reduce((sum, value) => sum + value, 0) / recent.length : 0,
       overlapRateRecent: reviewableTotal ? overlapTotal / reviewableTotal : 0,
       averageLatencyMsRecent: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : 0,
       recent,

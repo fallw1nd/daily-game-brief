@@ -14,8 +14,9 @@ export function annotateShadowOverlap(activeCandidates = [], shadowCandidates = 
   }));
 }
 
-export function summarizeShadowCoverage(shadowCandidates = [], sourceStats = [], isReviewable = () => true) {
-  const reviewable = shadowCandidates.filter(isReviewable);
+export function summarizeShadowCoverage(shadowCandidates = [], sourceStats = [], isContributionEligible = () => true) {
+  const reviewable = shadowCandidates.filter(isContributionEligible);
+  const unknownTime = shadowCandidates.filter((candidate) => candidate.timeRelation === "unknown");
   const overlappingCandidates = reviewable.filter((candidate) => candidate.overlapsActive);
   const uniqueCandidates = reviewable.filter((candidate) => !candidate.overlapsActive);
 
@@ -25,6 +26,9 @@ export function summarizeShadowCoverage(shadowCandidates = [], sourceStats = [],
       const sourceCandidates = reviewable.filter((candidate) =>
         (candidate.appearances || []).some((appearance) => appearance.sourceId === stat.sourceId),
       );
+      const sourceUnknownTime = unknownTime.filter((candidate) =>
+        (candidate.appearances || []).some((appearance) => appearance.sourceId === stat.sourceId),
+      );
       const overlapping = sourceCandidates.filter((candidate) => candidate.overlapsActive).length;
       const unique = sourceCandidates.length - overlapping;
       return {
@@ -32,6 +36,7 @@ export function summarizeShadowCoverage(shadowCandidates = [], sourceStats = [],
         reviewableCandidates: sourceCandidates.length,
         uniqueCandidates: unique,
         overlappingCandidates: overlapping,
+        unknownTimeCandidates: sourceUnknownTime.length,
         overlapRate: sourceCandidates.length ? overlapping / sourceCandidates.length : 0,
       };
     });
@@ -40,6 +45,7 @@ export function summarizeShadowCoverage(shadowCandidates = [], sourceStats = [],
     reviewableCandidates: reviewable.length,
     uniqueCandidates: uniqueCandidates.length,
     overlappingCandidates: overlappingCandidates.length,
+    unknownTimeCandidates: unknownTime.length,
     overlapRate: reviewable.length ? overlappingCandidates.length / reviewable.length : 0,
     bySource,
   };

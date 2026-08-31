@@ -12,7 +12,7 @@ describe("source health ledger", () => {
     expect(second.sources.a.averageCandidatesRecent).toBe(2);
   });
 
-  it("persists reviewable, unique, and active-overlap contribution for shadow promotion decisions", () => {
+  it("persists timed contribution and unknown-time health separately for shadow promotion decisions", () => {
     const first = updateSourceHealth({generatedAt:"2026-09-01T02:10:00Z",sourceStats:[{
       sourceId:"deep-media",
       mode:"shadow",
@@ -23,6 +23,7 @@ describe("source health ledger", () => {
       shadowReviewableCandidates:4,
       shadowUniqueCandidates:3,
       shadowOverlappingCandidates:1,
+      shadowUnknownTimeCandidates:5,
     }]});
     const second = updateSourceHealth({generatedAt:"2026-09-02T02:10:00Z",sourceStats:[{
       sourceId:"deep-media",
@@ -34,10 +35,13 @@ describe("source health ledger", () => {
       shadowReviewableCandidates:2,
       shadowUniqueCandidates:1,
       shadowOverlappingCandidates:1,
+      shadowUnknownTimeCandidates:3,
     }]}, first);
     expect(second.sources["deep-media"].lastUniqueCandidates).toBe(1);
+    expect(second.sources["deep-media"].lastUnknownTimeCandidates).toBe(3);
     expect(second.sources["deep-media"].averageReviewableCandidatesRecent).toBe(3);
     expect(second.sources["deep-media"].averageUniqueCandidatesRecent).toBe(2);
+    expect(second.sources["deep-media"].averageUnknownTimeCandidatesRecent).toBe(4);
     expect(second.sources["deep-media"].overlapRateRecent).toBeCloseTo(2 / 6);
   });
 });
