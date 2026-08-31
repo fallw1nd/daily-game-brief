@@ -12,13 +12,14 @@ describe("source health ledger", () => {
     expect(second.sources.a.averageCandidatesRecent).toBe(2);
   });
 
-  it("persists timed contribution and unknown-time health separately for shadow promotion decisions", () => {
+  it("persists filtering, timed contribution and unknown-time health separately for shadow promotion decisions", () => {
     const first = updateSourceHealth({generatedAt:"2026-09-01T02:10:00Z",sourceStats:[{
       sourceId:"deep-media",
       mode:"shadow",
       capabilities:["features"],
       status:"ok",
       count:10,
+      filteredCount:4,
       durationMs:90,
       shadowReviewableCandidates:4,
       shadowUniqueCandidates:3,
@@ -31,12 +32,15 @@ describe("source health ledger", () => {
       capabilities:["features"],
       status:"ok",
       count:8,
+      filteredCount:2,
       durationMs:110,
       shadowReviewableCandidates:2,
       shadowUniqueCandidates:1,
       shadowOverlappingCandidates:1,
       shadowUnknownTimeCandidates:3,
     }]}, first);
+    expect(second.sources["deep-media"].lastFilteredCandidates).toBe(2);
+    expect(second.sources["deep-media"].averageFilteredCandidatesRecent).toBe(3);
     expect(second.sources["deep-media"].lastUniqueCandidates).toBe(1);
     expect(second.sources["deep-media"].lastUnknownTimeCandidates).toBe(3);
     expect(second.sources["deep-media"].averageReviewableCandidatesRecent).toBe(3);
