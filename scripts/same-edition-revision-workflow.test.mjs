@@ -5,8 +5,11 @@ const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.y
 const publisher = await readFile("scripts/publish-editorial-decision.mjs", "utf8");
 
 describe("authorized same-edition revision workflow", () => {
-  it("accepts only an explicit revision wake backed by durable state and skips the normal SLA fallback", () => {
+  it("opens durable state from the explicit revision wake and skips the normal SLA fallback", () => {
     expect(packetWorkflow).toContain('"user_authorized_same_edition_revision"');
+    expect(packetWorkflow).toContain("bash scripts/update-edition-state-branch.sh");
+    expect(packetWorkflow).toContain('"$edition" revision-opened');
+    expect(packetWorkflow).toContain("--reason=user_authorized_same_edition_revision");
     expect(packetWorkflow).toContain('state.revisionRequest?.status !== "open"');
     expect(packetWorkflow).toContain('state.packet?.status !== "pending"');
     expect(packetWorkflow).toContain("revision_authorized: ${{ steps.edition.outputs.revision_authorized }}");
