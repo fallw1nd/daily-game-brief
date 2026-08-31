@@ -1,8 +1,12 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { latestDueWindow, plannedWindow } from "./lib/edition-window.mjs";
 import { expectedEditorialWindow, validateFinalizedEditorialPacket } from "./lib/editorial-packet.mjs";
 import { resolveDueEdition } from "./resolve-due-edition.mjs";
+
+const chineseApp = await readFile("src/App.tsx", "utf8");
+const englishApp = await readFile("src/EnglishApp.tsx", "utf8");
 
 function packetForDaily(editionId) {
   const window = expectedEditorialWindow(editionId);
@@ -94,5 +98,12 @@ describe("Daily Edition precutover compatibility", () => {
       windowStart: "2026-09-01 10:10",
       windowEnd: "2026-09-01 17:00",
     });
+  });
+
+  it("switches both Chinese and English footer cadence by edition period", () => {
+    expect(chineseApp).toContain('edition.period === "daily" ? "每天一期，整理值得核验的游戏行业动态。"');
+    expect(chineseApp).toContain('edition.period === "daily" ? "北京时间 12:00 更新"');
+    expect(englishApp).toContain('edition.period === "daily" ? "One evidence-checked video-game industry brief each day."');
+    expect(englishApp).toContain('edition.period === "daily" ? "Updated at 12:00 Beijing Time"');
   });
 });
