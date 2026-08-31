@@ -2,6 +2,7 @@ name: Brief publication SLA watchdog
 
 on:
   schedule:
+    # Legacy production schedule remains unchanged during Daily precutover.
     # 11:00 and 17:50 Asia/Shanghai; leaves normal editorial publication headroom before fallback.
     - cron: "0 3 * * *"
     - cron: "50 9 * * *"
@@ -14,6 +15,7 @@ on:
         options:
           - am
           - pm
+          - daily
 
       edition:
         description: Exact edition ID for manual verification
@@ -25,8 +27,9 @@ permissions:
   actions: write
 
 concurrency:
-  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '0 3 * * *' && 'am' || 'pm') }}
-  cancel-in-progress: true
+  # Exact-edition recovery must not cancel another recovery run for the same period.
+  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.edition || (github.event.schedule == '0 3 * * *' && 'scheduled-am' || 'scheduled-pm') }}
+  cancel-in-progress: false
 
 jobs:
   verify:
