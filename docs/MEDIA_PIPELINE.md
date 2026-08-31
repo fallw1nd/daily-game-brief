@@ -1,6 +1,8 @@
 # Media Pipeline
 
-The media pipeline enriches an edition after publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and publishes the validated data and files directly to `main`. It then dispatches the normal Pages deployment.
+The media pipeline enriches an edition after Canonical publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and publishes the validated data and files directly to `main`. It then dispatches the normal Pages deployment.
+
+For the future Daily cadence, Canonical publication is intentionally scheduled ahead of the 12:00 public release so exact-edition media enrichment can run in the staging interval. Daily evidence closes at 10:10, the editorial handoff runs at 10:20, Canonical SLA recovery is 11:00, scheduled media recovery is 11:10, and Pages holds the Daily deployment until `plannedAt=12:00`. This timing is precutover-only until formal production authorization; legacy AM/PM schedules remain active meanwhile.
 
 ## Cover priority
 
@@ -52,7 +54,9 @@ Run npm run media:audit for a read-only report or npm run media:enrich for the l
 - writes to public/media/briefs/YYYY/MM/<edition-id>/;
 - records a specific unavailable reason instead of forcing a mismatch.
 
-The editorial publisher dispatches the workflow for the exact edition immediately after publication. Scheduled runs at 11:10 and 18:00 Asia/Shanghai are idempotent recovery checks after the widened SLA window; they do not replace or delay the publisher-triggered exact-edition enrichment. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
+The editorial publisher dispatches the workflow for the exact edition immediately after Canonical publication. Legacy scheduled runs at 11:10 and 18:00 Asia/Shanghai are idempotent recovery checks and remain unchanged during precutover. After formal Daily cutover, 11:10 becomes the single scheduled Daily media recovery point and the legacy 18:00 recovery is removed/disabled. Exact-edition enrichment remains event-driven and should normally finish before the 12:00 release gate; the scheduled recovery does not replace or delay it. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
+
+Media remains a nonblocking lane. The noon release cannot fabricate or force an image merely to meet the clock: any unresolved record must carry the explicit unavailable reason required by the Canonical contract. Verified media found later may revise only the media state/assets of that same edition and trigger a later Pages update.
 
 ## DeepSeek search configuration
 
