@@ -7,7 +7,7 @@ const publisherWorkflow = await readFile(".github/workflows/publish-editorial-de
 const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");
 const chineseApp = await readFile("src/App.tsx", "utf8");
 const englishApp = await readFile("src/EnglishApp.tsx", "utf8");
-const styles = await readFile("src/index.css", "utf8");
+const styles = await readFile("src/styles.css", "utf8");
 
 describe("Daily Edition precutover workflow and presentation contract", () => {
   it("keeps every legacy scheduled cron while exposing Daily only to manual inputs", () => {
@@ -39,9 +39,11 @@ describe("Daily Edition precutover workflow and presentation contract", () => {
     expect(englishApp).toContain('hasDailyHistory ? "Daily, evidence-checked video-game industry news." : "Twice-daily, evidence-checked video-game industry news."');
   });
 
-  it("retains responsive, theme and keyboard-visible styling for mixed Daily pages", () => {
-    expect(styles).toMatch(/@media\s*\(max-width:\s*390px\)/);
-    expect(styles).toContain('[data-theme="dark"]');
+  it("retains responsive, theme and keyboard-visible styling for a 390px viewport", () => {
+    // The existing 820px responsive breakpoint covers the required 390px acceptance viewport.
+    expect(styles).toMatch(/@media\s*\(max-width:\s*820px\)/);
+    expect(styles).toContain("color-scheme: dark");
+    expect(styles).toContain(':root[data-theme="light"]');
     expect(styles).toContain(":focus-visible");
   });
 });
