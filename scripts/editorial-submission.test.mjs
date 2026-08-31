@@ -44,6 +44,36 @@ describe("editorial submission handoff", () => {
     expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial, packetBlobSha })).toEqual([]);
   });
 
+  it("accepts the first production Daily bridge submission", () => {
+    const dailyPacket = {
+      ...packet,
+      finalizedAt: "2026-08-31T06:38:18.807Z",
+      coverageThrough: "2026-08-31 10:10",
+      editorialInput: {
+        ...packet.editorialInput,
+        window: {
+          id: "2026-08-31-daily",
+          period: "daily",
+          plannedAt: "2026-08-31 12:00",
+          windowStart: "2026-08-30 17:00",
+          windowEnd: "2026-08-31 10:10",
+        },
+      },
+    };
+    const dailyEditorial = {
+      ...editorial,
+      editionId: "2026-08-31-daily",
+      archiveTitle: "日报｜《Example Game》正式公布",
+      upcomingMode: "replace",
+    };
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-31-daily",
+      packet: dailyPacket,
+      editorial: dailyEditorial,
+      packetBlobSha,
+    })).toEqual([]);
+  });
+
   it("rejects a mismatched branch and morning upcoming mode", () => {
     const errors = validateEditorialSubmission({
       branchName: "automation/editorial/2026-08-27-pm", packet,
