@@ -27,6 +27,13 @@ describe("final editorial packet workflow", () => {
     expect(workflow).toContain("steps.edition.outcome == 'success'");
   });
 
+  it("dispatches exact-edition SLA verification without requiring a checkout", () => {
+    expect(workflow).toContain('GH_REPO: ${{ github.repository }}');
+    expect(workflow).toContain("gh workflow run brief-sla-watchdog.yml");
+    expect(workflow).toContain('-f period="${{ needs.collect.outputs.period }}"');
+    expect(workflow).toContain('-f edition="${{ needs.collect.outputs.edition }}"');
+  });
+
   it("builds bounded title-only hints after evidence and before editorialization", () => {
     const evidenceIndex = workflow.indexOf("- name: Build bounded evidence packages");
     const hintIndex = workflow.indexOf("- name: Build title-only hints");
