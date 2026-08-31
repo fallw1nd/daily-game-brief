@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 
 const contract = await readFile("docs/SCHEDULED_TASK_PROMPT.md", "utf8");
 const architecture = await readFile("docs/AUTOMATION_ARCHITECTURE.md", "utf8");
+const dailyMigration = await readFile("docs/DAILY_EDITION_MIGRATION.md", "utf8");
 const packetWorkflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
 const slaWorkflow = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");
 const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");
+const publisherWorkflow = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
 
 describe("thin scheduled-task orchestration contract", () => {
   it("keeps handoff times separate from immutable evidence cutoffs", () => {
@@ -17,6 +19,20 @@ describe("thin scheduled-task orchestration contract", () => {
     expect(slaWorkflow).toContain('- cron: "50 9 * * *"');
     expect(mediaWorkflow).toContain('- cron: "10 3 * * *"');
     expect(mediaWorkflow).toContain('- cron: "0 10 * * *"');
+  });
+
+  it("adds Daily manual compatibility without cutting over production schedules", () => {
+    expect(dailyMigration).toContain("precutover compatibility only");
+    expect(dailyMigration).toContain("Formal production cutover requires separate explicit authorization");
+    expect(dailyMigration).toContain("previous day 17:00 **exclusive** through current day 17:00 **inclusive**");
+    expect(dailyMigration).toContain("The existing PM ChatGPT task is converted to Daily. The AM task is disabled");
+    expect(packetWorkflow).toContain("          - daily");
+    expect(slaWorkflow).toContain("          - daily");
+    expect(mediaWorkflow).toContain("(am|pm|daily)");
+    expect(publisherWorkflow).toContain("(am|pm|daily)");
+    expect(packetWorkflow.match(/- cron:/g)).toHaveLength(2);
+    expect(slaWorkflow.match(/- cron:/g)).toHaveLength(2);
+    expect(mediaWorkflow.match(/- cron:/g)).toHaveLength(2);
   });
 
   it("selects oldest pending or invalid work and binds it to one immutable packet", () => {
@@ -72,6 +88,8 @@ describe("thin scheduled-task orchestration contract", () => {
     expect(packetWorkflow).toContain("verify-after-handoff:");
     expect(packetWorkflow).toContain("gh workflow run brief-sla-watchdog.yml");
     expect(packetWorkflow).toContain('-f edition="${{ needs.collect.outputs.edition }}"');
+    expect(slaWorkflow).toContain("cancel-in-progress: false");
+    expect(slaWorkflow).toContain("inputs.edition ||");
   });
 
   it("keeps editorial facts bounded while delegating details to live rules", () => {
