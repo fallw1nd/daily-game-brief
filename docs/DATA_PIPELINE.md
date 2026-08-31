@@ -2,6 +2,8 @@
 
 The production migration described in [`AUTOMATION_ARCHITECTURE.md`](./AUTOMATION_ARCHITECTURE.md) is active. The two existing ChatGPT Scheduled Tasks remain the evidence-bounded editorial layer; trusted GitHub Actions code on `main` is the only publisher of Canonical data and English locale state.
 
+The Daily compatibility described in [`DAILY_EDITION_MIGRATION.md`](./DAILY_EDITION_MIGRATION.md) is **precutover only** until separately authorized. Its target public release is 12:00 Asia/Shanghai, with a 10:10 evidence cutoff so deterministic collection, editorial handoff, Canonical publication, media enrichment, validation, and deployment preparation happen before release.
+
 The website reads `public/data/latest.json` at runtime. Every published Canonical edition is also stored under `public/data/archive/YYYY/MM/`, while `public/data/manifest.json` is the ordered archive index. A malformed payload never replaces the bundled fallback edition. English presentation is stored separately under `public/data/locales/en/` and never becomes an independent fact store.
 
 ## ChatGPT task handoff
@@ -24,14 +26,17 @@ The task stops after the editorial handoff commit succeeds. `.github/workflows/p
 
 Every newly scheduled Canonical edition uses `schemaVersion: 2`, `timezone: "Asia/Shanghai"`, a continuous positive `issueNumber`, and an `id` equal to `date + "-" + period`. Schema version 1 is reserved for existing legacy archives only. Each new edition includes `entries`, `upcoming`, `tracking`, and `sourceReport`, plus the media state defined below. Keep the existing field names, including `fact_status`, `time_status`, and `title_key`.
 
-Each v2 edition also requires an `archiveTitle` and `leadEntryId`. The title starts with `早报｜` or `晚报｜` to match `period`, contains 8–40 characters, and summarizes one real, high-impact entry without overstating its verification status. `leadEntryId` references that entry in the same Canonical edition. The publisher copies both fields into the manifest item. Historical archive JSON remains append-only except for the repository's explicit same-edition revision path; revisions never change the issue number.
+Each v2 edition also requires an `archiveTitle` and `leadEntryId`. The title starts with `早报｜`, `晚报｜`, or `日报｜` to match `period`, contains 8–40 characters, and summarizes one real, high-impact entry without overstating its verification status. `leadEntryId` references that entry in the same Canonical edition. The publisher copies both fields into the manifest item. Historical archive JSON remains append-only except for the repository's explicit same-edition revision path; revisions never change the issue number.
 
-The fixed windows remain:
+The fixed evidence windows are:
 
-- AM: previous day 17:00 **exclusive** → current day 10:10 **inclusive**;
-- PM: current day 10:10 **exclusive** → current day 17:00 **inclusive**.
+- AM: previous day 17:00 **exclusive** → current day 10:10 **inclusive**; `plannedAt` 10:10;
+- PM: current day 10:10 **exclusive** → current day 17:00 **inclusive**; `plannedAt` 17:00;
+- Daily, once formally activated: previous day 10:10 **exclusive** → current day 10:10 **inclusive**; `plannedAt` 12:00.
 
-Neither English generation, locale repair, media enrichment, nor retry logic may alter these windows or issue sequencing.
+For Daily, `windowEnd` and `plannedAt` are intentionally different. `windowEnd=10:10` is the immutable evidence cutoff and packet start. `plannedAt=12:00` is the public release target. Information first published after 10:10 cannot be pulled backward into that day's Daily even if it is discovered while editorial or media processing is still underway.
+
+Neither English generation, locale repair, media enrichment, retry logic, nor the noon deployment gate may alter these windows or issue sequencing.
 
 ## English Overlay contract
 
@@ -85,7 +90,7 @@ npm run check
 
 For a normal changed edition, publisher code writes Canonical archive/latest/manifest plus either a valid English Overlay or explicit English unavailable state, rebuilds the generated search/locale indexes, and commits the resulting production data in one trusted publication step. A concurrent `main` advance causes the same committed editorial decision to be rebuilt from current `main` and retried rather than rebasing stale generated data.
 
-Pushing a production commit starts or explicitly dispatches the Pages workflow. The workflow validates the append-only archive, regenerates derived indexes, builds the site, uploads the artifact, and deploys it. Generated search and locale indexes are reproducible build outputs where configured; no OpenAI or GitHub token is exposed in browser code.
+Pushing a production commit starts or explicitly dispatches the Pages workflow. For Daily, Canonical and verified media may be committed to `main` before noon, but Pages deployment is held until the Daily edition's `plannedAt=12:00`. This staging interval lets media enrichment replace valid explicit unavailable states before public release without changing the edition's facts or issue number. Generated search and locale indexes are reproducible build outputs where configured; no OpenAI or GitHub token is exposed in browser code.
 
 ## Image publishing
 
@@ -108,6 +113,8 @@ The store order is a discovery preference, not an aspect-ratio requirement. Afte
 Download accepted assets to `public/media/briefs/YYYY/MM/<edition-id>/`, convert them to WebP or JPEG, and keep files below 500 KB. The JSON path is relative to `public/` and must not begin with `/`. If the connected GitHub tool cannot upload binary media, a durable official HTTPS CDN URL is acceptable. Do not use scraped search thumbnails, unrelated stock imagery, hotlinked fan art, or an image whose source page was not opened. Image credit does not replace source verification.
 
 Before publishing, confirm that every supplied image URL loads and that Simplified Chinese `alt`, `credit`, and `sourceUrl` are present. English media alt text belongs to the English Overlay; it does not alter the Canonical media asset or its traceability. CI rejects an unresolved media state on new Canonical editions: each item needs either valid media or a specific unavailable reason.
+
+For Daily, exact-edition media enrichment is dispatched as soon as Canonical publication succeeds. The scheduled 11:10 recovery is a second chance before the noon release gate. Media failure does not permit fact drift, unrelated fallback art, or a blocked Canonical edition; unresolved items remain explicitly unavailable and may be enriched after release if a verified asset is later found.
 
 ## Failure behavior
 
