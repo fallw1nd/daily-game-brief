@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { auditCoverage } from "./lib/coverage-audit.mjs";
 
@@ -41,5 +42,10 @@ describe("coverage audit", () => {
       packages: [{ ...baseItem, timeRelation: "prior-24h-audit" }],
     }, { id: "2026-08-26-pm", entries: [] });
     expect(audit.omissions).toEqual([]);
+  });
+
+  it("keeps the coverage audit CLI compatible with Daily edition IDs", () => {
+    const script = readFileSync("scripts/audit-news-coverage.mjs", "utf8");
+    expect(script).toContain("(?:am|pm|daily)");
   });
 });

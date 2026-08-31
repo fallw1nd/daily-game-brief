@@ -106,13 +106,18 @@ jobs:
         run: |
           BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
 
-      - name: Restore previous event ledger
+      - name: Restore previous automation ledgers
         shell: bash
         if: steps.edition.outputs.needed != 'false'
         run: |
           mkdir -p artifacts
           git fetch origin automation/state:refs/remotes/origin/automation/state || true
           git show origin/automation/state:automation/ledger/events.json > artifacts/event-ledger-previous.json || true
+          git show origin/automation/state:automation/health/sources.json > artifacts/source-health-previous.json || true
+
+      - name: Update persistent source health
+        run: node scripts/update-source-health.mjs
+        if: steps.edition.outputs.needed != 'false'
 
       - name: Update persistent event ledger
         run: node scripts/update-event-ledger.mjs
@@ -140,6 +145,7 @@ jobs:
           path: |
             artifacts/news-candidates.json
             artifacts/news-shadow-report.json
+            artifacts/source-health.json
             artifacts/news-evidence.json
             artifacts/title-hints.json
             artifacts/event-ledger.json
@@ -157,27 +163,33 @@ jobs:
           const evidence = require('./artifacts/news-evidence.json');
           const titleHints = require('./artifacts/title-hints.json');
           const ledger = require('./artifacts/event-ledger.json');
+          const health = require('./artifacts/source-health.json');
           console.log('## Final editorial packet');
           console.log(`- Window: ${report.window.windowStart} — ${report.window.windowEnd} Asia/Shanghai`);
-          console.log(`- Sources: ${report.totals.healthySources}/${report.totals.sources} healthy`);
-          console.log(`- Candidates: ${report.totals.candidates} total; A=${report.totals.tierA}; B=${report.totals.tierB}`);
+          console.log(`- Active sources: ${report.totals.healthyActiveSources}/${report.totals.activeSources} healthy`);
+          console.log(`- Shadow sources: ${report.totals.healthyShadowSources}/${report.totals.shadowSources} healthy; shadow candidates=${report.totals.shadowCandidates}`);
+          console.log(`- Production candidates: ${report.totals.activeCandidates}; A=${report.totals.tierA}; B=${report.totals.tierB}`);
           console.log(`- Adjacent matches removed before review: ${report.totals.adjacentMatches}`);
           console.log(`- Evidence packages: ${evidence.totals.packages}; primary + independent=${evidence.totals.primaryPlusIndependent}; limited pages=${evidence.totals.limitedPages}`);
           console.log(`- Title hints: registry misses=${titleHints.registryMisses}; verified=${titleHints.hints.length}; limited=${titleHints.limited.length}`);
           console.log(`- Ledger: ${ledger.totals.events} retained events; recurring=${ledger.totals.recurring}`);
+          console.log(`- Source health ledger: ${Object.keys(health.sources || {}).length} sources tracked`);
+          console.log('- Shadow sources are observation-only and never enter the production evidence packet.');
           console.log('- Title hint sources are naming evidence only; the finalized packet does not modify archives or publish content.');
           NODE
           fi
 
-      - name: Persist packet, ledger, and durable acknowledgement
+      - name: Persist packet, ledgers, and durable acknowledgement
         id: persist
         if: steps.edition.outputs.needed != 'false'
         shell: bash
         run: |
           packet="$RUNNER_TEMP/editorial-packet.json"
           ledger="$RUNNER_TEMP/event-ledger.json"
+          health="$RUNNER_TEMP/source-health.json"
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
+          cp artifacts/source-health.json "$health"
           edition_id="${{ steps.edition.outputs.edition }}"
           period="${{ steps.edition.outputs.period }}"
           success=false
@@ -185,10 +197,11 @@ jobs:
             state_dir="$RUNNER_TEMP/packet-state-$attempt"
             git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
             git worktree add --detach "$state_dir" origin/automation/state
-            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
+            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger" "$state_dir/automation/health"
             cp "$packet" "$state_dir/automation/packets/$edition_id.json"
             cp "$packet" "$state_dir/automation/packets/latest-$period.json"
             cp "$ledger" "$state_dir/automation/ledger/events.json"
+            cp "$health" "$state_dir/automation/health/sources.json"
             node scripts/record-edition-state.mjs \
               --state-root="$state_dir" \
               --edition="$edition_id" \
@@ -197,7 +210,7 @@ jobs:
               --run-id="${{ github.run_id }}"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
-            git -C "$state_dir" add automation/packets automation/ledger/events.json "automation/status/$edition_id.json"
+            git -C "$state_dir" add automation/packets automation/ledger/events.json automation/health/sources.json "automation/status/$edition_id.json"
             if git -C "$state_dir" diff --cached --quiet; then
               success=true
             else
