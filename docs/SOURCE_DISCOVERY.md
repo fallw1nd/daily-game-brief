@@ -32,9 +32,12 @@ Substantive interviews, investigations, technical analysis, industry analysis, r
 - 4Gamer Reviews
 - VGC News
 - GAME Watch
-- 電ファミニコゲーマー
+- 電ファミニコゲーマー News
+- 電ファミニコゲーマー Interviews
 - Game Developer
-- PC Gamer News
+- PC Gamer
+
+Where a publisher exposes a stable first-party RSS/Atom feed with publication timestamps, the shadow registry prefers that feed over broad HTML navigation scraping. VGC News, 電ファミ News/Interviews, Game Developer, and PC Gamer therefore use feed endpoints while remaining shadow-only. Separate feeds from the same publisher retain the same `independenceKey` / `publisherFamily`, so splitting discovery lanes never creates false corroboration.
 
 ## Phase 2 shadow pool
 
