@@ -53,6 +53,12 @@ Official award discovery:
 
 These award sources are registered as `official` + `primary`, but remain `shadow` until the production runner confirms stable discovery and usable publication timestamps.
 
+## Shadow contribution metrics
+
+Shadow promotion is based on contribution, not raw article volume. Each real collector run records reviewable shadow events, how many overlap an active-source event, how many remain unique to the shadow pool, and a per-source overlap rate. The durable source-health ledger keeps recent averages of reviewable, unique, and overlapping candidates so a high-volume duplicate feed does not look more useful than a smaller source that consistently finds otherwise-missed stories.
+
+Cross-source overlap uses a known canonical title key plus event kind when available; otherwise it falls back to the existing event key. These metrics are observational and do not merge shadow candidates into the active event ledger or publication path.
+
 ## Primary-source resolution
 
 Opened secondary/discovery pages are scanned only for explicit links to registered official domains. Those links are recorded as resolver candidates. Discovery of a link does **not** mean the primary page has been opened and does not upgrade `fact_status`.
