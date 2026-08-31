@@ -29,8 +29,8 @@ Historical `am` and `pm` editions, IDs, issue numbers, paths, titles, windows, a
 After formal cutover, the intended Daily production sequence is:
 
 1. **10:10** — close the 24-hour evidence window and start `Final editorial packet` (`10 2 * * *`, UTC).
-2. **10:20** — run the Daily ChatGPT editorial handoff. The existing AM long-lived task is converted to Daily; no third task is created.
-3. **11:00** — Canonical publication SLA / GitHub-owned degraded recovery (`0 3 * * *`, UTC). A normal valid editorial decision may publish earlier; the SLA is the recovery deadline, not the public release time.
+2. **10:20** — run the Daily ChatGPT editorial handoff. The existing AM long-lived task is converted to Daily; no third task is created. If the exact acknowledged Daily packet is missing, the task may create only an exact-edition `automation/wake/<edition-id>.json` on `automation/editorial/<edition-id>` and stop. That push wakes the existing GitHub packet workflow; ChatGPT does not collect, build, validate, or publish recovery data itself.
+3. **11:00** — Canonical publication SLA / GitHub-owned degraded recovery (`0 3 * * *`, UTC). A normal valid editorial decision may publish earlier; the SLA is the recovery deadline, not the public release time. A packet run started by the 10:20 wake signal also schedules this exact-edition SLA verification, so GitHub cron delay is not the only liveness path.
 4. **Immediately after Canonical publication** — dispatch exact-edition media enrichment. This remains event-driven and should normally complete before the public release.
 5. **11:10** — scheduled media recovery (`10 3 * * *`, UTC) for any exact-edition enrichment that did not complete normally.
 6. **12:00** — planned public Daily release. Daily Pages deployment is held until the edition's `plannedAt`, so early Canonical/media commits can stage safely without exposing the new edition before noon.
@@ -48,12 +48,13 @@ The existing production schedules remain unchanged during precutover:
 - Scheduled media recovery: 11:10 AM and 18:00 PM.
 - Existing ChatGPT Scheduled Tasks remain AM 10:20 and PM 17:10.
 
-Manual workflow inputs may accept an exact Daily edition so compatibility can be validated without enabling a Daily production cron. `main`, production archives, `latest.json`, `manifest.json`, and external ChatGPT Scheduled Tasks are not changed by precutover work.
+Manual workflow inputs may accept an exact Daily edition so compatibility can be validated without enabling a Daily production cron. The Daily wake push trigger may also exist before cutover, but it is inert because legacy AM/PM task prompts never write `automation/wake/*.json` and the trigger accepts only `automation/editorial/*-daily`. `main`, production archives, `latest.json`, `manifest.json`, and external ChatGPT Scheduled Tasks are not changed by precutover work.
 
 ## Reliability invariants
 
-- GitHub remains the only durable orchestrator and publisher.
-- ChatGPT remains a bounded editorial worker and may consume only acknowledged immutable packet evidence.
+- GitHub remains the only durable orchestrator, recovery executor, validator, and publisher.
+- ChatGPT remains a bounded editorial worker. The only liveness exception is an exact-edition Daily wake file when the acknowledged packet is missing; the wake is a trigger, not recovery state or content.
+- The wake target must come from the immediate successor of current `main` Canonical state, never from Actions start time or wall-clock guessing. The GitHub resolver independently rejects a mismatched or too-early exact edition.
 - `submitted` and `valid` remain GitHub publication-lane states; `timed_out` remains GitHub SLA-lane state.
 - Invalid editorial output can only be repaired for the same edition and same `packetBlobSha`.
 - Normal Canonical preflight remains authoritative even if durable state lags.
@@ -73,15 +74,16 @@ Evidence extraction records candidates omitted by its package limit, including A
 
 Do not enable Daily production until all of the following are true:
 
-1. Precutover Verify passes `npm run check` with AM/PM regressions and Daily compatibility tests.
+1. Precutover Verify passes `npm run check` with AM/PM regressions, Daily compatibility tests, and the exact-edition wake-path regression.
 2. The **last legacy edition is a healthy AM edition** whose 10:10 cutoff and publication/deployment state establish the clean migration boundary.
 3. The legacy PM run for that cutover date is disabled before its 17:00 cutoff; it must not publish after Daily ownership begins.
 4. Historical archive hashes remain unchanged.
 5. The exact production workflow changes and external Scheduled Task changes are reviewed together.
+6. The Daily UI and root `AGENTS.md` no longer describe the active Daily edition as a twice-daily 10:10/17:00 product.
 
 At formal cutover:
 
-- the existing **AM ChatGPT task** is converted to the Daily task and remains at 10:20;
+- the existing **AM ChatGPT task** is converted to the Daily task and remains at 10:20, including the bounded missing-packet wake rule;
 - the existing PM ChatGPT task is disabled;
 - the 10:10 packet schedule is mapped to `daily` and the legacy 17:00 packet schedule is removed/disabled;
 - the 11:00 SLA schedule is mapped to `daily` and the legacy 17:50 SLA schedule is removed/disabled;
@@ -108,6 +110,6 @@ No calendar date is hardcoded as the migration date. Due-edition selection deriv
 
 ## Production acceptance
 
-`npm run check` proves compatibility, not production completion. The migration is not considered production-verified until the first real Daily publishes correctly around the noon release target and at least three consecutive Daily editions complete without manual publication intervention. Prefer seven days without publication intervention before closing the migration maintenance item.
+`npm run check` proves compatibility, not production completion. The migration is not considered production-verified until the first real Daily publishes correctly around the noon release target and at least three consecutive Daily editions complete without manual publication intervention. The first real Daily acceptance must explicitly verify both normal packet availability and the independent wake/SLA liveness path. Prefer seven days without publication intervention before closing the migration maintenance item.
 
 Editorial Discovery Expansion is intentionally out of scope for cadence migration. Any subject taxonomy such as `game | company | platform | person | topic`, or any Canonical schema change motivated by non-game subjects, must be proposed and tested independently.
