@@ -1,11 +1,10 @@
 name: Final editorial packet
-run-name: Final editorial packet · ${{ github.event_name == 'push' && 'daily-wake' || (github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '10 2 * * *' && 'am' || 'pm')) }} · ${{ github.event_name == 'push' && github.ref_name || inputs.edition || 'scheduled' }}
+run-name: Final editorial packet · ${{ github.event_name == 'push' && 'daily-wake' || (github.event_name == 'workflow_dispatch' && inputs.period || 'daily') }} · ${{ github.event_name == 'push' && github.ref_name || inputs.edition || 'scheduled' }}
 
 on:
   schedule:
-    # Legacy production schedule remains unchanged during precutover.
+    # Daily production cutoff: 10:10 Asia/Shanghai.
     - cron: "10 2 * * *"
-    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       period:
@@ -21,9 +20,9 @@ on:
         required: true
         type: string
   push:
-    # Inert during precutover. After Daily cutover the existing 10:20 ChatGPT
-    # task may write one exact-edition wake file when the acknowledged packet is
-    # missing. The wake commit is only a trigger; GitHub still owns recovery.
+    # Daily liveness fallback. The 10:20 ChatGPT task may write one exact-edition
+    # wake file when the acknowledged packet is missing. The wake commit is only
+    # a trigger; GitHub still owns recovery.
     branches:
       - "automation/editorial/*-daily"
     paths:
@@ -33,10 +32,8 @@ permissions:
   contents: write
   actions: write
 
-# Keep collectors independent by period. A late run from another period must
-# never cancel the collector for the current fixed window.
 concurrency:
-  group: news-discovery-state-${{ github.event_name == 'push' && 'daily' || (github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '10 2 * * *' && 'am' || 'pm')) }}
+  group: news-discovery-state-${{ github.event_name == 'push' && 'daily' || (github.event_name == 'workflow_dispatch' && inputs.period || 'daily') }}
   cancel-in-progress: false
 
 jobs:
@@ -94,11 +91,7 @@ jobs:
               --edition="$edition" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
           else
-            if [ "${{ github.event.schedule }}" = "10 2 * * *" ]; then
-              period="am"
-            else
-              period="pm"
-            fi
+            period="daily"
             node scripts/resolve-due-edition.mjs \
               --period="$period" \
               --purpose=packet \
