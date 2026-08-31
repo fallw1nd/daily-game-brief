@@ -1,7 +1,7 @@
 import { normalizeHeadline } from "./news-pipeline.mjs";
 
 const chinaPattern = /(?:中国|国产|腾讯|网易|米哈游|叠纸|鹰角|莉莉丝|完美世界|Bilibili|哔哩哔哩)/i;
-const significantKinds = new Set(["delay", "release-date", "launch", "company", "result"]);
+const significantKinds = new Set(["cancel", "delay", "release-date", "launch", "company", "result"]);
 const awardPattern = /\b(?:award|awards|winner|winners|nominee|nominees|nomination|nominations|finalist|finalists|shortlist|longlist|entries open|submissions open)\b|奖项|大奖|获奖|提名|入围|长名单|短名单|报名|優勝|受賞|ノミネート/i;
 const interviewPattern = /\b(?:interview|interviews|q&a|conversation with)\b|专访|采访|访谈|群访|对谈|インタビュー/i;
 const reviewPattern = /\b(?:review|reviews|hands-on|impressions)\b|评测|试玩体验|体验报告|レビュー|プレイレポ/i;

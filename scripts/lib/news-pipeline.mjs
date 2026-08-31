@@ -5,14 +5,15 @@ import {
 } from "./edition-window.mjs";
 
 const majorPatterns = [
-  /\b(?:announce|announced|reveal|revealed|release date|launch|delay|delayed|cancel|cancelled|update|dlc|acquisition|layoff|lawsuit|policy|award|winner|champion)\b/i,
-  /(?:公布|公开|发表|发售日|上线|延期|取消|更新|扩展|收购|裁员|诉讼|政策|获奖|冠军|世界级)/,
-  /(?:発表|発売日|配信開始|延期|中止|アップデート|買収|訴訟|優勝)/,
+  /\b(?:announce|announced|reveal|revealed|release date|launch|delay|delayed|cancel|cancelled|canceled|update|dlc|acquisition|layoff|lawsuit|policy|award|winner|champion)\b/i,
+  /(?:公布|公开|发表|发售日|上线|延期|取消|停止发售|更新|扩展|收购|裁员|诉讼|政策|获奖|冠军|世界级)/,
+  /(?:発表|発売日|配信開始|延期|発売中止|販売中止|配信中止|中止|アップデート|買収|訴訟|優勝)/,
 ];
 
 const chinaPatterns = [/(?:中国|国产|腾讯|网易|米哈游|叠纸|鹰角|莉莉丝|完美世界|Bilibili|哔哩哔哩)/i];
 
 const eventPatterns = [
+  ["cancel", /\b(?:cancel|cancelled|canceled|cancellation)\b|取消(?:发售|发行|上线)?|停止发售|発売中止|販売中止|配信中止/i],
   ["delay", /\b(?:delay|delayed|postpone|postponed)\b|延期|発売延期/i],
   ["release-date", /\b(?:release date|launch date|dated for|launches? on)\b|发售日|定档|発売日/i],
   ["launch", /\b(?:launch|launched|available now|released)\b|正式上线|现已推出|配信開始/i],
@@ -25,7 +26,7 @@ const eventPatterns = [
 
 const eventStopWords = new Set([
   "about", "after", "ahead", "also", "announced", "announces", "announcement", "available",
-  "date", "dated", "debut", "details", "first", "from", "game", "games", "gets", "launch",
+  "cancel", "cancelled", "canceled", "cancellation", "date", "dated", "debut", "details", "first", "from", "game", "games", "gets", "launch",
   "launched", "launches", "major", "more", "news", "official", "release", "released", "releases",
   "revealed", "reveals", "season", "show", "shows", "this", "trailer", "update", "with",
 ]);
@@ -168,11 +169,17 @@ function tierFor(record) {
   return "C";
 }
 
+function preferredQuotedSubject(raw) {
+  const titleQuote = raw.match(/[《『]([^》』]{2,100})[》』]/)?.[1];
+  if (titleQuote) return titleQuote;
+  return raw.match(/[「“"]([^」”"]{2,100})[」”"]/)?.[1] || "";
+}
+
 export function eventIdentity(headline) {
   const raw = stripHtml(headline);
   const normalized = normalizeHeadline(raw);
   const eventKind = eventPatterns.find(([, pattern]) => pattern.test(raw))?.[0] || "other";
-  const quoted = raw.match(/[《『「“"]([^》』」”"]{2,100})[》』」”"]/)?.[1];
+  const quoted = preferredQuotedSubject(raw);
   let subjectKey = quoted ? normalizeHeadline(quoted) : "";
   if (!subjectKey) {
     const boundary = eventPatterns
