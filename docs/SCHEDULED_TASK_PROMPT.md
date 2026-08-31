@@ -1,6 +1,6 @@
 # Scheduled Task Editorial Contract
 
-Use this prompt only for the two existing ChatGPT tasks: AM at 10:20 and PM at 17:10, `Asia/Shanghai`. Handoff time does not change edition identity or the fixed 10:10 AM / 17:00 PM evidence cutoffs.
+Use this prompt only for the two existing ChatGPT tasks: AM at 10:20 and PM at 17:10, `Asia/Shanghai`. Handoff time does not change edition identity or the fixed 10:10 AM / 17:00 PM evidence cutoffs. During Daily precutover these production tasks remain unchanged; at formal cutover the existing AM task is converted to Daily at 10:20 and the PM task is disabled. Daily closes evidence at 10:10 and is planned for public release at 12:00.
 
 ## 1. Resolve input and Canonical state
 
@@ -16,7 +16,8 @@ Do not inspect or poll Actions, dispatch recovery, create or delete workflows, e
 - Return one `include`, `exclude`, or `needs_review` decision for every `packages` and `trackingQueue` item. Do not add events outside the packet.
 - Use only opened evidence. `official` needs an opened primary source; `multi_source_verified` needs two independent reliable sources. Keep rumors `unconfirmed` and `needs_review` tracked with a concrete next check.
 - Follow live `AGENTS.md` for Chinese titles, mainland terminology, sources, time boundaries, copy, and uncertainty. Its narrow naming lookups cannot change facts. Never invent a subject marked `requires_subject_identity`.
-- AM uses `upcomingMode:"replace"`; PM uses `upcomingMode:"inherit_and_patch"`.
+- AM uses `upcomingMode:"replace"`; PM uses `upcomingMode:"inherit_and_patch"`; Daily uses `upcomingMode:"replace"`.
+- Daily uses the immutable evidence window `(previous day 10:10, current day 10:10]`, `plannedAt` current day 12:00. Never add facts first published after 10:10 merely because the editorial task runs at 10:20.
 
 Use `contractVersion:2` and the exact `packetBlobSha`. Each included item needs a complete language-neutral `sharedFactFrame`. Do not invent issue numbers, final entry IDs, or digests.
 
