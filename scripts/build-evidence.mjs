@@ -204,7 +204,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
 });
 
 const output = {
-  schemaVersion: 3,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   window: report.window,
   adjacentEdition: report.adjacentEdition,
