@@ -12,6 +12,17 @@ describe("final editorial packet workflow", () => {
     expect(workflow).not.toContain('cron: "45 8 * * *"');
   });
 
+  it("accepts only an exact Daily editorial-branch wake signal", () => {
+    expect(workflow).toContain('branches:\n      - "automation/editorial/*-daily"');
+    expect(workflow).toContain('paths:\n      - "automation/wake/*.json"');
+    expect(workflow).toContain('edition="${GITHUB_REF_NAME#automation/editorial/}"');
+    expect(workflow).toContain('wake_path="automation/wake/$edition.json"');
+    expect(workflow).toContain("wake.schemaVersion !== 1");
+    expect(workflow).toContain("wake.period !== 'daily'");
+    expect(workflow).toContain("wake.reason !== 'packet_missing_at_handoff'");
+    expect(workflow).toContain('--edition="$edition"');
+  });
+
   it("builds bounded title-only hints after evidence and before editorialization", () => {
     const evidenceIndex = workflow.indexOf("- name: Build bounded evidence packages");
     const hintIndex = workflow.indexOf("- name: Build title-only hints");
