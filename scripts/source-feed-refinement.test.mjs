@@ -4,31 +4,52 @@ import { describe, expect, it } from "vitest";
 const registry = JSON.parse(await readFile("config/news-sources.json", "utf8"));
 const byId = new Map(registry.sources.map((source) => [source.id, source]));
 
-describe("shadow source feed refinements", () => {
-  it("keeps production active sources unchanged while moving suitable shadow sources to feeds", () => {
-    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(13);
+describe("selective source promotion after runner observation", () => {
+  it("promotes only the first technically validated cohort", () => {
+    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(18);
 
-    const expectedFeeds = new Map([
+    const promotedFeeds = new Map([
+      ["4gamer-topics", "https://www.4gamer.net/rss/news_topics.xml"],
+      ["4gamer-interview", "https://www.4gamer.net/rss/all_interview.xml"],
+      ["4gamer-review", "https://www.4gamer.net/rss/all_review.xml"],
       ["vgc-news", "https://www.videogameschronicle.com/category/news/feed/"],
-      ["denfaminico", "https://news.denfaminicogamer.jp/category/news/feed"],
-      ["denfaminico-interviews", "https://news.denfaminicogamer.jp/category/interview/feed"],
       ["game-developer", "https://www.gamedeveloper.com/rss.xml"],
-      ["pcgamer-news", "https://www.pcgamer.com/rss/"],
     ]);
 
-    for (const [id, url] of expectedFeeds) {
+    for (const [id, url] of promotedFeeds) {
       const source = byId.get(id);
-      expect(source?.mode).toBe("shadow");
+      expect(source?.mode).toBe("active");
       expect(source?.format).toBe("rss");
       expect(source?.url).toBe(url);
-      expect(source?.linkPattern).toBeUndefined();
     }
   });
 
-  it("keeps Denfami news and interviews independent as lanes but not as corroborating publishers", () => {
+  it("keeps noisier or timestamp-limited sources in shadow", () => {
+    for (const id of [
+      "game-watch",
+      "denfaminico",
+      "denfaminico-interviews",
+      "pcgamer-news",
+      "gcores-news",
+      "gcores-articles",
+      "ucg-industry",
+      "ucg-reviews",
+      "the-game-awards-news",
+      "bafta-games-awards",
+      "dice-awards",
+    ]) {
+      expect(byId.get(id)?.mode).toBe("shadow");
+    }
+  });
+
+  it("corrects Denfami interviews to its real interview archive without creating publisher independence", () => {
     const news = byId.get("denfaminico");
     const interviews = byId.get("denfaminico-interviews");
-    expect(news?.capabilities).toEqual(["news"]);
+    expect(news?.url).toBe("https://news.denfaminicogamer.jp/category/news/feed");
+    expect(news?.format).toBe("rss");
+    expect(interviews?.url).toBe("https://news.denfaminicogamer.jp/category/interview");
+    expect(interviews?.format).toBe("html");
+    expect(interviews?.linkPattern).toBe("^https://news\\.denfaminicogamer\\.jp/interview/");
     expect(interviews?.capabilities).toEqual(["interviews", "features"]);
     expect(interviews?.defaultLane).toBe("interviews");
     expect(news?.independenceKey).toBe("denfaminicogamer");
