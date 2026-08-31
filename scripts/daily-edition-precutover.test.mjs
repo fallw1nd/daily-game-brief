@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { latestDueWindow, plannedWindow } from "./lib/edition-window.mjs";
 import { expectedEditorialWindow, validateFinalizedEditorialPacket } from "./lib/editorial-packet.mjs";
-import { latestDueWindow, plannedWindow } from "./lib/news-pipeline.mjs";
 import { resolveDueEdition } from "./resolve-due-edition.mjs";
 
 function packetForDaily(editionId) {
