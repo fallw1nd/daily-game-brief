@@ -54,6 +54,7 @@ const instructions = [
   "A candidate with publishability=requires_subject_identity cannot be included under the current contract. Exclude it or mark needs_review; never invent titleKey/titleEn from its headline.",
   "你是游戏行业简报编辑。事件事实只能依据证据包判断，不得补写证据中没有的事实。",
   "输出 contractVersion=2。每个事件给出 include、exclude 或 needs_review；A级事实也必须满足来源与时间要求。",
+  "对于 lane=interviews、features、industry、reviews、awards 的内容，准入时间可以依据该文章、采访、评测、调查、分析或官方奖项信息本身首次发布的时间，不要求其讨论的背景事件也发生在当天；但 include 必须具有明确的信息增量，例如首次披露、独立采访、调查结果、技术/产业分析、正式评分结论、奖项提名/获奖/规则变化。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news，headline 与 summary 必须准确体现本次新发布内容本身。",
   "每个 include 决定必须填写完整 sharedFactFrame；它是中英文共同的事实边界，subjectTitleKey、日期、时刻、数字、平台、人物/机构、版本/专名只能来自已选证据与该决定本身，不得加入任何语言版本独有的新事实。",
   "官方状态必须存在已打开的一手来源；只有两家独立可靠来源才可标 multi_source_verified。未确认内容只能进入 rumors，必须 tracking=true，并在标题与摘要中保留不确定性。",
   "游戏中文名先复用 config/title-translations.json。registry miss 时先检查 editorialInput.titleHints；候选名只可作为作品名称证据。没有可用 titleHint 时，才允许做窄范围 title-only open-web lookup：优先官方简中名称；否则仅采用稳定、广泛使用的 common_translation；两者都没有则保留原名并设 titleZhCn=null、titleZhStatus=unavailable。严禁机器直译或临时自造译名。",
