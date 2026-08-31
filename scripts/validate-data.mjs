@@ -1,11 +1,13 @@
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { windowForEditionId } from "./lib/edition-window.mjs";
 import { verifiedWindowTimeError } from "./lib/time-window.mjs";
 
 const dataRoot = resolve("public/data");
 const errors = [];
 const warnings = [];
 const mediaFiles = new Map();
+const editionPeriods = new Set(["am", "pm", "daily"]);
 const factStatuses = new Set([
   "official",
   "media_relay_official",
@@ -65,8 +67,10 @@ function trackLocalMedia(asset, context) {
 }
 
 function hasValidArchiveTitle(title, period) {
-  const prefix = period === "am" ? "早报｜" : "晚报｜";
-  return (
+  const prefixes = { am: "早报｜", pm: "晚报｜", daily: "日报｜" };
+  const prefix = prefixes[period];
+  return Boolean(
+    prefix &&
     typeof title === "string" &&
     title.trim().startsWith(prefix) &&
     [...title.trim()].length >= 8 &&
@@ -81,11 +85,6 @@ async function readJson(path) {
     errors.push(`${path}: ${error.message}`);
     return null;
   }
-}
-
-function beijingTimestamp(value) {
-  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value ?? "")) return NaN;
-  return Date.parse(`${value.replace(" ", "T")}:00+08:00`);
 }
 
 function sourceHost(source) {
@@ -153,6 +152,9 @@ function validateEdition(edition, path) {
   if (!new Set([1, 2]).has(edition.schemaVersion)) {
     errors.push(`${path}: schemaVersion must be 1 or 2`);
   }
+  if (edition.period === "daily" && edition.schemaVersion !== 2) {
+    errors.push(`${path}: Daily canonical editions must use schemaVersion 2`);
+  }
   if (edition.id !== `${edition.date}-${edition.period}`) {
     errors.push(`${path}: id must match date and period`);
   }
@@ -162,35 +164,20 @@ function validateEdition(edition, path) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(edition.date ?? "")) {
     errors.push(`${path}: date must use YYYY-MM-DD`);
   }
-  if (!new Set(["am", "pm"]).has(edition.period)) {
-    errors.push(`${path}: period must be am or pm`);
+  if (!editionPeriods.has(edition.period)) {
+    errors.push(`${path}: period must be am, pm, or daily`);
   }
   if (edition.timezone !== "Asia/Shanghai") {
     errors.push(`${path}: timezone must be Asia/Shanghai`);
   }
-  const plannedAt = beijingTimestamp(edition.plannedAt);
-  const windowStart = beijingTimestamp(edition.windowStart);
-  const windowEnd = beijingTimestamp(edition.windowEnd);
-  if (![plannedAt, windowStart, windowEnd].every(Number.isFinite)) {
-    errors.push(`${path}: plannedAt, windowStart, and windowEnd must use YYYY-MM-DD HH:mm`);
+  const expectedWindow = windowForEditionId(edition.id);
+  if (!expectedWindow) {
+    errors.push(`${path}: edition id does not resolve to a supported fixed window`);
   } else {
-    const expectedHour = edition.period === "am" ? "10:10" : "17:00";
-    if (edition.plannedAt !== `${edition.date} ${expectedHour}`) {
-      errors.push(`${path}: plannedAt does not match the fixed ${edition.period} schedule`);
-    }
-    if (edition.windowEnd !== edition.plannedAt) {
-      errors.push(`${path}: windowEnd must equal plannedAt`);
-    }
-    const expectedStart = edition.period === "pm"
-      ? `${edition.date} 10:10`
-      : new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Shanghai",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(plannedAt - 24 * 60 * 60 * 1000)) + " 17:00";
-    if (edition.windowStart !== expectedStart) {
-      errors.push(`${path}: windowStart does not match the fixed ${edition.period} window`);
+    for (const key of ["plannedAt", "windowStart", "windowEnd"]) {
+      if (edition[key] !== expectedWindow[key]) {
+        errors.push(`${path}: ${key} does not match the fixed ${edition.period} window`);
+      }
     }
   }
   if (!Array.isArray(edition.entries)) {
@@ -369,7 +356,7 @@ if (manifest) {
       if (typeof item.leadEntryId !== "string" || item.leadEntryId.length === 0) {
         errors.push(`manifest.json: missing leadEntryId for ${item.id}`);
       }
-      if (!/^archive\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-(am|pm)\.json$/.test(item.path ?? "")) {
+      if (!/^archive\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-(am|pm|daily)\.json$/.test(item.path ?? "")) {
         errors.push(`manifest.json: invalid archive path for ${item.id}`);
         continue;
       }

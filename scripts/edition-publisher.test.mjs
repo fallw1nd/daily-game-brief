@@ -153,4 +153,59 @@ describe("idempotent edition publisher", () => {
     expect(result.edition.upcoming[0].cover).toEqual(cover);
     expect(result.edition.upcoming[0].cover_status).toBe("verified");
   });
+
+  it("publishes Daily as schema v2 with a noon planned time and continuous issue number", () => {
+    const dailyPacket = {
+      editorialInput: {
+        ...packet.editorialInput,
+        window: {
+          id: "2026-09-01-daily",
+          period: "daily",
+          plannedAt: "2026-09-01 12:00",
+          windowStart: "2026-08-31 10:10",
+          windowEnd: "2026-09-01 10:10",
+        },
+      },
+    };
+    const dailyEditorial = {
+      ...editorial,
+      editionId: "2026-09-01-daily",
+      archiveTitle: "日报｜《Example Game》正式公布",
+      upcomingMode: "replace",
+      decisions: [{
+        ...editorial.decisions[0],
+        beijingTime: "2026-09-01 09:30",
+      }],
+    };
+    const dailyManifest = {
+      ...manifest,
+      latest: "2026-08-31-am",
+      editions: [
+        { id: "2026-08-30-pm", issueNumber: 19 },
+        { id: "2026-08-31-am", issueNumber: 20 },
+      ],
+    };
+    const result = buildEdition({
+      packet: dailyPacket,
+      editorial: dailyEditorial,
+      latest,
+      manifest: dailyManifest,
+      now: new Date("2026-09-01T02:12:00Z"),
+    });
+    expect(result.status).toBe("built");
+    expect(result.edition).toMatchObject({
+      id: "2026-09-01-daily",
+      issueNumber: 21,
+      period: "daily",
+      schemaVersion: 2,
+      archiveTitle: "日报｜《Example Game》正式公布",
+      plannedAt: "2026-09-01 12:00",
+      nextEditionAt: "2026-09-02 12:00",
+      windowStart: "2026-08-31 10:10",
+      windowEnd: "2026-09-01 10:10",
+    });
+    expect(result.manifest.latest).toBe("2026-09-01-daily");
+    expect(result.archivePath).toBe("archive/2026/09/2026-09-01-daily.json");
+    expect(result.edition.upcoming).toEqual([]);
+  });
 });

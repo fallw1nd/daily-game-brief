@@ -118,24 +118,77 @@ describe("editorial API contract", () => {
     expect(errors).toContain("decisions[0]: needs_review requires tracking=true");
   });
 });
-  it("distinguishes game, entity, and unresolved topic subjects", () => {
-    const company = {
-      ...evidence.packages[0],
-      eventKey: "company-1",
-      eventKind: "company",
-      subjectKey: "example-publisher",
+
+it("distinguishes game, entity, and unresolved topic subjects", () => {
+  const company = {
+    ...evidence.packages[0],
+    eventKey: "company-1",
+    eventKind: "company",
+    subjectKey: "example-publisher",
+  };
+  const topic = {
+    ...evidence.packages[0],
+    eventKey: "topic-1",
+    eventKind: "legal-report",
+    subjectKey: null,
+  };
+  const input = buildEditorialInput({ ...evidence, packages: [evidence.packages[0], company, topic] });
+  expect(input.packages.map((item) => item.subject)).toEqual([
+    { kind: "game", key: "example game" },
+    { kind: "entity", key: "example-publisher" },
+    { kind: "topic", key: null },
+  ]);
+  expect(input.packages[2].publishability).toBe("requires_subject_identity");
+});
+
+function syntheticPackages(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...evidence.packages[0],
+    eventKey: `stress-${index}`,
+    subjectKey: `stress game ${index}`,
+    headline: `Stress Game ${index} announced`,
+    tier: index % 4 === 0 ? "A" : "B",
+    score: index % 4 === 0 ? 140 : 100,
+    sources: [{
+      ...evidence.packages[0].sources[0],
+      url: `https://publisher.example/news/${index}`,
+      evidenceText: `Publisher announced Stress Game ${index}. ${"Evidence ".repeat(16)}`,
+    }],
+  }));
+}
+
+describe("editorial input pressure telemetry", () => {
+  for (const count of [10, 20, 40, 80]) {
+    it(`keeps ${count} candidate pressure observable`, () => {
+      const input = buildEditorialInput({ ...evidence, packages: syntheticPackages(count) }, 12000);
+      expect(input.budget.candidateItems).toBe(count);
+      expect(input.budget.includedItems + input.budget.omittedItems).toBe(count);
+      expect(input.budget.omittedItems).toBe(input.budget.omissions.length);
+      expect(input.budget.omittedTierA).toBe(input.budget.omissions.filter((item) => item.tier === "A").length);
+      expect(input.budget.omittedTierB).toBe(input.budget.omissions.filter((item) => item.tier === "B").length);
+      if (count >= 40) {
+        expect(input.budget.omittedItems).toBeGreaterThan(0);
+        expect(input.budget.omittedTierA).toBeGreaterThan(0);
+        expect(input.budget.omissions.every((item) => item.reason === "input_budget")).toBe(true);
+      }
+    });
+  }
+
+  it("fails visibly instead of truncating active tracking evidence", () => {
+    const tracked = syntheticPackages(1)[0];
+    const ledger = {
+      events: {
+        [tracked.eventKey]: {
+          eventKey: tracked.eventKey,
+          eventKind: tracked.eventKind,
+          subjectKey: tracked.subjectKey,
+          lastHeadline: tracked.headline,
+          firstSeenAt: "2026-08-31T09:00:00.000Z",
+          lastSeenAt: "2026-08-31T09:00:00.000Z",
+          tracking: { active: true, reason: "still developing" },
+        },
+      },
     };
-    const topic = {
-      ...evidence.packages[0],
-      eventKey: "topic-1",
-      eventKind: "legal-report",
-      subjectKey: null,
-    };
-    const input = buildEditorialInput({ ...evidence, packages: [evidence.packages[0], company, topic] });
-    expect(input.packages.map((item) => item.subject)).toEqual([
-      { kind: "game", key: "example game" },
-      { kind: "entity", key: "example-publisher" },
-      { kind: "topic", key: null },
-    ]);
-    expect(input.packages[2].publishability).toBe("requires_subject_identity");
+    expect(() => buildEditorialInput({ ...evidence, packages: [tracked] }, 200, ledger)).toThrow(/active tracking/i);
   });
+});

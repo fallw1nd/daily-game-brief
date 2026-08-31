@@ -194,6 +194,7 @@ export const editorialSchema = {
 
 export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) {
   const packages = [];
+  const omitted = [];
   let usedChars = 0;
   const activeTracking = Object.values(ledger?.events || {}).filter((item) => item.tracking?.active === true);
   const activeKeys = new Set(activeTracking.map((item) => item.eventKey));
@@ -216,6 +217,7 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
   for (const item of trackingQueue) usedChars += JSON.stringify(item).length;
   if (usedChars > maxChars) throw new Error("active tracking queue exceeds the editorial input budget");
 
+  let budgetBlocked = false;
   for (const item of evidenceItems) {
     const sources = (item.sources || []).flatMap((source, sourceIndex) => {
       if (source.status !== "opened" || !source.evidenceText) return [];
@@ -237,6 +239,10 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
       }];
     });
     if (!sources.length) continue;
+    if (budgetBlocked) {
+      omitted.push({ eventKey: item.eventKey, tier: item.tier || null, score: item.score ?? null, reason: "input_budget" });
+      continue;
+    }
     const compact = {
       eventKey: item.eventKey,
       eventKind: item.eventKind,
@@ -266,7 +272,9 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
     const size = JSON.stringify(compact).length;
     if (usedChars + size > maxChars) {
       if (activeKeys.has(item.eventKey)) throw new Error(`active tracking evidence exceeds the editorial input budget: ${item.eventKey}`);
-      break;
+      budgetBlocked = true;
+      omitted.push({ eventKey: item.eventKey, tier: item.tier || null, score: item.score ?? null, reason: "input_budget" });
+      continue;
     }
     packages.push(compact);
     usedChars += size;
@@ -282,6 +290,12 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
       usedInputChars: usedChars,
       estimatedInputTokens: Math.ceil(usedChars / 4),
       activeTrackingItems: activeTracking.length,
+      candidateItems: evidenceItems.length,
+      includedItems: packages.length,
+      omittedItems: omitted.length,
+      omittedTierA: omitted.filter((item) => item.tier === "A").length,
+      omittedTierB: omitted.filter((item) => item.tier === "B").length,
+      omissions: omitted,
     },
   };
 }
@@ -291,6 +305,13 @@ function hasSubstantialChinese(value) {
   const chars = [...value];
   const cjk = chars.filter((char) => /[\u3400-\u9fff]/u.test(char)).length;
   return cjk >= 4 && cjk / Math.max(chars.length, 1) > 0.15;
+}
+
+function englishArchivePrefix(editionId) {
+  if (editionId?.endsWith("-am")) return "Morning Brief |";
+  if (editionId?.endsWith("-pm")) return "Evening Brief |";
+  if (editionId?.endsWith("-daily")) return "Daily Brief |";
+  return null;
 }
 
 export function validateEnglishEditorialLocale(output) {
@@ -312,8 +333,9 @@ export function validateEnglishEditorialLocale(output) {
   const requiredText = [en.archiveTitle, ...(en.entries || []).flatMap((item) => [item.headline, item.summary, item.verification, item.timeNote])];
   if (requiredText.some((value) => typeof value !== "string" || !value.trim())) errors.push("English locale required text must be non-empty");
   if (requiredText.some(hasSubstantialChinese)) errors.push("English locale required text must not contain substantial Chinese fallback copy");
-  const prefix = output.editionId?.endsWith("-pm") ? "Evening Brief |" : "Morning Brief |";
-  if (!String(en.archiveTitle || "").startsWith(prefix)) errors.push(`locales.en.archiveTitle must start with ${prefix}`);
+  const prefix = englishArchivePrefix(output.editionId);
+  if (!prefix) errors.push("editionId must end with -am, -pm, or -daily");
+  else if (!String(en.archiveTitle || "").startsWith(prefix)) errors.push(`locales.en.archiveTitle must start with ${prefix}`);
   if (en.sourceReport !== null && en.sourceReport !== undefined) {
     if (!Array.isArray(en.sourceReport.checked) || !Array.isArray(en.sourceReport.limited) || typeof en.sourceReport.note !== "string") {
       errors.push("locales.en.sourceReport must be complete when present");

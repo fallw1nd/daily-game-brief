@@ -2,9 +2,8 @@ name: Brief publication SLA watchdog
 
 on:
   schedule:
-    # 11:00 and 17:50 Asia/Shanghai; leaves normal editorial publication headroom before fallback.
+    # Daily publication SLA: 11:00 Asia/Shanghai.
     - cron: "0 3 * * *"
-    - cron: "50 9 * * *"
   workflow_dispatch:
     inputs:
       period:
@@ -14,6 +13,7 @@ on:
         options:
           - am
           - pm
+          - daily
 
       edition:
         description: Exact edition ID for manual verification
@@ -25,8 +25,9 @@ permissions:
   actions: write
 
 concurrency:
-  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.period || (github.event.schedule == '0 3 * * *' && 'am' || 'pm') }}
-  cancel-in-progress: true
+  # Exact-edition recovery must not cancel another recovery run.
+  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.edition || 'scheduled-daily' }}
+  cancel-in-progress: false
 
 jobs:
   verify:
@@ -55,11 +56,7 @@ jobs:
               --period="$period" \
               --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
           else
-            if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
-              period="am"
-            else
-              period="pm"
-            fi
+            period="daily"
             state_dir="$RUNNER_TEMP/sla-state-selection"
             git worktree add --detach "$state_dir" origin/automation/state
             node scripts/resolve-due-edition.mjs \

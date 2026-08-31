@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
-import { latestDueWindow, plannedWindow } from "./lib/news-pipeline.mjs";
+import { latestDueWindow, plannedWindow } from "./lib/edition-window.mjs";
 
 function dateRange(start, end) {
   const values = [];
@@ -14,7 +14,7 @@ function dateRange(start, end) {
 }
 
 export function resolveDueEdition({ period, now = new Date(), manifest, states = {}, purpose = "publication" }) {
-  if (!new Set(["am", "pm"]).has(period)) throw new Error("period must be am or pm");
+  if (!new Set(["am", "pm", "daily"]).has(period)) throw new Error("period must be am, pm, or daily");
   if (!new Set(["packet", "editorial", "publication"]).has(purpose)) throw new Error("purpose must be packet, editorial, or publication");
   const latestDue = latestDueWindow(period, now);
   const cutoff = (window) => Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);

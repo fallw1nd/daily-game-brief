@@ -53,6 +53,13 @@ function requiredEnglish(value, context, errors, minLength = 2) {
   }
 }
 
+function archivePrefix(period) {
+  if (period === "am") return "Morning Brief |";
+  if (period === "pm") return "Evening Brief |";
+  if (period === "daily") return "Daily Brief |";
+  return null;
+}
+
 function validateSourceLabels(entry, overlayEntry, context, errors) {
   const labels = Array.isArray(overlayEntry.sourceLabels) ? overlayEntry.sourceLabels : [];
   const byIndex = new Map();
@@ -190,10 +197,13 @@ export function validateEnglishOverlay(canonical, overlay) {
   if (isDigest(overlay.canonicalCopyDigest) && overlay.canonicalCopyDigest !== expectedCopyDigest) {
     warnings.push("overlay.canonicalCopyDigest differs from current Simplified Chinese presentation");
   }
-  const prefix = canonical.period === "pm" ? "Evening Brief |" : "Morning Brief |";
-  requiredEnglish(overlay.archiveTitle, "overlay.archiveTitle", errors, prefix.length + 2);
-  if (typeof overlay.archiveTitle === "string" && !overlay.archiveTitle.startsWith(prefix)) {
-    errors.push(`overlay.archiveTitle should start with ${prefix}`);
+  const prefix = archivePrefix(canonical.period);
+  if (!prefix) errors.push("canonical period must be am, pm, or daily");
+  else {
+    requiredEnglish(overlay.archiveTitle, "overlay.archiveTitle", errors, prefix.length + 2);
+    if (typeof overlay.archiveTitle === "string" && !overlay.archiveTitle.startsWith(prefix)) {
+      errors.push(`overlay.archiveTitle should start with ${prefix}`);
+    }
   }
   validateEntries(canonical, overlay, errors);
   validateUpcoming(canonical, overlay, errors);

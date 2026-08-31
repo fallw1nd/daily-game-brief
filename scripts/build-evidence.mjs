@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
 
 const INPUT_PATH = resolve(process.env.NEWS_SHADOW_REPORT_PATH || "artifacts/news-shadow-report.json");
@@ -133,8 +134,11 @@ const [report, sourceConfig] = await Promise.all([
   readFile(SOURCE_CONFIG_PATH, "utf8").then((text) => JSON.parse(text)),
 ]);
 const sourceById = new Map(sourceConfig.sources.map((source) => [source.id, source]));
+const candidateBudget = selectEvidenceCandidates(report.reviewQueue, MAX_CANDIDATES);
+const selectedCandidates = candidateBudget.selected;
+const omittedCandidates = candidateBudget.omissions;
 
-const packages = await mapLimit(report.reviewQueue.slice(0, MAX_CANDIDATES), 3, async (candidate) => {
+const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
   const appearances = candidate.appearances.slice(0, 3);
   const sources = await mapLimit(appearances, 2, async (appearance) => {
     const source = sourceById.get(appearance.sourceId);
@@ -174,6 +178,7 @@ const output = {
   adjacentEdition: report.adjacentEdition,
   limits: { candidatePackages: MAX_CANDIDATES, sourcesPerCandidate: 3, evidenceCharsPerSource: MAX_EVIDENCE_CHARS },
   totals: {
+    ...candidateBudget.telemetry,
     packages: packages.length,
     primaryPlusIndependent: packages.filter((item) => item.readiness === "primary-plus-independent").length,
     needsIndependentReport: packages.filter((item) => item.readiness === "needs-independent-report").length,
@@ -181,10 +186,11 @@ const output = {
     needsMoreEvidence: packages.filter((item) => item.readiness === "needs-more-evidence").length,
     limitedPages: packages.flatMap((item) => item.sources).filter((item) => item.status === "limited").length,
   },
+  omissions: omittedCandidates,
   packages,
 };
 
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
-console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; limited pages=${output.totals.limitedPages}`);
+console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
 console.log(`Report: ${OUTPUT_PATH}`);

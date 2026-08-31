@@ -13,6 +13,15 @@ describe("Pages deployment trigger contract", () => {
     expect(deploy).toMatch(/\n\s*workflow_dispatch:\s*\n/);
   });
 
+  it("holds a staged Daily build until its noon plannedAt without delaying legacy editions", async () => {
+    const deploy = await workflow("deploy.yml");
+
+    expect(deploy).toContain("Hold Daily release until noon");
+    expect(deploy).toContain("edition.period !== 'daily'");
+    expect(deploy).toContain("edition.plannedAt.replace(' ', 'T')");
+    expect(deploy).toContain("Daily release is staged; waiting");
+  });
+
   it("publisher dispatches Pages for changed data and idempotent publish retries without widening locale repair", async () => {
     const publisher = await workflow("publish-editorial-decision.yml");
 

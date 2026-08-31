@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { latestDueWindow } from "./lib/edition-window.mjs";
 import {
-  latestDueWindow,
   mergeCandidates,
   parseFeed,
   parseHtmlLinks,
@@ -16,8 +16,8 @@ const USER_AGENT = "DailyGameBriefDiscoveryBot/1.0 (+https://fallw1nd.github.io/
 const periodArg = process.argv.find((arg) => arg.startsWith("--period="))?.split("=")[1];
 const period = periodArg || process.env.BRIEF_PERIOD;
 
-if (!new Set(["am", "pm"]).has(period)) {
-  throw new Error("Pass --period=am or --period=pm");
+if (!new Set(["am", "pm", "daily"]).has(period)) {
+  throw new Error("Pass --period=am, --period=pm, or --period=daily");
 }
 
 const config = JSON.parse(await readFile(CONFIG_PATH, "utf8"));

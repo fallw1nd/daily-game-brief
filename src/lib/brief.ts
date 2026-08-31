@@ -2,6 +2,7 @@ import type {
   BriefEdition,
   BriefEntry,
   BriefSearchEntry,
+  EditionPeriod,
   SectionKey,
 } from "../types";
 
@@ -57,6 +58,12 @@ function hasUsableImage(value: unknown, kind: "editorial" | "cover"): boolean {
   );
 }
 
+function archivePrefix(period: EditionPeriod): string {
+  if (period === "am") return "早报｜";
+  if (period === "pm") return "晚报｜";
+  return "日报｜";
+}
+
 export function validateEdition(
   value: unknown,
   options: ValidationOptions = {},
@@ -72,6 +79,12 @@ export function validateEdition(
     errors.push("edition id, date, and period are required");
   } else if (edition.id !== `${edition.date}-${edition.period}`) {
     errors.push("edition id must match date and period");
+  }
+  if (edition.period && !new Set<EditionPeriod>(["am", "pm", "daily"]).has(edition.period)) {
+    errors.push("edition period must be am, pm, or daily");
+  }
+  if (edition.period === "daily" && edition.schemaVersion !== 2) {
+    errors.push("Daily canonical editions must use schemaVersion 2");
   }
   if (!Number.isInteger(edition.issueNumber) || Number(edition.issueNumber) < 1) {
     errors.push("edition issueNumber must be a positive integer");
@@ -113,8 +126,8 @@ export function validateEdition(
     }
   }
 
-  if (edition.schemaVersion === 2) {
-    const expectedPrefix = edition.period === "am" ? "早报｜" : "晚报｜";
+  if (edition.schemaVersion === 2 && edition.period) {
+    const expectedPrefix = archivePrefix(edition.period);
     const archiveTitle =
       typeof edition.archiveTitle === "string" ? edition.archiveTitle.trim() : "";
 
