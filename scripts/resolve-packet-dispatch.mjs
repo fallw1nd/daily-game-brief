@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { plannedWindow } from "./lib/news-pipeline.mjs";
+import { plannedWindow } from "./lib/edition-window.mjs";
 
 export const MAX_EARLY_RECOVERY_MS = 5 * 60 * 1000;
 
@@ -8,8 +8,8 @@ function cutoffMs(window) {
 }
 
 export function resolvePacketDispatchTarget({ period, edition = "", now = new Date() }) {
-  if (!new Set(["am", "pm"]).has(period)) {
-    throw new Error("period must be am or pm");
+  if (!new Set(["am", "pm", "daily"]).has(period)) {
+    throw new Error("period must be am, pm, or daily");
   }
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new Error("now must be a valid Date");
@@ -17,7 +17,7 @@ export function resolvePacketDispatchTarget({ period, edition = "", now = new Da
 
   const requested = String(edition || "").trim();
   const targetId = requested || plannedWindow(period, now).id;
-  const match = targetId.match(/^(\d{4}-\d{2}-\d{2})-(am|pm)$/);
+  const match = targetId.match(/^(\d{4}-\d{2}-\d{2})-(am|pm|daily)$/);
   if (!match || match[2] !== period) {
     throw new Error(`edition ${targetId} does not match period ${period}`);
   }
