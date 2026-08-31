@@ -74,8 +74,8 @@ describe("thin scheduled-task orchestration contract", () => {
 
   it("checks main Canonical before drafting, branching for a decision, or submitting", () => {
     const preflight = contract.indexOf("After packet preflight");
-    const main = contract.indexOf("read current `main`");
-    const canonical = contract.indexOf("If a normal Canonical exists");
+    const main = contract.indexOf("read current `main`", preflight);
+    const canonical = contract.indexOf("If a normal Canonical exists", main);
     const produce = contract.indexOf("## 2. Produce one bounded decision");
     const branch = contract.lastIndexOf("create or reuse `automation/editorial/<edition-id>`");
     const commit = contract.indexOf("Commit only `automation/inbox/<edition-id>.json`");
