@@ -103,6 +103,22 @@ describe("authorized same-edition production revision", () => {
     expect(state.deployment.status).toBe("pending");
   });
 
+  it("makes a retry of the same already-open revision idempotent after publication was reset to pending", () => {
+    const opened = applyEditionStateEvent(publishedState(), "revision-opened", {
+      reason: "user_authorized_same_edition_revision",
+      actor: "maintenance-test",
+      at: "2026-08-31T13:50:00.000Z",
+    });
+    const retried = applyEditionStateEvent(opened, "revision-opened", {
+      reason: "user_authorized_same_edition_revision",
+      actor: "maintenance-test",
+      at: "2026-08-31T13:51:00.000Z",
+    });
+    expect(retried).toEqual(opened);
+    expect(retried.publication.status).toBe("pending");
+    expect(retried.revisionRequest.status).toBe("open");
+  });
+
   it("rejects revision opening without explicit authorization", () => {
     expect(() => applyEditionStateEvent(publishedState(), "revision-opened", { reason: "retry" }))
       .toThrow("explicit user authorization");
