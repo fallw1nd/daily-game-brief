@@ -15,8 +15,10 @@ import {
   resolveKnownSubjectKey,
 } from "./lib/source-expansion.mjs";
 import { annotateShadowOverlap, summarizeShadowCoverage } from "./lib/shadow-coverage.mjs";
+import { filterSourceRecords } from "./lib/source-record-filter.mjs";
 
 const CONFIG_PATH = resolve("config/news-sources.json");
+const FILTER_CONFIG_PATH = resolve("config/news-source-filters.json");
 const TITLE_REGISTRY_PATH = resolve("config/title-translations.json");
 const LATEST_PATH = resolve("public/data/latest.json");
 const OUTPUT_PATH = resolve(process.env.NEWS_CANDIDATES_PATH || "artifacts/news-candidates.json");
@@ -29,8 +31,9 @@ if (!new Set(["am", "pm", "daily"]).has(period)) {
   throw new Error("Pass --period=am, --period=pm, or --period=daily");
 }
 
-const [config, latest, titleRegistry] = await Promise.all([
+const [config, filterConfig, latest, titleRegistry] = await Promise.all([
   readFile(CONFIG_PATH, "utf8").then(JSON.parse),
+  readFile(FILTER_CONFIG_PATH, "utf8").then(JSON.parse),
   readFile(LATEST_PATH, "utf8").then(JSON.parse),
   readFile(TITLE_REGISTRY_PATH, "utf8").then(JSON.parse),
 ]);
@@ -56,7 +59,13 @@ async function fetchSource(source) {
   const text = await response.text();
   if (Buffer.byteLength(text) > config.maxResponseBytes) throw new Error("response exceeds configured limit");
   const parsed = source.format === "rss" ? parseFeed(text, source) : parseHtmlLinks(text, source);
-  return parsed.slice(0, source.maxCandidates || config.maxCandidatesPerSource).map((item) => ({ ...item, source }));
+  const filtered = filterSourceRecords(parsed, source, filterConfig);
+  return {
+    records: filtered.records
+      .slice(0, source.maxCandidates || config.maxCandidatesPerSource)
+      .map((item) => ({ ...item, source })),
+    filteredCount: filtered.filteredCount,
+  };
 }
 
 async function mapLimit(items, limit, worker) {
@@ -75,7 +84,7 @@ async function mapLimit(items, limit, worker) {
 const fetched = await mapLimit(config.sources, 4, async (source) => {
   const startedAt = Date.now();
   try {
-    const records = await fetchSource(source);
+    const { records, filteredCount } = await fetchSource(source);
     return {
       sourceId: source.id,
       mode: source.mode || "active",
@@ -85,6 +94,7 @@ const fetched = await mapLimit(config.sources, 4, async (source) => {
       publisherFamily: source.publisherFamily || source.independenceKey,
       status: "ok",
       count: records.length,
+      filteredCount,
       durationMs: Date.now() - startedAt,
       records,
     };
@@ -98,6 +108,7 @@ const fetched = await mapLimit(config.sources, 4, async (source) => {
       publisherFamily: source.publisherFamily || source.independenceKey,
       status: "limited",
       count: 0,
+      filteredCount: 0,
       durationMs: Date.now() - startedAt,
       error: error.message,
       records: [],
@@ -194,6 +205,7 @@ const report = {
     healthyActiveSources: activeStats.filter((item) => item.status === "ok").length,
     healthyShadowSources: shadowStats.filter((item) => item.status === "ok").length,
     limitedSources: sourceStats.filter((item) => item.status !== "ok").length,
+    filteredRecords: sourceStats.reduce((sum, item) => sum + Number(item.filteredCount || 0), 0),
     candidates: candidates.length,
     activeCandidates: candidates.length,
     shadowCandidates: shadowCandidates.length,
@@ -218,7 +230,7 @@ await Promise.all([
   writeFile(REPORT_PATH, JSON.stringify(report, null, 2) + "\n"),
 ]);
 
-console.log(`News collection: active=${report.totals.activeCandidates} candidates (A=${report.totals.tierA}, B=${report.totals.tierB}); shadow=${report.totals.shadowCandidates} candidates; limited sources=${report.totals.limitedSources}`);
+console.log(`News collection: active=${report.totals.activeCandidates} candidates (A=${report.totals.tierA}, B=${report.totals.tierB}); shadow=${report.totals.shadowCandidates} candidates; filtered records=${report.totals.filteredRecords}; limited sources=${report.totals.limitedSources}`);
 console.log(`Shadow contribution: window-qualified=${report.totals.shadowReviewableCandidates}; unique=${report.totals.shadowUniqueCandidates}; overlaps-active=${report.totals.shadowOverlappingCandidates}; unknown-time=${report.totals.shadowUnknownTimeCandidates}; overlap-rate=${report.shadowCoverage.overlapRate.toFixed(3)}`);
 console.log(`Sources: active ${report.totals.healthyActiveSources}/${report.totals.activeSources} healthy; shadow ${report.totals.healthyShadowSources}/${report.totals.shadowSources} healthy`);
 console.log(`Report: ${REPORT_PATH}`);
