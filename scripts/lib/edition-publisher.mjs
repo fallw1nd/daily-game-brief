@@ -4,6 +4,7 @@ import {
   resolveSelectedTimeEvidence,
   verifiedWindowTimeError,
 } from "./time-window.mjs";
+import { archiveTitlePrefix, nextEditionAt } from "./edition-window.mjs";
 import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";
 
 export { editorialDecisionDigest };
@@ -14,15 +15,6 @@ function beijingNow(now) {
     hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   }).formatToParts(now).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
-}
-
-function nextEditionAt(window) {
-  if (window.period === "am") return `${window.id.slice(0, 10)} 17:00`;
-  const next = new Date(Date.parse(`${window.id.slice(0, 10)}T00:00:00+08:00`) + 86400000);
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(next);
-  return `${date} 10:10`;
 }
 
 function displayTitle(decision) {
@@ -106,6 +98,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const input = packet.editorialInput;
   const window = input.window;
   if (editorial.editionId !== window.id) throw new Error("editorial editionId does not match packet window");
+  if (window.period === "daily" && editorial.upcomingMode !== "replace") throw new Error("Daily editions require upcomingMode=replace");
   const existingManifestItem = manifest.editions.find((item) => item.id === window.id);
   const decisionDigest = editorialDecisionDigest(editorial);
   const degradedEdition = latest.id === window.id && (
@@ -115,7 +108,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   if (existingManifestItem && !degradedEdition) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
-  const prefix = window.period === "am" ? "早报｜" : "晚报｜";
+  const prefix = archiveTitlePrefix(window.period);
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const counters = new Map();

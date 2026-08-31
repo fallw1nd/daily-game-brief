@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { plannedWindow } from "./lib/news-pipeline.mjs";
+import { EDITION_PERIODS, editionWindowForDate, plannedWindow } from "./lib/edition-window.mjs";
 
 export const MAX_EARLY_RECOVERY_MS = 5 * 60 * 1000;
 
@@ -8,8 +8,8 @@ function cutoffMs(window) {
 }
 
 export function resolvePacketDispatchTarget({ period, edition = "", now = new Date() }) {
-  if (!new Set(["am", "pm"]).has(period)) {
-    throw new Error("period must be am or pm");
+  if (!EDITION_PERIODS.includes(period)) {
+    throw new Error(`period must be one of ${EDITION_PERIODS.join(", ")}`);
   }
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new Error("now must be a valid Date");
@@ -17,12 +17,12 @@ export function resolvePacketDispatchTarget({ period, edition = "", now = new Da
 
   const requested = String(edition || "").trim();
   const targetId = requested || plannedWindow(period, now).id;
-  const match = targetId.match(/^(\d{4}-\d{2}-\d{2})-(am|pm)$/);
+  const match = targetId.match(/^(\d{4}-\d{2}-\d{2})-(am|pm|daily)$/);
   if (!match || match[2] !== period) {
     throw new Error(`edition ${targetId} does not match period ${period}`);
   }
 
-  const window = plannedWindow(period, new Date(`${match[1]}T12:00:00+08:00`));
+  const window = editionWindowForDate(match[1], period);
   if (window.id !== targetId) {
     throw new Error(`invalid edition ${targetId}`);
   }

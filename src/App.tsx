@@ -37,6 +37,7 @@ import type {
   BriefManifest,
   BriefManifestItem,
   BriefSearchIndex,
+  EditionPeriod,
   FactStatus,
   ImageAsset,
   SectionKey,
@@ -81,10 +82,13 @@ const titleStatusLabels = {
 
 const sourceKindLabels = { primary: "一手", secondary: "补充", discovery: "线索" };
 
-const periodLabels = {
+const periodLabels: Record<EditionPeriod, { edition: string; english: string; nextTime: string; nextEdition: string }> = {
   am: { edition: "早报", english: "MORNING", nextTime: "今日 17:00", nextEdition: "游戏晚报" },
   pm: { edition: "晚报", english: "EVENING", nextTime: "明日 10:10", nextEdition: "游戏早报" },
-} as const;
+  daily: { edition: "日报", english: "DAILY", nextTime: "明日 17:00", nextEdition: "游戏日报" },
+};
+
+const periodName = (period: EditionPeriod) => periodLabels[period].edition;
 
 const storySectionDefinitions: Array<{
   id: string;
@@ -113,8 +117,7 @@ const storyTitle = (entry: BriefEntry) =>
   entry.title.title_zh_cn ? "《" + entry.title.title_zh_cn + "》" : entry.title.title_en;
 
 const archiveEditionTitle = (item: BriefManifestItem) =>
-  item.archiveTitle?.trim() ||
-  `${item.period === "am" ? "早报" : "晚报"}｜本期简报`;
+  item.archiveTitle?.trim() || `${periodName(item.period)}｜本期简报`;
 
 function resolveMediaUrl(url: string): string {
   if (/^(https?:|data:|blob:)/.test(url)) return url;
@@ -221,7 +224,6 @@ function PendingMark({ tracking }: Pick<BriefEntry, "tracking">) {
   if (tracking !== true) return null;
   return <span className="pending-mark">{"\u4ecd\u5f85\u786e\u8ba4"}</span>;
 }
-
 
 function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
@@ -430,6 +432,7 @@ function App({
 
   const sourceReport = edition.sourceReport ?? fallbackSourceReport;
   const period = periodLabels[edition.period];
+  const hasDailyHistory = manifest?.editions.some((item) => item.period === "daily") ?? edition.period === "daily";
 
   const visibleStorySections = storySectionDefinitions
     .map((definition) => ({
@@ -469,6 +472,7 @@ function App({
   const pageTitle = edition.archiveTitle?.trim() ||
     manifestEdition?.archiveTitle?.trim() ||
     `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
+  const nextEditionDisplay = nextManifestEdition?.plannedAt || period.nextTime;
 
   const directoryItems = [
     ...visibleStorySections.map((section) => ({
@@ -702,7 +706,7 @@ function App({
             <div><dt>信息窗口</dt><dd>{timeOnly(edition.windowStart)}-{timeOnly(edition.windowEnd)}</dd></div>
             <div><dt>计划运行</dt><dd>{edition.plannedAt}</dd></div>
             <div><dt>实际生成</dt><dd>{edition.generatedAt}</dd></div>
-            <div><dt>下一期</dt><dd>{period.nextTime}</dd></div>
+            <div><dt>下一期</dt><dd>{nextEditionDisplay}</dd></div>
           </dl>
         </section>
 
@@ -765,18 +769,17 @@ function App({
                 nextBoundary="已是最新一期"
                 previous={previousManifestEdition ? {
                   href: editionHref(previousManifestEdition.id),
-                  issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + (previousManifestEdition.period === "am" ? "早报" : "晚报"),
+                  issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + periodName(previousManifestEdition.period),
                   title: archiveEditionTitle(previousManifestEdition),
                 } : undefined}
                 next={nextManifestEdition ? {
                   href: editionHref(nextManifestEdition.id),
-                  issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + (nextManifestEdition.period === "am" ? "早报" : "晚报"),
+                  issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + periodName(nextManifestEdition.period),
                   title: archiveEditionTitle(nextManifestEdition),
                 } : undefined}
               />
             </section>
           )}
-
 
           <section className="editorial-section source-report" id="source-report" aria-labelledby="source-report-title">
             <SectionHeader
@@ -797,7 +800,7 @@ function App({
           <header>
             <span>{archiveNumber}</span>
             <div>
-              <h2 id="archive-title">往期早晚报</h2>
+              <h2 id="archive-title">{hasDailyHistory ? "往期简报" : "往期早晚报"}</h2>
               <p>
                 {manifest
                   ? "已归档" + manifest.editions.length + "期，可按期次浏览或跨期检索新闻。"
@@ -817,7 +820,6 @@ function App({
               </div>
             </label>
           </header>
-
           {archiveError && <p className="archive-status">{archiveError}</p>}
 
           {query.trim() && (
@@ -831,7 +833,7 @@ function App({
                   <a key={item.editionId + item.entryId} href={editionHref(item.editionId, item.entryId)}>
                     <span className="archive-result__issue">
                       NO.{String(item.issueNumber).padStart(3, "0")}
-                      <small>{item.date} · {item.period === "am" ? "早报" : "晚报"}</small>
+                      <small>{item.date} · {periodName(item.period)}</small>
                     </span>
                     <span className="archive-result__copy">
                       <small>{item.titleZhCn || item.titleEn}</small>
@@ -897,18 +899,17 @@ function App({
             )}
           </section>
         </section>
-
       </main>
 
       <footer className="site-footer">
         <div className="footer-identity">
           <div className="brand"><span>游戏圈动态</span><small>DAILY GAME BRIEF</small></div>
-          <p>每天两次，整理值得核验的游戏行业动态。</p>
+          <p>{hasDailyHistory ? "每日整理值得核验的游戏行业动态。" : "每天两次，整理值得核验的游戏行业动态。"}</p>
         </div>
         <div className="footer-meta">
           <span>编辑与维护</span>
           <strong>Fallw1nd-津秋</strong>
-          <small>北京时间 10:10 / 17:00 更新</small>
+          <small>{hasDailyHistory ? "北京时间 17:00 更新" : "北京时间 10:10 / 17:00 更新"}</small>
         </div>
         <div className="footer-metrics" aria-label="简报归档规模">
           <span><strong>{manifest?.editions.length ?? "-"}</strong> 期归档</span>

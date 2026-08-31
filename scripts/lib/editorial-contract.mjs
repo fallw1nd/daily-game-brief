@@ -3,6 +3,7 @@ import {
   resolveSelectedTimeEvidence,
   verifiedWindowTimeError,
 } from "./time-window.mjs";
+import { englishArchiveTitlePrefix } from "./edition-window.mjs";
 import { validateJsonSchema } from "./json-schema.mjs";
 
 const sections = ["releases", "reviews", "news", "industry", "features", "rumors", "observations"];
@@ -216,7 +217,9 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
   for (const item of trackingQueue) usedChars += JSON.stringify(item).length;
   if (usedChars > maxChars) throw new Error("active tracking queue exceeds the editorial input budget");
 
-  for (const item of evidenceItems) {
+  let omitted = [];
+  for (let itemIndex = 0; itemIndex < evidenceItems.length; itemIndex += 1) {
+    const item = evidenceItems[itemIndex];
     const sources = (item.sources || []).flatMap((source, sourceIndex) => {
       if (source.status !== "opened" || !source.evidenceText) return [];
       return [{
@@ -266,6 +269,9 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
     const size = JSON.stringify(compact).length;
     if (usedChars + size > maxChars) {
       if (activeKeys.has(item.eventKey)) throw new Error(`active tracking evidence exceeds the editorial input budget: ${item.eventKey}`);
+      omitted = evidenceItems.slice(itemIndex).filter((candidate) =>
+        (candidate.sources || []).some((source) => source.status === "opened" && source.evidenceText)
+      );
       break;
     }
     packages.push(compact);
@@ -282,6 +288,13 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
       usedInputChars: usedChars,
       estimatedInputTokens: Math.ceil(usedChars / 4),
       activeTrackingItems: activeTracking.length,
+      candidateItems: evidenceItems.length,
+      includedItems: packages.length,
+      omittedItems: omitted.length,
+      omittedTierA: omitted.filter((item) => item.tier === "A").length,
+      omittedTierB: omitted.filter((item) => item.tier === "B").length,
+      omittedTierAEventKeys: omitted.filter((item) => item.tier === "A").map((item) => item.eventKey),
+      omissionReason: omitted.length ? "character_budget" : null,
     },
   };
 }
@@ -312,8 +325,11 @@ export function validateEnglishEditorialLocale(output) {
   const requiredText = [en.archiveTitle, ...(en.entries || []).flatMap((item) => [item.headline, item.summary, item.verification, item.timeNote])];
   if (requiredText.some((value) => typeof value !== "string" || !value.trim())) errors.push("English locale required text must be non-empty");
   if (requiredText.some(hasSubstantialChinese)) errors.push("English locale required text must not contain substantial Chinese fallback copy");
-  const prefix = output.editionId?.endsWith("-pm") ? "Evening Brief |" : "Morning Brief |";
-  if (!String(en.archiveTitle || "").startsWith(prefix)) errors.push(`locales.en.archiveTitle must start with ${prefix}`);
+  const period = output.editionId?.match(/-(am|pm|daily)$/)?.[1];
+  if (period) {
+    const prefix = englishArchiveTitlePrefix(period);
+    if (!String(en.archiveTitle || "").startsWith(prefix)) errors.push(`locales.en.archiveTitle must start with ${prefix}`);
+  }
   if (en.sourceReport !== null && en.sourceReport !== undefined) {
     if (!Array.isArray(en.sourceReport.checked) || !Array.isArray(en.sourceReport.limited) || typeof en.sourceReport.note !== "string") {
       errors.push("locales.en.sourceReport must be complete when present");
@@ -328,6 +344,8 @@ export function validateEditorialOutput(output, input) {
   const allowedKeys = new Set([...input.packages.map((item) => item.eventKey), ...(input.trackingQueue || []).map((item) => item.eventKey)]);
   errors.push(...validateJsonSchema(output, editorialSchema));
   if (output.contractVersion !== 2) errors.push("output.contractVersion must be 2");
+  if (output.editionId !== input.window?.id) errors.push("output.editionId must match the immutable packet window");
+  if (input.window?.period === "daily" && output.upcomingMode !== "replace") errors.push("Daily editions require upcomingMode=replace");
   const seen = new Set();
   for (const [index, item] of output.decisions.entries()) {
     const context = `decisions[${index}]`;

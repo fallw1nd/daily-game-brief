@@ -1,34 +1,11 @@
-function previousDate(date) {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day) - 86400000).toISOString().slice(0, 10);
-}
+import { expectedEditorialWindow } from "./edition-window.mjs";
 
-export function expectedEditorialWindow(editionId) {
-  const match = String(editionId || "").match(/^(\d{4}-\d{2}-\d{2})-(am|pm)$/);
-  if (!match) return null;
-  const [, date, period] = match;
-  if (period === "am") {
-    return {
-      id: editionId,
-      period,
-      plannedAt: `${date} 10:10`,
-      windowStart: `${previousDate(date)} 17:00`,
-      windowEnd: `${date} 10:10`,
-    };
-  }
-  return {
-    id: editionId,
-    period,
-    plannedAt: `${date} 17:00`,
-    windowStart: `${date} 10:10`,
-    windowEnd: `${date} 17:00`,
-  };
-}
+export { expectedEditorialWindow };
 
 export function validateFinalizedEditorialPacket(packet, { editionId, period } = {}) {
   const errors = [];
   const expected = expectedEditorialWindow(editionId);
-  if (!expected) return ["expected edition ID must match YYYY-MM-DD-am|pm"];
+  if (!expected) return ["expected edition ID must match YYYY-MM-DD-am|pm|daily"];
   if (period && period !== expected.period) errors.push(`expected period ${period} does not match edition ${editionId}`);
   if (!packet || typeof packet !== "object") return [...errors, "packet must be an object"];
 

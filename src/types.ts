@@ -6,6 +6,7 @@ export type FactStatus =
   | "unconfirmed";
 export type TimeStatus = "verified" | "date_only" | "time_unverified";
 export type Locale = "zh-CN" | "en";
+export type EditionPeriod = "am" | "pm" | "daily";
 export type EntryFlag = "supplement" | "rumor" | "corrected" | "region_difference" | "platform_difference";
 export type SectionKey = "focus" | "releases" | "reviews" | "news" | "industry" | "features" | "rumors" | "observations" | "upcoming" | "tracking" | "search-report";
 
@@ -30,11 +31,11 @@ export interface UpcomingEntry {
 }
 export interface SourceReport { checked: string[]; limited: string[]; note: string; }
 export interface BriefEdition {
-  schemaVersion?: 1 | 2; archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: "am" | "pm"; plannedAt: string;
+  schemaVersion?: 1 | 2; archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: EditionPeriod; plannedAt: string;
   generatedAt: string; windowStart: string; windowEnd: string; timezone: "Asia/Shanghai"; nextEditionAt: string; revised: boolean; entries: BriefEntry[];
   upcoming: UpcomingEntry[]; tracking: string[]; sourceReport?: SourceReport;
 }
-export interface BriefManifestItem { archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: "am" | "pm"; plannedAt?: string; generatedAt: string; revised: boolean; path: string; }
+export interface BriefManifestItem { archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: EditionPeriod; plannedAt?: string; generatedAt: string; revised: boolean; path: string; }
 export interface BriefManifest { schemaVersion: 1; updatedAt: string; latest: string; editions: BriefManifestItem[]; }
 
 export interface EnglishSourceLabel { sourceIndex: number; label: string; }
@@ -54,13 +55,13 @@ export type EnglishLocaleAvailability =
 export interface EnglishLocaleIndex { schemaVersion: 1; locale: "en"; updatedAt: string; latestCanonicalEditionId: string; latestAvailableEditionId: string | null; editions: EnglishLocaleAvailability[]; }
 
 export interface BriefSearchEntry {
-  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: "am" | "pm"; entryId: string; titleZhCn?: string; titleEn: string;
+  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: EditionPeriod; entryId: string; titleZhCn?: string; titleEn: string;
   headline: string; summary: string; platforms: string[]; region: string; factStatus: FactStatus;
 }
 export interface BriefSearchIndex { schemaVersion: 1; updatedAt: string; entries: BriefSearchEntry[]; }
 export interface BriefSearchCopy { subject: string; headline: string; summary: string; }
 export interface BriefSearchItemV2 {
-  editionId: string; entryId: string; issue: number; date: string; period: "am" | "pm"; section: SectionKey; tracking: boolean; availableLocales: Locale[];
+  editionId: string; entryId: string; issue: number; date: string; period: EditionPeriod; section: SectionKey; tracking: boolean; availableLocales: Locale[];
   titleKey: string; titleZhCn?: string; titleEn: string; copy: { "zh-CN": BriefSearchCopy; en?: BriefSearchCopy; }; platforms: string[]; region: string;
   factStatus: FactStatus; titleStatus?: GameTitle["title_zh_status"];
 }
