@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
 
 const INPUT_PATH = resolve(process.env.NEWS_SHADOW_REPORT_PATH || "artifacts/news-shadow-report.json");
@@ -133,13 +134,9 @@ const [report, sourceConfig] = await Promise.all([
   readFile(SOURCE_CONFIG_PATH, "utf8").then((text) => JSON.parse(text)),
 ]);
 const sourceById = new Map(sourceConfig.sources.map((source) => [source.id, source]));
-const selectedCandidates = report.reviewQueue.slice(0, MAX_CANDIDATES);
-const omittedCandidates = report.reviewQueue.slice(MAX_CANDIDATES).map((candidate) => ({
-  eventKey: candidate.eventKey,
-  tier: candidate.tier || null,
-  score: candidate.score ?? null,
-  reason: "evidence_candidate_limit",
-}));
+const candidateBudget = selectEvidenceCandidates(report.reviewQueue, MAX_CANDIDATES);
+const selectedCandidates = candidateBudget.selected;
+const omittedCandidates = candidateBudget.omissions;
 
 const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
   const appearances = candidate.appearances.slice(0, 3);
@@ -181,11 +178,7 @@ const output = {
   adjacentEdition: report.adjacentEdition,
   limits: { candidatePackages: MAX_CANDIDATES, sourcesPerCandidate: 3, evidenceCharsPerSource: MAX_EVIDENCE_CHARS },
   totals: {
-    reviewQueueCandidates: report.reviewQueue.length,
-    selectedCandidates: selectedCandidates.length,
-    omittedByCandidateLimit: omittedCandidates.length,
-    omittedTierA: omittedCandidates.filter((item) => item.tier === "A").length,
-    omittedTierB: omittedCandidates.filter((item) => item.tier === "B").length,
+    ...candidateBudget.telemetry,
     packages: packages.length,
     primaryPlusIndependent: packages.filter((item) => item.readiness === "primary-plus-independent").length,
     needsIndependentReport: packages.filter((item) => item.readiness === "needs-independent-report").length,
