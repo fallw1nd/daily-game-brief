@@ -9,6 +9,8 @@ const publicationStatuses = new Set(["pending", "committed", "failed"]);
 const publicationSources = new Set(["editorial", "degraded"]);
 const optionalStatuses = new Set(["pending", "available", "partial", "unavailable", "failed"]);
 const deploymentStatuses = new Set(["pending", "deployed", "failed"]);
+const revisionStatuses = new Set(["open", "completed"]);
+const revisionReason = "user_authorized_same_edition_revision";
 
 export function gitBlobSha(content) {
   const buffer = Buffer.isBuffer(content) ? content : Buffer.from(String(content));
@@ -43,6 +45,7 @@ export function createEditionState(editionId, at = new Date().toISOString()) {
     localeEn: emptyLane("pending"),
     media: emptyLane("pending"),
     retry: { owner: "github-orchestrator", attempt: 0, updatedAt: at },
+    revisionRequest: null,
     revision: 0,
     transitions: [],
   };
@@ -73,8 +76,20 @@ export function validateEditionState(state) {
     ["state.publication.mainSha", state.publication?.mainSha],
   ]) {
     try { if (value !== null) assertSha(value, name); } catch (error) { errors.push(error.message); }
+  }
   if (!optionalStatuses.has(state.localeEn?.status)) errors.push("state.localeEn.status is invalid");
   if (!optionalStatuses.has(state.media?.status)) errors.push("state.media.status is invalid");
+  if (state.revisionRequest != null) {
+    if (typeof state.revisionRequest !== "object") errors.push("state.revisionRequest must be null or an object");
+    else {
+      if (!revisionStatuses.has(state.revisionRequest.status)) errors.push("state.revisionRequest.status is invalid");
+      if (state.revisionRequest.reason !== revisionReason) errors.push("state.revisionRequest.reason is invalid");
+      try { assertSha(state.revisionRequest.previousMainSha, "state.revisionRequest.previousMainSha"); } catch (error) { errors.push(error.message); }
+      if (typeof state.revisionRequest.openedAt !== "string" || !state.revisionRequest.openedAt) errors.push("state.revisionRequest.openedAt is required");
+      if (state.revisionRequest.status === "completed" && (typeof state.revisionRequest.completedAt !== "string" || !state.revisionRequest.completedAt)) {
+        errors.push("completed revisionRequest requires completedAt");
+      }
+    }
   }
   if (!Number.isInteger(state.revision) || state.revision < 0) errors.push("state.revision must be a non-negative integer");
   if (!Array.isArray(state.transitions)) errors.push("state.transitions must be an array");
@@ -103,6 +118,29 @@ export function applyEditionStateEvent(current, event, data = {}) {
   const initialErrors = validateEditionState(state);
   if (initialErrors.length) throw new Error(`invalid prior edition state: ${initialErrors.join("; ")}`);
 
+  if (event === "revision-opened") {
+    if (!current) throw new Error("same-edition revision requires an existing durable state");
+    if (data.reason !== revisionReason) throw new Error("same-edition revision requires explicit user authorization");
+    if (state.publication.status !== "committed") throw new Error("same-edition revision requires an already committed publication");
+    const previousMainSha = state.deployment.mainSha || state.publication.mainSha;
+    assertSha(previousMainSha, "previousMainSha");
+    if (state.revisionRequest?.status === "open") return state;
+    state.packet = { status: "pending", blobSha: null, producerRunId: null, completedAt: null };
+    state.editorial = { status: "pending", packetBlobSha: null, submissionSha: null, validationErrors: [], updatedAt: at };
+    state.publication = { status: "pending", mainSha: null, source: null, updatedAt: at, error: null };
+    state.deployment = { status: "pending", mainSha: null, runId: null, updatedAt: at, error: null };
+    state.localeEn = emptyLane("pending");
+    state.media = emptyLane("pending");
+    state.retry.attempt = 0;
+    state.revisionRequest = {
+      status: "open",
+      reason: revisionReason,
+      previousMainSha,
+      openedAt: at,
+      completedAt: null,
+    };
+    return record(state, event, at, actor, runId, { reason: revisionReason, previousMainSha });
+  }
   if (event === "packet-ready") {
     assertSha(data.packetBlobSha, "packetBlobSha");
     if (["submitted", "invalid", "valid", "timed_out"].includes(state.editorial.status) && state.packet.blobSha !== data.packetBlobSha) throw new Error("cannot replace a packet after editorial consumption");
@@ -153,6 +191,9 @@ export function applyEditionStateEvent(current, event, data = {}) {
     if (state.publication.status === "committed" && state.publication.mainSha === data.mainSha) return state;
     state.publication = { status: "committed", mainSha: data.mainSha, source, updatedAt: at, error: null };
     state.deployment.mainSha = data.mainSha;
+    if (state.revisionRequest?.status === "open") {
+      state.revisionRequest = { ...state.revisionRequest, status: "completed", completedAt: at };
+    }
     return record(state, event, at, actor, runId, { mainSha: data.mainSha, source });
   }
   if (event === "publication-failed") {
