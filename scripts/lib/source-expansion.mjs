@@ -65,7 +65,7 @@ export function candidateLane(candidate) {
   const capabilities = source.capabilities || [];
   const headline = candidate.headline || "";
 
-  if (capabilities.includes("awards") || awardPattern.test(headline)) return "awards";
+  if (source.defaultLane === "awards" || awardPattern.test(headline)) return "awards";
   if (capabilities.includes("interviews") && interviewPattern.test(headline)) return "interviews";
   if (capabilities.includes("reviews") && reviewPattern.test(headline)) return "reviews";
   if (capabilities.includes("rumors") && rumorPattern.test(headline)) return "rumors";
