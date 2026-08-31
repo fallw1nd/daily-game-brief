@@ -7,7 +7,7 @@ The Daily discovery system separates **where an item is discovered** from **what
 - `active`: may contribute candidates to the production review queue and evidence packet.
 - `shadow`: fetched and measured on the production runner, but excluded from the production review queue, event ledger, evidence packet, editorial packet, and Canonical publication.
 
-A source is promoted from `shadow` to `active` only after real GitHub-runner observations show acceptable availability, parser stability, candidate yield, duplicate/noise rate, and editorial usefulness.
+A source is promoted from `shadow` to `active` only after real GitHub-runner observations show acceptable availability, parser stability, candidate yield, duplicate/noise rate, and editorial usefulness. Static CI proves contract safety but never counts as source activation evidence.
 
 ## Reliability roles
 
