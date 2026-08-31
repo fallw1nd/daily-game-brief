@@ -2,10 +2,8 @@ name: Brief publication SLA watchdog
 
 on:
   schedule:
-    # Legacy production schedule remains unchanged during Daily precutover.
-    # 11:00 and 17:50 Asia/Shanghai; leaves normal editorial publication headroom before fallback.
+    # Daily publication SLA: 11:00 Asia/Shanghai.
     - cron: "0 3 * * *"
-    - cron: "50 9 * * *"
   workflow_dispatch:
     inputs:
       period:
@@ -27,8 +25,8 @@ permissions:
   actions: write
 
 concurrency:
-  # Exact-edition recovery must not cancel another recovery run for the same period.
-  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.edition || (github.event.schedule == '0 3 * * *' && 'scheduled-am' || 'scheduled-pm') }}
+  # Exact-edition recovery must not cancel another recovery run.
+  group: brief-sla-watchdog-${{ github.event_name == 'workflow_dispatch' && inputs.edition || 'scheduled-daily' }}
   cancel-in-progress: false
 
 jobs:
@@ -58,11 +56,7 @@ jobs:
               --period="$period" \
               --edition="${{ inputs.edition }}" >> "$GITHUB_OUTPUT"
           else
-            if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
-              period="am"
-            else
-              period="pm"
-            fi
+            period="daily"
             state_dir="$RUNNER_TEMP/sla-state-selection"
             git worktree add --detach "$state_dir" origin/automation/state
             node scripts/resolve-due-edition.mjs \
