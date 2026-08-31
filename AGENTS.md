@@ -33,7 +33,7 @@ Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use war
 
 ## Archive Titles, Themes & Search
 
-Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实` or `晚报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报` or `游戏晚报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
+Every manifest item needs a distinctive `archiveTitle` matching its period: `早报｜本期重磅事实`, `晚报｜本期重磅事实`, or `日报｜本期重磅事实`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to a generic edition label when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
 
 Maintain accessible dark/light themes with persistent keyboard-operable switching. Hide empty departments from content, directories, and top-level links. Archive rows represent editions; cross-edition search links results to their source edition and entry anchor.
 
@@ -44,6 +44,12 @@ Keep top navigation to `内容`, `日历`, and `归档`. Use `DAILY EDITION` as 
 Each new v2 story and upcoming game must provide verified media or an explicit unavailable reason. Use `images`/`cover` only with meaningful Chinese `alt`, `credit`, HTTPS `sourceUrl`, `kind`, and an optional `aspect`; otherwise set `image_status`/`cover_status` to `unavailable` with a specific note. Never force an unrelated image. Prefer traceable WebP/JPEG files below 500 KB under `public/media/briefs/YYYY/MM/<edition-id>/`. Keep news at 16:9. For covers prefer PSN Hong Kong square, Nintendo eShop Japan square, then Xbox Store rectangle; preserve the verified source ratio as `square`, `portrait`, or `landscape`.
 
 Storefronts are preferred discovery sources, not shape requirements. After listed sources fail, use configured web image search and accept square, portrait, or landscape covers when the game match and source page are clear. Keep cover credit and `sourceUrl` in data, but do not render a visible source caption on cover art.
+
+## Daily Edition Precutover Compatibility
+
+`daily` is a supported edition period for compatibility and manual recovery testing. Its ID is `YYYY-MM-DD-daily`, its fixed window is the previous day 17:00 exclusive through the edition date 17:00 inclusive, its Canonical archive remains schemaVersion 2, its Chinese title prefix is `日报｜`, its English title prefix is `Daily Brief |`, and its upcoming mode is `replace`.
+
+Precutover compatibility does not authorize production cadence changes. Until an explicit cutover is approved, scheduled production remains the legacy AM/PM cadence, historical archives remain immutable, external ChatGPT Scheduled Tasks remain unchanged, and no first Daily Canonical may be published. Formal cutover and rollback rules live in `docs/DAILY_EDITION_MIGRATION.md`.
 
 ## Maintenance Ledger
 
