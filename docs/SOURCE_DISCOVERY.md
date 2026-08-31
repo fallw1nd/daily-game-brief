@@ -78,4 +78,4 @@ Before changing a source from `shadow` to `active`, inspect at least:
 7. Whether the source should establish evidence (`high`/`primary`) or remain discovery-only.
 8. Whether source-specific filters are needed before activation.
 
-Do not promote sources merely to increase source count.
+Do not promote sources merely to increase source count. The first activation review should use at least one real Daily collector result from the production runner, and preferably several consecutive runs before changing high-volume or mixed-content sources.
