@@ -105,6 +105,33 @@ function upcomingEntry(item, previous) {
   };
 }
 
+function entryMedia(previous, imageSeed) {
+  if (previous?.image_status === "verified" && Array.isArray(previous.images) && previous.images.length) {
+    return {
+      imageSeed,
+      images: previous.images,
+      image_status: "verified",
+      ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),
+    };
+  }
+  return {
+    imageSeed,
+    image_status: "unavailable",
+    imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",
+  };
+}
+
+function sectionCounters(entries, windowId) {
+  const counters = new Map();
+  for (const entry of entries || []) {
+    const match = String(entry.id || "").match(new RegExp(`^${windowId}-(.+)-(\\d+)$`));
+    if (!match) continue;
+    const [, section, rawIndex] = match;
+    counters.set(section, Math.max(counters.get(section) || 0, Number(rawIndex) + 1));
+  }
+  return counters;
+}
+
 export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false }) {
   const input = packet.editorialInput;
   const window = input.window;
@@ -127,9 +154,11 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const prefix = archiveTitlePrefix(window.period);
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
-  const counters = new Map();
+  const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
+  const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
+  const counters = sectionCounters(previousEntries, window.id);
   const entryByEvent = new Map();
-  const entries = editorial.decisions.filter((item) => item.decision === "include").map((decision) => {
+  const revisedEntries = editorial.decisions.filter((item) => item.decision === "include").map((decision) => {
     const packetItem = packetByKey.get(decision.eventKey);
     if (!packetItem && !(decision.additionalSources || []).length) throw new Error(`included ${decision.eventKey} has no packet evidence`);
     const sources = sourcesFor(decision, packetItem);
@@ -146,11 +175,12 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       });
       if (timeError) throw new Error(`included ${decision.eventKey}: ${timeError}`);
     }
-    const index = counters.get(decision.section) || 0;
-    counters.set(decision.section, index + 1);
-    const id = `${window.id}-${decision.section}-${index}`;
-    entryByEvent.set(decision.eventKey, id);
     const title = displayTitle(decision);
+    const previous = authorizedLatestRevision ? previousByTitleKey.get(title.title_key) : null;
+    const index = counters.get(decision.section) || 0;
+    const id = previous?.id || `${window.id}-${decision.section}-${index}`;
+    if (!previous) counters.set(decision.section, index + 1);
+    entryByEvent.set(decision.eventKey, id);
     return {
       id,
       section: decision.section,
@@ -170,14 +200,22 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       entry_flags: decision.entryFlags,
       tracking: decision.tracking,
       ...(decision.sharedFactFrame ? { sharedFactFrameDigest: projectionDigest(decision.sharedFactFrame) } : {}),
-      imageSeed: decision.titleKey,
-      image_status: "unavailable",
-      imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",
+      ...entryMedia(previous, decision.titleKey),
     };
   });
+  const revisedByTitleKey = new Map(revisedEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
+  const existingTitleKeys = new Set(previousEntries.flatMap((entry) => entry.title?.title_key ? [entry.title.title_key] : []));
+  const entries = authorizedLatestRevision
+    ? [
+        ...previousEntries.map((entry) => revisedByTitleKey.get(entry.title?.title_key) || entry),
+        ...revisedEntries.filter((entry) => !existingTitleKeys.has(entry.title?.title_key)),
+      ]
+    : revisedEntries;
   if (!entries.length) throw new Error("an edition needs at least one included entry");
   const removeIds = new Set(editorial.removeUpcomingIds || []);
-  const baseUpcoming = editorial.upcomingMode === "replace" ? [] : (latest.upcoming || []);
+  const baseUpcoming = authorizedLatestRevision
+    ? (latest.upcoming || [])
+    : editorial.upcomingMode === "replace" ? [] : (latest.upcoming || []);
   const upcomingMap = new Map(baseUpcoming.filter((item) => !removeIds.has(item.id)).map((item) => [item.id, item]));
   const previousUpcoming = latest.upcoming || [];
   for (const item of editorial.upcoming || []) {
@@ -208,7 +246,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     revised: Boolean(existingManifestItem),
     entries,
     upcoming,
-    tracking: [],
+    tracking: authorizedLatestRevision ? (latest.tracking || []) : [],
     schemaVersion: 2,
     sourceReport: {
       checked: ["程序化来源注册表、事件账本与受限证据包", ...(editorial.checkedExtra || [])],
@@ -224,8 +262,8 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         bLevelIncluded: included.filter((item) => packetByKey.get(item.eventKey)?.tier === "B").length,
         cLevelExcluded: 0,
         trackingOpened: included.filter((item) => item.tracking).length,
-        imageVerifiedEntries: 0,
-        imageUnavailableEntries: entries.length,
+        imageVerifiedEntries: entries.filter((item) => item.image_status === "verified").length,
+        imageUnavailableEntries: entries.filter((item) => item.image_status !== "verified").length,
       },
       note: editorial.editorialNote,
       editorialDecisionDigest: decisionDigest,
