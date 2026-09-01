@@ -17,9 +17,26 @@ describe("source record filters", () => {
     expect(result.records.map((item) => item.headline)).toEqual(["新作ゲームの発売日が正式発表"]);
   });
 
+  it("keeps direct IGN reviews while excluding commerce-only feed items", () => {
+    const source = byId.get("ign-games");
+    const result = filterSourceRecords([
+      { headline: "Onimusha: Way of the Sword Review", url: "https://www.ign.com/articles/onimusha-way-of-the-sword-review" },
+      { headline: "The Blood of Dawnwalker Review", url: "https://www.ign.com/articles/the-blood-of-dawnwalker-review" },
+      { headline: "Best Buy Is Dropping Prices on 2026 Games in Its Labor Day Sale", url: "https://www.ign.com/articles/best-buy-game-deals" },
+      { headline: "Grab a Physical Copy for $10 Off Ahead of Launch", url: "https://www.ign.com/articles/pre-order-game-deal" },
+    ], source, filters);
+    expect(result.filteredCount).toBe(2);
+    expect(result.records.map((item) => item.headline)).toEqual([
+      "Onimusha: Way of the Sword Review",
+      "The Blood of Dawnwalker Review",
+    ]);
+  });
+
   it("allows a bounded filter to remain attached when a source is selectively promoted", () => {
     expect(byId.get("4gamer-topics")?.mode).toBe("active");
     expect(filters.sources["4gamer-topics"]).toBeTruthy();
+    expect(byId.get("ign-games")?.mode).toBe("shadow");
+    expect(filters.sources["ign-games"]).toBeTruthy();
     for (const id of ["denfaminico", "pcgamer-news"]) {
       expect(byId.get(id)?.mode).toBe("shadow");
       expect(filters.sources[id]).toBeTruthy();
