@@ -11,9 +11,17 @@ describe("authorized same-edition revision workflow", () => {
     expect(packetWorkflow).toContain('"$edition" revision-opened');
     expect(packetWorkflow).toContain("--reason=user_authorized_same_edition_revision");
     expect(packetWorkflow).toContain('state.revisionRequest?.status !== "open"');
-    expect(packetWorkflow).toContain('state.packet?.status !== "pending"');
+    expect(packetWorkflow).toContain('state.editorial?.status !== "pending"');
+    expect(packetWorkflow).toContain('state.packet?.status === "pending" || state.packet?.status === "ready"');
+    expect(packetWorkflow).toContain("!packetRefreshable");
     expect(packetWorkflow).toContain("revision_authorized: ${{ steps.edition.outputs.revision_authorized }}");
     expect(packetWorkflow).toContain("needs.collect.outputs.revision_authorized != 'true'");
+  });
+
+  it("allows evidence refresh only before editorial consumption", () => {
+    expect(packetWorkflow).toContain('const packetRefreshable = state.packet?.status === "pending" || state.packet?.status === "ready";');
+    expect(packetWorkflow).toContain('state.editorial?.status !== "pending" || !packetRefreshable');
+    expect(packetWorkflow).not.toContain('state.packet?.status !== "pending") throw new Error(`durable revision authorization is not open');
   });
 
   it("binds publication replacement to the open durable revision and exact immutable packet", () => {
