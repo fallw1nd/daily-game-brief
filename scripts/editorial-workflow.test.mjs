@@ -24,7 +24,8 @@ describe("final editorial packet workflow", () => {
     expect(workflow).toContain('wake.period !== "daily"');
     expect(workflow).toContain('new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"])');
     expect(workflow).toContain('state.revisionRequest?.status !== "open"');
-    expect(workflow).toContain('state.packet?.status !== "pending"');
+    expect(workflow).toContain('state.editorial?.status !== "pending"');
+    expect(workflow).toContain('state.packet?.status === "pending" || state.packet?.status === "ready"');
     expect(workflow).toContain('--edition="$edition"');
     expect(workflow).toContain("steps.edition.outcome == 'success'");
   });
