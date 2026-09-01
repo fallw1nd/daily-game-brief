@@ -8,6 +8,13 @@ const reviewPattern = /\b(?:review|reviews|hands-on|impressions)\b|评测|试玩
 const rumorPattern = /\b(?:rumou?r|leak|leaked|insider)\b|传闻|爆料|泄漏|泄露|リーク/i;
 const industryPattern = /\b(?:industry|business|earnings|revenue|acquisition|layoff|lawsuit|policy|regulation|publisher|studio closure)\b|行业|产业|业界|财报|营收|收购|裁员|诉讼|监管|发行商|工作室关闭/i;
 const releasePattern = /\b(?:release date|launch date|launches|available now|released)\b|发售日|上线|现已推出|定档|発売日|配信開始/i;
+const platformSubjectRules = [
+  {
+    key: "state-of-play",
+    sourceKeys: new Set(["sony-interactive-entertainment"]),
+    pattern: /\bstate of play\b/i,
+  },
+];
 
 function addAlias(index, value, titleKey) {
   const normalized = normalizeHeadline(value || "");
@@ -28,7 +35,7 @@ export function buildTitleAliasIndex(registry = {}) {
   return index;
 }
 
-export function resolveKnownSubjectKey(headline, aliasIndex) {
+export function resolveKnownSubjectKey(headline, aliasIndex, source = null) {
   const normalized = normalizeHeadline(headline || "");
   if (!normalized) return null;
   const aliases = [...aliasIndex.entries()]
@@ -36,6 +43,10 @@ export function resolveKnownSubjectKey(headline, aliasIndex) {
     .sort((a, b) => b[0].length - a[0].length);
   for (const [alias, titleKey] of aliases) {
     if (normalized === alias || normalized.includes(alias)) return titleKey;
+  }
+  const sourceKey = source?.independenceKey || source?.publisherFamily || null;
+  for (const rule of platformSubjectRules) {
+    if (sourceKey && rule.sourceKeys.has(sourceKey) && rule.pattern.test(normalized)) return rule.key;
   }
   return null;
 }
