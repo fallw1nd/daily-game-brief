@@ -36,7 +36,7 @@ async function fetchHtml(input) {
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
     const location = response.headers.get("location");
     if (!location) throw new Error("redirect is missing a location");
-    url = await safeUrl(new URL(location, url).href;
+    url = await safeUrl(new URL(location, url).href);
     if (redirects === 5) throw new Error("too many redirects");
   }
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
