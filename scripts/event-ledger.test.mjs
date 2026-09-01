@@ -31,6 +31,51 @@ describe("persistent event ledger", () => {
     expect(second.totals.recurring).toBe(1);
   });
 
+  it("does not claim an edition window for outside or prior-audit observations", () => {
+    const outside = updateLedger({
+      generatedAt: "2026-08-31T14:54:08.656Z",
+      window: { id: "2026-08-31-daily" },
+      candidates: [{
+        ...candidate,
+        eventKey: "state-of-play",
+        subjectKey: "state-of-play",
+        headline: "State of Play returns",
+        publishedAt: "2026-08-31T12:13:52.000Z",
+        timeRelation: "outside",
+      }],
+    });
+    expect(outside.events["state-of-play"].windowsSeen).toEqual([]);
+
+    const inWindow = updateLedger({
+      generatedAt: "2026-09-01T02:20:00.000Z",
+      window: { id: "2026-09-01-daily" },
+      candidates: [{
+        ...candidate,
+        eventKey: "state-of-play",
+        subjectKey: "state-of-play",
+        headline: "State of Play returns",
+        publishedAt: "2026-08-31T12:13:52.000Z",
+        timeRelation: "window",
+      }],
+    }, outside);
+    expect(inWindow.events["state-of-play"].windowsSeen).toEqual(["2026-09-01-daily"]);
+  });
+
+  it("drops undecided tier-C discovery noise from the durable ledger", () => {
+    const ledger = updateLedger({
+      generatedAt: "2026-08-31T14:54:08.656Z",
+      window: { id: "2026-08-31-daily" },
+      candidates: [{
+        ...candidate,
+        eventKey: "stale-low-value",
+        tier: "C",
+        score: 67,
+        timeRelation: "unknown",
+      }],
+    });
+    expect(ledger.events["stale-low-value"]).toBeUndefined();
+  });
+
   it("drops events outside retention", () => {
     const ledger = updateLedger({
       generatedAt: "2026-08-26T09:00:00.000Z",
