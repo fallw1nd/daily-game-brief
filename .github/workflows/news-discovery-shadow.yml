@@ -112,7 +112,8 @@ jobs:
               EDITION_ID="$edition" STATE_PATH="$state_path" node -e '
                 const fs = require("node:fs");
                 const state = JSON.parse(fs.readFileSync(process.env.STATE_PATH, "utf8"));
-                if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.packet?.status !== "pending") throw new Error(`durable revision authorization is not open for ${process.env.EDITION_ID}`);
+                const packetRefreshable = state.packet?.status === "pending" || state.packet?.status === "ready";
+                if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.editorial?.status !== "pending" || !packetRefreshable) throw new Error(`durable revision authorization is not refreshable for ${process.env.EDITION_ID}`);
               '
               echo "revision_authorized=true" >> "$GITHUB_OUTPUT"
             fi
