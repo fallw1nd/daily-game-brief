@@ -123,6 +123,29 @@ const editorial = {
   editorialNote: "Authorized same-edition revision overlay.",
 };
 
+function degradedYoungSunsEntry() {
+  return {
+    id: `${editionId}-releases-0`,
+    section: "releases",
+    title: {
+      title_key: "rebuilding-better-together-for-the-1-0",
+      title_en: "rebuilding better together for the 1 0",
+      title_zh_status: "unavailable",
+    },
+    headline: "[自动事实清单] Rebuilding Better Together for the 1.0 Launch of Young Suns",
+    summary: "Raw fallback excerpt.",
+    sources: [{ label: "Xbox Wire", url: "https://news.xbox.com/en-us/example/young-suns", kind: "primary" }],
+    images: [{
+      url: "media/briefs/young-suns.jpg",
+      alt: "Young Suns",
+      credit: "Xbox Wire",
+      sourceUrl: "https://news.xbox.com/en-us/example/young-suns",
+      kind: "editorial",
+    }],
+    image_status: "verified",
+  };
+}
+
 describe("authorized same-edition revision overlay", () => {
   it("replaces matching titles in place, preserves omitted canonical stories/media, and appends new entries", () => {
     const result = buildEdition({
@@ -146,6 +169,65 @@ describe("authorized same-edition revision overlay", () => {
     expect(result.edition.entries[2].headline).toBe("A genuinely new story");
     expect(result.entryIdsByEvent["halloween-revision"]).toBe(`${editionId}-news-0`);
     expect(result.entryIdsByEvent["new-story"]).toBe(`${editionId}-news-2`);
+  });
+
+  it("drops an unmatched degraded placeholder while preserving omitted normal canonical stories", () => {
+    const latest = structuredClone(currentLatest);
+    latest.entries.unshift(degradedYoungSunsEntry());
+    latest.sourceReport.note = "正常ChatGPT定时任务未在SLA前完成；已发布自动事实清单。";
+
+    const result = buildEdition({
+      packet,
+      editorial,
+      latest,
+      manifest,
+      allowSameEditionRevision: true,
+    });
+
+    expect(result.edition.entries.some((entry) => entry.headline.startsWith("[自动事实清单]"))).toBe(false);
+    expect(result.edition.entries.some((entry) => entry.title?.title_key === "crescent-tower-rising")).toBe(true);
+    expect(result.edition.entries.map((entry) => entry.id)).not.toContain(`${editionId}-releases-0`);
+  });
+
+  it("matches a degraded placeholder by unique source URL when its fallback title key was wrong", () => {
+    const latest = structuredClone(currentLatest);
+    latest.entries.unshift(degradedYoungSunsEntry());
+    latest.sourceReport.note = "正常ChatGPT定时任务未在SLA前完成；已发布自动事实清单。";
+
+    const revisedPacket = structuredClone(packet);
+    revisedPacket.editorialInput.packages.push({
+      eventKey: "young-suns-revision",
+      tier: "A",
+      sources: [{
+        sourceIndex: 0,
+        status: "opened",
+        kind: "primary",
+        label: "Xbox Wire",
+        url: "https://news.xbox.com/en-us/example/young-suns",
+      }],
+    });
+    const revisedEditorial = structuredClone(editorial);
+    const youngSuns = decision("young-suns-revision", "young-suns", "Young Suns", "《Young Suns》1.0版本正式上线");
+    youngSuns.section = "releases";
+    youngSuns.factStatus = "official";
+    youngSuns.releaseType = "正式上线";
+    youngSuns.sharedFactFrame.subjectTitleKey = "young-suns";
+    revisedEditorial.decisions.push(youngSuns);
+
+    const result = buildEdition({
+      packet: revisedPacket,
+      editorial: revisedEditorial,
+      latest,
+      manifest,
+      allowSameEditionRevision: true,
+    });
+
+    const entry = result.edition.entries.find((item) => item.title?.title_key === "young-suns");
+    expect(entry?.id).toBe(`${editionId}-releases-0`);
+    expect(entry?.headline).toBe("《Young Suns》1.0版本正式上线");
+    expect(entry?.image_status).toBe("verified");
+    expect(entry?.images?.[0]?.url).toBe("media/briefs/young-suns.jpg");
+    expect(result.edition.entries.some((item) => item.headline.startsWith("[自动事实清单]"))).toBe(false);
   });
 
   it("preserves the current release calendar and tracking lane during an authorized revision", () => {

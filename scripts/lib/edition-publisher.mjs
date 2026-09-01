@@ -51,6 +51,20 @@ function normalizedSourceUrl(value) {
   } catch { return value; }
 }
 
+function isDegradedPlaceholder(entry) {
+  return String(entry?.headline || "").startsWith("[自动事实清单]");
+}
+
+function degradedPreviousBySource(previousEntries, sources) {
+  const selected = new Set((sources || []).map((source) => normalizedSourceUrl(source.url)));
+  if (!selected.size) return null;
+  const matches = (previousEntries || []).filter((entry) =>
+    isDegradedPlaceholder(entry) &&
+    (entry.sources || []).some((source) => selected.has(normalizedSourceUrl(source.url)))
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function sourcesFor(decision, packetItem) {
   const selected = (packetItem?.sources || []).filter((source) =>
     (decision.sourceIndexes || []).includes(source.sourceIndex)
@@ -156,6 +170,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
   const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
+  const previousIds = new Set(previousEntries.map((entry) => entry.id));
   const counters = sectionCounters(previousEntries, window.id);
   const entryByEvent = new Map();
   const revisedEntries = editorial.decisions.filter((item) => item.decision === "include").map((decision) => {
@@ -176,7 +191,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       if (timeError) throw new Error(`included ${decision.eventKey}: ${timeError}`);
     }
     const title = displayTitle(decision);
-    const previous = authorizedLatestRevision ? previousByTitleKey.get(title.title_key) : null;
+    const previous = authorizedLatestRevision
+      ? previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
+      : null;
     const index = counters.get(decision.section) || 0;
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;
     if (!previous) counters.set(decision.section, index + 1);
@@ -203,12 +220,16 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       ...entryMedia(previous, decision.titleKey),
     };
   });
-  const revisedByTitleKey = new Map(revisedEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
-  const existingTitleKeys = new Set(previousEntries.flatMap((entry) => entry.title?.title_key ? [entry.title.title_key] : []));
+  const revisedById = new Map(revisedEntries.map((entry) => [entry.id, entry]));
   const entries = authorizedLatestRevision
     ? [
-        ...previousEntries.map((entry) => revisedByTitleKey.get(entry.title?.title_key) || entry),
-        ...revisedEntries.filter((entry) => !existingTitleKeys.has(entry.title?.title_key)),
+        ...previousEntries.flatMap((entry) => {
+          const replacement = revisedById.get(entry.id);
+          if (replacement) return [replacement];
+          if (isDegradedPlaceholder(entry)) return [];
+          return [entry];
+        }),
+        ...revisedEntries.filter((entry) => !previousIds.has(entry.id)),
       ]
     : revisedEntries;
   if (!entries.length) throw new Error("an edition needs at least one included entry");
