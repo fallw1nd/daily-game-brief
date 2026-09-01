@@ -288,3 +288,16 @@
 - **Close when:** Daily 与 legacy AM/PM 回归全部通过；exact-edition SLA 用当前 main 重跑后能成功写出 degraded Daily baseline；不改变固定窗口、schema、Scheduled Task 或正常 editorial 决策。
 - **Resolution:** [PR #85](https://github.com/fallw1nd/daily-game-brief/pull/85) / merge commit `47d0840d65d2a59e26f6aebca46a9997288dc4fa` 将 archive prefix 与 upcoming mode 改为显式 period mapping，并对未知 period fail closed。
 - **Verification:** PR #85 Verify run [33464922054](https://github.com/fallw1nd/daily-game-brief/actions/runs/33464922054) 通过；随后重跑同一 exact-edition SLA job，成功创建 `2026-09-01-daily` degraded Canonical baseline，之后同版授权 revision 再恢复为正常编辑版。关闭条件满足。
+
+## MNT-20260901-03 — degraded placeholder 在正式同版 revision 后残留
+
+- **Discovered:** 2026-09-01
+- **Priority:** P1
+- **Area:** publisher / same-edition revision / data quality
+- **Status:** resolved
+- **Evidence:** `2026-09-01-daily` 的 SLA degraded baseline 先生成了 Young Suns 的 `[自动事实清单]` 条目，并错误将文章 slug `rebuilding-better-together-for-the-1-0` 当作主体 `title_key`。随后正式 editorial revision 使用安全 overlay 语义：旧 Canonical 默认保留、只有相同 `title_key` 才替换。由于 degraded placeholder 的主体识别已错，正式 revision 无法匹配它，导致该英文摘录式 placeholder 与正式中文新闻并存到 NO.022 页面。
+- **Risk:** degraded 只应是 SLA 保底状态，却可能永久穿透到正式编辑版；错误 `title_key`、`[自动事实清单]` headline、截断英文摘要和内部枚举会破坏最终版编辑一致性。若直接改成“revision 中未提到的旧条目全部删除”，又会破坏现有防误删安全语义。
+- **Proposed resolution:** 普通 Canonical 仍保持 omission-preserving；只有 headline 以 `[自动事实清单]` 开头的 degraded placeholder 进入清理路径。正式 include 先按 `title_key` 匹配；若 degraded 阶段识别错主体，则允许唯一 exact primary source URL 匹配，并复用原 entry ID / verified media；未被正式 editorial 重新确认的 degraded placeholder 删除。
+- **Close when:** 回归覆盖 unmatched degraded placeholder cleanup、source-URL replacement 与 stable entry/media preservation；完整 Verify 通过；NO.022 同版 revision 不改 issueNumber 或固定窗口，且生产 Canonical 不再含 `[自动事实清单]` / Young Suns 错误条目；Pages 成功部署最终修订。
+- **Resolution:** [PR #87](https://github.com/fallw1nd/daily-game-brief/pull/87) / merge commit `eca8407648059b7a76f1df0fac2e7fae3a57af08` 将 degraded placeholder 与普通 Canonical 分流，增加唯一 source-URL replacement fallback，并保留普通条目的 omission-preserving 语义与已验证媒体复用。
+- **Verification:** PR #87 head `4f017ec82c307ba3e2d89c3057c753836f4a7b97` 的 Verify run [33469021421](https://github.com/fallw1nd/daily-game-brief/actions/runs/33469021421) 通过；随后 exact `2026-09-01-daily` cleanup revision 由 trusted publisher 成功写回 NO.022，issueNumber 仍为 22、固定窗口仍为 `(2026-08-31 10:10, 2026-09-01 10:10]`，正式 Canonical 保留 7 条编辑新闻并移除 Young Suns degraded placeholder；最终 Pages run [33469873521](https://github.com/fallw1nd/daily-game-brief/actions/runs/33469873521) 成功。关闭条件满足。
