@@ -20,6 +20,19 @@ function sectionFor(eventKind) {
   return "news";
 }
 
+function archivePrefix(period) {
+  if (period === "am") return "早报｜";
+  if (period === "pm") return "晚报｜";
+  if (period === "daily") return "日报｜";
+  throw new Error(`unsupported degraded period: ${period}`);
+}
+
+function upcomingMode(period) {
+  if (period === "am" || period === "daily") return "replace";
+  if (period === "pm") return "inherit_and_patch";
+  throw new Error(`unsupported degraded period: ${period}`);
+}
+
 function nullableDecision(item, reason) {
   return {
     eventKey: item.eventKey, decision: "exclude", section: null, titleKey: null, titleZhCn: null,
@@ -72,7 +85,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
   const decisions = [...packageDecisions, ...trackingDecisions];
   const included = decisions.filter((item) => item.decision === "include");
   if (!included.length) throw new Error("No high-confidence A-level event is eligible for degraded publication");
-  const prefix = input.window.period === "am" ? "早报｜" : "晚报｜";
+  const prefix = archivePrefix(input.window.period);
   const leadName = included[0].titleEn || "自动事实清单";
   return {
     contractVersion: 2,
@@ -81,7 +94,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
     archiveTitle: Array.from(`${prefix}${leadName}`).slice(0, 40).join(""),
     leadEventKey: included[0].eventKey,
     decisions,
-    upcomingMode: input.window.period === "am" ? "replace" : "inherit_and_patch",
+    upcomingMode: upcomingMode(input.window.period),
     removeUpcomingIds: [], upcoming: [],
     checkedExtra: ["无AI缺期兜底：仅使用已经打开的证据页"],
     limitedExtra: ["本期为自动事实清单，未执行中文编辑、传闻判断或最后15分钟人工式补查。"],
