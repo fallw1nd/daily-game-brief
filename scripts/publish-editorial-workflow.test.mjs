@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const workflow = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
+const stateUpdateScript = await readFile("scripts/update-edition-state-branch.sh", "utf8");
 
 describe("trusted bilingual publication workflow", () => {
   it("keeps one trusted publisher and exposes publish plus locale-repair modes", () => {
@@ -48,5 +49,12 @@ describe("trusted bilingual publication workflow", () => {
   it("does not misroute locale-repair failures through the Canonical publish retry", () => {
     expect(workflow).toContain("steps.submission.outputs.mode == 'publish'");
     expect(workflow).toContain("not used for locale-only repair");
+  });
+
+  it("skips missing durable state only for legacy AM/PM locale repairs and fails closed for Daily", () => {
+    expect(stateUpdateScript).toContain('[ "$event" = "locale-status" ]');
+    expect(stateUpdateScript).toContain('[[ "$edition" =~ -(am|pm)$ ]]');
+    expect(stateUpdateScript).toContain("Skipping durable locale acknowledgement for legacy pre-state edition");
+    expect(stateUpdateScript).toContain("Refusing to synthesize missing durable state for Daily locale acknowledgement");
   });
 });
