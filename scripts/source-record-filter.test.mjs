@@ -32,11 +32,11 @@ describe("source record filters", () => {
     ]);
   });
 
-  it("allows a bounded filter to remain attached when a source is selectively promoted", () => {
-    expect(byId.get("4gamer-topics")?.mode).toBe("active");
-    expect(filters.sources["4gamer-topics"]).toBeTruthy();
-    expect(byId.get("ign-games")?.mode).toBe("shadow");
-    expect(filters.sources["ign-games"]).toBeTruthy();
+  it("allows bounded filters to remain attached after selective promotion", () => {
+    for (const id of ["4gamer-topics", "ign-games"]) {
+      expect(byId.get(id)?.mode).toBe("active");
+      expect(filters.sources[id]).toBeTruthy();
+    }
     for (const id of ["denfaminico", "pcgamer-news"]) {
       expect(byId.get(id)?.mode).toBe("shadow");
       expect(filters.sources[id]).toBeTruthy();
