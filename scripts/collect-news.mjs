@@ -135,9 +135,11 @@ function annotate(records) {
         : publishedMs > windowEndMs - 24 * 60 * 60 * 1000 && publishedMs <= windowEndMs
           ? "prior-24h-audit"
           : "outside";
+    const canonicalSubjectKey = resolveKnownSubjectKey(candidate.headline, aliasIndex, candidate.source);
     return {
       ...candidate,
-      canonicalSubjectKey: resolveKnownSubjectKey(candidate.headline, aliasIndex),
+      subjectKey: candidate.subjectKey || canonicalSubjectKey,
+      canonicalSubjectKey,
       scoreSignals: candidateSignals(candidate),
       lane: candidateLane(candidate),
       publisherFamily: publisherFamily(candidate),

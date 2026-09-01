@@ -1,3 +1,11 @@
+function belongsToSnapshotWindow(candidate) {
+  return !candidate.timeRelation || candidate.timeRelation === "window" || candidate.timeRelation === "unknown";
+}
+
+function retainLedgerEvent(item) {
+  return item.tier !== "C" || Boolean(item.editorialState) || item.tracking?.active === true;
+}
+
 export function updateLedger(snapshot, previous = { events: {} }, options = {}) {
   const generatedAt = snapshot.generatedAt || options.now || new Date().toISOString();
   const retentionDays = Number(options.retentionDays || 45);
@@ -5,7 +13,10 @@ export function updateLedger(snapshot, previous = { events: {} }, options = {}) 
   const events = { ...(previous.events || {}) };
   for (const candidate of snapshot.candidates || []) {
     const prior = events[candidate.eventKey] || {};
-    const windowsSeen = [...new Set([...(prior.windowsSeen || []), snapshot.window.id])].slice(-20);
+    const priorWindows = prior.windowsSeen || [];
+    const windowsSeen = belongsToSnapshotWindow(candidate)
+      ? [...new Set([...priorWindows, snapshot.window.id])].slice(-20)
+      : priorWindows.slice(-20);
     const sources = [...new Set([...(prior.sources || []), ...(candidate.appearances || []).map((item) => item.sourceId)])];
     events[candidate.eventKey] = {
       ...prior,
@@ -27,6 +38,7 @@ export function updateLedger(snapshot, previous = { events: {} }, options = {}) 
   const cutoff = Date.parse(generatedAt) - retentionDays * 86400000;
   const retained = Object.values(events)
     .filter((item) => Math.max(Date.parse(item.lastSeenAt) || 0, Date.parse(item.lastDecisionAt) || 0) >= cutoff)
+    .filter(retainLedgerEvent)
     .sort((a, b) => Math.max(Date.parse(b.lastSeenAt) || 0, Date.parse(b.lastDecisionAt) || 0) -
       Math.max(Date.parse(a.lastSeenAt) || 0, Date.parse(a.lastDecisionAt) || 0))
     .slice(0, maxEvents);
@@ -36,7 +48,7 @@ export function updateLedger(snapshot, previous = { events: {} }, options = {}) 
     retentionDays,
     totals: {
       events: retained.length,
-      recurring: retained.filter((item) => item.windowsSeen.length > 1).length,
+      recurring: retained.filter((item) => (item.windowsSeen || []).length > 1).length,
       tracking: retained.filter((item) => item.tracking?.active === true).length,
     },
     events: Object.fromEntries(retained.map((item) => [item.eventKey, item])),
