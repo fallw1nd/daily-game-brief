@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEnglishOverlay,
+  buildEnglishRepairOverlay,
   buildLocaleUnavailableStatus,
   deriveEntryIdsByEvent,
 } from "./lib/bilingual-publisher.mjs";
@@ -90,6 +91,27 @@ function bilingualEditorial() {
   };
 }
 
+function repairDraft(canonical) {
+  return {
+    schemaVersion: 1,
+    locale: "en",
+    editionId: canonical.id,
+    archiveTitle: "Morning Brief | Test Game Announces a New Version",
+    entries: canonical.entries.map((entry) => ({
+      entryId: entry.id,
+      headline: "Test Game Announces a New Version",
+      summary: "The official source confirms a new version for the already verified platform set.",
+      verification: "The official page was opened and supports the event, platform and timing stated here.",
+      timeNote: "The official page timestamp falls within the fixed Beijing-time edition window.",
+      regionLabel: null,
+      releaseTypeLabel: null,
+      sourceLabels: [],
+    })),
+    upcoming: [],
+    sourceReport: null,
+  };
+}
+
 describe("trusted bilingual publication planner", () => {
   it("binds English event keys to canonical entry IDs and computes reproducible digests", () => {
     const canonical = canonicalEdition();
@@ -101,6 +123,43 @@ describe("trusted bilingual publication planner", () => {
     expect(result.overlay.entries[0].entryId).toBe(canonical.entries[0].id);
     expect(result.overlay.factsDigest).toBe(factsDigest(canonical));
     expect(result.overlay.localeDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it("repairs English directly against final Canonical entry IDs after same-edition revisions", () => {
+    const canonical = canonicalEdition();
+    canonical.id = "2026-09-01-daily";
+    canonical.period = "daily";
+    canonical.entries.push({
+      ...structuredClone(canonical.entries[0]),
+      id: "2026-09-01-daily-news-1",
+      title: { title_key: "preserved-story", title_en: "Preserved Story", title_zh_status: "unavailable" },
+      headline: "保留自上一轮正式修订的新闻",
+      summary: "该条目已经是正式 Canonical，但不再存在于最新 revision 的 eventKey 集合中。",
+      sharedFactFrameDigest: `sha256:${"2".repeat(64)}`,
+    });
+    canonical.entries[0].id = "2026-09-01-daily-news-0";
+    canonical.leadEntryId = canonical.entries[0].id;
+    const draft = repairDraft(canonical);
+    draft.archiveTitle = "Daily Brief | Final Canonical English Repair";
+    draft.entries[1] = {
+      ...draft.entries[1],
+      headline: "A Previously Published Story Remains in the Final Edition",
+      summary: "This presentation is keyed to the stable Canonical entry rather than a mutable revision event key.",
+    };
+    const result = buildEnglishRepairOverlay({ canonical, draft });
+    expect(result.status).toBe("available");
+    expect(result.overlay.entries.map((item) => item.entryId)).toEqual(canonical.entries.map((item) => item.id));
+    expect(result.overlay.factsDigest).toBe(factsDigest(canonical));
+  });
+
+  it("rejects a Canonical-ID repair draft that omits a preserved entry", () => {
+    const canonical = canonicalEdition();
+    const draft = repairDraft(canonical);
+    draft.entries = [];
+    const result = buildEnglishRepairOverlay({ canonical, draft });
+    expect(result.status).toBe("unavailable");
+    expect(result.reasonCode).toBe("locale-repair-invalid");
+    expect(result.summary).toContain("cover every canonical entry");
   });
 
   it("degrades Chinese-first publication with a machine-readable unavailable state", () => {
