@@ -39,6 +39,14 @@ function normalizeSourceLabels(items) {
   }));
 }
 
+function normalizeMediaAlts(items) {
+  return (items || []).map((item) => ({
+    assetKey: item.assetKey,
+    alt: item.alt,
+    ...(cleanOptional(item.creditLabel) ? { creditLabel: cleanOptional(item.creditLabel) } : {}),
+  }));
+}
+
 function previousUpcomingByIdentity(previousOverlay) {
   return new Map((previousOverlay?.upcoming || []).map((item) => [item.upcomingId ?? item.upcomingKey, item]));
 }
@@ -57,6 +65,42 @@ function buildUpcomingOverlay(canonical, draft, previousOverlay) {
       ...(cleanOptional(source.coverAlt) ? { coverAlt: cleanOptional(source.coverAlt) } : {}),
     };
   });
+}
+
+function finalizeEnglishOverlay(canonical, presentation) {
+  const overlay = {
+    schemaVersion: 1,
+    locale: "en",
+    editionId: canonical.id,
+    baseSchemaVersion: canonical.schemaVersion ?? 1,
+    factsDigest: factsDigest(canonical),
+    canonicalCopyDigest: canonicalCopyDigest(canonical),
+    localeDigest: `sha256:${"0".repeat(64)}`,
+    archiveTitle: presentation.archiveTitle,
+    entries: presentation.entries,
+    upcoming: presentation.upcoming,
+    ...(presentation.sourceReport ? { sourceReport: presentation.sourceReport } : {}),
+  };
+  overlay.localeDigest = localeDigest(overlay);
+  const validation = validateEnglishOverlay(canonical, overlay);
+  if (!validation.valid) {
+    return {
+      status: "unavailable",
+      reasonCode: "editorial-overlay-invalid",
+      summary: validation.summary,
+      overlay: null,
+      warnings: validation.warnings,
+      errors: validation.errors,
+    };
+  }
+  return {
+    status: "available",
+    reasonCode: null,
+    summary: "English overlay is valid.",
+    overlay,
+    warnings: validation.warnings,
+    errors: [],
+  };
 }
 
 export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null }) {
@@ -83,39 +127,60 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
       ? { sourceLabels: normalizeSourceLabels(item.sourceLabels) }
       : {}),
   }));
-  const overlay = {
-    schemaVersion: 1,
-    locale: "en",
-    editionId: canonical.id,
-    baseSchemaVersion: canonical.schemaVersion ?? 1,
-    factsDigest: factsDigest(canonical),
-    canonicalCopyDigest: canonicalCopyDigest(canonical),
-    localeDigest: `sha256:${"0".repeat(64)}`,
+  return finalizeEnglishOverlay(canonical, {
     archiveTitle: draft.archiveTitle,
     entries,
     upcoming: buildUpcomingOverlay(canonical, draft, previousOverlay),
-    ...(draft.sourceReport ? { sourceReport: draft.sourceReport } : {}),
-  };
-  overlay.localeDigest = localeDigest(overlay);
-  const validation = validateEnglishOverlay(canonical, overlay);
-  if (!validation.valid) {
+    sourceReport: draft.sourceReport,
+  });
+}
+
+export function buildEnglishRepairOverlay({ canonical, draft }) {
+  if (!draft || draft.schemaVersion !== 1 || draft.locale !== "en" || draft.editionId !== canonical?.id) {
     return {
       status: "unavailable",
-      reasonCode: "editorial-overlay-invalid",
-      summary: validation.summary,
+      reasonCode: "locale-repair-invalid",
+      summary: "English locale repair draft must use schemaVersion=1, locale=en, and the exact Canonical editionId.",
       overlay: null,
-      warnings: validation.warnings,
-      errors: validation.errors,
+      warnings: [],
+      errors: ["locale repair identity does not match Canonical edition"],
     };
   }
-  return {
-    status: "available",
-    reasonCode: null,
-    summary: "English overlay is valid.",
-    overlay,
-    warnings: validation.warnings,
-    errors: [],
-  };
+  const entries = (draft.entries || []).map((item) => ({
+    entryId: item.entryId,
+    headline: item.headline,
+    summary: item.summary,
+    verification: item.verification,
+    timeNote: item.timeNote,
+    ...(cleanOptional(item.regionLabel) ? { regionLabel: cleanOptional(item.regionLabel) } : {}),
+    ...(cleanOptional(item.releaseTypeLabel) ? { releaseTypeLabel: cleanOptional(item.releaseTypeLabel) } : {}),
+    ...(Array.isArray(item.sourceLabels) && item.sourceLabels.length
+      ? { sourceLabels: normalizeSourceLabels(item.sourceLabels) }
+      : {}),
+    ...(Array.isArray(item.mediaAlts) && item.mediaAlts.length
+      ? { mediaAlts: normalizeMediaAlts(item.mediaAlts) }
+      : {}),
+  }));
+  const upcoming = (draft.upcoming || []).map((item) => ({
+    upcomingId: item.upcomingId,
+    ...(cleanOptional(item.regionLabel) ? { regionLabel: cleanOptional(item.regionLabel) } : {}),
+    ...(cleanOptional(item.releaseTypeLabel) ? { releaseTypeLabel: cleanOptional(item.releaseTypeLabel) } : {}),
+    ...(cleanOptional(item.sourceLabel) ? { sourceLabel: cleanOptional(item.sourceLabel) } : {}),
+    ...(cleanOptional(item.coverAlt) ? { coverAlt: cleanOptional(item.coverAlt) } : {}),
+  }));
+  const result = finalizeEnglishOverlay(canonical, {
+    archiveTitle: draft.archiveTitle,
+    entries,
+    upcoming,
+    sourceReport: draft.sourceReport,
+  });
+  if (result.status !== "available") {
+    return {
+      ...result,
+      reasonCode: "locale-repair-invalid",
+    };
+  }
+  return result;
 }
 
 export function buildLocaleUnavailableStatus({ canonical, reasonCode, summary, observedAt }) {
