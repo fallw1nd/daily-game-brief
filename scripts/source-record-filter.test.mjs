@@ -23,7 +23,7 @@ describe("source record filters", () => {
       { headline: "Onimusha: Way of the Sword Review", url: "https://www.ign.com/articles/onimusha-way-of-the-sword-review" },
       { headline: "The Blood of Dawnwalker Review", url: "https://www.ign.com/articles/the-blood-of-dawnwalker-review" },
       { headline: "Best Buy Is Dropping Prices on 2026 Games in Its Labor Day Sale", url: "https://www.ign.com/articles/best-buy-game-deals" },
-      { headline: "Grab a Physical Copy for $10 Off Ahead of Launch", url: "https://www.ign.com/articles/pre-order-game-deal" },
+      { headline: "Pre-Order This Game for $10 Off Ahead of Launch", url: "https://www.ign.com/articles/pre-order-game-deal" },
     ], source, filters);
     expect(result.filteredCount).toBe(2);
     expect(result.records.map((item) => item.headline)).toEqual([
