@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTitleAliasIndex, candidateSignals, resolveKnownSubjectKey } from "./lib/source-expansion.mjs";
+import { buildTitleAliasIndex, candidateLane, candidateSignals, resolveKnownSubjectKey } from "./lib/source-expansion.mjs";
 
 describe("source expansion observability", () => {
   it("maps known multilingual title aliases to one canonical title key without inventing names", () => {
@@ -23,5 +23,17 @@ describe("source expansion observability", () => {
     const industryReport = candidateSignals({eventKind:"company",headline:"Studio announces layoffs",publishedAt:"2026-08-31T00:00:00Z",independentSources:["media-a","media-b"],source:{reliability:"high"}});
     expect(lowValueOfficial.evidenceConfidence).toBeGreaterThan(lowValueOfficial.editorialSignificance);
     expect(industryReport.editorialSignificance).toBeGreaterThanOrEqual(80);
+  });
+
+  it("routes score-opening reports to reviews even when discovered by a general news source", () => {
+    const candidate = {
+      eventKind: "review-score",
+      headline: "《鬼武者：剑之道》M站PC均分85！媒体评分解禁",
+      publishedAt: null,
+      independentSources: ["3dmgame"],
+      source: { reliability: "discovery", capabilities: ["news"] },
+    };
+    expect(candidateLane(candidate)).toBe("reviews");
+    expect(candidateSignals(candidate).editorialSignificance).toBeGreaterThanOrEqual(80);
   });
 });
