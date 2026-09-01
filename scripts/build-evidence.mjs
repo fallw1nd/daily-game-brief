@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
 import { extractExplicitOfficialLinks } from "./lib/primary-resolver.mjs";
+import { sourceVisiblePublishedAt } from "./lib/source-visible-time.mjs";
 
 const INPUT_PATH = resolve(process.env.NEWS_SHADOW_REPORT_PATH || "artifacts/news-shadow-report.json");
 const OUTPUT_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
@@ -164,7 +165,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
         publisherKey,
         observedPrimaryIndependenceKeys,
         pageTitle: meta.pageTitle,
-        publishedAt: meta.publishedAt,
+        publishedAt: meta.publishedAt || sourceVisiblePublishedAt(html, source),
         imageUrl: meta.imageUrl,
         canonicalUrl: meta.canonicalUrl,
         ...languageMetadata(source, meta, text),
