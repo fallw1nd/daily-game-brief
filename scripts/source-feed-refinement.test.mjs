@@ -5,8 +5,8 @@ const registry = JSON.parse(await readFile("config/news-sources.json", "utf8"));
 const byId = new Map(registry.sources.map((source) => [source.id, source]));
 
 describe("selective source promotion after runner observation", () => {
-  it("promotes only the first technically validated cohort", () => {
-    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(18);
+  it("keeps the technically validated active cohort bounded", () => {
+    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(19);
 
     const promotedFeeds = new Map([
       ["4gamer-topics", "https://www.4gamer.net/rss/news_topics.xml"],
@@ -14,6 +14,7 @@ describe("selective source promotion after runner observation", () => {
       ["4gamer-review", "https://www.4gamer.net/rss/all_review.xml"],
       ["vgc-news", "https://www.videogameschronicle.com/category/news/feed/"],
       ["game-developer", "https://www.gamedeveloper.com/rss.xml"],
+      ["ign-games", "https://www.ign.com/rss/articles/feed?tags=games"],
     ]);
 
     for (const [id, url] of promotedFeeds) {
