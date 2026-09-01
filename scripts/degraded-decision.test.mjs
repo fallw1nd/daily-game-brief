@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 
-function packet(overrides = {}) {
-  return { editorialInput: { window: { id: "2026-08-27-am", period: "am" }, trackingQueue: [], packages: [{
+function packet(overrides = {}, window = { id: "2026-08-27-am", period: "am" }) {
+  return { editorialInput: { window, trackingQueue: [], packages: [{
     eventKey: "event-1", eventKind: "announcement", subjectKey: "Example Game",
     headline: "Example Game announced", tier: "A", timeRelation: "window",
     sources: [{ sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher",
@@ -19,6 +19,21 @@ describe("zero-AI degraded decision", () => {
     expect(included.decision).toBe("include");
     expect(included.factStatus).toBe("official");
     expect(included.headline).toContain("自动事实清单");
+  });
+
+  it("uses the Daily archive prefix and replacement calendar mode", () => {
+    const output = buildDegradedDecision(packet({}, { id: "2026-09-01-daily", period: "daily" }));
+    expect(output.archiveTitle).toMatch(/^日报｜/);
+    expect(output.upcomingMode).toBe("replace");
+  });
+
+  it("preserves legacy AM and PM degraded semantics", () => {
+    const morning = buildDegradedDecision(packet());
+    const evening = buildDegradedDecision(packet({}, { id: "2026-08-27-pm", period: "pm" }));
+    expect(morning.archiveTitle).toMatch(/^早报｜/);
+    expect(morning.upcomingMode).toBe("replace");
+    expect(evening.archiveTitle).toMatch(/^晚报｜/);
+    expect(evening.upcomingMode).toBe("inherit_and_patch");
   });
 
   it("refuses to fabricate an edition when no event clears the threshold", () => {
