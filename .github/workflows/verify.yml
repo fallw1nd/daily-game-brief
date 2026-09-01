@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   check:
@@ -27,4 +28,25 @@ jobs:
         run: npm ci
 
       - name: Validate, test, and build
-        run: npm run check
+        id: check
+        shell: bash
+        run: |
+          set +e
+          npm run check 2>&1 | tee "$RUNNER_TEMP/verify.log"
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Surface failure on PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo '### Verify failure tail'
+            echo '```text'
+            tail -n 180 "$RUNNER_TEMP/verify.log"
+            echo '```'
+          } > "$RUNNER_TEMP/verify-comment.md"
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file "$RUNNER_TEMP/verify-comment.md"
