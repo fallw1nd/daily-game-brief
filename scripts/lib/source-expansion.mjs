@@ -1,7 +1,7 @@
 import { normalizeHeadline } from "./news-pipeline.mjs";
 
 const chinaPattern = /(?:中国|国产|腾讯|网易|米哈游|叠纸|鹰角|莉莉丝|完美世界|Bilibili|哔哩哔哩)/i;
-const significantKinds = new Set(["cancel", "delay", "release-date", "launch", "company", "result"]);
+const significantKinds = new Set(["cancel", "delay", "release-date", "launch", "company", "result", "review-score"]);
 const awardPattern = /\b(?:award|awards|winner|winners|nominee|nominees|nomination|nominations|finalist|finalists|shortlist|longlist|entries open|submissions open)\b|奖项|大奖|获奖|提名|入围|长名单|短名单|报名|優勝|受賞|ノミネート/i;
 const interviewPattern = /\b(?:interview|interviews|q&a|conversation with)\b|专访|采访|访谈|群访|对谈|インタビュー/i;
 const reviewPattern = /\b(?:review|reviews|hands-on|impressions)\b|评测|试玩体验|体验报告|レビュー|プレイレポ/i;
@@ -60,6 +60,7 @@ export function candidateSignals(candidate) {
   evidenceConfidence += Math.min(10, Math.max(0, independentCount - 1) * 5);
 
   let editorialSignificance = significantKinds.has(candidate.eventKind) ? 70 : candidate.eventKind === "announcement" ? 55 : candidate.eventKind === "update" || candidate.eventKind === "dlc" ? 45 : 30;
+  if (candidate.eventKind === "review-score") editorialSignificance = Math.max(editorialSignificance, 80);
   if (awardPattern.test(candidate.headline || "")) editorialSignificance = Math.max(editorialSignificance, 70);
   if (industryPattern.test(candidate.headline || "")) editorialSignificance = Math.max(editorialSignificance, 75);
   if (/(?:acquisition|layoff|lawsuit|政策|收购|裁员|诉讼)/i.test(candidate.headline || "")) editorialSignificance = Math.max(editorialSignificance, 80);
@@ -76,6 +77,7 @@ export function candidateLane(candidate) {
   const capabilities = source.capabilities || [];
   const headline = candidate.headline || "";
 
+  if (candidate.eventKind === "review-score") return "reviews";
   if (source.defaultLane === "awards" || awardPattern.test(headline)) return "awards";
   if (capabilities.includes("interviews") && interviewPattern.test(headline)) return "interviews";
   if (capabilities.includes("reviews") && reviewPattern.test(headline)) return "reviews";
