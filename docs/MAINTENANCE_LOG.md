@@ -301,3 +301,16 @@
 - **Close when:** 回归覆盖 unmatched degraded placeholder cleanup、source-URL replacement 与 stable entry/media preservation；完整 Verify 通过；NO.022 同版 revision 不改 issueNumber 或固定窗口，且生产 Canonical 不再含 `[自动事实清单]` / Young Suns 错误条目；Pages 成功部署最终修订。
 - **Resolution:** [PR #87](https://github.com/fallw1nd/daily-game-brief/pull/87) / merge commit `eca8407648059b7a76f1df0fac2e7fae3a57af08` 将 degraded placeholder 与普通 Canonical 分流，增加唯一 source-URL replacement fallback，并保留普通条目的 omission-preserving 语义与已验证媒体复用。
 - **Verification:** PR #87 head `4f017ec82c307ba3e2d89c3057c753836f4a7b97` 的 Verify run [33469021421](https://github.com/fallw1nd/daily-game-brief/actions/runs/33469021421) 通过；随后 exact `2026-09-01-daily` cleanup revision 由 trusted publisher 成功写回 NO.022，issueNumber 仍为 22、固定窗口仍为 `(2026-08-31 10:10, 2026-09-01 10:10]`，正式 Canonical 保留 7 条编辑新闻并移除 Young Suns degraded placeholder；最终 Pages run [33469873521](https://github.com/fallw1nd/daily-game-brief/actions/runs/33469873521) 成功。关闭条件满足。
+
+## MNT-20260901-04 — 知名评分事件缺少原媒体直采，导致依赖二手转述
+
+- **Discovered:** 2026-09-01
+- **Priority:** P1
+- **Area:** discovery / reviews / source provenance
+- **Status:** in_progress
+- **Evidence:** `2026-09-01-daily` 漏报修订中，《鬼武者 Way of the Sword》IGN 10 分最初只能由 active 的 3DM discovery 页面进入 immutable packet；当时 `config/news-sources.json` 已有 GameSpot 直采 RSS 与 reviews capability，却没有 IGN 直采源，因此最终稿只能按 3DM 转述的 `media_report` 边界处理。新增 IGN RSS 后，read-only GitHub runner observation [33488938868](https://github.com/fallw1nd/daily-game-brief/actions/runs/33488938868) 直接取得 `Onimusha: Way of the Sword Review` 与 `The Blood of Dawnwalker Review`，两篇均带 `2026-08-31T15:00:00Z` 发布时间并处在该 Daily 窗口内；过滤前 IGN 20 条候选、unknown-time 为 0。加入仅针对 Best Buy/Amazon/deal/pre-order 的 bounded commerce filter 后，第二次 observation [33489262329](https://github.com/fallw1nd/daily-game-brief/actions/runs/33489262329) 仍成功，IGN 保留 18 条、过滤 2 条、两篇目标 Review 均保留，unknown-time 仍为 0。
+- **Risk:** 若重量级评分媒体没有原站 discovery，简报会依赖中文或第三方转述是否恰好命中，既可能漏报，也会把本可直接核验的评分降成 relay/discovery provenance；同一问题会反复出现在 IGN 等媒体的高关注大作开分。
+- **Proposed resolution:** 将 IGN Games RSS 以 `media + high`、`news/reviews/features/interviews` capabilities 接入，先 shadow 实测再升 active；保留 GameSpot 现有 active 直采。对 IGN feed 只过滤明确购物/促销噪音，不把普通 Review 一律误分类成 `review-score`；只有标题明确出现评分解禁/开分/聚合分等信号时使用特殊事件类型。Metacritic/OpenCritic 不以普通 HTML/RSS 源冒充“开分时间”来源：聚合分是可变状态，后续应采用 durable snapshot/change detection 的 score-surface observer 后再进入固定窗口生产链。
+- **Close when:** 两次 GitHub-hosted shadow observation 均证明 IGN RSS 可用且时间稳定；bounded filter 保留目标 Review；IGN source promotion 与 filter 有回归测试；完整 `npm run check` 通过；修复合并后至少一次 read-only/production collector 以 `mode=active` 看到 IGN healthy 且能直接形成 Review candidates；不修改 Daily 固定窗口、schema、历史 Canonical 或 Scheduled Task。
+- **Resolution:** `fix/ign-direct-review-source` 已注册并经两次 runner observation 后将 `ign-games` 从 shadow 提升为 active，增加 bounded commerce filter 与 registry/filter 回归测试；PR / merge pending。
+- **Verification:** shadow observation runs [33488938868](https://github.com/fallw1nd/daily-game-brief/actions/runs/33488938868) 与 [33489262329](https://github.com/fallw1nd/daily-game-brief/actions/runs/33489262329) 均成功；完整 Verify、merge 与 post-merge active observation pending，因此本条暂不标记 resolved。

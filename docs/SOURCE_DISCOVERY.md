@@ -41,6 +41,16 @@ Promotion means these sources may now enter the production review/evidence pipel
 
 The first formal acceptance rerun deliberately keeps noisier or technically incomplete sources in shadow rather than increasing source count for its own sake.
 
+## Major review-source promotion
+
+GameSpot is already an active high-reliability RSS source with `reviews` capability. On 2026-09-01 a production omission review showed that an IGN 10/10 score was discovered only through a 3DM relay because IGN itself was not registered. IGN is therefore added through the same shadow-first promotion process rather than being trusted merely because of brand recognition.
+
+Read-only GitHub-hosted observations `33488938868` and `33489262329` verified the first-party `IGN Games` RSS surface on the production runner. The feed returned timestamped review/news candidates without unknown-time IGN records and directly contained both `Onimusha: Way of the Sword Review` and `The Blood of Dawnwalker Review` inside the affected Daily window. A bounded source filter removes obvious commerce/deal headlines while preserving those reviews. After the filtered observation remained healthy, `ign-games` is promoted to `active`, `reliability:"high"`, with `news`, `reviews`, `features`, and `interviews` capabilities.
+
+Direct media collection changes provenance, not editorial authority. An IGN or GameSpot review may enter the evidence queue from the original publisher, but the exact article still has to open successfully before its score or review claims can support publication. A normal single review is not automatically reclassified as `review-score`; the special event kind remains reserved for explicit score-opening / embargo-lift signals. When a relay and the original review describe the same score event, the editor should prefer the opened original review for the score claim and use the relay only when it adds independently useful evidence.
+
+Metacritic and OpenCritic are deliberately not registered as ordinary HTML/RSS article sources solely to increase direct-source counts. Their aggregate score is mutable state rather than a conventional timestamped article. A current aggregate value without a trustworthy opening/change timestamp cannot safely prove which fixed Daily window the score first belonged to. Direct aggregate coverage therefore requires a bounded score-surface observer with durable prior snapshots/change detection and explicit observation time semantics before it can become a production source. Until that mechanism exists, Metacritic/OpenCritic mentions discovered in timestamped articles remain eligible `review-score` signals, and any displayed aggregate score must be treated as a verification-time snapshot.
+
 ## Remaining Phase 1 shadow pool
 
 - GAME Watch — listing discovery works, but publication time still needs a safe listing adapter or opened-detail fallback before activation.
