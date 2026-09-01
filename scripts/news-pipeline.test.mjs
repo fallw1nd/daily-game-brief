@@ -54,6 +54,38 @@ describe("low-token news discovery pipeline", () => {
     expect(candidate.score).toBeGreaterThanOrEqual(125);
   });
 
+  it("recognizes Chinese review-score openings as a material event", () => {
+    const onimusha = eventIdentity("《鬼武者：剑之道》M站PC均分85！媒体评分解禁");
+    const dawnwalker = eventIdentity("《黎明行者之血》M站均分84！《巫师4》代餐来了");
+    expect(onimusha).toMatchObject({ eventKind: "review-score", subjectKey: "鬼武者 剑之道" });
+    expect(dawnwalker).toMatchObject({ eventKind: "review-score", subjectKey: "黎明行者之血" });
+  });
+
+  it("keeps a score-opening report reviewable when an HTML listing lacks an exact timestamp", () => {
+    const [candidate] = mergeCandidates([{
+      headline: "《黎明行者之血》M站均分84！《巫师4》代餐来了",
+      url: "https://example.com/dawnwalker-score",
+      summary: "",
+      publishedAt: null,
+      source: {
+        id: "discovery-media",
+        label: "Discovery Media",
+        group: "discovery",
+        independenceKey: "discovery-media",
+        priority: 68,
+      },
+    }]);
+    expect(candidate.eventKind).toBe("review-score");
+    expect(candidate.score).toBeGreaterThanOrEqual(80);
+    expect(candidate.tier).toBe("B");
+  });
+
+  it("recognizes explicit English and Japanese score-opening language without elevating an ordinary review", () => {
+    expect(eventIdentity("Onimusha: Way of the Sword review scores are live on Metacritic").eventKind).toBe("review-score");
+    expect(eventIdentity("『Game X』レビュー解禁、メタスコア85").eventKind).toBe("review-score");
+    expect(eventIdentity("Onimusha: Way of the Sword Review").eventKind).toBe("other");
+  });
+
   it("clusters differently worded reports around a quoted subject and event", () => {
     const first = eventIdentity("《Game X》公布发售日");
     const second = eventIdentity("《Game X》发售日正式公开");

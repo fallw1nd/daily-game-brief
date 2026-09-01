@@ -4,15 +4,19 @@ import {
   plannedWindow as resolvePlannedWindow,
 } from "./edition-window.mjs";
 
+const reviewScorePattern = /\b(?:review embargo(?:\s+(?:has|is))?\s+(?:lifted|up)|review scores?(?:\s+(?:are|is))?\s+(?:live|out)|reviews?\s+(?:are|is)\s+(?:live|out)|review roundup|critic scores?)\b|\b(?:metacritic|opencritic)\b.{0,24}\b(?:score|average|reviews?|rating)\b|\b(?:score|average|reviews?|rating)\b.{0,24}\b(?:metacritic|opencritic)\b|(?:媒体(?:评分|评测)(?:正式)?(?:解禁|公开|出炉)|(?:评分|评测)(?:正式)?(?:解禁|公开)|评测禁令(?:解除|解禁)|开分|(?:M站|MC|Metacritic|OpenCritic|IGN|GameSpot|VGC).{0,24}(?:均分|评分|\d+(?:\.\d+)?\s*(?:分|\/10|\/5))|均分\s*\d+(?:\.\d+)?)|(?:レビュー(?:スコア|解禁)|メタスコア|メディア評価(?:解禁|公開))/i;
+
 const majorPatterns = [
   /\b(?:announce|announced|reveal|revealed|release date|launch|delay|delayed|cancel|cancelled|canceled|update|dlc|acquisition|layoff|lawsuit|policy|award|winner|champion)\b/i,
   /(?:公布|公开|发表|发售日|上线|延期|取消|停止发售|更新|扩展|收购|裁员|诉讼|政策|获奖|冠军|世界级)/,
   /(?:発表|発売日|配信開始|延期|発売中止|販売中止|配信中止|中止|アップデート|買収|訴訟|優勝)/,
+  reviewScorePattern,
 ];
 
 const chinaPatterns = [/(?:中国|国产|腾讯|网易|米哈游|叠纸|鹰角|莉莉丝|完美世界|Bilibili|哔哩哔哩)/i];
 
 const eventPatterns = [
+  ["review-score", reviewScorePattern],
   ["cancel", /\b(?:cancel|cancelled|canceled|cancellation)\b|取消(?:发售|发行|上线)?|停止发售|発売中止|販売中止|配信中止/i],
   ["delay", /\b(?:delay|delayed|postpone|postponed)\b|延期|発売延期/i],
   ["release-date", /\b(?:release date|launch date|dated for|launches? on)\b|发售日|定档|発売日/i],
@@ -27,7 +31,7 @@ const eventPatterns = [
 const eventStopWords = new Set([
   "about", "after", "ahead", "also", "announced", "announces", "announcement", "available",
   "cancel", "cancelled", "canceled", "cancellation", "date", "dated", "debut", "details", "first", "from", "game", "games", "gets", "launch",
-  "launched", "launches", "major", "more", "news", "official", "release", "released", "releases",
+  "launched", "launches", "major", "more", "news", "official", "release", "released", "releases", "review", "reviews", "score", "scores",
   "revealed", "reveals", "season", "show", "shows", "this", "trailer", "update", "with",
 ]);
 
@@ -71,6 +75,10 @@ export function normalizeHeadline(value = "") {
     .toLocaleLowerCase("zh-CN")
     .replace(/[\s\p{P}\p{S}]+/gu, " ")
     .trim();
+}
+
+export function isReviewScoreHeadline(value = "") {
+  return reviewScorePattern.test(stripHtml(value));
 }
 
 export function canonicalUrl(input, base) {
@@ -157,6 +165,7 @@ function evidenceScore(record) {
   if (record.source.group === "official") score += 35;
   if (record.source.group === "event") score += 25;
   if (majorPatterns.some((pattern) => pattern.test(record.headline))) score += 25;
+  if (record.eventKind === "review-score") score += 15;
   if (chinaPatterns.some((pattern) => pattern.test(record.headline))) score += 15;
   if (!record.publishedAt) score -= 20;
   score += Math.min(30, Math.max(0, record.independentSources.length - 1) * 15);

@@ -25,6 +25,8 @@ Lane selection uses headline semantics plus source capabilities and a source-spe
 
 Substantive interviews, investigations, technical analysis, industry analysis, reviews, and award material may be admitted based on the publication time of that content itself. The underlying background event does not have to occur in the same Daily window. The content must add concrete information; ordinary opinion, recommendation copy, promotion, and repackaged old news remain excluded.
 
+A **review-score opening** is a material review event distinct from an ordinary single review. Headlines that explicitly indicate an embargo lift, media scores becoming public, Metacritic/OpenCritic score publication, or equivalent Chinese/Japanese score-opening language are classified as `eventKind:"review-score"` and routed to the `reviews` lane even when discovered by a general-news source. These candidates receive elevated discovery priority so an active source whose listing omits an exact timestamp can still reach the evidence-opening stage, where the article's real publication metadata must establish the fixed-window time. This priority does not make the reported score official, does not turn every ordinary review into a major event, and does not bypass source or time verification. Aggregate scores are snapshots and should be presented with an explicit verification-time boundary when they can change as more reviews arrive.
+
 ## First selectively promoted cohort
 
 After six read-only GitHub-hosted runner observations through run `33398534759`, the first bounded cohort is promoted for a formal same-edition production acceptance run:
