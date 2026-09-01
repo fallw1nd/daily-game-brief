@@ -9,6 +9,15 @@ describe("source expansion observability", () => {
     expect(resolveKnownSubjectKey("Completely Unknown Game announced", index)).toBeNull();
   });
 
+  it("resolves a platform-owned recurring news subject only for the owning source", () => {
+    const index = new Map();
+    const playStation = { independenceKey: "sony-interactive-entertainment" };
+    const unrelated = { independenceKey: "other-publisher" };
+    const headline = "State of Play & State of Play Japan return on September 3";
+    expect(resolveKnownSubjectKey(headline, index, playStation)).toBe("state-of-play");
+    expect(resolveKnownSubjectKey("State of play in the market", index, unrelated)).toBeNull();
+  });
+
   it("separates evidence confidence from editorial significance", () => {
     const lowValueOfficial = candidateSignals({eventKind:"other",headline:"Publisher posts a wallpaper",publishedAt:"2026-08-31T00:00:00Z",independentSources:["publisher"],source:{reliability:"primary"}});
     const industryReport = candidateSignals({eventKind:"company",headline:"Studio announces layoffs",publishedAt:"2026-08-31T00:00:00Z",independentSources:["media-a","media-b"],source:{reliability:"high"}});
