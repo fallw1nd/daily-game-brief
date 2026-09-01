@@ -7,6 +7,7 @@ import { buildEdition } from "./lib/edition-publisher.mjs";
 import { validateEditorialOutput } from "./lib/editorial-contract.mjs";
 import {
   buildEnglishOverlay,
+  buildEnglishRepairOverlay,
   buildLocaleUnavailableStatus,
   deriveEntryIdsByEvent,
   localeArchivePath,
@@ -16,6 +17,9 @@ import {
 const run = promisify(execFile);
 const PACKET_PATH = resolve(process.env.EDITORIAL_PACKET_PATH || "artifacts/editorial-packet.json");
 const DECISION_PATH = resolve(process.env.EDITORIAL_DECISION_PATH || "artifacts/editorial-decisions.json");
+const LOCALE_REPAIR_DRAFT_PATH = process.env.LOCALE_REPAIR_DRAFT_PATH
+  ? resolve(process.env.LOCALE_REPAIR_DRAFT_PATH)
+  : null;
 const RESULT_PATH = resolve(process.env.PUBLICATION_RESULT_PATH || "artifacts/publication-result.json");
 const PUBLICATION_MODE = process.env.PUBLICATION_MODE || "publish";
 const SAME_EDITION_REVISION_REASON = "user_authorized_same_edition_revision";
@@ -91,8 +95,15 @@ async function hasAuthorizedSameEditionRevision(editorial) {
   }
 }
 
-const packet = JSON.parse(await readFile(PACKET_PATH, "utf8"));
-const editorial = JSON.parse(await readFile(DECISION_PATH, "utf8"));
+const localeRepairDraft = PUBLICATION_MODE === "locale-repair" && LOCALE_REPAIR_DRAFT_PATH
+  ? await readOptionalJson(LOCALE_REPAIR_DRAFT_PATH)
+  : null;
+const editorial = localeRepairDraft
+  ? null
+  : JSON.parse(await readFile(DECISION_PATH, "utf8"));
+const packet = PUBLICATION_MODE === "publish"
+  ? JSON.parse(await readFile(PACKET_PATH, "utf8"))
+  : await readOptionalJson(PACKET_PATH);
 const [latestText, manifestText] = await Promise.all([
   readFile("public/data/latest.json", "utf8"),
   readFile("public/data/manifest.json", "utf8"),
@@ -103,8 +114,10 @@ const contractErrors = PUBLICATION_MODE === "locale-repair" ? [] : validateEdito
 if (contractErrors.length) throw new Error(`Editorial decisions failed evidence validation:\n- ${contractErrors.join("\n- ")}`);
 
 if (PUBLICATION_MODE === "locale-repair") {
-  const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
-  if (!manifestItem) throw new Error(`Cannot repair locale for unpublished edition ${editorial.editionId}`);
+  const editionId = localeRepairDraft?.editionId || editorial?.editionId;
+  if (!editionId) throw new Error("Locale repair requires an exact editionId");
+  const manifestItem = manifest.editions.find((item) => item.id === editionId);
+  if (!manifestItem) throw new Error(`Cannot repair locale for unpublished edition ${editionId}`);
   const archiveFile = resolve("public/data", manifestItem.path);
   const archiveTextBefore = await readFile(archiveFile, "utf8");
   const canonical = JSON.parse(archiveTextBefore);
@@ -113,13 +126,18 @@ if (PUBLICATION_MODE === "locale-repair") {
     latest: sha256Text(latestText),
     manifest: sha256Text(manifestText),
   };
-  const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
-  const localePlan = buildEnglishOverlay({
-    canonical,
-    editorial,
-    entryIdsByEvent: deriveEntryIdsByEvent(editorial),
-    previousOverlay: priorOverlay,
-  });
+  let localePlan;
+  if (localeRepairDraft) {
+    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft });
+  } else {
+    const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
+    localePlan = buildEnglishOverlay({
+      canonical,
+      editorial,
+      entryIdsByEvent: deriveEntryIdsByEvent(editorial),
+      previousOverlay: priorOverlay,
+    });
+  }
   if (localePlan.status !== "available") {
     throw new Error(`Locale repair rejected: ${localePlan.summary}`);
   }
@@ -146,7 +164,7 @@ if (PUBLICATION_MODE === "locale-repair") {
     throw new Error("locale-repair attempted to change canonical publication files");
   }
   await writePublicationResult({
-    editionId: editorial.editionId,
+    editionId,
     status: existingOverlayText === nextOverlayText && !hadStatus ? "locale-repair-noop" : "locale-repaired",
     publicationMode: "locale-repair",
     canonicalStatus: "unchanged",
@@ -155,7 +173,7 @@ if (PUBLICATION_MODE === "locale-repair") {
     feedbackEligible: false,
     canonicalHashes: beforeHashes,
   });
-  console.log(`${editorial.editionId}: English locale repaired; canonical publication hashes unchanged.`);
+  console.log(`${editionId}: English locale repaired; canonical publication hashes unchanged.`);
   process.exit(0);
 }
 
