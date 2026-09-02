@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { latestDueWindow } from "./lib/edition-window.mjs";
+import { resolveAdjacentManifestItem } from "./lib/adjacent-edition.mjs";
 import {
   mergeCandidates,
   parseFeed,
@@ -21,6 +22,7 @@ const CONFIG_PATH = resolve("config/news-sources.json");
 const FILTER_CONFIG_PATH = resolve("config/news-source-filters.json");
 const TITLE_REGISTRY_PATH = resolve("config/title-translations.json");
 const LATEST_PATH = resolve("public/data/latest.json");
+const MANIFEST_PATH = resolve("public/data/manifest.json");
 const OUTPUT_PATH = resolve(process.env.NEWS_CANDIDATES_PATH || "artifacts/news-candidates.json");
 const REPORT_PATH = resolve(process.env.NEWS_SHADOW_REPORT_PATH || "artifacts/news-shadow-report.json");
 const USER_AGENT = "DailyGameBriefDiscoveryBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
@@ -31,15 +33,29 @@ if (!new Set(["am", "pm", "daily"]).has(period)) {
   throw new Error("Pass --period=am, --period=pm, or --period=daily");
 }
 
-const [config, filterConfig, latest, titleRegistry] = await Promise.all([
+const [config, filterConfig, latest, manifest, titleRegistry] = await Promise.all([
   readFile(CONFIG_PATH, "utf8").then(JSON.parse),
   readFile(FILTER_CONFIG_PATH, "utf8").then(JSON.parse),
   readFile(LATEST_PATH, "utf8").then(JSON.parse),
+  readFile(MANIFEST_PATH, "utf8").then(JSON.parse),
   readFile(TITLE_REGISTRY_PATH, "utf8").then(JSON.parse),
 ]);
 const aliasIndex = buildTitleAliasIndex(titleRegistry);
 const referenceNow = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const window = latestDueWindow(period, referenceNow);
+const adjacentItem = resolveAdjacentManifestItem({
+  editions: manifest.editions || [],
+  windowId: window.id,
+  latestId: latest.id,
+});
+let adjacentEntries = [];
+if (adjacentItem?.id === latest.id) {
+  adjacentEntries = latest.entries || [];
+} else if (adjacentItem?.path) {
+  const adjacentArchive = await readFile(resolve("public/data", adjacentItem.path), "utf8").then(JSON.parse);
+  adjacentEntries = adjacentArchive.entries || [];
+}
+const adjacentEdition = adjacentItem?.id || null;
 
 async function fetchSource(source) {
   if (!source.url.startsWith("https://")) throw new Error("only HTTPS sources are allowed");
@@ -144,7 +160,7 @@ function annotate(records) {
       lane: candidateLane(candidate),
       publisherFamily: publisherFamily(candidate),
       timeRelation,
-      adjacentMatch: resemblesAdjacent(candidate, latest.entries || []),
+      adjacentMatch: resemblesAdjacent(candidate, adjacentEntries),
     };
   });
 }
@@ -186,7 +202,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   mode: "production-with-shadow-sources",
   window,
-  adjacentEdition: latest.id,
+  adjacentEdition,
   sourceStats,
   coverage: {
     method: "registered-source-list-and-rss",
