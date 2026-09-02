@@ -233,7 +233,7 @@
 - **Priority:** P1
 - **Area:** Scheduled task / packet recovery / Actions concurrency / task lifecycle
 - **Status:** resolved
-- **Evidence:** 2026-08-29 晚报等待 `automation/packets/2026-08-29-pm.json` 15 分钟后停止，并把原晚报 Scheduled Task 暂停。其认定为“matching collector”的 `Final editorial packet` run [33244366704](https://github.com/fallw1nd/daily-game-brief/actions/runs/33244366704) 实际是严重延迟执行的 AM cron：日志明确按 `10 2 * * *` 选择 `period=am`，最终持久化 `2026-08-29-am`，不可能生成 PM packet。原 workflow 同时让 AM/PM 共用 `news-discovery-state` concurrency group，延迟的相反时段 run 也存在互相取消风险。
+- **Evidence:** 2026-08-29 晚报等待 `automation/packets/2026-08-29-pm.json` 15 分钟后停止，并把原晚报 Scheduled Task 暂停。其认定为“matching collector”的 `Final editorial packet` run [33244366704](https://github.com/fallw1nd/daily-game-brief/actions/runs/33244366704) 实际是严重延迟执行的 AM cron：日志明确按 `10 2 * * *` 选择 `period=am`，最终持久化 `2026-08-29-am`，不可能生成 PM packet。原 workflow 同时让 AM/PM 共用同一个 `news-discovery-state` concurrency group，延迟的相反时段 run 也存在互相取消风险。
 - **Risk:** Scheduled Task 若按实际启动时间或“接近当前截止时间”把相反时段的延迟 run 当作 matching，会错误抑制 exact-edition recovery，造成当期 packet 永久缺失；而单次失败后自停长期任务会把一次事故扩大成后续每日持续漏跑。
 - **Root cause:** matching collector 缺少可在 job 启动前验证的目标 period/edition 身份，ChatGPT preflight 约束也未明确禁止用 `created_at` / `run_started_at` / 当前时钟推断 period；同时任务生命周期契约没有禁止单次故障修改长期 Scheduled Task 的 enabled 状态。Actions 侧 AM/PM 还共享同一个 concurrency group。
 - **Resolution:** [PR #47](https://github.com/fallw1nd/daily-game-brief/pull/47) / commit [`deee843`](https://github.com/fallw1nd/daily-game-brief/commit/deee84349004c804d58df5f2a9318abfb2937f7a) 为 `Final editorial packet` 增加目标 period/edition 可见的 run name，并把 collector concurrency 按 AM/PM 隔离；`docs/SCHEDULED_TASK_PROMPT.md` 规定只有目标 period/edition 被明确证明时才算 matching，禁止按实际运行时间猜测，无法证明或相反时段的 run 必须视为 non-matching 并允许 exact-edition recovery；同时明确任何单期 packet/recovery/validation/publication 故障都不得 disable、pause、改名或改时间两个长期 Scheduled Task。两个实际 ChatGPT 任务提示词已同步该规则，原晚报任务 `6a86cce353708191be251b6cf545fcc9` 已恢复启用，仍为每天17:00 Asia/Shanghai，早报任务保持10:10启用，没有新增长期任务。
@@ -314,3 +314,41 @@
 - **Close when:** 两次 GitHub-hosted shadow observation 均证明 IGN RSS 可用且时间稳定；bounded filter 保留目标 Review；IGN source promotion 与 filter 有回归测试；完整 `npm run check` 通过；修复合并后至少一次 read-only/production collector 以 `mode=active` 看到 IGN healthy 且能直接形成 Review candidates；不修改 Daily 固定窗口、schema、历史 Canonical 或 Scheduled Task。
 - **Resolution:** [PR #98](https://github.com/fallw1nd/daily-game-brief/pull/98) / merge commit `485fc3ba0474a8a2ae98ad72879c354e484184b3` 将 `ign-games` 以 `media + high`、`news/reviews/features/interviews` capabilities 正式升为 active，保留 GameSpot 现有 active 直采，并加入 bounded commerce filter、source registry / filter 回归测试与来源策略文档；普通单篇 Review 仍按 `reviews` lane 处理，不因来源品牌自动升级为 `review-score`。Metacritic/OpenCritic 的聚合分继续明确留给后续 durable snapshot/change-detection score-surface 机制，避免用当前页面状态伪造固定窗口内的“开分时间”。
 - **Verification:** shadow observation runs [33488938868](https://github.com/fallw1nd/daily-game-brief/actions/runs/33488938868) 与 [33489262329](https://github.com/fallw1nd/daily-game-brief/actions/runs/33489262329) 均成功；PR #98 最终 Verify run [33490339002](https://github.com/fallw1nd/daily-game-brief/actions/runs/33490339002) 通过完整 `npm run check` 并合并到 `main`。合并后 read-only acceptance run [33494171240](https://github.com/fallw1nd/daily-game-brief/actions/runs/33494171240) 成功：19/19 active sources healthy，`ign-games` 为 `mode:"active"` / `status:"ok"`，直接形成 `Onimusha: Way of the Sword Review` 与 `The Blood of Dawnwalker Review` 两条 `reviews` lane 候选，两者均保留 `2026-08-31T15:00:00Z` 精确发布时间并位于目标 Daily window。此次验收没有写入 automation state、packet、Canonical、public data、固定窗口、schema 或 Scheduled Task，关闭条件全部满足。
+
+---
+
+## 2026-09-02 append-only follow-up
+
+### Follow-up — MNT-20260830-01
+
+本段是既有 `MNT-20260830-01` 的追加记录，不是新问题。
+
+- **2026-09-02 production evidence:** `2026-09-02-daily` 再次验证单一 GitHub scheduler liveness 风险：10:10 collector 与后续 SLA 均发生明显延迟，而 10:20 的长期 ChatGPT Daily 任务当时按旧 contract 先消费历史 English backlog，再检查 missing-packet wake，因此当天独立 wake 机会被历史 locale 工作占用，NO.023 最终先进入 degraded publication。该现象属于本条既有“跨调度器缺包时必须保留独立 liveness backstop”的同一根因，不另开重复 MNT。
+- **2026-09-02 resolution follow-up:** [PR #100](https://github.com/fallw1nd/daily-game-brief/pull/100) / merge commit `519a06c8287a450a2121fa9c751810c969926da3` 将 Daily Scheduled Task contract 的顺序调整为 Canonical → 当前 Daily missing-packet wake → 至多一个历史 English repair，保证历史 locale backlog 不再抢占当天 liveness 机会；同时保留 GitHub 对 collection、SLA、publication、deployment 的单一恢复责任。现有长期 Scheduled Task 已同步读取当前 `main` contract，没有新增第二个 Daily task。
+- **2026-09-02 close-state update:** 本条继续保持 `in_progress`。这次事故证明修复必要，但发生故障时旧顺序尚未触发 exact wake，因此仍缺“真实生产中由 10:20 backstop 写 wake → exact packet acknowledgement → exact SLA/normal publication”的关闭证据；既定连续无人干预 Daily 条件也仍需自然积累，不人为制造缺包事故。
+
+## MNT-20260902-01 — 同版 revision 把当前 degraded edition 当作 adjacent edition
+
+- **Discovered:** 2026-09-02
+- **Priority:** P1
+- **Area:** discovery / same-edition revision / adjacent deduplication
+- **Status:** resolved
+- **Evidence:** NO.023 先由 SLA degraded fallback 发布后，授权同版 revision 的 collector 仍用 `public/data/latest.json` 作为 adjacent edition。由于 latest 已经是 `2026-09-02-daily` 本身，collector 会把当前 degraded Canonical 中已经出现的事件当成“上一期已报道”并去重，导致《No Rest for the Wicked》等应进入正式 revision 的候选被隐藏。
+- **Risk:** degraded baseline 一旦成为 latest，同版正式修订会对自己去重，造成高价值候选漏入 packet；最终版可能无法替换/清理 degraded 内容，即使上游来源和时间窗口都正确。
+- **Proposed resolution:** same-edition revision 必须从 manifest 找到当前 edition 的真实前一 edition 作为 adjacent；新期仍使用 latest，历史期按 manifest 邻接关系解析。Scheduled liveness 顺序问题继续归 `MNT-20260830-01`，不与本条混合关闭条件。
+- **Close when:** new/same-edition/historical/first-edition adjacency 回归通过；完整 Verify 通过；真实 `2026-09-02-daily` revision packet 的 `adjacentEdition` 为 `2026-09-01-daily`，并恢复 degraded edition 中被自去重的窗口内候选；正式 revision 成功发布且 Pages 部署成功。
+- **Resolution:** [PR #100](https://github.com/fallw1nd/daily-game-brief/pull/100) / merge commit `519a06c8287a450a2121fa9c751810c969926da3` 修正 published same-edition revision 的 adjacent resolver，并加入 `scripts/adjacent-edition.test.mjs` 回归；未修改固定窗口、schema、期号或历史 archive。
+- **Verification:** PR #100 合并后重新生成的 immutable packet blob `aac6bd99abf3bceaf8b4210b58071c551e1b3ed6` 明确记录 `editorialInput.adjacentEdition:"2026-09-01-daily"`，并重新包含《No Rest for the Wicked》延期、Turok: Origins 等 NO.023 正式 revision 候选。trusted publisher run [33604611326](https://github.com/fallw1nd/daily-game-brief/actions/runs/33604611326) 验证通过并以 commit `4f9ac246a4a6b5473cbc9398ab2fde462c34ed96` 写回 issue 23；媒体后续 commit `08e2eb38032ef8497699a785815c85f18b3f48a7` 成功补图，最终生产 Pages 在 locale repair 后以 main `706891f5737c78482f5615e4b2a79b86ce5cdfb9` / run [33605065664](https://github.com/fallw1nd/daily-game-brief/actions/runs/33605065664) 成功部署。关闭条件满足。
+
+## MNT-20260902-02 — 同版 revision 英文 Overlay 未按最终稳定 Canonical ID 顺序生成
+
+- **Discovered:** 2026-09-02
+- **Priority:** P1
+- **Area:** i18n / trusted publisher / same-edition revision
+- **Status:** in_progress
+- **Evidence:** NO.023 正式 same-edition revision 中，Canonical 正确复用了 degraded baseline 的稳定 entry ID 与已有 edition 顺序；但 normal English planner 先按 editorial include/eventKey 顺序生成 Overlay。validator 因此报 `entryId/order does not match canonical entry`，中文 Canonical 正常发布而 `localeEn` 降级为 `editorial-overlay-invalid`，需要额外 locale-only repair 才恢复英文。
+- **Risk:** 每次同版 revision 只要发生 stable-ID 复用或最终 Canonical 顺序与当前 editorial include 顺序不同，英文首轮都会无谓降级，产生额外 workflow、incident、Pages 部署和人工恢复负担；中文事实不受影响，但 bilingual 交付不能一次完成。
+- **Proposed resolution:** normal English planner 在 eventKey → stable `entryId` 绑定后，按最终 Canonical entries 顺序重排 Overlay；未知或无法映射的 ID 仍保留给现有 validator fail closed，不能通过排序掩盖非法 draft。locale-repair 继续直接使用 Canonical ID，不改变其安全边界。
+- **Close when:** 回归复现 preserved stable IDs 与 editorial include 顺序不同的 same-edition revision 并首轮生成 valid Overlay；完整 Verify 通过；修复合并；下一次真实同版 revision 在 normal publisher 首轮直接得到 `localeEn=available`，无需单独 locale-repair。不得为验收人为修改已完成的 NO.023。
+- **Resolution:** [PR #102](https://github.com/fallw1nd/daily-game-brief/pull/102) / squash merge commit `c3b2d9219ae13db53d51390aae9a8626f57a034f` 已将 `buildEnglishOverlay()` 的 eventKey 草稿在 stable ID 解析后按最终 Canonical 顺序排序，并新增 `scripts/bilingual-revision-order.test.mjs`；不修改 Canonical、固定窗口、期号、schema、Scheduled Task 或生产数据。
+- **Verification:** PR #102 head `b64055904597716569d4edb41fef395196df48cd` 的 Verify run [33605873758](https://github.com/fallw1nd/daily-game-brief/actions/runs/33605873758) 完整通过 `Validate, test, and build`。本次 NO.023 的实际英文已在修复合并前通过 locale-only trusted repair 恢复：main `706891f5737c78482f5615e4b2a79b86ce5cdfb9`、durable `localeEn.status:"available"`、最终 Pages run [33605065664](https://github.com/fallw1nd/daily-game-brief/actions/runs/33605065664) 成功。由于这条生产修复走的是 locale-repair 而非 PR #102 修改后的 normal revision path，最后一个生产关闭条件尚未满足，本条保持 `in_progress`。
