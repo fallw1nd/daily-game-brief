@@ -37,16 +37,16 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("`pending` starts a decision; `invalid` repairs one");
     expect(contract).toContain("durable `validationErrors` and `submissionSha`");
     expect(contract).toContain("Copy it unchanged to `packetBlobSha`");
-    expect(contract).toContain("Never skip backlog or derive identity from runner time");
+    expect(contract).toContain("Never skip Canonical backlog or derive its identity from runner time");
   });
 
-  it("keeps Canonical work ahead of English repair and wake recovery", () => {
-    expect(contract).toContain("two bounded lanes in order: current Canonical editorial work first, then at most one published English repair");
-    expect(contract).toContain("continue to English repair before considering the missing-packet wake");
-    expect(contract).toContain("immediate next missing Daily from current `main`");
+  it("keeps current Daily liveness ahead of English repair", () => {
+    expect(contract).toContain("three bounded checks in order: current Canonical editorial work first, then current Daily liveness wake, then at most one published English repair");
+    expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
+    expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
     expect(contract).toContain("`packet_missing_at_handoff`");
-    expect(contract).toContain("Never infer edition from Actions timing or wall-clock date");
+    expect(contract).toContain("Only when no Canonical decision and no current missing-packet wake is required");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');
   });
