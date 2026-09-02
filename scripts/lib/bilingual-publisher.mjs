@@ -115,6 +115,7 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
     };
   }
   const ids = entryIdsByEvent || deriveEntryIdsByEvent(editorial);
+  const canonicalOrder = new Map((canonical.entries || []).map((entry, index) => [entry.id, index]));
   const entries = (draft.entries || []).map((item) => ({
     entryId: ids[item.eventKey],
     headline: item.headline,
@@ -126,7 +127,11 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
     ...(Array.isArray(item.sourceLabels) && item.sourceLabels.length
       ? { sourceLabels: normalizeSourceLabels(item.sourceLabels) }
       : {}),
-  }));
+  })).sort((left, right) => {
+    const leftIndex = canonicalOrder.get(left.entryId) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = canonicalOrder.get(right.entryId) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex;
+  });
   return finalizeEnglishOverlay(canonical, {
     archiveTitle: draft.archiveTitle,
     entries,
