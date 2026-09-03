@@ -1,0 +1,128 @@
+name: One-shot revision media alt fix
+
+on:
+  push:
+    branches:
+      - fix/revision-media-alt-sync
+    paths:
+      - .github/workflows/one-shot-revision-media-alt-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/revision-media-alt-sync
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply bounded patch
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function replaceOnce(text, from, to, label) {
+            const first = text.indexOf(from);
+            if (first < 0) throw new Error(`missing patch anchor: ${label}`);
+            if (text.indexOf(from, first + from.length) >= 0) throw new Error(`non-unique patch anchor: ${label}`);
+            return text.slice(0, first) + to + text.slice(first + from.length);
+          }
+
+          const publisherPath = 'scripts/lib/edition-publisher.mjs';
+          let publisher = fs.readFileSync(publisherPath, 'utf8');
+          publisher = replaceOnce(
+            publisher,
+            'import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";\n',
+            'import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";\nimport { generatedEditorialAlt } from "./media-alt.mjs";\n',
+            'media-alt import',
+          );
+          publisher = replaceOnce(
+            publisher,
+            `function entryMedia(previous, imageSeed) {\n  if (previous?.image_status === "verified" && Array.isArray(previous.images) && previous.images.length) {\n    return {\n      imageSeed,\n      images: previous.images,\n      image_status: "verified",\n      ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),\n    };\n  }\n  return {\n    imageSeed,\n    image_status: "unavailable",\n    imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",\n  };\n}\n`,
+            `function entryMedia(previous, imageSeed, nextRecord) {\n  if (previous?.image_status === "verified" && Array.isArray(previous.images) && previous.images.length) {\n    const previousGeneratedAlt = generatedEditorialAlt(previous);\n    const nextGeneratedAlt = generatedEditorialAlt(nextRecord);\n    const images = previous.images.map((image) =>\n      image?.kind === "editorial" && image.alt === previousGeneratedAlt\n        ? { ...image, alt: nextGeneratedAlt }\n        : image\n    );\n    return {\n      imageSeed,\n      images,\n      image_status: "verified",\n      ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),\n    };\n  }\n  return {\n    imageSeed,\n    image_status: "unavailable",\n    imageNote: "正文先行发布；图片由异步媒体流程按一手页、官方视频和商店素材顺序自动核验补全。",\n  };\n}\n`,
+            'entryMedia',
+          );
+          publisher = replaceOnce(
+            publisher,
+            `    if (!previous) counters.set(decision.section, index + 1);\n    entryByEvent.set(decision.eventKey, id);\n    return {\n      id,\n      section: decision.section,\n      title,\n      headline: localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })),\n`,
+            `    if (!previous) counters.set(decision.section, index + 1);\n    entryByEvent.set(decision.eventKey, id);\n    const headline = localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }));\n    return {\n      id,\n      section: decision.section,\n      title,\n      headline,\n`,
+            'headline reuse',
+          );
+          publisher = replaceOnce(
+            publisher,
+            '      ...entryMedia(previous, decision.titleKey),\n',
+            '      ...entryMedia(previous, decision.titleKey, { id, title, headline }),\n',
+            'entryMedia call',
+          );
+          fs.writeFileSync(publisherPath, publisher);
+
+          const testPath = 'scripts/edition-revision-overlay.test.mjs';
+          let test = fs.readFileSync(testPath, 'utf8');
+          test = replaceOnce(
+            test,
+            '      alt: "Young Suns",\n',
+            '      alt: "rebuilding better together for the 1 0：[自动事实清单] Rebuilding Better Together for the 1.0 Launch of Young Suns相关配图",\n',
+            'degraded generated alt fixture',
+          );
+          test = replaceOnce(
+            test,
+            '    expect(result.edition.entries[0].images[0].url).toBe("media/briefs/halloween.jpg");\n',
+            '    expect(result.edition.entries[0].images[0].url).toBe("media/briefs/halloween.jpg");\n    expect(result.edition.entries[0].images[0].alt).toBe("Halloween");\n',
+            'manual alt preservation assertion',
+          );
+          test = replaceOnce(
+            test,
+            '    expect(entry?.images?.[0]?.url).toBe("media/briefs/young-suns.jpg");\n',
+            '    expect(entry?.images?.[0]?.url).toBe("media/briefs/young-suns.jpg");\n    expect(entry?.images?.[0]?.alt).toBe("Young Suns：《Young Suns》1.0版本正式上线相关配图");\n',
+            'generated alt refresh assertion',
+          );
+          fs.writeFileSync(testPath, test);
+
+          const dataPaths = [
+            'public/data/latest.json',
+            'public/data/archive/2026/09/2026-09-03-daily.json',
+          ];
+          const expectedAlt = 'Another Eden Begins：《Another Eden Begins》免费体验版上线，可游玩至主线第6章并继承存档相关配图';
+          for (const path of dataPaths) {
+            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            if (data.id !== '2026-09-03-daily' || data.issueNumber !== 24) throw new Error(`unexpected edition in ${path}`);
+            const entry = data.entries.find((item) => item.id === '2026-09-03-daily-releases-0');
+            if (!entry || entry.headline !== '《Another Eden Begins》免费体验版上线，可游玩至主线第6章并继承存档') throw new Error(`unexpected target entry in ${path}`);
+            const image = entry.images?.find((item) => item.kind === 'editorial');
+            if (!image || !image.alt.includes('[自动事实清单]')) throw new Error(`stale generated alt not found in ${path}`);
+            image.alt = expectedAlt;
+            fs.writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
+          }
+          NODE
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate, test, and build
+        run: npm run check
+      - name: Verify bounded diff and commit
+        shell: bash
+        run: |
+          rm .github/workflows/one-shot-revision-media-alt-fix.yml
+          changed="$(git status --short | awk '{print $2}' | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/one-shot-revision-media-alt-fix.yml \
+            public/data/archive/2026/09/2026-09-03-daily.json \
+            public/data/latest.json \
+            scripts/edition-revision-overlay.test.mjs \
+            scripts/lib/edition-publisher.mjs | sort)"
+          if [ "$changed" != "$expected" ]; then
+            echo "Unexpected diff:" >&2
+            git status --short >&2
+            exit 1
+          fi
+          git config user.name "fallw1nd"
+          git config user.email "60083508+fallw1nd@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(media): sync reused revision alt text"
+          git push origin HEAD:fix/revision-media-alt-sync
