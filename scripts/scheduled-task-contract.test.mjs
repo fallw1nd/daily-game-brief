@@ -9,16 +9,18 @@ const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "
 const publisherWorkflow = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
 
 describe("Daily scheduled-task orchestration contract", () => {
-  it("uses one Daily production task with a bounded second pass", () => {
-    expect(contract).toContain("one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 10:32");
+  it("uses one Daily production task with an hourly-safe second pass", () => {
+    expect(contract).toContain("one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 11:20");
+    expect(contract).toContain("GitHub's degraded fallback deadline is 11:40");
     expect(contract).toContain("There is still only one long-lived ChatGPT task");
     expect(contract).toContain("former PM task is disabled");
-    expect(contract).toContain("Daily closes evidence at 10:10 and is planned for public release at 12:00");
+    expect(contract).toContain("public release remains planned for 12:00");
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
     expect(slaWorkflow).toContain('- cron: "0 3 * * *"');
+    expect(slaWorkflow).toContain('- cron: "40 3 * * *"');
     expect(mediaWorkflow).toContain('- cron: "10 3 * * *"');
     expect(packetWorkflow.match(/- cron:/g)).toHaveLength(1);
-    expect(slaWorkflow.match(/- cron:/g)).toHaveLength(1);
+    expect(slaWorkflow.match(/- cron:/g)).toHaveLength(2);
     expect(mediaWorkflow.match(/- cron:/g)).toHaveLength(1);
   });
 
@@ -56,7 +58,7 @@ describe("Daily scheduled-task orchestration contract", () => {
 
   it("leaves in-flight publication and timeout states to GitHub", () => {
     expect(contract).toContain("`submitted`/`valid` belong to GitHub's publication lane");
-    expect(contract).toContain("`timed_out` to its SLA lane");
+    expect(contract).toContain("`timed_out` to its degraded fallback lane");
     expect(contract).toContain("never select or re-edit them");
     expect(contract).toContain("GitHub Actions owns collection recovery, validation, trusted publication, deployment, state acknowledgement, and incidents");
     expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
