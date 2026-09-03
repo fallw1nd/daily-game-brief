@@ -9,8 +9,9 @@ const mediaWorkflow = await readFile(".github/workflows/media-enrichment.yml", "
 const publisherWorkflow = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
 
 describe("Daily scheduled-task orchestration contract", () => {
-  it("uses one Daily production cadence", () => {
-    expect(contract).toContain("one active long-lived ChatGPT editorial task: Daily at 10:20");
+  it("uses one Daily production task with a bounded second pass", () => {
+    expect(contract).toContain("one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 10:32");
+    expect(contract).toContain("There is still only one long-lived ChatGPT task");
     expect(contract).toContain("former PM task is disabled");
     expect(contract).toContain("Daily closes evidence at 10:10 and is planned for public release at 12:00");
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
@@ -40,12 +41,14 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("Never skip Canonical backlog or derive its identity from runner time");
   });
 
-  it("keeps current Daily liveness ahead of English repair", () => {
+  it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
     expect(contract).toContain("three bounded checks in order: current Canonical editorial work first, then current Daily liveness wake, then at most one published English repair");
     expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
     expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
     expect(contract).toContain("`packet_missing_at_handoff`");
+    expect(contract).toContain("Then stop the current invocation. A later invocation may consume the acknowledged packet");
+    expect(contract).toContain("never wait for or poll Actions inside the wake invocation");
     expect(contract).toContain("Only when no Canonical decision and no current missing-packet wake is required");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');
@@ -83,7 +86,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   it("never lets one failure mutate the active task", () => {
     expect(contract).toContain("do not poll Actions");
     expect(contract).toContain("Then stop");
-    expect(contract).toContain("A single Canonical or locale failure must never pause, disable, rename, reschedule, or otherwise mutate the active Daily task");
+    expect(contract).toContain("A single Canonical or locale failure must never mutate the active Daily task");
   });
 
   it("stays a thin orchestration prompt", () => {
