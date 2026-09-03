@@ -6,6 +6,7 @@ import {
   verifiedWindowTimeError,
 } from "./time-window.mjs";
 import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";
+import { generatedEditorialAlt } from "./media-alt.mjs";
 
 export { editorialDecisionDigest };
 
@@ -119,11 +120,18 @@ function upcomingEntry(item, previous) {
   };
 }
 
-function entryMedia(previous, imageSeed) {
+function entryMedia(previous, imageSeed, nextRecord) {
   if (previous?.image_status === "verified" && Array.isArray(previous.images) && previous.images.length) {
+    const previousGeneratedAlt = generatedEditorialAlt(previous);
+    const nextGeneratedAlt = generatedEditorialAlt(nextRecord);
+    const images = previous.images.map((image) =>
+      image?.kind === "editorial" && image.alt === previousGeneratedAlt
+        ? { ...image, alt: nextGeneratedAlt }
+        : image
+    );
     return {
       imageSeed,
-      images: previous.images,
+      images,
       image_status: "verified",
       ...(Array.isArray(previous.mediaSources) ? { mediaSources: previous.mediaSources } : {}),
     };
@@ -198,11 +206,12 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;
     if (!previous) counters.set(decision.section, index + 1);
     entryByEvent.set(decision.eventKey, id);
+    const headline = localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }));
     return {
       id,
       section: decision.section,
       title,
-      headline: localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })),
+      headline,
       summary: localizeRegisteredTitles(decision.summary),
       beijingTime: decision.beijingTime || window.windowEnd,
       ...(timeEvidenceAt ? { timeEvidenceAt } : {}),
@@ -217,7 +226,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       entry_flags: decision.entryFlags,
       tracking: decision.tracking,
       ...(decision.sharedFactFrame ? { sharedFactFrameDigest: projectionDigest(decision.sharedFactFrame) } : {}),
-      ...entryMedia(previous, decision.titleKey),
+      ...entryMedia(previous, decision.titleKey, { id, title, headline }),
     };
   });
   const revisedById = new Map(revisedEntries.map((entry) => [entry.id, entry]));
