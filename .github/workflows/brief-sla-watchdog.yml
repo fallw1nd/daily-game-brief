@@ -2,8 +2,9 @@ name: Brief publication SLA watchdog
 
 on:
   schedule:
-    # Daily publication SLA: 11:00 Asia/Shanghai.
+    # 11:00 preflight keeps packet recovery independent; 11:40 is the Daily degraded fallback deadline.
     - cron: "0 3 * * *"
+    - cron: "40 3 * * *"
   workflow_dispatch:
     inputs:
       period:
@@ -70,6 +71,25 @@ jobs:
       - name: Check repository and deployed manifest
         id: sla
         run: node scripts/check-brief-sla.mjs --period=${{ steps.edition.outputs.period }} --edition=${{ steps.edition.outputs.edition }}
+
+      - name: Resolve degraded fallback deadline
+        id: deadline
+        shell: bash
+        env:
+          EDITION_ID: ${{ steps.edition.outputs.edition }}
+          PERIOD: ${{ steps.edition.outputs.period }}
+        run: |
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const edition = process.env.EDITION_ID || "";
+          const period = process.env.PERIOD || "";
+          if (period !== "daily") {
+            console.log("degraded_due=true");
+            process.exit(0);
+          }
+          const date = edition.slice(0, 10);
+          const deadline = new Date(`${date}T03:40:00Z`);
+          console.log(`degraded_due=${Date.now() >= deadline.getTime() ? "true" : "false"}`);
+          NODE
 
       - name: Restore acknowledged immutable packet
         id: packet
@@ -170,7 +190,7 @@ jobs:
 
       - name: Build and publish degraded fact list
         id: fallback
-        if: steps.sla.outputs.status != 'healthy' && steps.packet_ready.outputs.available == 'true'
+        if: steps.deadline.outputs.degraded_due == 'true' && steps.sla.outputs.status != 'healthy' && steps.packet_ready.outputs.available == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -270,14 +290,14 @@ jobs:
           fi
 
       - name: Open or update SLA incident
-        if: steps.sla.outputs.status != 'healthy' && (steps.fallback.outputs.published != 'true' || steps.ledger_feedback.outcome == 'failure')
+        if: steps.deadline.outputs.degraded_due == 'true' && steps.sla.outputs.status != 'healthy' && (steps.fallback.outputs.published != 'true' || steps.ledger_feedback.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
           existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
-          body="The scheduled edition did not reach a healthy deployed state by the SLA check.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Pages re-dispatched: **${{ steps.fallback.outputs.deploy_retriggered || 'false' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
+          body="The scheduled edition did not reach a healthy deployed state by the degraded fallback deadline.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Pages re-dispatched: **${{ steps.fallback.outputs.deploy_retriggered || 'false' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
           body="$body\n- Ledger feedback: **${{ steps.ledger_feedback.outcome || 'not run' }}**"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
@@ -305,6 +325,7 @@ jobs:
             echo "## Brief SLA"
             echo "- Expected: ${{ steps.sla.outputs.expected }}"
             echo "- Status: ${{ steps.sla.outputs.status }}"
+            echo "- Degraded fallback due: ${{ steps.deadline.outputs.degraded_due || 'false' }}"
             echo "- Local latest: ${{ steps.sla.outputs.local_latest }}"
             echo "- Online latest: ${{ steps.sla.outputs.online_latest || 'unavailable' }}"
             echo "- Original packet: ${{ steps.packet.outputs.available || 'false' }}"
