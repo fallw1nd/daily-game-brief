@@ -345,10 +345,31 @@
 - **Discovered:** 2026-09-02
 - **Priority:** P1
 - **Area:** i18n / trusted publisher / same-edition revision
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** NO.023 正式 same-edition revision 中，Canonical 正确复用了 degraded baseline 的稳定 entry ID 与已有 edition 顺序；但 normal English planner 先按 editorial include/eventKey 顺序生成 Overlay。validator 因此报 `entryId/order does not match canonical entry`，中文 Canonical 正常发布而 `localeEn` 降级为 `editorial-overlay-invalid`，需要额外 locale-only repair 才恢复英文。
 - **Risk:** 每次同版 revision 只要发生 stable-ID 复用或最终 Canonical 顺序与当前 editorial include 顺序不同，英文首轮都会无谓降级，产生额外 workflow、incident、Pages 部署和人工恢复负担；中文事实不受影响，但 bilingual 交付不能一次完成。
 - **Proposed resolution:** normal English planner 在 eventKey → stable `entryId` 绑定后，按最终 Canonical entries 顺序重排 Overlay；未知或无法映射的 ID 仍保留给现有 validator fail closed，不能通过排序掩盖非法 draft。locale-repair 继续直接使用 Canonical ID，不改变其安全边界。
 - **Close when:** 回归复现 preserved stable IDs 与 editorial include 顺序不同的 same-edition revision 并首轮生成 valid Overlay；完整 Verify 通过；修复合并；下一次真实同版 revision 在 normal publisher 首轮直接得到 `localeEn=available`，无需单独 locale-repair。不得为验收人为修改已完成的 NO.023。
 - **Resolution:** [PR #102](https://github.com/fallw1nd/daily-game-brief/pull/102) / squash merge commit `c3b2d9219ae13db53d51390aae9a8626f57a034f` 已将 `buildEnglishOverlay()` 的 eventKey 草稿在 stable ID 解析后按最终 Canonical 顺序排序，并新增 `scripts/bilingual-revision-order.test.mjs`；不修改 Canonical、固定窗口、期号、schema、Scheduled Task 或生产数据。
 - **Verification:** PR #102 head `b64055904597716569d4edb41fef395196df48cd` 的 Verify run [33605873758](https://github.com/fallw1nd/daily-game-brief/actions/runs/33605873758) 完整通过 `Validate, test, and build`。本次 NO.023 的实际英文已在修复合并前通过 locale-only trusted repair 恢复：main `706891f5737c78482f5615e4b2a79b86ce5cdfb9`、durable `localeEn.status:"available"`、最终 Pages run [33605065664](https://github.com/fallw1nd/daily-game-brief/actions/runs/33605065664) 成功。由于这条生产修复走的是 locale-repair 而非 PR #102 修改后的 normal revision path，最后一个生产关闭条件尚未满足，本条保持 `in_progress`。
+- **2026-09-03 production close verification:** `2026-09-03-daily` 是 PR #102 合并后的下一次真实 same-edition revision。normal trusted publisher run [33738320922](https://github.com/fallw1nd/daily-game-brief/actions/runs/33738320922) 在首轮完成 evidence validation、build、atomic publication 与 Canonical/locale acknowledgement；`Acknowledge repaired English locale` 与 degraded-English incident 步骤均未运行，durable state 直接记录 `localeEn.status:"available"`。最终 production state 保持 `editorial:"valid"`、`publication:"committed"`、`localeEn:"available"`，无需 locale-only repair，满足本条最后一个生产关闭条件。
+
+---
+
+## 2026-09-03 append-only follow-up
+
+### Follow-up — MNT-20260830-01
+
+本段是既有 `MNT-20260830-01` 的追加记录，不是新问题。
+
+- **2026-09-03 production evidence:** 10:20 长期 ChatGPT Daily 任务在北京时间约10:24正常执行并成功写入 exact `automation/wake/2026-09-03-daily.json`；GitHub 随后于10:26将 `2026-09-03-daily` packet 持久化为 ready。但当时 contract 要求 wake invocation 提交后立即停止，且同一长期任务当天没有第二次运行机会，因此 ready packet 一直没有 Canonical submission，11:00 旧 SLA 将其标为 `timed_out` 并发布 degraded NO.024。这证明“wake 成功”本身不足以保证 SLA 前完成编辑，仍需要独立的后续 editor pass。
+- **2026-09-03 resolution follow-up:** [PR #103](https://github.com/fallw1nd/daily-game-brief/pull/103) 先建立 one-task second-pass contract；ChatGPT Tasks 平台随后明确拒绝同一任务10:20/10:32的一小时内双运行，因此最终 production commit [`d155f0b`](https://github.com/fallw1nd/daily-game-brief/commit/d155f0b24c2619449f2ed5c28622a1adb02a5c32) 将唯一长期任务改为10:20与11:20两个 exact invocation，并把 GitHub 11:00 watchdog 限定为 packet/recovery preflight、真正 degraded fallback 延后至11:40。实际 task `6a86ccc265fc8191a6c72a6bab1cdcea` 已原地更新，仍为唯一启用 Daily task；未创建第二个长期任务。
+- **2026-09-03 close-state update:** 本条继续保持 `in_progress`。9月3日事故提供了“10:20 wake → exact packet acknowledgement”的真实证据，但新10:20/11:20结构是在事故后上线，尚缺一次自然生产中“10:20需要 wake → GitHub packet ready → 11:20 safety pass 正常提交 → 11:40前 normal publisher 接管”的闭环，以及既定连续无人干预 Daily 证据；不人为制造缺包事故来凑关闭条件。
+
+### Follow-up — MNT-20260828-05
+
+本段是既有 `MNT-20260828-05` 的追加记录，不是新问题。
+
+- **2026-09-03 recurrence:** NO.024 从 degraded baseline 正式 same-edition revision 后，`Another Eden Begins` 正文已变为正常中文编辑稿，但 publisher 复用已验证图片时原样复制 degraded 阶段自动生成的 alt，导致 alt 仍含 `[自动事实清单]`。这说明 PR #37 只覆盖 title backfill，尚未覆盖 same-edition revision 的 verified-media reuse 路径。
+- **2026-09-03 resolution follow-up:** [PR #105](https://github.com/fallw1nd/daily-game-brief/pull/105) / merge commit `d86ebb10041b6e55ce7e0e26b8cb09da36669c6f` 扩展媒体复用逻辑：只有旧 alt 精确等于旧 entry 的 deterministic generated editorial alt 时，才按新 title/headline 重建；manual/source-authored alt 保持不变。回归覆盖 degraded source-URL replacement 与 manual alt preservation；同时只修正 NO.024 latest/archive 的这一处 accessibility alt，不改变事实、期号、窗口、来源、图片二进制或英文 Overlay。one-shot bounded run [33741973599](https://github.com/fallw1nd/daily-game-brief/actions/runs/33741973599) 与标准 PR Verify run [33742315538](https://github.com/fallw1nd/daily-game-brief/actions/runs/33742315538) 均通过完整 `npm run check`，Pages run [33742426044](https://github.com/fallw1nd/daily-game-brief/actions/runs/33742426044) 成功；NO.024 latest/archive 当前为同一 blob，修正后的 alt 已与正式 headline 同步。
+- **2026-09-03 close-state update:** 本条仍保持 `in_progress`。新的 same-edition revision 防复发与 NO.024 当前数据已经修正，但原 Close when 还要求已知 `2026-08-28-am` Gravhounds 历史 stale alt 被安全修正；本次授权范围是今天的生产事故，不顺带修改该历史 archive。
