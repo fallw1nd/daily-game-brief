@@ -137,7 +137,7 @@ function degradedYoungSunsEntry() {
     sources: [{ label: "Xbox Wire", url: "https://news.xbox.com/en-us/example/young-suns", kind: "primary" }],
     images: [{
       url: "media/briefs/young-suns.jpg",
-      alt: "Young Suns",
+      alt: "rebuilding better together for the 1 0：[自动事实清单] Rebuilding Better Together for the 1.0 Launch of Young Suns相关配图",
       credit: "Xbox Wire",
       sourceUrl: "https://news.xbox.com/en-us/example/young-suns",
       kind: "editorial",
@@ -163,6 +163,7 @@ describe("authorized same-edition revision overlay", () => {
     expect(result.edition.entries[0].headline).toBe("Updated Halloween headline");
     expect(result.edition.entries[0].image_status).toBe("verified");
     expect(result.edition.entries[0].images[0].url).toBe("media/briefs/halloween.jpg");
+    expect(result.edition.entries[0].images[0].alt).toBe("Halloween");
     expect(result.edition.entries[1].headline).toBe("Existing Crescent Tower story");
     expect(result.edition.entries[1].image_status).toBe("verified");
     expect(result.edition.entries[2].id).toBe(`${editionId}-news-2`);
@@ -227,6 +228,7 @@ describe("authorized same-edition revision overlay", () => {
     expect(entry?.headline).toBe("《Young Suns》1.0版本正式上线");
     expect(entry?.image_status).toBe("verified");
     expect(entry?.images?.[0]?.url).toBe("media/briefs/young-suns.jpg");
+    expect(entry?.images?.[0]?.alt).toBe("Young Suns：《Young Suns》1.0版本正式上线相关配图");
     expect(result.edition.entries.some((item) => item.headline.startsWith("[自动事实清单]"))).toBe(false);
   });
 
