@@ -1,0 +1,63 @@
+name: One-shot maintenance 2026-09-03
+
+on:
+  push:
+    branches:
+      - docs/maintenance-20260903-recovery
+    paths:
+      - .github/workflows/one-shot-maintenance-20260903.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: docs/maintenance-20260903-recovery
+          fetch-depth: 0
+      - name: Update append-only maintenance ledger
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'docs/MAINTENANCE_LOG.md';
+          let text = fs.readFileSync(path, 'utf8');
+
+          const heading = '## MNT-20260902-02 — 同版 revision 英文 Overlay 未按最终稳定 Canonical ID 顺序生成';
+          const start = text.indexOf(heading);
+          if (start < 0) throw new Error('MNT-20260902-02 heading missing');
+          const next = text.indexOf('\n## ', start + heading.length);
+          const end = next < 0 ? text.length : next;
+          let section = text.slice(start, end);
+          const statusFrom = '- **Status:** in_progress';
+          if (!section.includes(statusFrom)) throw new Error('MNT-20260902-02 is not in_progress');
+          if ((section.match(/- \*\*Status:\*\*/g) || []).length !== 1) throw new Error('ambiguous status in MNT-20260902-02');
+          section = section.replace(statusFrom, '- **Status:** resolved');
+          const closeEvidence = '- **2026-09-03 production close verification:** `2026-09-03-daily` 是 PR #102 合并后的下一次真实 same-edition revision。normal trusted publisher run [33738320922](https://github.com/fallw1nd/daily-game-brief/actions/runs/33738320922) 在首轮完成 evidence validation、build、atomic publication 与 Canonical/locale acknowledgement；`Acknowledge repaired English locale` 与 degraded-English incident 步骤均未运行，durable state 直接记录 `localeEn.status:"available"`。最终 production state 保持 `editorial:"valid"`、`publication:"committed"`、`localeEn:"available"`，无需 locale-only repair，满足本条最后一个生产关闭条件。';
+          if (!section.includes(closeEvidence)) section = section.trimEnd() + `\n${closeEvidence}\n`;
+          text = text.slice(0, start) + section + text.slice(end);
+
+          const followupMarker = '## 2026-09-03 append-only follow-up';
+          if (text.includes(followupMarker)) throw new Error('2026-09-03 follow-up already exists');
+          text = text.trimEnd() + `\n\n---\n\n${followupMarker}\n\n### Follow-up — MNT-20260830-01\n\n本段是既有 \`MNT-20260830-01\` 的追加记录，不是新问题。\n\n- **2026-09-03 production evidence:** 10:20 长期 ChatGPT Daily 任务在北京时间约10:24正常执行并成功写入 exact \`automation/wake/2026-09-03-daily.json\`；GitHub 随后于10:26将 \`2026-09-03-daily\` packet 持久化为 ready。但当时 contract 要求 wake invocation 提交后立即停止，且同一长期任务当天没有第二次运行机会，因此 ready packet 一直没有 Canonical submission，11:00 旧 SLA 将其标为 \`timed_out\` 并发布 degraded NO.024。这证明“wake 成功”本身不足以保证 SLA 前完成编辑，仍需要独立的后续 editor pass。\n- **2026-09-03 resolution follow-up:** [PR #103](https://github.com/fallw1nd/daily-game-brief/pull/103) 先建立 one-task second-pass contract；ChatGPT Tasks 平台随后明确拒绝同一任务10:20/10:32的一小时内双运行，因此最终 production commit [\`d155f0b\`](https://github.com/fallw1nd/daily-game-brief/commit/d155f0b24c2619449f2ed5c28622a1adb02a5c32) 将唯一长期任务改为10:20与11:20两个 exact invocation，并把 GitHub 11:00 watchdog 限定为 packet/recovery preflight、真正 degraded fallback 延后至11:40。实际 task \`6a86ccc265fc8191a6c72a6bab1cdcea\` 已原地更新，仍为唯一启用 Daily task；未创建第二个长期任务。\n- **2026-09-03 close-state update:** 本条继续保持 \`in_progress\`。9月3日事故提供了“10:20 wake → exact packet acknowledgement”的真实证据，但新10:20/11:20结构是在事故后上线，尚缺一次自然生产中“10:20需要 wake → GitHub packet ready → 11:20 safety pass 正常提交 → 11:40前 normal publisher 接管”的闭环，以及既定连续无人干预 Daily 证据；不人为制造缺包事故来凑关闭条件。\n\n### Follow-up — MNT-20260828-05\n\n本段是既有 \`MNT-20260828-05\` 的追加记录，不是新问题。\n\n- **2026-09-03 recurrence:** NO.024 从 degraded baseline 正式 same-edition revision 后，\`Another Eden Begins\` 正文已变为正常中文编辑稿，但 publisher 复用已验证图片时原样复制 degraded 阶段自动生成的 alt，导致 alt 仍含 \`[自动事实清单]\`。这说明 PR #37 只覆盖 title backfill，尚未覆盖 same-edition revision 的 verified-media reuse 路径。\n- **2026-09-03 resolution follow-up:** [PR #105](https://github.com/fallw1nd/daily-game-brief/pull/105) / merge commit \`d86ebb10041b6e55ce7e0e26b8cb09da36669c6f\` 扩展媒体复用逻辑：只有旧 alt 精确等于旧 entry 的 deterministic generated editorial alt 时，才按新 title/headline 重建；manual/source-authored alt 保持不变。回归覆盖 degraded source-URL replacement 与 manual alt preservation；同时只修正 NO.024 latest/archive 的这一处 accessibility alt，不改变事实、期号、窗口、来源、图片二进制或英文 Overlay。one-shot bounded run [33741973599](https://github.com/fallw1nd/daily-game-brief/actions/runs/33741973599) 与标准 PR Verify run [33742315538](https://github.com/fallw1nd/daily-game-brief/actions/runs/33742315538) 均通过完整 \`npm run check\`，Pages run [33742426044](https://github.com/fallw1nd/daily-game-brief/actions/runs/33742426044) 成功；NO.024 latest/archive 当前为同一 blob，修正后的 alt 已与正式 headline 同步。\n- **2026-09-03 close-state update:** 本条仍保持 \`in_progress\`。新的 same-edition revision 防复发与 NO.024 当前数据已经修正，但原 Close when 还要求已知 \`2026-08-28-am\` Gravhounds 历史 stale alt 被安全修正；本次授权范围是今天的生产事故，不顺带修改该历史 archive。\n`;
+          fs.writeFileSync(path, text);
+          NODE
+      - name: Verify only maintenance log changed
+        shell: bash
+        run: |
+          rm .github/workflows/one-shot-maintenance-20260903.yml
+          changed="$(git status --short | awk '{print $2}' | sort)"
+          expected="$(printf '%s\n' .github/workflows/one-shot-maintenance-20260903.yml docs/MAINTENANCE_LOG.md | sort)"
+          if [ "$changed" != "$expected" ]; then
+            echo "Unexpected diff:" >&2
+            git status --short >&2
+            exit 1
+          fi
+          git config user.name "fallw1nd"
+          git config user.email "60083508+fallw1nd@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(maintenance): record 2026-09-03 recovery acceptance"
+          git push origin HEAD:docs/maintenance-20260903-recovery
