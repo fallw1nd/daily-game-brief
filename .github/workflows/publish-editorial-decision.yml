@@ -311,6 +311,19 @@ jobs:
             gh issue close "$number" --comment "English locale is available after trusted locale repair. Canonical publication remained unchanged."
           fi
 
+      - name: Close recovered publication incident
+        if: steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          edition="${{ steps.submission.outputs.edition }}"
+          title="Editorial publication failed: $edition"
+          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          if [ -n "$number" ]; then
+            gh issue close "$number" --comment "Recovered by trusted publisher run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Canonical publication is committed for the same edition; fixed window and issue identity are unchanged."
+          fi
+
       - name: Trigger Pages deployment
         if: steps.publication.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && steps.submission.outputs.mode == 'publish')
         env:
