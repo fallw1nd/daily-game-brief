@@ -84,6 +84,13 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("repair that field without changing unrelated decisions or adding evidence");
   });
 
+  it("closes stale publication incidents after trusted recovery", () => {
+    expect(publisherWorkflow).toContain("Close recovered publication incident");
+    expect(publisherWorkflow).toContain("Editorial publication failed: $edition");
+    expect(publisherWorkflow).toContain("steps.publication.outcome == 'success'");
+    expect(publisherWorkflow).toContain("Recovered by trusted publisher run");
+  });
+
   it("repairs English against final Canonical IDs instead of mutable event keys", () => {
     expect(contract).toContain("Final Canonical `entryId` and order are authoritative");
     expect(contract).toContain("Each English entry uses final Canonical `entryId`");
