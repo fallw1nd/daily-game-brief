@@ -64,6 +64,21 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
   });
 
+  it("self-checks shared fact identity before handing a submission to the publisher", () => {
+    expect(contract).toContain("validator-parity self-checks");
+    expect(contract).toContain("every packet package/tracking item appears exactly once");
+    expect(contract).toContain("`sharedFactFrame.subjectTitleKey === titleKey`");
+    expect(contract).toContain("`sharedFactFrame.platforms` exactly equals the Canonical `platforms` array in values and order");
+    expect(contract).toContain("Do not weaken or work around these invariants");
+  });
+
+  it("keeps Daily preflight and degraded fallback on separate GitHub deadlines", () => {
+    expect(architecture).toContain("11:00 Daily watchdog pass is recovery/preflight only");
+    expect(architecture).toContain("11:40 is the first Daily timeout/degraded fallback deadline");
+    expect(architecture).toContain("one long-lived Daily task with exact 10:20 and 11:20 invocations");
+    expect(architecture).not.toContain("Daily packet runs, including those started by the bounded wake signal, use the 11:00 SLA");
+  });
+
   it("keeps editorial facts bounded while attempting English by default", () => {
     expect(contract).toContain("add nothing outside the packet");
     expect(contract).toContain("Follow live `AGENTS.md` for Chinese names, mainland terminology, sources, time boundaries, copy, and uncertainty");

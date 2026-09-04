@@ -16,6 +16,7 @@ The task has three bounded checks in order: current Canonical editorial work fir
 ## 2. Canonical submission
 - Return exactly one `include`, `exclude`, or `needs_review` for every packet package/tracking item; add nothing outside the packet. Use only opened evidence. `official` needs opened primary evidence; `multi_source_verified` needs two independent reliable sources. Never invent a `requires_subject_identity` subject. Daily uses `upcomingMode:"replace"`.
 - Follow live `AGENTS.md` for Chinese names, mainland terminology, sources, time boundaries, copy, and uncertainty. Narrow naming lookups cannot change facts. Every include needs a complete language-neutral `sharedFactFrame`; do not invent issue numbers, final `entryId`, or digests.
+- Before committing, perform validator-parity self-checks: every packet package/tracking item appears exactly once; for every include, `sharedFactFrame.subjectTitleKey === titleKey`, and `sharedFactFrame.platforms` exactly equals the Canonical `platforms` array in values and order. Do not weaken or work around these invariants.
 - For every normal Daily submission, attempt complete `locales.en` by default. English is nonblocking, but omission is exceptional. English must match Canonical order and stay inside the same evidence/sharedFactFrame. If complete English cannot safely be produced, omit `locales.en`.
 - Commit only `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`. After it succeeds, do not poll Actions and stop the current invocation.
 
