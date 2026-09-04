@@ -75,6 +75,22 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("omit `locales.en`");
   });
 
+  it("requires a validator-shaped pre-submit self-check", () => {
+    expect(contract).toContain("Before committing, self-check every include against the immutable packet");
+    expect(contract).toContain("`sharedFactFrame.subjectTitleKey`");
+    expect(contract).toContain("`sharedFactFrame.platforms`");
+    expect(contract).toContain("must exactly match the Canonical title/platform decision");
+    expect(contract).toContain("durable `validationErrors` name a field");
+    expect(contract).toContain("repair that field without changing unrelated decisions or adding evidence");
+  });
+
+  it("closes stale publication incidents after trusted recovery", () => {
+    expect(publisherWorkflow).toContain("Close recovered publication incident");
+    expect(publisherWorkflow).toContain("Editorial publication failed: $edition");
+    expect(publisherWorkflow).toContain("steps.publication.outcome == 'success'");
+    expect(publisherWorkflow).toContain("Recovered by trusted publisher run");
+  });
+
   it("repairs English against final Canonical IDs instead of mutable event keys", () => {
     expect(contract).toContain("Final Canonical `entryId` and order are authoritative");
     expect(contract).toContain("Each English entry uses final Canonical `entryId`");
@@ -92,7 +108,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   });
 
   it("stays a thin orchestration prompt", () => {
-    expect(contract.split(/\s+/u).length).toBeLessThan(700);
-    expect(contract.split(/\r?\n/u).length).toBeLessThan(55);
+    expect(contract.split(/\s+/u).length).toBeLessThan(760);
+    expect(contract.split(/\r?\n/u).length).toBeLessThan(60);
   });
 });
