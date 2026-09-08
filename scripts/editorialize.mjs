@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.mjs";
+import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calendar-discovery.mjs";
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
@@ -28,7 +29,24 @@ const eligibleTitleHints = (titleHintReport?.hints || []).filter((hint) =>
 const titleHintReserve = eligibleTitleHints.length ? JSON.stringify(eligibleTitleHints).length : 0;
 if (titleHintReserve >= MAX_INPUT_CHARS) throw new Error("title hints exceed the editorial input budget");
 
-const editorialInput = buildEditorialInput(evidence, MAX_INPUT_CHARS - titleHintReserve, ledger);
+let calendarBaseline;
+let calendarDiscovery;
+if (evidence.window.period === "daily") {
+  const [latest, manifest, config, titleRegistry] = await Promise.all([
+    "public/data/latest.json", "public/data/manifest.json", "config/release-calendar-sources.json", "config/title-translations.json",
+  ].map(path => readFile(path, "utf8").then(JSON.parse)));
+  const editionDate = evidence.window.id.slice(0, 10);
+  calendarBaseline = await loadCanonicalUpcomingBaseline({ latest, manifest, editionDate });
+  const report = await collectReleaseCalendar({ config, editionDate, baseline: calendarBaseline.items, titleRegistry });
+  const reportPath = resolve(process.env.RELEASE_CALENDAR_REPORT_PATH || "artifacts/release-calendar-discovery.json");
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
+  calendarDiscovery = boundCalendarReport(report);
+  console.log("Calendar coverage: " + JSON.stringify(report.coverage));
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarDiscovery.candidates.length} candidate rows in packet; ${calendarDiscovery.omittedCandidates} omitted by limits. Discovery requires primary-source verification.\n`);
+}
+const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length : 0;
+const editorialInput = buildEditorialInput(evidence, MAX_INPUT_CHARS - titleHintReserve - calendarReserve, ledger);
 const packetSubjects = new Set(editorialInput.packages
   .map((item) => String(item.subjectKey || "").trim().toLocaleLowerCase("en-US"))
   .filter(Boolean));
@@ -42,18 +60,10 @@ editorialInput.budget.usedInputChars += titleHintChars;
 editorialInput.budget.estimatedInputTokens = Math.ceil(editorialInput.budget.usedInputChars / 4);
 editorialInput.budget.titleHintItems = titleHints.length;
 
-if (editorialInput.window.period === "daily") {
-  const [latest, manifest] = await Promise.all([
-    readFile("public/data/latest.json", "utf8").then(JSON.parse),
-    readFile("public/data/manifest.json", "utf8").then(JSON.parse),
-  ]);
-  const baseline = await loadCanonicalUpcomingBaseline({
-    latest,
-    manifest,
-    editionDate: editorialInput.window.id.slice(0, 10),
-  });
-  editorialInput.upcomingBaseline = baseline;
-  editorialInput.budget.usedInputChars += JSON.stringify(baseline).length;
+if (calendarBaseline) {
+  editorialInput.upcomingBaseline = calendarBaseline;
+  editorialInput.upcomingDiscovery = calendarDiscovery;
+  editorialInput.budget.usedInputChars += calendarReserve;
   editorialInput.budget.estimatedInputTokens = Math.ceil(editorialInput.budget.usedInputChars / 4);
 }
 
@@ -84,7 +94,8 @@ const instructions = [
   "不要计算或填写 factsDigest、canonicalCopyDigest、localeDigest，也不要猜最终 entryId；可信 publisher 会在 Canonical entry ID 确定后绑定并计算 digest。",
   "英文是非阻塞展示层：如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；绝不能为了让英文通过而削弱、改写或丢弃已验证的中文 Canonical 决定。publisher 会将该期英文明确标记为 unavailable，中文仍正常发布。",
   "早报必须以 upcomingMode=replace 重建未来15天；晚报使用 inherit_and_patch，只处理新日期变化；日报必须使用 upcomingMode=inherit_and_patch。日报不要复制 editorialInput.upcomingBaseline.items，也不要因为本次 packet 没有新的发售证据而提交空表覆盖历史；trusted publisher 会继承该 Canonical 基线并自动剔除当日及15天窗口外条目。",
-  "日报的 editorialInput.upcomingBaseline.refreshRange 是事件 packet-only 规则的唯一日历例外。若该范围非空，只对 startInclusive 到 endInclusive 做窄范围发售日历核验：优先开发商/发行商官方公告、PlayStation/Nintendo/Xbox/Steam 官方商店或平台页面，并打开每个采用的来源。查到的事实只能写入 upcoming 日历字段，不能改变 packages/trackingQueue 的 include/exclude、正文事实、时间、factStatus、source classification 或 tracking。若没有可靠来源则不要填充。",
+  "日报的 editorialInput.upcomingBaseline.refreshRange 是事件 packet-only 规则的唯一日历例外，每天覆盖完整未来15天，不把旧期次存在等同于已完成核验。只对 startInclusive 到 endInclusive 做发售日历核验：优先开发商/发行商官方公告、PlayStation/Nintendo/Xbox/Steam 官方商店或平台页面，并打开每个采用的来源。查到的事实只能写入 upcoming 日历字段，不能改变 packages/trackingQueue 的 include/exclude、正文事实、时间、factStatus、source classification 或 tracking。若没有可靠来源则不要填充。",
+  "editorialInput.upcomingDiscovery 是自动发现线索，不是可直接发布的事实。优先核验 knownTitle、crossSource 和 inBaseline=false 的记录；所有采用项都要打开官方详情页，核对日期、平台、地区、正式版/抢先体验/移植/DLC及完整游戏身份。dates有冲突时不能猜选；reviewLinks是待阅读文章，不是游戏条目。对PC、PlayStation、Xbox、Nintendo分别搜索完整15天；coverage中failed/empty_or_changed或只有部分列表、omittedCandidates>0必须做针对性补查，并在sourceReport记录实际检查与缺口；不得声称全量覆盖。只修改日历字段，不扩充新闻事件。",
   "日报本次 upcoming/removeUpcomingIds 还可用于 packet 已打开证据明确支持的新发售、延期、取消或日期变化。不要重复提交未变化的 baseline 条目；新增或变更项必须带可追溯 HTTPS source。",
   "日报 archiveTitle 必须以 '日报｜' 开头；其事实窗口是前一日 10:10 exclusive 至当日 10:10 inclusive，plannedAt 为当日 12:00。10:10 是证据封窗与 packet 起点，12:00 是计划发布时间，不得把 10:10—12:00 之间的新事实补进当期。",
   "对 packages 与 trackingQueue 中的每个 eventKey 恰好输出一次决定；trackingQueue 无新证据时必须明确继续追踪或关闭。needs_review 必须 tracking=true；已解决或不再需要跟踪时 tracking=false，并在 reason 写明关闭依据。",

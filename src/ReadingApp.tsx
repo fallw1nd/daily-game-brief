@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, ImageSquare, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
 import { loadArchivedEdition, loadBriefManifest, loadEnglishLocaleIndex, loadEnglishOverlay, loadLatestEdition, loadSearchIndex } from "./data/briefLoader";
 import { loadEnglishSearchIndex } from "./data/englishLoader";
 import { searchArchiveEntries } from "./lib/brief";
@@ -42,6 +42,7 @@ function Photo({ asset, lead = false, cover = false, english }: { asset?: ImageA
   const [failedUrl, setFailedUrl] = useState("");
   const [loadedUrl, setLoadedUrl] = useState("");
   if (!asset || asset.placeholder) return null;
+  if (failedUrl === asset.url && cover) return <figure className="r-photo r-photo--cover r-cover-unavailable"><ImageSquare /><span role="status">{english ? "Cover unavailable" : "封面暂不可用"}</span></figure>;
   if (failedUrl === asset.url) return <span className="r-photo-error" role="status">{english ? "Image temporarily unavailable" : "图片暂时无法加载"}</span>;
   const aspect = cover ? asset.aspect ?? "portrait" : "landscape";
   const [width, height] = !cover ? [800, 450] : aspect === "square" ? [160, 160] : aspect === "portrait" ? [114, 160] : [160, 90];
@@ -255,7 +256,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {calendar && upcoming.length > 0 && <p className="r-calendar-note r-warning">{t(`沿用 ${calendar.sourceDate} 收录的计划，本期未重新核验；日期如有调整，请以来源公告为准。`, `Plans recorded on ${calendar.sourceDate}, not reverified for this edition. Check the linked sources for schedule changes.`)} <a href={readingHref(calendar.sourceId, "upcoming", english)}>{t("查看原期日历", "View source edition")}<ArrowRight /></a></p>}
         {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} <button className="r-button" onClick={() => setCalendarRetry((value) => value + 1)}>{t("重试", "Try again")}</button></> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
         <div className="r-calendar-list">{upcoming.map((item) => <article key={item.id} className="r-calendar-item">
-        <time dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><Photo asset={item.cover} cover english={english} /><div><h3>{item.title.title_zh_cn || item.title.title_en}</h3><p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && <p>{item.note}</p>}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
+        {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{item.title.title_zh_cn || item.title.title_en}</h3><p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && <p>{item.note}</p>}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
       </article>)}</div></section>}
 
       <nav className="r-pager" aria-label={t("期次导航", "Edition navigation")}>
