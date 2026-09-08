@@ -180,7 +180,7 @@ if (PUBLICATION_MODE === "locale-repair") {
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 let publisherLatest = latest;
-if (!allowSameEditionRevision && editorial.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
+if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
   const baseline = await loadCanonicalUpcomingBaseline({
     latest,
     manifest,
