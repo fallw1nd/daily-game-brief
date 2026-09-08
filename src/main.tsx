@@ -37,12 +37,14 @@ function LocaleSwitch({ english }: { english: boolean }) {
   );
 }
 
+const reading = new URLSearchParams(window.location.search).get("view") !== "classic";
+const ReadingApp = React.lazy(() => import("./ReadingApp"));
 const english = new URLSearchParams(window.location.search).get("lang") === "en";
 document.documentElement.lang = english ? "en" : "zh-CN";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {english ? <EnglishApp /> : <App />}
-    <LocaleSwitch english={english} />
+    {reading ? <React.Suspense fallback={<p role="status">正在读取简报 / Loading…</p>}><ReadingApp english={english} /></React.Suspense> : english ? <EnglishApp /> : <App />}
+    {!reading && <LocaleSwitch english={english} />}
   </React.StrictMode>,
 );

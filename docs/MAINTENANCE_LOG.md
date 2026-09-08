@@ -386,3 +386,52 @@
 - **2026-09-04 resolution follow-up:** [PR #109](https://github.com/fallw1nd/daily-game-brief/pull/109) / squash merge commit `9504dd22055193c0b6484f5e6a6ce64a79d84583` 在不改变 10:20/11:20 task、11:00 preflight、11:40 degraded deadline、12:00 plannedAt、固定窗口或 production data 的前提下，为 `docs/SCHEDULED_TASK_PROMPT.md` 增加 validator-shaped pre-submit self-check，要求 `sharedFactFrame.subjectTitleKey/platforms` 与最终 title/platform decision 一致，并让 durable `validationErrors` 只驱动同字段修复；trusted publisher 同时增加 same-edition 成功后的 `Editorial publication failed: <edition>` incident 自动收敛。PR #109 Verify run [33837992896](https://github.com/fallw1nd/daily-game-brief/actions/runs/33837992896) 完整成功。
 - **2026-09-04 incident convergence:** 首次 invalid submission 创建的 incident [#107](https://github.com/fallw1nd/daily-game-brief/issues/107) 在确认同 edition normal publisher 已成功后关闭；以后相同恢复路径由 trusted publisher 自动关闭，不再依赖人工补账。
 - **2026-09-04 close-state update:** `MNT-20260830-01` 继续保持 `in_progress`。当前结构已证明第二次 editorial opportunity 与 exact packet handoff 可工作，但仍需下一次自然无人干预的 wake 场景在 11:20 safety pass 首次提交即通过 validator、并在 11:40 前由 normal publisher commit；原条目要求的连续无人干预 Daily 证据也继续自然积累，不人为制造事故。
+
+## MNT-20260907-03 — 今日重点首条未使用编辑指定 leadEntryId
+
+- **Discovered:** 2026-09-07
+- **Priority:** P2
+- **Area:** editorial presentation / lead selection
+- **Status:** in_progress
+- **Evidence:** 生产页面资源与 main `a57e1ed` 构建一致。NO.028 archiveTitle 为 DON’T NOD、leadEntryId 为 industry-0；App.tsx:411 和 EnglishApp.tsx:201 按 focus/news/releases/industry 拼接选首条，实际选择 Civilization VII 的 news-0。loader 与 entriesForSection 未作头条重排。
+- **Proposed resolution:** 两种语言优先使用有效 leadEntryId 对应条目作为视觉头条，剩余重点去重；只为没有有效指定头条的兼容输入保留原回退。
+- **Close when:** 回归覆盖指定头条不在 news 首位及旧数据回退；中英文实屏确认 H1 与视觉头条主题一致，完整检查通过且修复合并。
+
+## MNT-20260907-04 — Daily 窗口展示丢失跨日信息
+
+- **Discovered:** 2026-09-07
+- **Priority:** P2
+- **Area:** edition metadata / time presentation
+- **Status:** in_progress
+- **Evidence:** NO.028 的窗口为 2026-09-06 10:10 至 2026-09-07 10:10；App.tsx 与 EnglishApp.tsx 均通过 timeOnly(slice(11)) 展示两端，最终字符串为 10:10-10:10，掩盖跨日关系。生产数据本身正确。
+- **Proposed resolution:** 显示两端日期或明确“前日10:10至当日10:10”，保留时区与真实时间，不改生产窗口。
+- **Close when:** 中英文 Daily、legacy AM/PM、跨月窗口展示回归通过；实屏显示跨日关系、完整检查通过且修复合并。
+
+### 2026-09-07 sample verification — MNT-20260907-03 / MNT-20260907-04
+
+- **Resolution:** 独立分支 `codex/editorial-reading-sample` 的 `view=reading` 样例共用中英文 ReadingApp；readingLead 优先采用有效 leadEntryId，完整 article 不重复；readingWindow 保留两端日期与 Asia/Shanghai。原站默认入口与生产数据不变。
+- **Verification:** 新增样例回归覆盖指定头条不在news首位、逐条唯一锚点、Daily/legacy/跨月窗口、主题与配色、核验展开、历史日历、搜索源锚点、无图、图片加载失败和英文不可用。整体结果记录在 docs/READING_SAMPLE.md；未做浏览器实屏验收、未合并或部署，生产关闭条件仍未满足，保持 in_progress。
+
+## MNT-20260908-01 — 阅读样例图片尺寸声明与显示比例不一致
+
+- **Discovered:** 2026-09-08
+- **Priority:** P2
+- **Area:** reading sample / media layout
+- **Status:** in_progress
+- **Evidence:** 样例Photo把封面统一声明160×160；CSS在图片加载后采用auto比例。手机新闻图同时指定16:9及180/240px max-height，可能额外裁切或改变占位。此问题限于未发布样例。
+- **Proposed resolution:** 按已验证aspect为封面设置占位；新闻图片由16:9容器确定高度，手机普通图限制宽度；保留原图与来源；失败时采用已有文字回退。
+- **Close when:** 方/竖/横封面与主图加载策略回归通过；完整检查成功；允许的浏览器环境确认320/390/640px与桌面无额外裁切、加载位移和失败空列；用户接受样例后按既有流程集成。
+- **Resolution:** 本地codex/editorial-reading-sample已增加比例容器与一致width/height，去掉冲突max-height；图标与动效优化一并记录于docs/READING_SAMPLE.md。
+- **Verification:** 2026-09-08 npm run check 通过：64个测试文件、315项测试、28期数据及英文校验、生产构建。未进行实屏测量，不标为resolved。
+
+## MNT-20260908-02 — 空发售清单导致日历整栏消失
+
+- **Discovered:** 2026-09-08
+- **Priority:** P2
+- **Area:** release calendar / reading sample
+- **Status:** in_progress
+- **Evidence:** 本地归档9月1日至7日upcoming均为空，9月7日sourceReport说明以replace提交空列表；8月31日有27条，10条仍处于9月7日之后15天范围内。原站和样例以数组长度隐藏入口与栏目。
+- **Proposed resolution:** 样例保留栏目，沿用最近非空快照中仍在窗口内的记录并明确未重新核验；独立显示加载失败和空状态。后续编辑生产流程应调查持续空清单的原因。
+- **Close when:** 窗口边界/跨年/来源提示/失败重试测试通过；允许环境完成人工验收并集成；生产编辑恢复持续核验发售清单，有实际期次证据。
+- **Resolution:** 本地样例已实现，未修改生产数据或发布流程。
+- **Verification:** npm run check通过：64个测试文件、319项测试、28期数据/英文校验及构建。未进行实屏验收，生产根因仍待处理。
