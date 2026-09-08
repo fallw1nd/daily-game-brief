@@ -13,6 +13,7 @@ import {
   localeArchivePath,
   localeStatusPath,
 } from "./lib/bilingual-publisher.mjs";
+import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
 
 const run = promisify(execFile);
 const PACKET_PATH = resolve(process.env.EDITORIAL_PACKET_PATH || "artifacts/editorial-packet.json");
@@ -179,7 +180,17 @@ if (PUBLICATION_MODE === "locale-repair") {
 
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
-const result = buildEdition({ packet, editorial, latest, manifest, now, allowSameEditionRevision });
+let publisherLatest = latest;
+if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
+  const baseline = await loadCanonicalUpcomingBaseline({
+    latest,
+    manifest,
+    editionDate: editorial.editionId.slice(0, 10),
+  });
+  publisherLatest = { ...latest, upcoming: baseline.items };
+  console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
+}
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision });
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
