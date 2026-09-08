@@ -2,7 +2,7 @@
 
 ## Project Structure & Commands
 
-The site is a Vite, React, and TypeScript application. UI code lives in `src/`, production data in `public/data/`, helpers and tests in `src/lib/`, automation scripts in `scripts/`, and contributor documentation at the root or in `docs/`. `DESIGN.md` defines visual roles. Run `npm install` once, `npm run dev` locally, `npm test` for Vitest, `npm run typecheck` for strict TypeScript, `npm run validate:data` for archive integrity, and `npm run check` before every push.
+The site is a Vite, React, and TypeScript application. UI code lives in `src/`, production data in `public/data/`, helpers and tests in `src/lib/`, automation scripts in `scripts/`, and contributor documentation at the root or in `docs/`. Run `npm install` once, `npm run dev` locally, `npm test` for Vitest, `npm run typecheck` for strict TypeScript, `npm run validate:data` for archive integrity, and `npm run check` before every push.
 
 ## Code, Tests & Reviews
 
@@ -12,34 +12,15 @@ Use two-space indentation. Name components and types in `PascalCase`, functions 
 
 ## Content & Source Rules
 
-Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `official` without opening a primary source, machine-translate game titles, renumber issues, or delete historical editions. Keep rumors structurally distinct and preserve uncertainty in display copy. Visual decisions belong to `DESIGN.md` and the `gpt-taste` skill.
+Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `official` without opening a primary source, machine-translate game titles, renumber issues, or delete historical editions. Keep rumors structurally distinct and preserve uncertainty in display copy. For UI work only, read `docs/VISUAL_GUIDELINES.md` and `docs/READING_SAMPLE.md`; use the accepted implementation as the current reference.
 
-Production cadence is `period:"daily"`. Daily edition IDs are `YYYY-MM-DD-daily`, normal evidence windows are `(previous day 10:10, current day 10:10]`, and `plannedAt` is current day 12:00. Facts first published after 10:10 belong to the next Daily edition; the 10:10–12:00 interval is production time, not part of the current fact window. The first production Daily is the explicitly authorized migration bridge `2026-08-31-daily`, using `(2026-08-30 17:00, 2026-08-31 10:10]` because the last published legacy edition is `2026-08-30-pm`; this one-time bridge prevents overlap with already-published PM facts. Historical `am`/`pm` editions and their fixed windows remain immutable but are no longer the active production cadence.
+Production is Daily (`YYYY-MM-DD-daily`): Asia/Shanghai evidence window `(previous day 10:10, current day 10:10]`, planned publication 12:00. Never extend the window into production time. Historical AM/PM and the one-time 2026-08-31 migration bridge remain immutable; exact orchestration and bridge are in `docs/SCHEDULED_TASK_PROMPT.md`.
 
 A broadly used community or playful Chinese name may be selected when found on the open web; mark it `common_translation`, never official.
 
-For games with an official mainland-China Simplified Chinese channel or site, visible Chinese copy must use the official mainland Simplified Chinese terminology when available, not an overseas-source translation. This applies beyond the game title to named version subtitles, characters/agents, classes/professions, modes, mechanics, and other proper in-game terms. When the event packet is based on a foreign-language or overseas source, a narrow terminology-only lookup against an official mainland Simplified Chinese source is allowed to normalize wording; it must not add event facts, times, platforms, release claims, source classification, tracking decisions, or candidates.
+Use official mainland Simplified Chinese terminology for titles, versions, characters, classes, modes and mechanics when available. Naming-only lookups may normalize existing terms, never add facts, times, platforms, release claims, source status, tracking decisions or candidates.
 
-## Permanent Editorial Hierarchy
-
-Treat the product as news, never a marketing landing page. Keep this type language stable across themes:
-
-- L0 site chrome: 12px JetBrains Mono, weight 600, tabular figures.
-- L1 edition H1: Inter with Noto Sans SC/system fallback, 40px desktop/32px mobile, weight 500, line-height 1.05.
-- L2 section headings: 28px desktop/24px mobile, weight 600, line-height 1.2; 12px semantic-accent mono numbers.
-- L3 story headlines: 22px desktop/19px mobile, weight 600, line-height 1.35; summaries 15.5px/1.75 near 65 characters per line.
-- L3a story subject: game/product name at 18px desktop/17px mobile, weight 650, line-height 1.28, with a semantic-accent rule; it appears before the event headline.
-- L4 evidence: 11–12px JetBrains Mono, line-height 1.5, muted text; semantic-accent links and active states.
-
-Use `#000000`, `#FFFFFF`, `#A1A1AA`, and default `#EA580C` in dark mode; use warm paper `#F6F1E8`, ink `#1A1714`, and default `#B34200` in light mode. Reader-selectable cobalt, jade, violet, and rose accents may replace orange only through the approved `DESIGN.md` semantic tokens; typography and hierarchy never change with accent choice. Group with rules, columns, and spacing—not large rounded story cards. Ban promotional slogans and generic AI copy.
-
-## Archive Titles, Themes & Search
-
-Every manifest item needs a distinctive `archiveTitle` formatted `早报｜本期重磅事实`, `晚报｜本期重磅事实`, or `日报｜本期重磅事实` according to its `period`, plus a `leadEntryId` resolving to that story. Render the same `archiveTitle` as the edition page H1; never fall back to generic `游戏早报`, `游戏晚报`, or `游戏日报` when the field exists. Prefer a major game, publisher/platform decision, or widely discussed event; never overstate rumor status. Schema v2 archives store the same fields. Historical title corrections require explicit approval.
-
-Maintain accessible dark/light themes with persistent keyboard-operable switching. Hide empty departments from content, directories, and top-level links. Archive rows represent editions; cross-edition search links results to their source edition and entry anchor.
-
-Keep top navigation to `内容`, `日历`, and `归档`. Use `DAILY EDITION` as the nonnumeric masthead eyebrow and show `NO.###` only once in top chrome. Let edition H1 titles use the full available width and remain single-line when they fit. Reserve inset space for archive selection rails so they never overlap issue or date text.
+Every edition needs a distinctive period-prefixed `archiveTitle` and valid `leadEntryId`; archive and manifest must agree. Historical title corrections require explicit approval.
 
 ## Editorial Media Contract
 

@@ -6,7 +6,7 @@ const byId = new Map(registry.sources.map((source) => [source.id, source]));
 
 describe("selective source promotion after runner observation", () => {
   it("keeps the technically validated active cohort bounded", () => {
-    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(19);
+    expect(registry.sources.filter((source) => (source.mode || "active") === "active")).toHaveLength(21);
 
     const promotedFeeds = new Map([
       ["4gamer-topics", "https://www.4gamer.net/rss/news_topics.xml"],
@@ -14,6 +14,8 @@ describe("selective source promotion after runner observation", () => {
       ["4gamer-review", "https://www.4gamer.net/rss/all_review.xml"],
       ["vgc-news", "https://www.videogameschronicle.com/category/news/feed/"],
       ["game-developer", "https://www.gamedeveloper.com/rss.xml"],
+      ["denfaminico", "https://news.denfaminicogamer.jp/category/news/feed"],
+      ["pcgamer-news", "https://www.pcgamer.com/rss/"],
       ["ign-games", "https://www.ign.com/rss/articles/feed?tags=games"],
     ]);
 
@@ -28,9 +30,7 @@ describe("selective source promotion after runner observation", () => {
   it("keeps noisier or timestamp-limited sources in shadow", () => {
     for (const id of [
       "game-watch",
-      "denfaminico",
       "denfaminico-interviews",
-      "pcgamer-news",
       "gcores-news",
       "gcores-articles",
       "ucg-industry",
