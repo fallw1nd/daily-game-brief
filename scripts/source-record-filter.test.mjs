@@ -38,7 +38,7 @@ describe("source record filters", () => {
       expect(filters.sources[id]).toBeTruthy();
     }
     for (const id of ["denfaminico", "pcgamer-news"]) {
-      expect(byId.get(id)?.mode).toBe("shadow");
+      expect(byId.get(id)?.mode).toBe("active");
       expect(filters.sources[id]).toBeTruthy();
     }
   });

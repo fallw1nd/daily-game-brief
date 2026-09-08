@@ -392,7 +392,7 @@
 - **Discovered:** 2026-09-07
 - **Priority:** P2
 - **Area:** editorial presentation / lead selection
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 生产页面资源与 main `a57e1ed` 构建一致。NO.028 archiveTitle 为 DON’T NOD、leadEntryId 为 industry-0；App.tsx:411 和 EnglishApp.tsx:201 按 focus/news/releases/industry 拼接选首条，实际选择 Civilization VII 的 news-0。loader 与 entriesForSection 未作头条重排。
 - **Proposed resolution:** 两种语言优先使用有效 leadEntryId 对应条目作为视觉头条，剩余重点去重；只为没有有效指定头条的兼容输入保留原回退。
 - **Close when:** 回归覆盖指定头条不在 news 首位及旧数据回退；中英文实屏确认 H1 与视觉头条主题一致，完整检查通过且修复合并。
@@ -404,7 +404,7 @@
 - **Discovered:** 2026-09-07
 - **Priority:** P2
 - **Area:** edition metadata / time presentation
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** NO.028 的窗口为 2026-09-06 10:10 至 2026-09-07 10:10；App.tsx 与 EnglishApp.tsx 均通过 timeOnly(slice(11)) 展示两端，最终字符串为 10:10-10:10，掩盖跨日关系。生产数据本身正确。
 - **Proposed resolution:** 显示两端日期或明确“前日10:10至当日10:10”，保留时区与真实时间，不改生产窗口。
 - **Close when:** 中英文 Daily、legacy AM/PM、跨月窗口展示回归通过；实屏显示跨日关系、完整检查通过且修复合并。
@@ -421,7 +421,7 @@
 - **Discovered:** 2026-09-08
 - **Priority:** P2
 - **Area:** reading sample / media layout
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 样例Photo把封面统一声明160×160；CSS在图片加载后采用auto比例。手机新闻图同时指定16:9及180/240px max-height，可能额外裁切或改变占位。此问题限于未发布样例。
 - **Proposed resolution:** 按已验证aspect为封面设置占位；新闻图片由16:9容器确定高度，手机普通图限制宽度；保留原图与来源；失败时采用已有文字回退。
 - **Close when:** 方/竖/横封面与主图加载策略回归通过；完整检查成功；允许的浏览器环境确认320/390/640px与桌面无额外裁切、加载位移和失败空列；用户接受样例后按既有流程集成。
@@ -453,3 +453,31 @@
 - **Bounded follow-up:** 以完整15天扫描替代尾部扫描；增加Steam/Nintendo/Xbox/PlayStation与独立跨平台月历发现，优先知名登记与跨来源线索、按来源分配名额、记录失败和截断，并交由原编辑流程打开官方来源后采用。详见docs/RELEASE_CALENDAR.md。保持in_progress，等待自然期次实际新增/延期核验及平台覆盖证据。
 
 - **2026-09-08 follow-up merged:** [PR #113](https://github.com/fallw1nd/daily-game-brief/pull/113)已合并main 3678ffc。[Verify #688](https://github.com/fallw1nd/daily-game-brief/actions/runs/34201134090)通过：338项测试、29期数据/英文校验与构建；六源真实发现及断网packet构建验证完成。[正式部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34201347323)成功；线上index-DSqaRc80.js、ReadingApp-B9jszoPr.css及ReadingApp-C9Rc_oAx.js均HTTP 200，160/112px封面规范已在生产资源中确认。封面展示与自动发现代码完成不等于覆盖问题已关闭；等待后续自然期次采用的一手核验记录。
+
+### 2026-09-08 manual acceptance — MNT-20260907-03 / MNT-20260907-04 / MNT-20260908-01
+
+用户在本次系统审查前明确确认“人工验收完成”。结合各条既有回归、PR #111/#113 和部署证据，上述三个展示问题关闭；保留此前未验收的历史记录。MNT-20260908-02 的展示验收完成，但持续日历核验仍等待自然期次证据。
+
+## MNT-20260908-03 — 定时选期 JSON 污染 Actions output 与恢复依赖缺失
+
+- **Discovered:** 2026-09-08
+- **Priority:** P1
+- **Area:** scheduled collection / SLA recovery
+- **Status:** in_progress
+- **Evidence:** [watchdog run 34203862156](https://github.com/fallw1nd/daily-game-brief/actions/runs/34203862156)，job 101988689341 的 Select immutable due edition 报 Invalid format '{'。resolve-due-edition 已自行 append 合法输出，但两条 workflow 又把 JSON stdout 重定向到同一文件。另恢复路径未 npm ci，而 editorialize 新增 jsdom 依赖。
+- **Bounded resolution:** 只去除 due resolver 的错误重定向，保留 dispatch resolver 的合法输出；仅在需要缺包恢复时 npm ci。执行真实 CLI 校验输出协议，并检查两条 workflow 接线。归一化测试读入的 CRLF，消除 Windows 假失败，不改发布校验。
+- **Close when:** 回归和完整检查通过、合并；后续自然 scheduled run 通过选期，实际恢复路径完成或等效隔离恢复验证有证据。未满足自然运行条件前不标 resolved。
+
+## MNT-20260908-04 — 空解析响应掩盖来源缺口，观察源利用不足
+
+- **Discovered:** 2026-09-08
+- **Priority:** P2
+- **Area:** source health / discovery coverage
+- **Status:** in_progress
+- **Evidence:** automation/state bc68bb2 的18次观察中 Rockstar、gamescom 均请求成功但平均候选为0；BAFTA 连续失败18次。PC Gamer 有16/18次成功和3条累计独立候选，电ファミ有18/18次成功和2条累计独立候选；本地复核两源各解析40项。active 的 shadow contribution 零值不能解释为没有贡献。
+- **Bounded resolution:** 新增 dataStatus、最近有数据时间、最近空响应连续次数与有效响应率，标记贡献指标测量范围，在 Actions summary 展示空/失败来源；PC Gamer、电ファミ转 active，保留可信度和发布核验门槛。BAFTA 的403不绕过访问限制，季节性空源不武断删除。
+- **Close when:** 指标兼容/恢复回归通过并合并；自然采集输出独立的数据可用性摘要，新增来源进入候选且继续经过原事实/时间/去重校验。没有采用记录前不宣称提升已发布覆盖率。
+
+- **2026-09-08 local verification:** 实际启用新配置采集成功：374条active候选、110条shadow候选，active请求成功19/21、shadow 8/9；两个晋升源保持过滤后进入active，未将候选写入生产数据。来源失败继续独立降级。
+
+- **Verification (MNT-20260908-03 / MNT-20260908-04):** npm run check 全部通过：69个测试文件、342项测试、29期归档/英文校验、生产构建。真实 resolver CLI 的 packet/publication 输出协议通过；完整检查包含发现网络失败时仍能构建有效编辑包的集成回归。public/data 与基准提交无差异。

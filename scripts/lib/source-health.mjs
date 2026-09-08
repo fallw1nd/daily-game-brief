@@ -25,9 +25,18 @@ export function updateSourceHealth(report, previous = {schemaVersion:1,sources:{
     const unknownTimeCounts = recent.map((item) => item.unknownTimeCount || 0);
     const reviewableTotal = reviewableCounts.reduce((sum, value) => sum + value, 0);
     const overlapTotal = overlapCounts.reduce((sum, value) => sum + value, 0);
+    const emptyStreakEnd = [...recent].reverse().findIndex(item => item.status !== "ok" || item.count > 0);
     sources[stat.sourceId] = {
       mode: stat.mode || "active",
       capabilities: stat.capabilities || [],
+      // Availability is transport success; parsed data is a separate signal.
+      dataStatus: stat.status !== "ok" ? "unavailable" : Number(stat.count || 0) > 0 ? "available" : "empty",
+      consecutiveEmptyResponses: stat.status === "ok" && !Number(stat.count || 0)
+        ? emptyStreakEnd === -1 ? recent.length : emptyStreakEnd
+        : 0,
+      lastDataAt: [...recent].reverse().find(item => item.status === "ok" && item.count > 0)?.at || prior.lastDataAt || null,
+      usableResponseRateRecent: recent.filter(item => item.status === "ok" && item.count > 0).length / recent.length,
+      contributionMetricsScope: stat.mode === "shadow" ? "shadow" : "not_measured",
       checks: Number(prior.checks || 0) + 1,
       successes: Number(prior.successes || 0) + (stat.status === "ok" ? 1 : 0),
       consecutiveFailures: stat.status === "ok" ? 0 : Number(prior.consecutiveFailures || 0) + 1,

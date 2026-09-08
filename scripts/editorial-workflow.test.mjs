@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-const workflow = await readFile(".github/workflows/news-discovery-shadow.yml", "utf8");
+const workflow = (await readFile(".github/workflows/news-discovery-shadow.yml", "utf8")).replace(/\r\n/g, "\n");
 const editorialize = await readFile("scripts/editorialize.mjs", "utf8");
 
 describe("final editorial packet workflow", () => {

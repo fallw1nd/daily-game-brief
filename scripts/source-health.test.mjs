@@ -49,3 +49,23 @@ describe("source health ledger", () => {
     expect(second.sources["deep-media"].overlapRateRecent).toBeCloseTo(2 / 6);
   });
 });
+
+ it("distinguishes empty parsing and unavailable sources, including legacy history", () => {
+   const previous = { sources: { a: { recent: [{ at: "2026-09-07", status: "ok", count: 0 }] } } };
+   const report = (status, count) => ({ generatedAt: "2026-09-08", sourceStats: [{ sourceId: "a", mode: "active", status, count }] });
+   const empty = updateSourceHealth(report("ok", 0), previous);
+   expect(empty.sources.a.dataStatus).toBe("empty");
+   expect(empty.sources.a.consecutiveEmptyResponses).toBe(2);
+   expect(empty.sources.a.successRateRecent).toBe(1);
+   expect(empty.sources.a.usableResponseRateRecent).toBe(0);
+   expect(empty.sources.a.contributionMetricsScope).toBe("not_measured");
+   const recovered = updateSourceHealth(report("ok", 3), empty);
+   expect(recovered.sources.a.dataStatus).toBe("available");
+   expect(recovered.sources.a.consecutiveEmptyResponses).toBe(0);
+   expect(recovered.sources.a.lastDataAt).toBe("2026-09-08");
+   expect(recovered.sources.a.usableResponseRateRecent).toBeCloseTo(1 / 3);
+   const failed = updateSourceHealth(report("limited", 0), recovered);
+   expect(failed.sources.a.dataStatus).toBe("unavailable");
+   expect(failed.sources.a.lastDataAt).toBe("2026-09-08");
+   expect(failed.sources.a.consecutiveFailures).toBe(1);
+ });
