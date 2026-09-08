@@ -451,3 +451,5 @@
 
 - **2026-09-08 coverage finding:** PR #112恢复继承后，refreshRange仍将旧期次日期视为完整核验边界，只查询窗口尾部，无法补回早期遗漏。实测六源发现100条待核验游戏/平台记录，另有12条受上限影响；现有列表明显不是完整发售集合。
 - **Bounded follow-up:** 以完整15天扫描替代尾部扫描；增加Steam/Nintendo/Xbox/PlayStation与独立跨平台月历发现，优先知名登记与跨来源线索、按来源分配名额、记录失败和截断，并交由原编辑流程打开官方来源后采用。详见docs/RELEASE_CALENDAR.md。保持in_progress，等待自然期次实际新增/延期核验及平台覆盖证据。
+
+- **2026-09-08 follow-up merged:** [PR #113](https://github.com/fallw1nd/daily-game-brief/pull/113)已合并main 3678ffc。[Verify #688](https://github.com/fallw1nd/daily-game-brief/actions/runs/34201134090)通过：338项测试、29期数据/英文校验与构建；六源真实发现及断网packet构建验证完成。[正式部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34201347323)成功；线上index-DSqaRc80.js、ReadingApp-B9jszoPr.css及ReadingApp-C9Rc_oAx.js均HTTP 200，160/112px封面规范已在生产资源中确认。封面展示与自动发现代码完成不等于覆盖问题已关闭；等待后续自然期次采用的一手核验记录。
