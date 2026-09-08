@@ -149,7 +149,7 @@ describe("reading sample", () => {
     expect(container.textContent).toContain("Read in Chinese");
     expect(overlay).not.toHaveBeenCalled();
   });
-  it("reserves cover space from the declared aspect before loading and keeps editorial images at 16:9", () => {
+  it("retains cover intrinsic ratios inside the shared frame and keeps editorial images at 16:9", () => {
     const old = legacy as BriefEdition;
     const item = old.upcoming.find((game) => game.cover)!;
     expect(item.cover).toBeDefined();
@@ -248,4 +248,19 @@ describe("restored release calendar", () => {
     await act(async () => container.querySelector<HTMLButtonElement>(".r-calendar-empty button")!.click());
     expect(container.querySelectorAll(".r-calendar-item").length).toBeGreaterThan(0);
   });
+});
+
+
+it("keeps a readable calendar item and a stable cover slot after cover load failure", async () => {
+  const old = legacy as BriefEdition;
+  const container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={old} initialManifest={manifest} initialSearchIndex={search} />));
+  const image = container.querySelector<HTMLImageElement>(".r-photo--cover img")!;
+  const item = image.closest(".r-calendar-item")!;
+  const title = item.querySelector("h3")?.textContent;
+  await act(async () => image.dispatchEvent(new Event("error")));
+  expect(item.querySelector(".r-cover-unavailable")?.textContent).toContain("封面暂不可用");
+  expect(item.querySelector("h3")?.textContent).toBe(title);
+  expect(item.querySelector(".r-calendar-date")).not.toBeNull();
 });

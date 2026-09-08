@@ -23,14 +23,14 @@ describe("Daily upcoming baseline", () => {
     ], "2026-12-30").map((entry) => entry.id)).toEqual(["new-year"]);
   });
 
-  it("computes only the uncovered tail of the new 15-day horizon", () => {
+  it("rechecks the full horizon even when a recent edition already has calendar entries", () => {
     expect(upcomingRefreshRange("2026-08-31-daily", "2026-09-08")).toEqual({
-      startInclusive: "2026-09-16",
+      startInclusive: "2026-09-09",
       endInclusive: "2026-09-23",
     });
-    expect(upcomingRefreshRange("2026-09-08-daily", "2026-09-08")).toBeNull();
+    expect(upcomingRefreshRange("2026-09-08-daily", "2026-09-08")).toEqual({ startInclusive: "2026-09-09", endInclusive: "2026-09-23" });
     expect(upcomingRefreshRange("2026-09-08-daily", "2026-09-09")).toEqual({
-      startInclusive: "2026-09-24",
+      startInclusive: "2026-09-10",
       endInclusive: "2026-09-24",
     });
   });
@@ -56,7 +56,7 @@ describe("Daily upcoming baseline", () => {
     });
     expect(result.sourceEditionId).toBe("2026-08-31-daily");
     expect(result.items.map((entry) => entry.id)).toEqual(["kept", "last-verified-day"]);
-    expect(result.refreshRange).toEqual({ startInclusive: "2026-09-16", endInclusive: "2026-09-23" });
+    expect(result.refreshRange).toEqual({ startInclusive: "2026-09-09", endInclusive: "2026-09-23" });
   });
 
   it("prefers the latest Canonical upcoming when it is already populated", async () => {
@@ -68,7 +68,7 @@ describe("Daily upcoming baseline", () => {
     expect(result).toEqual({
       sourceEditionId: "2026-09-08-daily",
       items: [item("current", "09.12")],
-      refreshRange: null,
+      refreshRange: { startInclusive: "2026-09-09", endInclusive: "2026-09-23" },
     });
   });
 });

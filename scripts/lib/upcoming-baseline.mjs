@@ -39,13 +39,8 @@ export function filterUpcomingWindow(items, editionDate, days = 15) {
 export function upcomingRefreshRange(sourceEditionId, editionDate, days = 15) {
   const targetStart = editionDayTimestamp(editionDate) + DAY_MS;
   const targetEnd = editionDayTimestamp(editionDate) + days * DAY_MS;
-  const sourceDate = String(sourceEditionId || "").slice(0, 10);
-  const sourceStart = /^\d{4}-\d{2}-\d{2}$/.test(sourceDate) ? editionDayTimestamp(sourceDate) : Number.NaN;
-  const sourceVerifiedThrough = Number.isFinite(sourceStart) ? sourceStart + days * DAY_MS : Number.NaN;
-  const refreshStart = Number.isFinite(sourceVerifiedThrough)
-    ? Math.max(targetStart, sourceVerifiedThrough + DAY_MS)
-    : targetStart;
-  if (refreshStart > targetEnd) return null;
+  // An edition date is not evidence that its calendar was exhaustively checked.
+  const refreshStart = targetStart;
   return {
     startInclusive: dateOnly(refreshStart),
     endInclusive: dateOnly(targetEnd),
