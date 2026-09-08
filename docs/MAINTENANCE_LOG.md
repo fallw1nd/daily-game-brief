@@ -481,3 +481,9 @@
 - **2026-09-08 local verification:** 实际启用新配置采集成功：374条active候选、110条shadow候选，active请求成功19/21、shadow 8/9；两个晋升源保持过滤后进入active，未将候选写入生产数据。来源失败继续独立降级。
 
 - **Verification (MNT-20260908-03 / MNT-20260908-04):** npm run check 全部通过：69个测试文件、342项测试、29期归档/英文校验、生产构建。真实 resolver CLI 的 packet/publication 输出协议通过；完整检查包含发现网络失败时仍能构建有效编辑包的集成回归。public/data 与基准提交无差异。
+
+### 2026-09-08 merge evidence — MNT-20260908-03 / MNT-20260908-04
+
+[PR #114](https://github.com/fallw1nd/daily-game-brief/pull/114) 已合并 main 59a4171。[Verify #690](https://github.com/fallw1nd/daily-game-brief/actions/runs/34247180226) 全部通过，包含342项测试与29期归档/英文校验。两项继续保持 in_progress：定时输出协议和来源配置已修复，但自然 scheduled/recovery 闭环及来源采用证据仍待观察。现有证据不足以保证无人干预连续成功或无遗漏。
+
+- **Deployment:** [Pages run 34247416179](https://github.com/fallw1nd/daily-game-brief/actions/runs/34247416179) 成功；线上首页HTTP200，仍引用已验收 index-DSqaRc80.js。合并后 npm run check 再次通过342测试、29期归档及英文校验、构建。
