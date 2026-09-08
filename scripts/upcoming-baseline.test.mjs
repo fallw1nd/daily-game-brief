@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { filterUpcomingWindow, loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
+import { filterUpcomingWindow, loadCanonicalUpcomingBaseline, upcomingRefreshRange } from "./lib/upcoming-baseline.mjs";
 
 const item = (id, date) => ({ id, date });
 
@@ -23,12 +23,24 @@ describe("Daily upcoming baseline", () => {
     ], "2026-12-30").map((entry) => entry.id)).toEqual(["new-year"]);
   });
 
+  it("computes only the uncovered tail of the new 15-day horizon", () => {
+    expect(upcomingRefreshRange("2026-08-31-daily", "2026-09-08")).toEqual({
+      startInclusive: "2026-09-16",
+      endInclusive: "2026-09-23",
+    });
+    expect(upcomingRefreshRange("2026-09-08-daily", "2026-09-08")).toBeNull();
+    expect(upcomingRefreshRange("2026-09-08-daily", "2026-09-09")).toEqual({
+      startInclusive: "2026-09-24",
+      endInclusive: "2026-09-24",
+    });
+  });
+
   it("falls back to the newest non-empty Canonical snapshot when latest is empty", async () => {
     const root = await mkdtemp(join(tmpdir(), "daily-calendar-"));
     await mkdir(join(root, "archive/2026/08"), { recursive: true });
     await writeFile(join(root, "archive/2026/08/2026-08-31-daily.json"), JSON.stringify({
       id: "2026-08-31-daily",
-      upcoming: [item("expired", "09.07"), item("kept", "09.10"), item("edge", "09.23")],
+      upcoming: [item("expired", "09.07"), item("kept", "09.10"), item("last-verified-day", "09.15")],
     }));
     const result = await loadCanonicalUpcomingBaseline({
       latest: { id: "2026-09-08-daily", upcoming: [] },
@@ -43,7 +55,8 @@ describe("Daily upcoming baseline", () => {
       dataRoot: root,
     });
     expect(result.sourceEditionId).toBe("2026-08-31-daily");
-    expect(result.items.map((entry) => entry.id)).toEqual(["kept", "edge"]);
+    expect(result.items.map((entry) => entry.id)).toEqual(["kept", "last-verified-day"]);
+    expect(result.refreshRange).toEqual({ startInclusive: "2026-09-16", endInclusive: "2026-09-23" });
   });
 
   it("prefers the latest Canonical upcoming when it is already populated", async () => {
@@ -52,6 +65,10 @@ describe("Daily upcoming baseline", () => {
       manifest: { latest: "2026-09-08-daily", editions: [] },
       editionDate: "2026-09-08",
     });
-    expect(result).toEqual({ sourceEditionId: "2026-09-08-daily", items: [item("current", "09.12")] });
+    expect(result).toEqual({
+      sourceEditionId: "2026-09-08-daily",
+      items: [item("current", "09.12")],
+      refreshRange: null,
+    });
   });
 });
