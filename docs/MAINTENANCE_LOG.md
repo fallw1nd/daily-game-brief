@@ -397,6 +397,8 @@
 - **Proposed resolution:** 两种语言优先使用有效 leadEntryId 对应条目作为视觉头条，剩余重点去重；只为没有有效指定头条的兼容输入保留原回退。
 - **Close when:** 回归覆盖指定头条不在 news 首位及旧数据回退；中英文实屏确认 H1 与视觉头条主题一致，完整检查通过且修复合并。
 
+- **2026-09-08 integration:** [PR #111](https://github.com/fallw1nd/daily-game-brief/pull/111) 已合并至main 3478dc9；[CI验证](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184236504)通过，319项测试、29期数据与英文校验、构建通过。[Pages部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184338320)成功。2026-09-08线上首页与新版JS/CSS均HTTP 200，资源名与构建一致；NO.029、英文及日历来源归档可读。浏览器实屏关闭条件仍未满足，保持in_progress。
+
 ## MNT-20260907-04 — Daily 窗口展示丢失跨日信息
 
 - **Discovered:** 2026-09-07
@@ -412,6 +414,8 @@
 - **Resolution:** 独立分支 `codex/editorial-reading-sample` 的 `view=reading` 样例共用中英文 ReadingApp；readingLead 优先采用有效 leadEntryId，完整 article 不重复；readingWindow 保留两端日期与 Asia/Shanghai。原站默认入口与生产数据不变。
 - **Verification:** 新增样例回归覆盖指定头条不在news首位、逐条唯一锚点、Daily/legacy/跨月窗口、主题与配色、核验展开、历史日历、搜索源锚点、无图、图片加载失败和英文不可用。整体结果记录在 docs/READING_SAMPLE.md；未做浏览器实屏验收、未合并或部署，生产关闭条件仍未满足，保持 in_progress。
 
+- **2026-09-08 integration:** [PR #111](https://github.com/fallw1nd/daily-game-brief/pull/111) 已合并至main 3478dc9；[CI验证](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184236504)通过，319项测试、29期数据与英文校验、构建通过。[Pages部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184338320)成功。2026-09-08线上首页与新版JS/CSS均HTTP 200，资源名与构建一致；NO.029、英文及日历来源归档可读。浏览器实屏关闭条件仍未满足，保持in_progress。
+
 ## MNT-20260908-01 — 阅读样例图片尺寸声明与显示比例不一致
 
 - **Discovered:** 2026-09-08
@@ -424,6 +428,8 @@
 - **Resolution:** 本地codex/editorial-reading-sample已增加比例容器与一致width/height，去掉冲突max-height；图标与动效优化一并记录于docs/READING_SAMPLE.md。
 - **Verification:** 2026-09-08 npm run check 通过：64个测试文件、315项测试、28期数据及英文校验、生产构建。未进行实屏测量，不标为resolved。
 
+- **2026-09-08 integration:** [PR #111](https://github.com/fallw1nd/daily-game-brief/pull/111) 已合并至main 3478dc9；[CI验证](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184236504)通过，319项测试、29期数据与英文校验、构建通过。[Pages部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184338320)成功。2026-09-08线上首页与新版JS/CSS均HTTP 200，资源名与构建一致；NO.029、英文及日历来源归档可读。浏览器实屏关闭条件仍未满足，保持in_progress。
+
 ## MNT-20260908-02 — 空发售清单导致日历整栏消失
 
 - **Discovered:** 2026-09-08
@@ -435,3 +441,10 @@
 - **Close when:** 窗口边界/跨年/来源提示/失败重试测试通过；允许环境完成人工验收并集成；生产编辑恢复持续核验发售清单，有实际期次证据。
 - **Resolution:** 本地样例已实现，未修改生产数据或发布流程。
 - **Verification:** npm run check通过：64个测试文件、319项测试、28期数据/英文校验及构建。未进行实屏验收，生产根因仍待处理。
+
+- **2026-09-08 integration:** [PR #111](https://github.com/fallw1nd/daily-game-brief/pull/111) 已合并至main 3478dc9；[CI验证](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184236504)通过，319项测试、29期数据与英文校验、构建通过。[Pages部署](https://github.com/fallw1nd/daily-game-brief/actions/runs/34184338320)成功。2026-09-08线上首页与新版JS/CSS均HTTP 200，资源名与构建一致；NO.029、英文及日历来源归档可读。浏览器实屏关闭条件仍未满足，保持in_progress。
+
+### 2026-09-08 release follow-up
+
+- 发布核对时发现其他工作已通过PR #112合并生产发售日历修复（main 3f61538）。已无冲突同步并保留其全部脚本和编辑约束改动，本次后续提交仅补充本维护日志，不改动该修复。MNT-20260908-02继续等待实际期次的持续核验证据。
+- **Integration verification:** 同步PR #112后，类型检查、326项测试（66文件）、29期数据/英文校验与生产构建通过；线上资源保持一致。
