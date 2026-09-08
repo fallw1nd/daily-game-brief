@@ -7,6 +7,10 @@ function editionDayTimestamp(date) {
   return Date.parse(`${date}T00:00:00+08:00`);
 }
 
+function dateOnly(timestamp) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
 export function upcomingDateTimestamp(date, editionDate) {
   const match = String(date || "").match(/^(\d{2})\.(\d{2})$/);
   if (!match) return Number.NaN;
@@ -31,12 +35,30 @@ export function filterUpcomingWindow(items, editionDate, days = 15) {
     .sort((left, right) => upcomingDateTimestamp(left.date, editionDate) - upcomingDateTimestamp(right.date, editionDate));
 }
 
+export function upcomingRefreshRange(sourceEditionId, editionDate, days = 15) {
+  const targetStart = editionDayTimestamp(editionDate) + DAY_MS;
+  const targetEnd = editionDayTimestamp(editionDate) + days * DAY_MS;
+  const sourceDate = String(sourceEditionId || "").slice(0, 10);
+  const sourceStart = /^\d{4}-\d{2}-\d{2}$/.test(sourceDate) ? editionDayTimestamp(sourceDate) : Number.NaN;
+  const sourceVerifiedThrough = Number.isFinite(sourceStart) ? sourceStart + days * DAY_MS : Number.NaN;
+  const refreshStart = Number.isFinite(sourceVerifiedThrough)
+    ? Math.max(targetStart, sourceVerifiedThrough + DAY_MS)
+    : targetStart;
+  if (refreshStart > targetEnd) return null;
+  return {
+    startInclusive: dateOnly(refreshStart),
+    endInclusive: dateOnly(targetEnd),
+  };
+}
+
 export async function loadCanonicalUpcomingBaseline({ latest, manifest, editionDate, dataRoot = "public/data" }) {
   const current = filterUpcomingWindow(latest?.upcoming, editionDate);
   if (current.length) {
+    const sourceEditionId = latest?.id || manifest?.latest || null;
     return {
-      sourceEditionId: latest?.id || manifest?.latest || null,
+      sourceEditionId,
       items: current,
+      refreshRange: upcomingRefreshRange(sourceEditionId, editionDate),
     };
   }
 
@@ -46,12 +68,21 @@ export async function loadCanonicalUpcomingBaseline({ latest, manifest, editionD
       const archived = JSON.parse(await readFile(resolve(dataRoot, item.path), "utf8"));
       const candidates = filterUpcomingWindow(archived?.upcoming, editionDate);
       if (candidates.length) {
-        return { sourceEditionId: archived.id || item.id, items: candidates };
+        const sourceEditionId = archived.id || item.id;
+        return {
+          sourceEditionId,
+          items: candidates,
+          refreshRange: upcomingRefreshRange(sourceEditionId, editionDate),
+        };
       }
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
   }
 
-  return { sourceEditionId: null, items: [] };
+  return {
+    sourceEditionId: null,
+    items: [],
+    refreshRange: upcomingRefreshRange(null, editionDate),
+  };
 }
