@@ -170,6 +170,7 @@ if (PUBLICATION_MODE === "locale-repair") {
     publicationMode: "locale-repair",
     canonicalStatus: "unchanged",
     localeStatus: "available",
+    localeWarnings: localePlan.warnings,
     feedbackEligible: false,
     canonicalHashes: beforeHashes,
   });
