@@ -2,13 +2,14 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const DAY_MS = 86_400_000;
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 function editionDayTimestamp(date) {
   return Date.parse(`${date}T00:00:00+08:00`);
 }
 
 function dateOnly(timestamp) {
-  return new Date(timestamp).toISOString().slice(0, 10);
+  return new Date(timestamp + SHANGHAI_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 export function upcomingDateTimestamp(date, editionDate) {
