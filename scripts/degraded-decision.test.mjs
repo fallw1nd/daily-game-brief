@@ -21,10 +21,10 @@ describe("zero-AI degraded decision", () => {
     expect(included.headline).toContain("自动事实清单");
   });
 
-  it("uses the Daily archive prefix and replacement calendar mode", () => {
+  it("uses the Daily archive prefix and inherited calendar mode", () => {
     const output = buildDegradedDecision(packet({}, { id: "2026-09-01-daily", period: "daily" }));
     expect(output.archiveTitle).toMatch(/^日报｜/);
-    expect(output.upcomingMode).toBe("replace");
+    expect(output.upcomingMode).toBe("inherit_and_patch");
   });
 
   it("preserves legacy AM and PM degraded semantics", () => {

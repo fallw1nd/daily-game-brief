@@ -1,3 +1,4 @@
+import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 import { describe, expect, it } from "vitest";
 import { validateEditorialSubmission } from "./lib/editorial-submission.mjs";
 
@@ -64,7 +65,7 @@ describe("editorial submission handoff", () => {
       ...editorial,
       editionId: "2026-08-31-daily",
       archiveTitle: "日报｜《Example Game》正式公布",
-      upcomingMode: "replace",
+      upcomingMode: "inherit_and_patch",
     };
     expect(validateEditorialSubmission({
       branchName: "automation/editorial/2026-08-31-daily",
@@ -101,4 +102,16 @@ describe("editorial submission handoff", () => {
     });
     expect(errors).toContain("editorial packetBlobSha does not match the restored packet blob");
   });
+});
+
+it("accepts generated Daily fallback through the real submission validator and rejects calendar replacement", () => {
+ const p = structuredClone(packet);
+ p.finalizedAt = "2026-09-09T02:25:00Z"; p.coverageThrough = "2026-09-09 10:10";
+ p.editorialInput.window = {id:"2026-09-09-daily",period:"daily",plannedAt:"2026-09-09 12:00",windowStart:"2026-09-08 10:10",windowEnd:"2026-09-09 10:10"};
+ Object.assign(p.editorialInput.packages[0], {tier:"A",timeRelation:"window",eventKind:"announcement",headline:"Example Game announced"});
+ p.editorialInput.packages[0].sources[0].publishedAt = "2026-09-09T01:00:00Z";
+ const output = buildDegradedDecision(p, {packetBlobSha});
+ const validate = editorial => validateEditorialSubmission({branchName:"automation/editorial/2026-09-09-daily",packet:p,editorial,packetBlobSha});
+ expect(validate(output)).toEqual([]);
+ expect(validate({...output, upcomingMode:"replace"})).toContain("upcomingMode must be inherit_and_patch");
 });
