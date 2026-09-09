@@ -126,6 +126,10 @@ jobs:
           git worktree remove --force "$state_dir"
           echo "period=$period" >> "$GITHUB_OUTPUT"
 
+      - name: Install packet dependencies
+        if: steps.edition.outputs.needed != 'false'
+        run: npm ci
+
       - name: Collect final candidate snapshot
         if: steps.edition.outputs.needed != 'false'
         shell: bash
@@ -243,7 +247,7 @@ jobs:
 
   verify-after-handoff:
     needs: collect
-    if: needs.collect.outputs.needed != 'false' && needs.collect.outputs.revision_authorized != 'true'
+    if: always() && !cancelled() && needs.collect.outputs.edition != '' && needs.collect.outputs.needed != 'false' && needs.collect.outputs.revision_authorized != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 65
     steps:

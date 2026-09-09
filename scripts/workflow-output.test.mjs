@@ -38,3 +38,11 @@ describe("scheduled edition output protocol", () => {
     }
   });
 });
+
+ it("installs dependencies on both packet builders and recovers a failed collection with an exact identity", async () => {
+   const packet = (await readFile(".github/workflows/news-discovery-shadow.yml", "utf8")).replace(/\r\n/g, "\n");
+   const sla = (await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8")).replace(/\r\n/g, "\n");
+   expect(packet).toContain("- name: Install packet dependencies\n        if: steps.edition.outputs.needed != 'false'\n        run: npm ci");
+   for (const workflow of [packet, sla]) expect(workflow.indexOf("run: npm ci")).toBeLessThan(workflow.indexOf("node scripts/editorialize.mjs"));
+   expect(packet).toContain("if: always() && !cancelled() && needs.collect.outputs.edition != '' && needs.collect.outputs.needed != 'false' && needs.collect.outputs.revision_authorized != 'true'");
+ });

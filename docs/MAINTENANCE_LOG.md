@@ -487,3 +487,8 @@
 [PR #114](https://github.com/fallw1nd/daily-game-brief/pull/114) 已合并 main 59a4171。[Verify #690](https://github.com/fallw1nd/daily-game-brief/actions/runs/34247180226) 全部通过，包含342项测试与29期归档/英文校验。两项继续保持 in_progress：定时输出协议和来源配置已修复，但自然 scheduled/recovery 闭环及来源采用证据仍待观察。现有证据不足以保证无人干预连续成功或无遗漏。
 
 - **Deployment:** [Pages run 34247416179](https://github.com/fallw1nd/daily-game-brief/actions/runs/34247416179) 成功；线上首页HTTP200，仍引用已验收 index-DSqaRc80.js。合并后 npm run check 再次通过342测试、29期归档及英文校验、构建。
+
+### 2026-09-09 recurrence — MNT-20260908-03
+
+- **Evidence:** [run 34303025254](https://github.com/fallw1nd/daily-game-brief/actions/runs/34303025254), job102313832067, 10:25北京，ERR_MODULE_NOT_FOUND: jsdom。PR #114仅为SLA恢复添加依赖，遗漏正常采集路径，造成未生成9月9日packet。collect失败后verify-after-handoff被默认success条件跳过；截至12:19独立scheduled尚未运行，不能当作及时恢复保证。
+- **Resolution:** 正常采集按needed安装锁定依赖；失败后只在选期成功、有exact edition、非取消且非授权revision时启动既有SLA恢复。保持既定窗口和发布保护，检查两个editorialize调用入口均先安装依赖。继续以本次真实恢复及发布闭环作为验证证据，不声称GitHub cron能准点启动。
