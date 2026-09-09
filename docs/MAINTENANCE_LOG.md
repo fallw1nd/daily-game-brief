@@ -463,7 +463,7 @@
 - **Discovered:** 2026-09-08
 - **Priority:** P1
 - **Area:** scheduled collection / SLA recovery
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** [watchdog run 34203862156](https://github.com/fallw1nd/daily-game-brief/actions/runs/34203862156)，job 101988689341 的 Select immutable due edition 报 Invalid format '{'。resolve-due-edition 已自行 append 合法输出，但两条 workflow 又把 JSON stdout 重定向到同一文件。另恢复路径未 npm ci，而 editorialize 新增 jsdom 依赖。
 - **Bounded resolution:** 只去除 due resolver 的错误重定向，保留 dispatch resolver 的合法输出；仅在需要缺包恢复时 npm ci。执行真实 CLI 校验输出协议，并检查两条 workflow 接线。归一化测试读入的 CRLF，消除 Windows 假失败，不改发布校验。
 - **Close when:** 回归和完整检查通过、合并；后续自然 scheduled run 通过选期，实际恢复路径完成或等效隔离恢复验证有证据。未满足自然运行条件前不标 resolved。
@@ -496,3 +496,13 @@
 ### 2026-09-09 preventive repair — MNT-20260908-02
 
 检查恢复后的发布入口发现，PR #112只更新提示/基线恢复，validateEditorialSubmission仍强制Daily replace，buildDegradedDecision也生成replace。正确的inherit_and_patch正式稿会被拒绝，fallback会跳过日历基线继承。将两处同步为Daily inherit_and_patch，AM/PM语义保留；以真实fallback生成器→submission validator测试覆盖，不改历史数据。
+
+### 2026-09-09 recovery evidence — MNT-20260908-03 / MNT-20260908-02
+
+- **Merged repairs:** [PR #115](https://github.com/fallw1nd/daily-game-brief/pull/115)补齐正常采集依赖并修正失败后的恢复条件；[PR #116](https://github.com/fallw1nd/daily-game-brief/pull/116)统一Daily日历的投稿校验与降级生成语义。[Verify 34310740737](https://github.com/fallw1nd/daily-game-brief/actions/runs/34310740737)与[Verify 34311227139](https://github.com/fallw1nd/daily-game-brief/actions/runs/34311227139)成功，后者包含344项测试。
+- **Actual recovery:** [正常采集重试34310959840](https://github.com/fallw1nd/daily-game-brief/actions/runs/34310959840)实际安装依赖并成功生成证据包；[SLA恢复34311118795](https://github.com/fallw1nd/daily-game-brief/actions/runs/34311118795)随后成功发布降级稿。经用户授权开启同一期正式修订，[证据包34311344475](https://github.com/fallw1nd/daily-game-brief/actions/runs/34311344475)成功，未改变9月8日10:10至9月9日10:10的窗口。
+- **Natural schedule:** [scheduled 34323325631](https://github.com/fallw1nd/daily-game-brief/actions/runs/34323325631)在北京时间15:20通过Select immutable due edition，输出needed=false并正确跳过已有包的重复采集，无Actions output格式错误。这验证自然选期与幂等分支，不算第二次完整采集。GitHub cron本次迟到约5小时，仍不能保证12:00准点启动；代码修复不等于消除托管调度延迟。
+- **Formal publication:** [34343466863](https://github.com/fallw1nd/daily-game-brief/actions/runs/34343466863)成功，将NO.030修订为9条正文、13条官方页面核验的未来发售记录与完整英文版本，main 3b4216f。日期冲突未冒充确认，抢先体验和平台移植单独标注；历史期号与旧期归档不变。[媒体34343587553](https://github.com/fallw1nd/daily-game-brief/actions/runs/34343587553)成功，main b5a8af2，9条新闻配图、12张封面，NHL 27保留明确不可用状态。
+- **Calendar scope:** MNT-20260908-02获得本期PC/PlayStation/Xbox/Nintendo实际采用证据；因关闭条件要求自然期次持续核验，仍保持in_progress。73条发现候选受输入预算限制，未宣称本期日历完整覆盖所有发行。
+
+- **Live verification / closure:** [Pages 34343682100](https://github.com/fallw1nd/daily-game-brief/actions/runs/34343682100)成功。2026-09-09线上latest、当期归档、英文索引及英文当期文件均HTTP 200，正文与日历分别9/13，英文索引当期available。MNT-20260908-03的回归、合并、自然选期、实际恢复与正式发布条件已满足，标为resolved；保留上述托管调度延迟限制。发布后完整npm run check通过344项测试、30期归档与英文校验及构建。
