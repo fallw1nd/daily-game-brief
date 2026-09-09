@@ -492,3 +492,7 @@
 
 - **Evidence:** [run 34303025254](https://github.com/fallw1nd/daily-game-brief/actions/runs/34303025254), job102313832067, 10:25北京，ERR_MODULE_NOT_FOUND: jsdom。PR #114仅为SLA恢复添加依赖，遗漏正常采集路径，造成未生成9月9日packet。collect失败后verify-after-handoff被默认success条件跳过；截至12:19独立scheduled尚未运行，不能当作及时恢复保证。
 - **Resolution:** 正常采集按needed安装锁定依赖；失败后只在选期成功、有exact edition、非取消且非授权revision时启动既有SLA恢复。保持既定窗口和发布保护，检查两个editorialize调用入口均先安装依赖。继续以本次真实恢复及发布闭环作为验证证据，不声称GitHub cron能准点启动。
+
+### 2026-09-09 preventive repair — MNT-20260908-02
+
+检查恢复后的发布入口发现，PR #112只更新提示/基线恢复，validateEditorialSubmission仍强制Daily replace，buildDegradedDecision也生成replace。正确的inherit_and_patch正式稿会被拒绝，fallback会跳过日历基线继承。将两处同步为Daily inherit_and_patch，AM/PM语义保留；以真实fallback生成器→submission validator测试覆盖，不改历史数据。

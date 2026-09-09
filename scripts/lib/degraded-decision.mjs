@@ -28,8 +28,8 @@ function archivePrefix(period) {
 }
 
 function upcomingMode(period) {
-  if (period === "am" || period === "daily") return "replace";
-  if (period === "pm") return "inherit_and_patch";
+  if (period === "am") return "replace";
+  if (period === "pm" || period === "daily") return "inherit_and_patch";
   throw new Error(`unsupported degraded period: ${period}`);
 }
 

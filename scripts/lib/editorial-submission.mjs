@@ -51,7 +51,7 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   for (const key of ["decisions", "removeUpcomingIds", "upcoming", "checkedExtra", "limitedExtra"]) {
     if (!Array.isArray(editorial?.[key])) errors.push(`${key} must be an array`);
   }
-  const expectedMode = period === "pm" ? "inherit_and_patch" : "replace";
+  const expectedMode = period === "am" ? "replace" : "inherit_and_patch";
   if (editorial?.upcomingMode !== expectedMode) errors.push(`upcomingMode must be ${expectedMode}`);
   if (typeof editorial?.editorialNote !== "string" || !editorial.editorialNote.trim()) {
     errors.push("editorialNote is required");
