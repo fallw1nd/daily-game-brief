@@ -515,3 +515,7 @@
 - **Evidence:** 用户指出NO.030标题缺少主语，如“公开由MAPPA制作的片头动画主视觉”，归档/搜索脱离主体栏无法辨别游戏。
 - **Bounded resolution:** 按用户授权补全本期9条中英文标题和期标题，同步latest/归档/manifest/英文副本与自动图片alt；在packet提示及编辑契约各加入一句独立可读要求。另记录用户提供的5个中文译名和出处，采用common_translation，不未经核验升为官方。
 - **Close when:** 本期数据/英文校验、完整检查及上线一致性通过；后续自然期次标题采用明确主语。保留观察状态，避免仅凭提示变更宣称已杜绝复发。
+
+- **2026-09-09 merged verification:** [PR #118](https://github.com/fallw1nd/daily-game-brief/pull/118)已合并main 2195a3d；[Verify 34345069872](https://github.com/fallw1nd/daily-game-brief/actions/runs/34345069872)成功。344项测试、30期数据与英文校验、构建通过；当期事实投影未变，9条中英文标题补全主语，5个用户译名已写入注册表和日历。自然期次采用效果仍待观察，MNT-20260909-01保持in_progress。
+
+- **Live verification:** [Pages 34345211050](https://github.com/fallw1nd/daily-game-brief/actions/runs/34345211050)成功；线上latest与当期归档逐字段一致，中英文期标题包含主语，五个指定译名均已生效。
