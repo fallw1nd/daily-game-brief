@@ -506,3 +506,12 @@
 - **Calendar scope:** MNT-20260908-02获得本期PC/PlayStation/Xbox/Nintendo实际采用证据；因关闭条件要求自然期次持续核验，仍保持in_progress。73条发现候选受输入预算限制，未宣称本期日历完整覆盖所有发行。
 
 - **Live verification / closure:** [Pages 34343682100](https://github.com/fallw1nd/daily-game-brief/actions/runs/34343682100)成功。2026-09-09线上latest、当期归档、英文索引及英文当期文件均HTTP 200，正文与日历分别9/13，英文索引当期available。MNT-20260908-03的回归、合并、自然选期、实际恢复与正式发布条件已满足，标为resolved；保留上述托管调度延迟限制。发布后完整npm run check通过344项测试、30期归档与英文校验及构建。
+
+## MNT-20260909-01 — 标题依赖主体栏导致独立阅读缺少主语
+
+- **Discovered:** 2026-09-09
+- **Priority:** P2
+- **Status:** in_progress
+- **Evidence:** 用户指出NO.030标题缺少主语，如“公开由MAPPA制作的片头动画主视觉”，归档/搜索脱离主体栏无法辨别游戏。
+- **Bounded resolution:** 按用户授权补全本期9条中英文标题和期标题，同步latest/归档/manifest/英文副本与自动图片alt；在packet提示及编辑契约各加入一句独立可读要求。另记录用户提供的5个中文译名和出处，采用common_translation，不未经核验升为官方。
+- **Close when:** 本期数据/英文校验、完整检查及上线一致性通过；后续自然期次标题采用明确主语。保留观察状态，避免仅凭提示变更宣称已杜绝复发。
