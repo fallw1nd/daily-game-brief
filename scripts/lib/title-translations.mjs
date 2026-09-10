@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
+import { adoptTitleHints } from "./title-knowledge.mjs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const registryPath = resolve("config/title-translations.json");
 const registry = JSON.parse(readFileSync(registryPath, "utf8"));
-export const titleTranslations = Object.freeze(registry.translations ?? {});
+export let titleTranslations = Object.freeze(registry.translations ?? {});
 
 function normalizedAlias(value) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : "";
@@ -19,6 +20,8 @@ export function getRegisteredTitleTranslation(titleKey, titleEn = null) {
 }
 
 export function resolveTitleTranslation({ titleKey, titleZhCn = null, titleZhStatus = "unavailable", titleEn = null }) {
+  const preferred = getRegisteredTitleTranslation(titleKey, titleEn);
+  if (preferred?.evidence?.kind === "user_provided") return { titleKey, titleZhCn: preferred.titleZhCn, titleEn, titleZhStatus: preferred.titleZhStatus, source: "registry" };
   const explicitZh = typeof titleZhCn === "string" ? titleZhCn.trim() : "";
   if (titleZhStatus !== "unavailable" && explicitZh) {
     return { titleKey, titleZhCn: explicitZh, titleEn, titleZhStatus, source: "editorial" };
@@ -59,4 +62,13 @@ export function localizeHeadline(headline, { titleEn = null, titleZhCn = null } 
     localized = localized.split(english).join(chinese);
   }
   return localized;
+}
+
+export function persistVerifiedTitleHints(hints) {
+  const current = JSON.parse(readFileSync(registryPath, "utf8"));
+  const next = adoptTitleHints(current, hints || []);
+  if (JSON.stringify(next.translations) === JSON.stringify(current.translations)) return false;
+  writeFileSync(registryPath, JSON.stringify(next, null, 2) + "\n");
+  titleTranslations = Object.freeze(next.translations);
+  return true;
 }

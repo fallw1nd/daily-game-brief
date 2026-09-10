@@ -160,7 +160,7 @@ describe("authorized same-edition revision overlay", () => {
     expect(result.status).toBe("revised");
     expect(result.edition.entries).toHaveLength(3);
     expect(result.edition.entries[0].id).toBe(`${editionId}-news-0`);
-    expect(result.edition.entries[0].headline).toBe("Updated Halloween headline");
+    expect(result.edition.entries[0].headline).toBe("《Halloween: The Game》：Updated Halloween headline");
     expect(result.edition.entries[0].image_status).toBe("verified");
     expect(result.edition.entries[0].images[0].url).toBe("media/briefs/halloween.jpg");
     expect(result.edition.entries[0].images[0].alt).toBe("Halloween");

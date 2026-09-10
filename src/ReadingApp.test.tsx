@@ -33,6 +33,26 @@ beforeEach(() => {
 afterEach(async () => { if (root) { await act(async () => root?.unmount()); root = undefined; } document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
 describe("reading sample", () => {
+  it("renders showcase gaps with one unique anchor per story across multiple groups", () => {
+    const value = structuredClone(edition);
+    const brief = value.entries.find(entry => entry.id !== value.leadEntryId)!;
+    brief.showcaseBrief = true;
+    const group = { id: "direct", title: "任天堂直面会", titleEn: "Nintendo Direct", status: "partial" as const, total: 3, covered: 2, entryIds: [value.leadEntryId!, brief.id] };
+    value.showcases = [group, { ...group, id: "regional-direct" }];
+    render(value);
+    expect(document.querySelector("#direct")?.textContent).toContain("尚在补齐");
+    expect(document.querySelectorAll(`article[id="${brief.id}"]`)).toHaveLength(1);
+    expect(document.querySelectorAll(`article[id="${value.leadEntryId}"]`)).toHaveLength(1);
+    expect(document.querySelector(`#regional-direct a[href="#${brief.id}"]`)).not.toBeNull();
+  });
+
+  it("keeps orphan showcase briefs readable when optional group metadata is absent", () => {
+    const value = structuredClone(edition);
+    const brief = value.entries.find(entry => entry.id !== value.leadEntryId)!;
+    brief.showcaseBrief = true;
+    render(value);
+    expect(document.querySelectorAll(`article[id="${brief.id}"]`)).toHaveLength(1);
+  });
   it("uses the editorial lead even when the first news item is different, without duplicating its article", () => {
     expect(edition.entries[0].id).not.toBe(edition.leadEntryId);
     expect(readingLead(edition)?.id).toBe(edition.leadEntryId);

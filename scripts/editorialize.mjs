@@ -1,3 +1,4 @@
+import { showcaseEvidencePackages } from "./lib/showcase.mjs";
 import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.mjs";
@@ -23,9 +24,7 @@ try { titleHintReport = JSON.parse(await readFile(TITLE_HINTS_PATH, "utf8")); } 
 const evidenceSubjects = new Set((evidence.packages || [])
   .map((item) => String(item.subjectKey || "").trim().toLocaleLowerCase("en-US"))
   .filter(Boolean));
-const eligibleTitleHints = (titleHintReport?.hints || []).filter((hint) =>
-  evidenceSubjects.has(String(hint?.subjectKey || "").trim().toLocaleLowerCase("en-US"))
-);
+const eligibleTitleHints = titleHintReport?.hints || [];
 const titleHintReserve = eligibleTitleHints.length ? JSON.stringify(eligibleTitleHints).length : 0;
 if (titleHintReserve >= MAX_INPUT_CHARS) throw new Error("title hints exceed the editorial input budget");
 
@@ -46,7 +45,27 @@ if (evidence.window.period === "daily") {
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarDiscovery.candidates.length} candidate rows in packet; ${calendarDiscovery.omittedCandidates} omitted by limits. Discovery requires primary-source verification.\n`);
 }
 const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length : 0;
-const editorialInput = buildEditorialInput(evidence, MAX_INPUT_CHARS - titleHintReserve - calendarReserve, ledger);
+let showcaseReport = { events: [], announcements: [], coverage: [] };
+try { showcaseReport = JSON.parse(await readFile(process.env.SHOWCASE_REPORT_PATH || "artifacts/showcase-evidence.json", "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
+const showcaseManifest = { events: showcaseReport.events, announcements: showcaseReport.announcements.map(({ id, showcaseId }) => ({ id, showcaseId })), coverage: showcaseReport.coverage };
+const showcaseReserve = showcaseManifest.events.length ? JSON.stringify(showcaseManifest).length : 0;
+const extraPackages = showcaseEvidencePackages(showcaseReport);
+const combinedEvidence = { ...evidence, packages: [...extraPackages, ...evidence.packages] };
+const inputLimit = MAX_INPUT_CHARS - titleHintReserve - calendarReserve - showcaseReserve;
+const editorialInput = buildEditorialInput(combinedEvidence, inputLimit, ledger);
+if (showcaseManifest.events.length) editorialInput.showcases = showcaseManifest;
+const delivered = new Set(editorialInput.packages.map(item => item.eventKey));
+let remaining = combinedEvidence.packages.filter(item => !delivered.has(item.eventKey) && item.sources?.some(source => source.status === "opened" && source.evidenceText));
+const continuationInputs = [];
+while (remaining.length) {
+  const showcaseRemaining = remaining.filter(item => item.showcaseRefs?.length);
+  const input = buildEditorialInput({ ...evidence, packages: showcaseRemaining.length ? showcaseRemaining : remaining }, inputLimit, null);
+  if (!input.packages.length) throw new Error("an evidence item cannot fit in a bounded continuation packet");
+  if (showcaseManifest.events.length) input.showcases = showcaseManifest;
+  continuationInputs.push(input);
+  const consumed = new Set(input.packages.map(item => item.eventKey));
+  remaining = remaining.filter(item => !consumed.has(item.eventKey));
+}
 const packetSubjects = new Set(editorialInput.packages
   .map((item) => String(item.subjectKey || "").trim().toLocaleLowerCase("en-US"))
   .filter(Boolean));
@@ -56,7 +75,7 @@ const titleHints = eligibleTitleHints.filter((hint) =>
 const titleHintChars = titleHints.length ? JSON.stringify(titleHints).length : 0;
 editorialInput.titleHints = titleHints;
 editorialInput.budget.maxInputChars = MAX_INPUT_CHARS;
-editorialInput.budget.usedInputChars += titleHintChars;
+editorialInput.budget.usedInputChars += titleHintChars + showcaseReserve;
 editorialInput.budget.estimatedInputTokens = Math.ceil(editorialInput.budget.usedInputChars / 4);
 editorialInput.budget.titleHintItems = titleHints.length;
 
@@ -102,5 +121,18 @@ const packet = {
 };
 await mkdir(dirname(PACKET_PATH), { recursive: true });
 await writeFile(PACKET_PATH, JSON.stringify(packet, null, 2) + "\n");
+const batchDirectory = resolve(dirname(PACKET_PATH), "editorial-batches");
+await mkdir(batchDirectory, { recursive: true });
+const queue = { schemaVersion: 1, editionId: editorialInput.window.id, totalAnnouncements: showcaseManifest.announcements.length, initialEventKeys: editorialInput.packages.map(item => item.eventKey), batches: [] };
+for (const [index, input] of continuationInputs.entries()) {
+  input.titleHints = eligibleTitleHints;
+  input.budget.usedInputChars += titleHintReserve + showcaseReserve;
+  input.budget.maxInputChars = MAX_INPUT_CHARS;
+  const continuation = { ...packet, editorialInput: input, continuation: { index: index + 1, scope: input.packages.every(item => item.showcaseRefs?.length) ? "showcase" : "news", preservePublished: true } };
+  const name = `${editorialInput.window.id}-${index + 1}.json`;
+  await writeFile(resolve(batchDirectory, name), JSON.stringify(continuation, null, 2) + "\n");
+  queue.batches.push({ name, scope: continuation.continuation.scope, status: "pending", eventKeys: input.packages.map(item => item.eventKey) });
+}
+await writeFile(resolve(batchDirectory, "queue.json"), JSON.stringify(queue, null, 2) + "\n");
 console.log(`Editorial packet: ${editorialInput.packages.length} packages; title hints=${titleHints.length}; estimated reading=${editorialInput.budget.estimatedInputTokens} tokens`);
 console.log(`Packet: ${PACKET_PATH}`);

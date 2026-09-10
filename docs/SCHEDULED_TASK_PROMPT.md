@@ -12,6 +12,7 @@ Both invocations use the same idempotent contract. The task has three bounded ch
 5. Only when no Canonical decision and no current missing-packet wake is required may the task continue to one English repair.
 
 ## 2. Canonical submission
+- Exception: ready `showcase_completion` revisions consume scoped continuation packets; preserve published copy, lead and calendar. See `docs/SHOWCASE_RECOVERY.md`.
 - Both Chinese and English headlines and archive titles must name their game, company or person so they remain understandable without the separate subject label.
 - Return exactly one `include`, `exclude`, or `needs_review` for every packet package/tracking item; add nothing outside the packet. Use only opened evidence. `official` requires opened primary evidence; `multi_source_verified` requires two independent reliable sources. Never invent a `requires_subject_identity` subject.
 - Daily uses `upcomingMode:"inherit_and_patch"`. Do not copy `editorialInput.upcomingBaseline.items` or replace the calendar with empty data. Trusted publisher carries the newest verified Canonical calendar forward and expires entries outside the strict future-15-day window.

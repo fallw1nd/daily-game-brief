@@ -1,3 +1,5 @@
+import { auditShowcase } from "./showcase.mjs";
+import { normalizeSubjectHeadline } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 import {
@@ -200,16 +202,25 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     }
     const title = displayTitle(decision);
     const previous = authorizedLatestRevision
-      ? previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
+      ? packetItem?.showcaseRefs?.length
+        ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => packetItem.showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId))))
+        : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
+    if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
+      throw new Error(`included ${decision.eventKey}: existingEntryId must identify the confirmed subject in this edition`);
+    }
     const index = counters.get(decision.section) || 0;
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;
     if (!previous) counters.set(decision.section, index + 1);
     entryByEvent.set(decision.eventKey, id);
-    const headline = localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }));
+    if (previous && packet.continuation?.preservePublished === true) {
+      return { ...previous, showcaseRefs: [...new Map([...(previous.showcaseRefs || []), ...(packetItem?.showcaseRefs || [])].map(ref => [`${ref.showcaseId}:${ref.announcementId}`, ref])).values()] };
+    }
+    const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
     return {
       id,
       section: decision.section,
+      ...(packetItem?.showcaseRefs ? { showcaseRefs: [...new Map([...(previous?.showcaseRefs || []), ...packetItem.showcaseRefs].map(ref => [`${ref.showcaseId}:${ref.announcementId}`, ref])).values()], showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
       title,
       headline,
       summary: localizeRegisteredTitles(decision.summary),
@@ -229,6 +240,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       ...entryMedia(previous, decision.titleKey, { id, title, headline }),
     };
   });
+  if (new Set(revisedEntries.map(entry => entry.id)).size !== revisedEntries.length) throw new Error("multiple decisions overwrite the same entry; merge announcement evidence into one decision");
   const revisedById = new Map(revisedEntries.map((entry) => [entry.id, entry]));
   const entries = authorizedLatestRevision
     ? [
@@ -243,6 +255,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     : revisedEntries;
   if (!entries.length) throw new Error("an edition needs at least one included entry");
   const removeIds = new Set(editorial.removeUpcomingIds || []);
+  if (packet.continuation?.scope === "showcase" && ((editorial.upcoming || []).length || removeIds.size)) throw new Error("showcase completion cannot change the release calendar");
   const baseUpcoming = authorizedLatestRevision
     ? (latest.upcoming || [])
     : editorial.upcomingMode === "replace" ? [] : (latest.upcoming || []);
@@ -254,9 +267,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   }
   const upcoming = [...upcomingMap.values()].filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
-  const leadEntryId = entryByEvent.get(editorial.leadEventKey) || entries[0].id;
+  const leadEntryId = packet.continuation?.preservePublished && authorizedLatestRevision ? latest.leadEntryId : entryByEvent.get(editorial.leadEventKey) || entries[0].id;
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
-  const archiveTitle = localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }));
+  const archiveTitle = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(packet.continuation?.preservePublished && authorizedLatestRevision ? latest.archiveTitle : editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")
@@ -301,6 +314,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     archiveTitle,
     leadEntryId,
   };
+  if (input.showcases?.events?.length) {
+    edition.showcases = input.showcases.events.map(event => {
+      const items = input.showcases.announcements.filter(item => item.showcaseId === event.id);
+      const audit = auditShowcase(event, items, entries);
+      return { id: event.id, title: event.kind === "nintendo-direct" ? `任天堂直面会 · ${event.date}` : `State of Play · ${event.date}`, titleEn: event.kind === "nintendo-direct" ? `Nintendo Direct · ${event.date}` : `State of Play · ${event.date}`, ...audit, entryIds: entries.filter(entry => entry.showcaseRefs?.some(ref => ref.showcaseId === event.id)).map(entry => entry.id) };
+    });
+  } else if (authorizedLatestRevision && latest.showcases) edition.showcases = latest.showcases;
   const path = `archive/${edition.date.slice(0, 4)}/${edition.date.slice(5, 7)}/${edition.id}.json`;
   const manifestItem = {
     id: edition.id, issueNumber: edition.issueNumber, date: edition.date, period: edition.period,

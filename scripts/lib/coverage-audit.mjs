@@ -23,6 +23,7 @@ function entryText(entry) {
 }
 
 function isCovered(item, entries) {
+  if (item.showcaseRefs?.length) return item.showcaseRefs.every(ref => entries.some(entry => entry.showcaseRefs?.some(candidate => candidate.showcaseId === ref.showcaseId && candidate.announcementId === ref.announcementId)));
   const sourceUrls = new Set((item.sources || []).flatMap((source) => {
     const values = [source.url, source.canonicalUrl].map(normalizedUrl).filter(Boolean);
     return values;

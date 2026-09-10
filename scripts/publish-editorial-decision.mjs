@@ -1,3 +1,4 @@
+import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -87,7 +88,12 @@ async function hasAuthorizedSameEditionRevision(editorial) {
     const state = JSON.parse(stdout);
     return state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
-      state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON &&
+      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || (
+        state.revisionRequest?.reason === "showcase_completion" &&
+        packet.continuation?.scope === "showcase" && packet.continuation?.preservePublished === true &&
+        packet.editorialInput.packages.length > 0 &&
+        packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)))
+      )) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
@@ -178,6 +184,7 @@ if (PUBLICATION_MODE === "locale-repair") {
   process.exit(0);
 }
 
+persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 let publisherLatest = latest;
@@ -231,6 +238,7 @@ const localePlan = buildEnglishOverlay({
   editorial,
   entryIdsByEvent: result.entryIdsByEvent,
   previousOverlay: priorOverlay,
+  preservePublished: packet.continuation?.preservePublished === true,
 });
 
 const archiveFile = resolve("public/data", result.archivePath);

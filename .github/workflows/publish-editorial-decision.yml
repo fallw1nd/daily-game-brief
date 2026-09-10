@@ -224,7 +224,7 @@ jobs:
               exit 0
             fi
 
-            git add public/data
+            git add public/data config/title-translations.json
             if [ "$mode" = "locale-repair" ]; then
               git commit -m "fix(i18n): repair English locale for $edition"
             else
@@ -349,9 +349,11 @@ jobs:
             git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
             git worktree add --detach "$state_dir" origin/automation/state
             EVENT_LEDGER_PATH="$state_dir/automation/ledger/events.json" node scripts/apply-editorial-feedback.mjs
+            node scripts/advance-showcase-queue.mjs --state-root="$state_dir"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
             git -C "$state_dir" add automation/ledger/events.json
+            if [ -d "$state_dir/automation/batches" ]; then git -C "$state_dir" add automation/batches automation/packets automation/status; fi
             if git -C "$state_dir" diff --cached --quiet; then
               echo "updated=false" >> "$GITHUB_OUTPUT"
               success=true

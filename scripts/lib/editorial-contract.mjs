@@ -79,6 +79,7 @@ export const editorialSchema = {
         additionalProperties: false,
         properties: {
           eventKey: { type: "string" },
+          existingEntryId: { type: "string" },
           decision: { type: "string", enum: ["include", "exclude", "needs_review"] },
           section: { type: ["string", "null"], enum: [...sections, null] },
           titleKey: { type: ["string", "null"] },
@@ -251,6 +252,7 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
         kind: item.eventKind === "company" ? "entity" : item.subjectKey ? "game" : "topic",
         key: item.subjectKey || null,
       },
+      ...(item.showcaseRefs ? { showcaseRefs: item.showcaseRefs } : {}),
       publishability: item.subjectKey ? "direct" : "requires_subject_identity",
       headline: item.headline,
       tier: item.tier,

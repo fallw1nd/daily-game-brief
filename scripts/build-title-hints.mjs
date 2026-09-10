@@ -1,3 +1,4 @@
+import { titleLookupDue, titleLookupRecord } from "./lib/title-knowledge.mjs";
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
@@ -8,7 +9,7 @@ import { selectTitleHintSubjects, validateTitleHintCandidate } from "./lib/title
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const OUTPUT_PATH = resolve(process.env.TITLE_HINTS_PATH || "artifacts/title-hints.json");
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim();
-const MAX_SUBJECTS = Number(process.env.TITLE_HINT_LIMIT || 8);
+const MAX_SUBJECTS = Number(process.env.TITLE_HINT_LIMIT || 20);
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const USER_AGENT = "DailyGameBriefTitleBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
 
@@ -189,7 +190,18 @@ async function mapLimit(items, limit, worker) {
 }
 
 const evidence = JSON.parse(await readFile(EVIDENCE_PATH, "utf8"));
-const subjects = selectTitleHintSubjects(evidence, MAX_SUBJECTS);
+const CACHE_PATH = resolve(process.env.TITLE_CACHE_PATH || "artifacts/title-lookup-cache.json");
+async function optionalJson(path, fallback) { try { return JSON.parse(await readFile(path, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; return fallback; } }
+const cache = await optionalJson(CACHE_PATH, { schemaVersion: 1, records: {}, pending: [] });
+const latest = await optionalJson("public/data/latest.json", { upcoming: [] });
+const showcases = await optionalJson("artifacts/showcase-evidence.json", { announcements: [] });
+evidence.upcoming = latest.upcoming;
+evidence.showcaseAnnouncements = showcases.announcements;
+evidence.pendingTitles = cache.pending;
+const allSubjects = selectTitleHintSubjects(evidence, Number.MAX_SAFE_INTEGER);
+const due = allSubjects.filter(subject => titleLookupDue(subject, cache.records[subject.titleKey]));
+const subjects = due.slice(0, Math.min(20, MAX_SUBJECTS));
+cache.pending = due.slice(subjects.length);
 const limited = [];
 let hints = [];
 
@@ -198,6 +210,7 @@ if (DEEPSEEK_API_KEY && subjects.length) {
     try {
       const candidates = await searchTitle(subject);
       const validated = [];
+      let sourceFailed = false;
       for (const candidate of candidates) {
         const sourcePages = await mapLimit(candidate.sources || [], 2, async (source) => {
           try {
@@ -206,6 +219,7 @@ if (DEEPSEEK_API_KEY && subjects.length) {
             if (blockedSearchHost(url.hostname) || /\.(?:avif|gif|jpe?g|png|webp)$/i.test(url.pathname)) return null;
             return await fetchTitleEvidence(url.href, source.label || url.hostname);
           } catch {
+            sourceFailed = true;
             return null;
           }
         });
@@ -213,14 +227,18 @@ if (DEEPSEEK_API_KEY && subjects.length) {
         if (hint) validated.push(hint);
       }
       if (!validated.length) limited.push({ subjectKey: subject.subjectKey, reason: "no source-verified Chinese title candidate" });
-      return validated;
+      const conflict = new Set(validated.map(item => item.titleZhCn)).size > 1;
+      cache.records[subject.titleKey] = { ...titleLookupRecord(subject, validated.length && !conflict ? "verified" : sourceFailed ? "error" : "not-found"), hints: conflict ? [] : validated };
+      return conflict ? [] : validated;
     } catch (error) {
+      cache.records[subject.titleKey] = titleLookupRecord(subject, "error");
       limited.push({ subjectKey: subject.subjectKey, reason: error.message.slice(0, 240) });
       return [];
     }
   });
   hints = results.flat();
 } else if (!DEEPSEEK_API_KEY && subjects.length) {
+  for (const subject of subjects) cache.records[subject.titleKey] = titleLookupRecord(subject, "error");
   limited.push(...subjects.map((subject) => ({ subjectKey: subject.subjectKey, reason: "title search provider unavailable" })));
 }
 
@@ -228,10 +246,14 @@ const output = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
   searchEnabled: Boolean(DEEPSEEK_API_KEY),
-  registryMisses: subjects.length,
-  hints,
+  registryMisses: allSubjects.length,
+  queriedSubjects: DEEPSEEK_API_KEY ? subjects.length : 0,
+  queuedSubjects: cache.pending.length,
+  hints: [...new Map([...Object.values(cache.records).flatMap(record => record.hints || []), ...hints].filter(hint => allSubjects.some(subject => subject.titleKey === hint.titleKey)).map(hint => [`${hint.titleKey}:${hint.titleZhCn}`, hint])).values()],
   limited,
 };
+await mkdir(dirname(CACHE_PATH), { recursive: true });
+await writeFile(CACHE_PATH, JSON.stringify(cache, null, 2) + "\n");
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
 console.log(`Title hints: registry misses=${output.registryMisses}; verified hints=${output.hints.length}; limited=${output.limited.length}`);
