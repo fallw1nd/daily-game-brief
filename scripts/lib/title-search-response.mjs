@@ -5,7 +5,7 @@ export function parseTitleSearchResponse(data) {
     throw Object.assign(new Error("DeepSeek response did not execute a completed web search"), { code: "SEARCH_NOT_EXECUTED" });
   }
   if (data.stop_reason === "max_tokens") throw new Error("DeepSeek title search output exceeded its token budget");
-  const text = blocks.filter(item => item.type === "text").map(item => item.text || "").join("\n").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  const text = (blocks.filter(item => item.type === "text").at(-1)?.text || "").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   if (!text) throw new Error("DeepSeek title search returned no candidate JSON");
   const candidates = JSON.parse(text).candidates;
   if (!Array.isArray(candidates) || candidates.length > 2) throw new Error("invalid title candidate count");

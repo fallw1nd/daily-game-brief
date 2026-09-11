@@ -46,7 +46,12 @@ async function previousEnglishOverlay(manifest, editionId) {
   const index = manifest.editions.findIndex((item) => item.id === editionId);
   if (index <= 0) return null;
   const previous = manifest.editions[index - 1];
-  return readOptionalJson(resolve("public/data", localeArchivePath(previous.id)));
+  return readEnglishPresentation(previous.id);
+}
+
+async function readEnglishPresentation(editionId) {
+  return await readOptionalJson(resolve("public/data", localeArchivePath(editionId)))
+    || (await readOptionalJson(resolve("public/data", localeStatusPath(editionId))))?.retainedPresentation || null;
 }
 
 async function writePublicationResult(value) {
@@ -59,7 +64,7 @@ async function rebuildGeneratedIndexes() {
   await run(process.execPath, ["scripts/build-search-index.mjs"]);
 }
 
-async function writeLocalePlan(canonical, localePlan) {
+async function writeLocalePlan(canonical, localePlan, { preservePublished = false } = {}) {
   const overlayFile = resolve("public/data", localeArchivePath(canonical.id));
   const statusFile = resolve("public/data", localeStatusPath(canonical.id));
   if (localePlan.status === "available") {
@@ -74,6 +79,8 @@ async function writeLocalePlan(canonical, localePlan) {
     summary: localePlan.summary,
     observedAt: canonical.generatedAt,
   });
+  const retained = await readEnglishPresentation(canonical.id);
+  if (preservePublished && retained?.editionId === canonical.id) status.retainedPresentation = retained;
   await mkdir(dirname(statusFile), { recursive: true });
   await writeFile(statusFile, JSON.stringify(status, null, 2) + "\n");
   await rm(overlayFile, { force: true });
@@ -135,7 +142,8 @@ if (PUBLICATION_MODE === "locale-repair") {
   };
   let localePlan;
   if (localeRepairDraft) {
-    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft });
+    const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
+    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
   } else {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
     localePlan = buildEnglishOverlay({
@@ -239,7 +247,7 @@ if (result.status === "already-exists") {
   process.exit(0);
 }
 
-const priorOverlay = await readOptionalJson(resolve("public/data", localeArchivePath(publisherLatest.id)));
+const priorOverlay = await readEnglishPresentation(publisherLatest.id);
 const localePlan = buildEnglishOverlay({
   canonical: result.edition,
   editorial,
@@ -256,7 +264,7 @@ await Promise.all([
   ...(historicalSupplement ? [] : [writeFile("public/data/latest.json", editionText)]),
   writeFile("public/data/manifest.json", JSON.stringify(result.manifest, null, 2) + "\n"),
 ]);
-await writeLocalePlan(result.edition, localePlan);
+await writeLocalePlan(result.edition, localePlan, { preservePublished: packet.continuation?.preservePublished === true });
 await rebuildGeneratedIndexes();
 await writePublicationResult({
   editionId: editorial.editionId,

@@ -113,6 +113,26 @@ function repairDraft(canonical) {
 }
 
 describe("trusted bilingual publication planner", () => {
+  it("keeps existing English when a showcase revision only attaches references", () => {
+    const canonical = canonicalEdition();
+    const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    canonical.entries[0].showcaseRefs = [{ showcaseId: "direct", announcementId: "game", factIds: ["release"] }];
+    const result = buildEnglishOverlay({ canonical, editorial: {}, previousOverlay: previous, preservePublished: true });
+    expect(result.status).toBe("available");
+    expect(result.overlay.entries).toEqual(previous.entries);
+    expect(result.overlay.factsDigest).not.toBe(previous.factsDigest);
+  });
+  it("retains manual English copy when filling a missing supplement translation", () => {
+    const canonical = canonicalEdition();
+    const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    previous.entries[0].summary = "Manually reviewed English wording that must survive automatic supplement repair.";
+    canonical.entries.push({ ...canonical.entries[0], id: `${canonical.id}-news-1` });
+    const result = buildEnglishRepairOverlay({ canonical, draft: repairDraft(canonical), retainedPresentation: previous });
+    expect(result.status).toBe("available");
+    expect(result.overlay.entries[0].summary).toBe(previous.entries[0].summary);
+    expect(result.overlay.entries).toHaveLength(2);
+  });
+
   it("binds English event keys to canonical entry IDs and computes reproducible digests", () => {
     const canonical = canonicalEdition();
     const editorial = bilingualEditorial();

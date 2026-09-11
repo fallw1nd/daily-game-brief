@@ -116,6 +116,10 @@ function finalizeEnglishOverlay(canonical, presentation) {
 export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null, preservePublished = false }) {
   const draft = editorial?.locales?.en;
   if (!draft) {
+    if (preservePublished && previousOverlay?.editionId === canonical.id
+      && canonical.entries.every(entry => previousOverlay.entries?.some(item => item.entryId === entry.id))) {
+      return finalizeEnglishOverlay(canonical, previousOverlay);
+    }
     return {
       status: "unavailable",
       reasonCode: "editorial-overlay-missing",
@@ -157,7 +161,7 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   });
 }
 
-export function buildEnglishRepairOverlay({ canonical, draft }) {
+export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentation = null }) {
   if (!draft || draft.schemaVersion !== 1 || draft.locale !== "en" || draft.editionId !== canonical?.id) {
     return {
       status: "unavailable",
@@ -168,7 +172,8 @@ export function buildEnglishRepairOverlay({ canonical, draft }) {
       errors: ["locale repair identity does not match Canonical edition"],
     };
   }
-  const entries = (draft.entries || []).map((item) => ({
+  const retained = retainedPresentation?.editionId === canonical.id ? new Map((retainedPresentation.entries || []).map(item => [item.entryId, item])) : new Map();
+  const entries = (draft.entries || []).map((item) => retained.get(item.entryId) || item).map((item) => ({
     entryId: item.entryId,
     headline: item.headline,
     summary: item.summary,
@@ -191,7 +196,7 @@ export function buildEnglishRepairOverlay({ canonical, draft }) {
     ...(cleanOptional(item.coverAlt) ? { coverAlt: cleanOptional(item.coverAlt) } : {}),
   }));
   const result = finalizeEnglishOverlay(canonical, {
-    archiveTitle: draft.archiveTitle,
+    archiveTitle: retainedPresentation?.editionId === canonical.id ? retainedPresentation.archiveTitle : draft.archiveTitle,
     entries,
     upcoming,
     sourceReport: draft.sourceReport,

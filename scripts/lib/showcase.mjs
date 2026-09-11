@@ -24,11 +24,17 @@ export function parseShowcasePage(html, source, event) {
   const announcements = [];
   const seen = new Set();
   for (const segment of headlineSegments) {
+    const description = typeof segment.description === "string" ? segment.description : segment.description?.text || "";
+    if (/^THL$/.test(segment.title) && /Nintendo Treehouse: Live/.test(description)) continue;
+    if (/^Nintendo Today/.test(segment.title) && /watch the presentation/.test(description)) continue;
+    const evidenceText = clean(`${segment.title}. ${segment.subtitle || ""} ${description}`);
+    const id = `${event.id}:${source.region}-segment-${segment.id}`;
     // Marketing headings are not game identities. Retain unresolved segments so
     // later transcript/detail verification cannot silently forget them.
-    announcements.push({ id: `${event.id}:${source.region}-segment-${segment.id}`, showcaseId: event.id,
+    announcements.push({ id, showcaseId: event.id,
       region: source.region, subjectKey: null, titleEn: null, titleKey: null,
-      headline: clean(segment.title), evidenceText: clean(`${segment.title}. ${segment.subtitle || ""} ${segment.description || ""}`),
+      headline: clean(segment.title), evidenceText,
+      factUnits: [{ id: `${id}:fact-0`, text: evidenceText }],
       sourceUrl: source.url, locator: `NintendoDirectHeadline:${segment.id}`, publishedAt: event.startsAt,
       kind: "primary", eventKind: "announcement", identityStatus: "needs_verification",
       ...(segment.video?.url ? { videoUrl: segment.video.url } : {}),

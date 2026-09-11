@@ -11,6 +11,7 @@ const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-
 const OUTPUT_PATH = resolve(process.env.TITLE_HINTS_PATH || "artifacts/title-hints.json");
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim();
 const MAX_SUBJECTS = Number(process.env.TITLE_HINT_LIMIT || 20);
+const MAX_RUN_TOKENS = Number(process.env.TITLE_MAX_RUN_TOKENS || 30000);
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const USER_AGENT = "DailyGameBriefTitleBot/1.0 (+https://fallw1nd.github.io/daily-game-brief/)";
 
@@ -101,15 +102,16 @@ async function searchTitle(subject) {
     headers: { Accept: "application/json", "x-api-key": DEEPSEEK_API_KEY, Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "anthropic-version": "2023-06-01", "Content-Type": "application/json", "User-Agent": USER_AGENT },
     body: JSON.stringify({
       model: "deepseek-flash", max_tokens: 700, thinking: { type: "disabled" },
-      system: 'Find existing Chinese names for this exact game/entity, matching sequel and subtitle. Prefer mainland Simplified Chinese official/store pages; otherwise require two independent reputable Chinese media. Never invent names. Return only JSON {"candidates":[{"name":"verbatim Chinese name","urls":["source page URL"]}]}, at most 2 names and 3 URLs each; empty candidates if unsupported.',
+      system: 'Find existing Chinese names for this exact title, including sequel/subtitle. Search once; do not open pages (the caller verifies them). Prefer mainland Simplified Chinese official stores, else reputable Chinese media. Never invent names. Return only JSON {"candidates":[{"name":"Chinese name","urls":["page URL"]}]}; max 2 names, 3 URLs each; empty if unsupported.',
       messages: [{ role: "user", content: [{ type: "text", text: subject.subjectKey }] }],
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
     }),
   });
   const body = await response.text();
   if (!response.ok) throw Object.assign(new Error(`DeepSeek title search HTTP ${response.status}`), { status: response.status });
   if (Buffer.byteLength(body) > MAX_HTML_BYTES) throw new Error("DeepSeek title search response is too large");
   const data = JSON.parse(body);
+  if (process.env.TITLE_DEBUG_RESPONSES_PATH) debugResponses.push({ subjectKey: subject.subjectKey, titleKey: subject.titleKey, stop_reason: data.stop_reason, usage: data.usage, content: (data.content || []).filter(item => ["text", "server_tool_use", "web_search_tool_result"].includes(item.type)) });
   for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"]]) {
     if (Number.isFinite(data.usage?.[key])) apiUsage[field] = (apiUsage[field] || 0) + data.usage[key];
   }
@@ -153,12 +155,13 @@ let queriedSubjects = 0;
 let successfulQueries = 0;
 const apiUsage = {};
 const providerCalls = [];
+const debugResponses = [];
 let providerBlocked = Date.parse(cache.provider?.retryAt || "") > Date.now();
 if (!providerBlocked) delete cache.provider;
 
 if (DEEPSEEK_API_KEY && subjects.length) {
   const results = await mapLimit(subjects, 2, async (subject) => {
-    if (providerBlocked) { cache.pending.push(subject); return []; }
+    if (providerBlocked || (apiUsage.totalTokens || 0) >= MAX_RUN_TOKENS) { cache.pending.push(subject); return []; }
     try {
       queriedSubjects += 1;
       const candidates = await searchTitle(subject);
@@ -210,6 +213,7 @@ const output = {
   successfulQueries,
   apiUsage,
   providerCalls,
+  tokenBudget: { softLimit: MAX_RUN_TOKENS, exhausted: (apiUsage.totalTokens || 0) >= MAX_RUN_TOKENS, note: "Already in-flight requests may exceed the soft limit; unstarted subjects remain queued." },
   ...(cache.provider ? { providerFailure: cache.provider } : {}),
   registryMisses: allSubjects.length,
   queriedSubjects,
@@ -221,5 +225,10 @@ await mkdir(dirname(CACHE_PATH), { recursive: true });
 await writeFile(CACHE_PATH, JSON.stringify(cache, null, 2) + "\n");
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
+if (process.env.TITLE_DEBUG_RESPONSES_PATH) {
+  const path = resolve(process.env.TITLE_DEBUG_RESPONSES_PATH);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(debugResponses, null, 2) + "\n");
+}
 console.log(`Title hints: registry misses=${output.registryMisses}; verified hints=${output.hints.length}; limited=${output.limited.length}`);
 console.log(`Report: ${OUTPUT_PATH}`);
