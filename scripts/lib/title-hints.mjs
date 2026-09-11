@@ -39,8 +39,8 @@ export function selectTitleHintSubjects(evidence, limit = 20) {
   const selected = [];
   for (const item of [...(evidence?.packages || []), ...(evidence?.showcaseAnnouncements || []), ...(evidence?.upcoming || []).map(item => ({ ...item, subjectKey: item.title?.title_en || item.titleEn, titleKey: item.title?.title_key || item.titleKey })), ...(evidence?.pendingTitles || [])]) {
     const subjectKey = String(item?.subjectKey || "").trim();
-    const normalized = subjectKey.toLocaleLowerCase("en-US");
-    if (!needsTitleLookup(subjectKey, item?.eventKind) || seen.has(normalized)) continue;
+    const normalized = item.titleKey || titleKeyFromSubject(subjectKey);
+    if (!needsTitleLookup(subjectKey, item?.eventKind) || getRegisteredTitleTranslation(item.titleKey, subjectKey) || seen.has(normalized)) continue;
     seen.add(normalized);
     selected.push({
       subjectKey,

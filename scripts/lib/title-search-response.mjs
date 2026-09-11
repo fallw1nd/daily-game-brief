@@ -7,7 +7,11 @@ export function parseTitleSearchResponse(data) {
   if (data.stop_reason === "max_tokens") throw new Error("DeepSeek title search output exceeded its token budget");
   const text = (blocks.filter(item => item.type === "text").at(-1)?.text || "").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   if (!text) throw new Error("DeepSeek title search returned no candidate JSON");
-  const candidates = JSON.parse(text).candidates;
+  // Native search may prefix its final JSON with a short explanation. Parse one
+  // complete suffix object; malformed/truncated JSON still fails closed.
+  const start = text.search(/\{\s*"candidates"\s*:/);
+  const json = start >= 0 ? text.slice(start).replace(/\s*```$/, "") : text;
+  const candidates = JSON.parse(json).candidates;
   if (!Array.isArray(candidates) || candidates.length > 2) throw new Error("invalid title candidate count");
   return candidates.map(item => {
     if (typeof item.name !== "string" || !Array.isArray(item.urls) || item.urls.length > 3 || item.urls.some(url => typeof url !== "string")) throw new Error("invalid title candidate fields");

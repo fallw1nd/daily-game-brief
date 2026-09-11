@@ -70,12 +70,9 @@ while (remaining.length) {
   const consumed = new Set(input.packages.map(item => item.eventKey));
   remaining = remaining.filter(item => !consumed.has(item.eventKey));
 }
-const packetSubjects = new Set(editorialInput.packages
-  .map((item) => String(item.subjectKey || "").trim().toLocaleLowerCase("en-US"))
-  .filter(Boolean));
-const titleHints = eligibleTitleHints.filter((hint) =>
-  packetSubjects.has(String(hint?.subjectKey || "").trim().toLocaleLowerCase("en-US"))
-);
+// The lookup report already limits hints to current news/calendar/queued names.
+// Keep calendar hints even when the same game has no news in this packet.
+const titleHints = eligibleTitleHints;
 const titleHintChars = titleHints.length ? JSON.stringify(titleHints).length : 0;
 editorialInput.titleHints = titleHints;
 editorialInput.budget.maxInputChars = MAX_INPUT_CHARS;

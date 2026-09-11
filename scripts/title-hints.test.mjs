@@ -16,6 +16,16 @@ function source(url, pageText, extra = {}) {
 }
 
 describe("title hint subject selection", () => {
+  it("deduplicates stable identities and punctuation variants without dropping sequels", () => {
+    expect(selectTitleHintSubjects({ packages: [
+      pkg("Fire Emblem: Fortune’s Weave"),
+      pkg("Fire Emblem: Fortune's Weave"),
+      pkg("LEGO® Batman™: Legacy of the Dark Knight"),
+      { ...pkg("未登録タイトル"), titleKey: "fable" },
+      pkg("Unregistered Example: Game"), pkg("Unregistered Example – Game"),
+      pkg("Unregistered Example: Game 2"),
+    ] }).map(item => item.subjectKey)).toEqual(["Unregistered Example: Game", "Unregistered Example: Game 2"]);
+  });
   it("does not search titles already registered, including the 2026-08-28 regressions", () => {
     const evidence = {
       packages: [

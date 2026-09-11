@@ -7,7 +7,7 @@ const registry = JSON.parse(readFileSync(registryPath, "utf8"));
 export let titleTranslations = Object.freeze(registry.translations ?? {});
 
 function normalizedAlias(value) {
-  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : "";
+  return typeof value === "string" ? value.replace(/[™®]/g, "").normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, " ").trim() : "";
 }
 
 export function getRegisteredTitleTranslation(titleKey, titleEn = null) {

@@ -102,7 +102,7 @@ async function searchTitle(subject) {
     headers: { Accept: "application/json", "x-api-key": DEEPSEEK_API_KEY, Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "anthropic-version": "2023-06-01", "Content-Type": "application/json", "User-Agent": USER_AGENT },
     body: JSON.stringify({
       model: "deepseek-flash", max_tokens: 700, thinking: { type: "disabled" },
-      system: 'Find existing Chinese names for this exact title, including sequel/subtitle. Search once; do not open pages (the caller verifies them). Prefer mainland Simplified Chinese official stores, else reputable Chinese media. Never invent names. Return only JSON {"candidates":[{"name":"Chinese name","urls":["page URL"]}]}; max 2 names, 3 URLs each; empty if unsupported.',
+      system: 'Search once for this exact title and its Chinese name. Keep sequel/subtitle identity. Sources: official Simplified Chinese stores, gamersky.com, 3dmgame.com, ali213.net, vgtime.com, gcores.com, ign.com.cn. Do not open pages; caller verifies them. Never translate. Return JSON only {"candidates":[{"name":"中文名","urls":["URL"]}]}; max 2 names, 3 URLs each. Empty if unsupported.',
       messages: [{ role: "user", content: [{ type: "text", text: subject.subjectKey }] }],
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
     }),
@@ -112,10 +112,10 @@ async function searchTitle(subject) {
   if (Buffer.byteLength(body) > MAX_HTML_BYTES) throw new Error("DeepSeek title search response is too large");
   const data = JSON.parse(body);
   if (process.env.TITLE_DEBUG_RESPONSES_PATH) debugResponses.push({ subjectKey: subject.subjectKey, titleKey: subject.titleKey, stop_reason: data.stop_reason, usage: data.usage, content: (data.content || []).filter(item => ["text", "server_tool_use", "web_search_tool_result"].includes(item.type)) });
-  for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"]]) {
+  for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"], ["cacheReadTokens", "cache_read_input_tokens"], ["cacheWriteTokens", "cache_creation_input_tokens"]]) {
     if (Number.isFinite(data.usage?.[key])) apiUsage[field] = (apiUsage[field] || 0) + data.usage[key];
   }
-  if (Number.isFinite(apiUsage.inputTokens) && Number.isFinite(apiUsage.outputTokens)) apiUsage.totalTokens = apiUsage.inputTokens + apiUsage.outputTokens;
+  if (Number.isFinite(apiUsage.inputTokens) && Number.isFinite(apiUsage.outputTokens)) apiUsage.totalTokens = apiUsage.inputTokens + apiUsage.outputTokens + (apiUsage.cacheReadTokens || 0) + (apiUsage.cacheWriteTokens || 0);
   providerCalls.push({ subjectKey: subject.subjectKey, outputTypes: (data.content || []).map(item => item.type), searchResultBlocks: (data.content || []).filter(item => item.type === "web_search_tool_result" && Array.isArray(item.content)).length });
   return parseTitleSearchResponse(data);
 }

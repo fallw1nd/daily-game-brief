@@ -241,8 +241,16 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       ...entryMedia(previous, decision.titleKey, { id, title, headline }),
     };
   });
-  if (new Set(revisedEntries.map(entry => entry.id)).size !== revisedEntries.length) throw new Error("multiple decisions overwrite the same entry; merge announcement evidence into one decision");
-  const revisedById = new Map(revisedEntries.map((entry) => [entry.id, entry]));
+  const revisedById = new Map();
+  for (const entry of revisedEntries) {
+    const prior = revisedById.get(entry.id);
+    if (prior) {
+      // Several regional records can point to the same already published fact.
+      // Only append evidence associations here; ordinary duplicate edits still fail.
+      if (packet.continuation?.preservePublished !== true || !previousIds.has(entry.id)) throw new Error("multiple decisions overwrite the same entry; merge announcement evidence into one decision");
+      revisedById.set(entry.id, { ...prior, showcaseRefs: mergeShowcaseRefs([...(prior.showcaseRefs || []), ...(entry.showcaseRefs || [])]) });
+    } else revisedById.set(entry.id, entry);
+  }
   const entries = authorizedLatestRevision
     ? [
         ...previousEntries.flatMap((entry) => {

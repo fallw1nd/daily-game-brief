@@ -19,7 +19,7 @@ export function normalizeSubjectHeadline(headline, title, { locale = "zh", entit
   const name = locale === "en" ? title?.title_en : title?.title_zh_cn || title?.title_en;
   if (!title?.title_key || !name?.trim()) throw new Error("headline subject is missing a confirmed title identity");
   const registered = getRegisteredTitleTranslation(title.title_key, title.title_en);
-  const aliases = [title.title_en, ...(locale === "en" ? [] : [title.title_zh_cn]), ...(registered?.titleEnAliases || [])];
+  const aliases = [title.title_en, ...(locale === "en" ? [] : [title.title_zh_cn, title.title_ja]), ...(registered?.titleEnAliases || [])];
   if (aliases.some(alias => containsName(headline, alias))) return headline;
   // An institution mentioned in a time clause or platform suffix is not the headline's subject.
   if (entities.some(entity => {
