@@ -113,24 +113,14 @@ async function searchTitle(subject) {
           type: "object",
           additionalProperties: false,
           properties: {
-            titleZhCn: { type: "string" },
-            suggestedStatus: { type: "string", enum: ["official_simplified", "common_translation"] },
-            reason: { type: "string" },
-            sources: {
+            name: { type: "string" },
+            urls: {
               type: "array",
               maxItems: 3,
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  url: { type: "string" },
-                  label: { type: "string" },
-                },
-                required: ["url", "label"],
-              },
+              items: { type: "string" },
             },
           },
-          required: ["titleZhCn", "suggestedStatus", "reason", "sources"],
+          required: ["name", "urls"],
         },
       },
     },
@@ -148,32 +138,27 @@ async function searchTitle(subject) {
     },
     body: JSON.stringify({
       model: "deepseek-v4-flash",
-      instructions: [
-        "You are a search-only finder for Chinese video-game title evidence.",
-        "Search only the supplied game title. Do not return event facts, dates, platforms, release claims, or additional games.",
-        "First look for an official Simplified Chinese name on the developer, publisher, platform, or storefront page.",
-        "If no official Simplified Chinese name exists, return a common_translation only when the same Chinese name is stably used by at least two independent reputable Chinese games-media sources.",
-        "Never translate, transliterate, or invent a Chinese name yourself. Return no candidate when the web evidence does not already contain one.",
-        "Every titleZhCn must appear verbatim on every returned source page. Return source PAGE URLs, never search-result URLs or direct assets.",
-        "The caller will open each source page and verify the Chinese string independently; your status is only a suggestion for an editor.",
-      ].join(" "),
+      instructions: "Find existing Chinese names for this exact game/entity, matching sequel and subtitle. Prefer mainland Simplified Chinese official/store pages; otherwise require two independent reputable Chinese media. Each name must occur verbatim on every cited page. Return page URLs only, no search links/assets. Never translate or invent names. Return empty candidates if unsupported.",
       input: JSON.stringify({ title: subject.subjectKey }),
       tools: [{ type: "web_search" }],
       tool_choice: { type: "web_search" },
       reasoning: { effort: "none" },
-      max_output_tokens: 1000,
+      max_output_tokens: 700,
       temperature: 0.1,
       text: { format: { type: "json_schema", name: "title_hint_candidates", schema } },
     }),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(`DeepSeek title search HTTP ${response.status}`);
+  if (!response.ok) throw Object.assign(new Error(`DeepSeek title search HTTP ${response.status}`), { status: response.status });
   if (Buffer.byteLength(body) > MAX_HTML_BYTES) throw new Error("DeepSeek title search response is too large");
   const data = JSON.parse(body);
+  for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"], ["totalTokens", "total_tokens"]]) {
+    if (Number.isFinite(data.usage?.[key])) apiUsage[field] = (apiUsage[field] || 0) + data.usage[key];
+  }
   if (data.status === "failed") throw new Error(data.error?.message || "DeepSeek title search failed");
   const text = outputText(data);
   if (!text) throw new Error("DeepSeek title search returned no structured output");
-  return JSON.parse(text).candidates || [];
+  return (JSON.parse(text).candidates || []).map(item => ({ titleZhCn: item.name, sources: (item.urls || []).map(url => ({ url })) }));
 }
 
 async function mapLimit(items, limit, worker) {
@@ -207,11 +192,19 @@ const subjects = due.slice(0, Math.min(20, MAX_SUBJECTS));
 cache.pending = due.slice(subjects.length);
 const limited = [];
 let hints = [];
+let queriedSubjects = 0;
+let successfulQueries = 0;
+const apiUsage = {};
+let providerBlocked = Date.parse(cache.provider?.retryAt || "") > Date.now();
+if (!providerBlocked) delete cache.provider;
 
 if (DEEPSEEK_API_KEY && subjects.length) {
   const results = await mapLimit(subjects, 2, async (subject) => {
+    if (providerBlocked) { cache.pending.push(subject); return []; }
     try {
+      queriedSubjects += 1;
       const candidates = await searchTitle(subject);
+      successfulQueries += 1;
       const validated = [];
       let sourceFailed = false;
       for (const candidate of candidates) {
@@ -226,7 +219,9 @@ if (DEEPSEEK_API_KEY && subjects.length) {
             return null;
           }
         });
-        const hint = validateTitleHintCandidate(subject, candidate, sourcePages.filter(Boolean));
+        const opened = sourcePages.filter(Boolean);
+        const hint = validateTitleHintCandidate(subject, { ...candidate, suggestedStatus: "official_simplified" }, opened)
+          || validateTitleHintCandidate(subject, { ...candidate, suggestedStatus: "common_translation" }, opened);
         if (hint) validated.push(hint);
       }
       if (!validated.length) limited.push({ subjectKey: subject.subjectKey, reason: "no source-verified Chinese title candidate" });
@@ -234,6 +229,10 @@ if (DEEPSEEK_API_KEY && subjects.length) {
       cache.records[subject.titleKey] = { ...titleLookupRecord(subject, validated.length && !conflict ? "verified" : sourceFailed ? "error" : "not-found"), hints: conflict ? [] : validated };
       return conflict ? [] : validated;
     } catch (error) {
+      if ([401, 402, 403, 429].includes(error.status)) {
+        providerBlocked = true;
+        cache.provider = { status: "unavailable", reason: error.message, retryAt: new Date(Date.now() + 6 * 3600000).toISOString() };
+      }
       cache.records[subject.titleKey] = titleLookupRecord(subject, "error");
       limited.push({ subjectKey: subject.subjectKey, reason: error.message.slice(0, 240) });
       return [];
@@ -249,8 +248,12 @@ const output = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
   searchEnabled: Boolean(DEEPSEEK_API_KEY),
+  providerStatus: !DEEPSEEK_API_KEY || providerBlocked || (queriedSubjects > 0 && successfulQueries === 0) ? "unavailable" : "available",
+  successfulQueries,
+  apiUsage,
+  ...(cache.provider ? { providerFailure: cache.provider } : {}),
   registryMisses: allSubjects.length,
-  queriedSubjects: DEEPSEEK_API_KEY ? subjects.length : 0,
+  queriedSubjects,
   queuedSubjects: cache.pending.length,
   hints: [...new Map([...Object.values(cache.records).flatMap(record => record.hints || []), ...hints].filter(hint => allSubjects.some(subject => subject.titleKey === hint.titleKey)).map(hint => [`${hint.titleKey}:${hint.titleZhCn}`, hint])).values()],
   limited,
