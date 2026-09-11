@@ -12,19 +12,39 @@ export function showcaseIdentity(kind, date) {
 // A source fragment is one announcement; sharing an article URL is not an identity.
 export function parseShowcasePage(html, source, event) {
   const document = new JSDOM(html, { url: source.url }).window.document;
+  let headlineSegments = [];
+  if (event.kind === "nintendo-direct" && source.region === "us") {
+    try {
+      const page = JSON.parse(document.querySelector("#__NEXT_DATA__")?.textContent || "{}");
+      headlineSegments = Object.values(page.props?.pageProps?.initialApolloState || {}).filter(item => item?.__typename === "NintendoDirectHeadline");
+    } catch { /* Changed embedded data remains an incomplete source, not invented facts. */ }
+  }
   document.querySelectorAll("nav,footer,header,script,style,noscript,aside,.screen-reader-text").forEach(node => node.remove());
   const main = document.querySelector(".entry-content") || document.querySelector(".nintendo-direct-wrapper,article,main,[role=main],#page-content") || document.body;
   const announcements = [];
   const seen = new Set();
-  const add = (title, text, href, locator) => {
+  for (const segment of headlineSegments) {
+    // Marketing headings are not game identities. Retain unresolved segments so
+    // later transcript/detail verification cannot silently forget them.
+    announcements.push({ id: `${event.id}:${source.region}-segment-${segment.id}`, showcaseId: event.id,
+      region: source.region, subjectKey: null, titleEn: null, titleKey: null,
+      headline: clean(segment.title), evidenceText: clean(`${segment.title}. ${segment.subtitle || ""} ${segment.description || ""}`),
+      sourceUrl: source.url, locator: `NintendoDirectHeadline:${segment.id}`, publishedAt: event.startsAt,
+      kind: "primary", eventKind: "announcement", identityStatus: "needs_verification",
+      ...(segment.video?.url ? { videoUrl: segment.video.url } : {}),
+    });
+  }
+  const add = (title, text, href, locator, facts = [text]) => {
     title = clean(title); text = clean(text);
     if (/^(オープニング|エンディング|ごあいさつ|Download Image)$/i.test(title)) return;
+    if (/^Nintendo (?:Today|Treehouse)/i.test(title)) return;
     if (title.length < 2 || title.length > 180 || text.length < 8 || /^(highlights|available|watch|read more|subscribe|latest|looking for|see more|related|最新|関連|動画|ソフト一覧)/i.test(title)) return;
     const key = showcaseKey(`${source.region} ${title} ${locator}`);
     if (seen.has(key)) return; seen.add(key);
     announcements.push({ id: `${event.id}:${key}`, showcaseId: event.id, region: source.region,
       subjectKey: title, titleEn: title, titleKey: showcaseKey(title), headline: text,
       evidenceText: text, sourceUrl: source.url, detailUrl: href || null, locator,
+      factUnits: [...new Set(facts.map(clean).filter(Boolean))].map((text, index) => ({ id: `${event.id}:${key}:fact-${index}`, text })),
       publishedAt: event.startsAt, kind: source.kind || "primary", eventKind: "announcement" });
   };
   // Nintendo Direct landing pages present game cards, sometimes without anchors.
@@ -58,7 +78,7 @@ export function parseShowcasePage(html, source, event) {
     const text = parts.join(" ");
     if (!text || /^(highlights|available|watch|latest|Nintendo Direct|State of Play|related|comments|leave a|looking for)/i.test(clean(node.textContent))) continue;
     if (text.length > 12000) continue; // Group heading, not an individual announcement.
-    add(node.textContent, text, node.querySelector("a[href]")?.href, node.id ? `#${node.id}` : `heading:${clean(node.textContent)}`);
+    add(node.textContent, text, node.querySelector("a[href]")?.href, node.id ? `#${node.id}` : `heading:${clean(node.textContent)}`, parts);
   }
   return { source, announcements, pageTitle: clean(document.title),
     // A parser cannot certify that an official highlights page exhausts the broadcast.
@@ -75,6 +95,7 @@ export function mergeShowcaseAnnouncements(items) {
     if (!prior) byIdentity.set(key, { ...item, id: key, regions: [item.region], evidence: [{ url: item.sourceUrl, locator: item.locator, text: item.evidenceText, region: item.region }] });
     else {
       prior.regions = [...new Set([...prior.regions, item.region])];
+      prior.factUnits = [...new Map([...(prior.factUnits || []), ...(item.factUnits || [])].map(fact => [fact.id, fact])).values()];
       if (!prior.evidence.some(source => source.url === item.sourceUrl && source.locator === item.locator)) prior.evidence.push({ url: item.sourceUrl, locator: item.locator, text: item.evidenceText, region: item.region });
     }
   }
@@ -82,13 +103,27 @@ export function mergeShowcaseAnnouncements(items) {
 }
 
 export function auditShowcase(event, announcements, entries, dispositions = []) {
-  const included = new Set(entries.flatMap(entry => (entry.showcaseRefs || []).filter(ref => ref.showcaseId === event.id).map(ref => ref.announcementId)));
+  const references = mergeShowcaseRefs(entries.flatMap(entry => entry.showcaseRefs || []).filter(ref => ref.showcaseId === event.id));
+  const included = new Set(announcements.filter(item => {
+    const ref = references.find(ref => ref.announcementId === item.id);
+    return ref && (item.factUnits || []).every(fact => ref.factIds?.includes(fact.id));
+  }).map(item => item.id));
   const allowedExclusions = new Set(dispositions.filter(item => item.status === "non_substantive" && item.reason && item.sourceUrl?.startsWith("https://")).map(item => item.announcementId));
   const missing = announcements.filter(item => !included.has(item.id) && !allowedExclusions.has(item.id)).map(item => item.id);
   const regionsComplete = ["jp", "us", "eu"].every(region => event.sources?.some(source => source.region === region && source.inventoryComplete === true && source.status === "parsed"));
   return { showcaseId: event.id, total: announcements.length, covered: announcements.filter(item => included.has(item.id)).length,
     nonSubstantive: announcements.filter(item => allowedExclusions.has(item.id)).length, missing,
     status: regionsComplete && announcements.length > 0 && missing.length === 0 ? "complete" : "partial" };
+}
+
+export function mergeShowcaseRefs(refs) {
+  const merged = new Map();
+  for (const ref of refs) {
+    const key = `${ref.showcaseId}:${ref.announcementId}`;
+    const prior = merged.get(key);
+    merged.set(key, { ...ref, ...((ref.factIds || prior?.factIds) ? { factIds: [...new Set([...(prior?.factIds || []), ...(ref.factIds || [])])] } : {}) });
+  }
+  return [...merged.values()];
 }
 
 export function batchShowcasePackages(packages, maxChars = 100000) {
@@ -116,6 +151,7 @@ export function showcaseEvidencePackages(report) {
     eventKey: item.id, eventKind: item.eventKind || "announcement", subjectKey: item.subjectKey,
     headline: item.headline, tier: "B", score: 70, timeRelation: "window", readiness: "needs-independent-report",
     showcaseRefs: [{ showcaseId: item.showcaseId, announcementId: item.id }],
+    showcaseFacts: item.factUnits || [],
     sources: (item.evidence || [{ url: item.sourceUrl, text: item.evidenceText, locator: item.locator, region: item.region }]).map(source => ({
       status: "opened", kind: "primary", independenceKey: item.showcaseId.startsWith("nintendo") ? "nintendo" : "sony-interactive-entertainment",
       label: item.showcaseId.startsWith("nintendo") ? "Nintendo Direct" : "PlayStation State of Play",

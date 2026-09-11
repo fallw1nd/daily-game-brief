@@ -194,12 +194,15 @@ const CACHE_PATH = resolve(process.env.TITLE_CACHE_PATH || "artifacts/title-look
 async function optionalJson(path, fallback) { try { return JSON.parse(await readFile(path, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; return fallback; } }
 const cache = await optionalJson(CACHE_PATH, { schemaVersion: 1, records: {}, pending: [] });
 const latest = await optionalJson("public/data/latest.json", { upcoming: [] });
-const showcases = await optionalJson("artifacts/showcase-evidence.json", { announcements: [] });
-evidence.upcoming = latest.upcoming;
+const showcases = await optionalJson(process.env.SHOWCASE_REPORT_PATH || "artifacts/showcase-evidence.json", { announcements: [] });
+const calendar = await optionalJson(process.env.RELEASE_CALENDAR_REPORT_PATH || "artifacts/release-calendar-discovery.json", { candidates: [] });
+evidence.upcoming = [...(latest.upcoming || []), ...(calendar.editionDate === evidence.window.id.slice(0, 10) ? calendar.candidates.map(item => ({ titleEn: item.title, id: item.productId || item.sourceUrl })) : [])];
 evidence.showcaseAnnouncements = showcases.announcements;
 evidence.pendingTitles = cache.pending;
 const allSubjects = selectTitleHintSubjects(evidence, Number.MAX_SAFE_INTEGER);
-const due = allSubjects.filter(subject => titleLookupDue(subject, cache.records[subject.titleKey]));
+const pendingKeys = new Set(cache.pending.map(subject => subject.titleKey));
+const due = allSubjects.filter(subject => titleLookupDue(subject, cache.records[subject.titleKey]))
+  .sort((a, b) => Number(pendingKeys.has(b.titleKey)) - Number(pendingKeys.has(a.titleKey)));
 const subjects = due.slice(0, Math.min(20, MAX_SUBJECTS));
 cache.pending = due.slice(subjects.length);
 const limited = [];

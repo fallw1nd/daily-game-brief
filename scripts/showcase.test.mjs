@@ -16,7 +16,7 @@ describe("showcase announcement accounting", () => {
     const parsed = parseShowcasePage(html, source, event);
     expect(parsed.announcements.map(item => item.subjectKey)).toEqual(["Game One", "Game One DLC"]);
     expect(parsed.announcements[0].evidenceText).toContain("demo");
-    const audit = auditShowcase(event, parsed.announcements, [{ showcaseRefs: [{ showcaseId: event.id, announcementId: parsed.announcements[0].id }] }]);
+    const audit = auditShowcase(event, parsed.announcements, [{ showcaseRefs: [{ showcaseId: event.id, announcementId: parsed.announcements[0].id, factIds: parsed.announcements[0].factUnits.map(fact => fact.id) }] }]);
     expect(audit.missing).toEqual([parsed.announcements[1].id]);
     expect(audit.status).toBe("partial");
   });
@@ -28,6 +28,14 @@ describe("showcase announcement accounting", () => {
     sources[0].inventoryComplete = false;
     expect(auditShowcase({ ...event, sources }, [item], entries).status).toBe("partial");
     expect(auditShowcase(event, [item], [], [{ announcementId: "one", status: "budget", reason: "full", sourceUrl: source.url }]).missing).toEqual(["one"]);
+  });
+  it("requires every fact increment, even when the game and page already have a story", () => {
+    const sources = ["jp", "us", "eu"].map(region => ({ ...source, region, status: "parsed" }));
+    const announcement = { id: "game", factUnits: [{ id: "release" }, { id: "dlc" }] };
+    const entries = [{ showcaseRefs: [{ showcaseId: event.id, announcementId: "game", factIds: ["release"] }] }];
+    expect(auditShowcase({ ...event, sources }, [announcement], entries).status).toBe("partial");
+    entries.push({ showcaseRefs: [{ showcaseId: event.id, announcementId: "game", factIds: ["dlc"] }] });
+    expect(auditShowcase({ ...event, sources }, [announcement], entries).status).toBe("complete");
   });
   it("merges only verified equivalent announcements and preserves regional facts", () => {
     const items = ["jp", "us"].map(region => ({ id: region, equivalentAnnouncementId: "shared", region, sourceUrl: source.url, locator: region, evidenceText: `${region} release date` }));

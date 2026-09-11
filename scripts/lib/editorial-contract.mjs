@@ -80,6 +80,7 @@ export const editorialSchema = {
         properties: {
           eventKey: { type: "string" },
           existingEntryId: { type: "string" },
+          coveredFactIds: { type: "array", items: { type: "string" } },
           decision: { type: "string", enum: ["include", "exclude", "needs_review"] },
           section: { type: ["string", "null"], enum: [...sections, null] },
           titleKey: { type: ["string", "null"] },
@@ -207,13 +208,13 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
     eventKey: item.eventKey,
     eventKind: item.eventKind,
     subjectKey: item.subjectKey,
-    lastHeadline: item.lastHeadline,
+    lastHeadline: String(item.lastHeadline || "").slice(0, 160),
     firstSeenAt: item.firstSeenAt,
     lastSeenAt: item.lastSeenAt,
     lastDecisionEdition: item.lastDecisionEdition,
     lastDecisionAt: item.lastDecisionAt,
-    reason: item.tracking.reason,
-    sourceUrls: item.sourceUrls || [],
+    reason: String(item.tracking.reason || "").slice(0, 240),
+    sourceUrls: (item.sourceUrls || []).slice(0, 1),
   }));
   for (const item of trackingQueue) usedChars += JSON.stringify(item).length;
   if (usedChars > maxChars) throw new Error("active tracking queue exceeds the editorial input budget");
@@ -253,6 +254,7 @@ export function buildEditorialInput(evidence, maxChars = 120000, ledger = null) 
         key: item.subjectKey || null,
       },
       ...(item.showcaseRefs ? { showcaseRefs: item.showcaseRefs } : {}),
+      ...(item.showcaseFacts ? { showcaseFacts: item.showcaseFacts } : {}),
       publishability: item.subjectKey ? "direct" : "requires_subject_identity",
       headline: item.headline,
       tier: item.tier,
@@ -365,6 +367,8 @@ export function validateEditorialOutput(output, input) {
         if (!item[key]) errors.push(`${context}: include requires ${key}`);
       }
       const evidenceItem = input.packages.find((candidate) => candidate.eventKey === item.eventKey);
+      if ((item.coveredFactIds || []).some(id => !evidenceItem?.showcaseFacts?.some(fact => fact.id === id))) errors.push(`${context}: coveredFactIds contains an unknown fact`);
+      if (evidenceItem?.showcaseFacts?.length && !(item.coveredFactIds || []).length) errors.push(`${context}: showcase inclusion must identify the facts covered in its copy`);
       const validIndexes = new Set((evidenceItem?.sources || []).map((source) => source.sourceIndex));
       if ((item.sourceIndexes || []).some((sourceIndex) => !validIndexes.has(sourceIndex))) errors.push(`${context}: sourceIndexes contains an unavailable source`);
       if (evidenceItem?.publishability && evidenceItem.publishability !== "direct") {

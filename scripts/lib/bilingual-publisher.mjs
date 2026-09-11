@@ -1,4 +1,5 @@
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
+import { programmaticRegionLabel, programmaticReleaseTypeLabel } from "../../src/lib/locale-dictionary.js";
 import { upcomingKey } from "../../src/lib/locale-projection.js";
 import {
   canonicalCopyDigest,
@@ -80,7 +81,12 @@ function finalizeEnglishOverlay(canonical, presentation) {
     archiveTitle: canonical.entries.length ? normalizeSubjectHeadline(presentation.archiveTitle, canonical.entries.find(entry => entry.id === canonical.leadEntryId)?.title || canonical.entries[0]?.title, { locale: "en", archive: true }) : presentation.archiveTitle,
     entries: presentation.entries.map(item => {
       const entry = canonical.entries.find(entry => entry.id === item.entryId);
-      return entry ? { ...item, headline: normalizeSubjectHeadline(item.headline, entry.title, { locale: "en" }) } : item;
+      return entry ? {
+        ...item,
+        headline: normalizeSubjectHeadline(item.headline, entry.title, { locale: "en" }),
+        ...(item.regionLabel === entry.region && programmaticRegionLabel(entry.region) ? { regionLabel: programmaticRegionLabel(entry.region) } : {}),
+        ...(item.releaseTypeLabel === entry.releaseType && programmaticReleaseTypeLabel(entry.releaseType) ? { releaseTypeLabel: programmaticReleaseTypeLabel(entry.releaseType) } : {}),
+      } : item;
     }),
     upcoming: presentation.upcoming,
     ...(presentation.sourceReport ? { sourceReport: presentation.sourceReport } : {}),

@@ -19,8 +19,14 @@ export function normalizeSubjectHeadline(headline, title, { locale = "zh", entit
   const name = locale === "en" ? title?.title_en : title?.title_zh_cn || title?.title_en;
   if (!title?.title_key || !name?.trim()) throw new Error("headline subject is missing a confirmed title identity");
   const registered = getRegisteredTitleTranslation(title.title_key, title.title_en);
-  const aliases = [title.title_en, ...(locale === "en" ? [] : [title.title_zh_cn]), ...(registered?.titleEnAliases || []), ...entities];
+  const aliases = [title.title_en, ...(locale === "en" ? [] : [title.title_zh_cn]), ...(registered?.titleEnAliases || [])];
   if (aliases.some(alias => containsName(headline, alias))) return headline;
+  // An institution mentioned in a time clause or platform suffix is not the headline's subject.
+  if (entities.some(entity => {
+    const value = normalize(entity);
+    const text = normalize(headline);
+    return value.length >= 2 && text.startsWith(value) && !/^(?:[a-z0-9]|\s*(?:结束后|之后|期间|版|版本|after\b|during\b|version\b))/i.test(text.slice(value.length));
+  })) return headline;
   // Preserve the degraded marker at the start: recovery uses it to identify placeholders.
   const marker = headline.match(/^\[自动事实清单\]\s*/)?.[0] || "";
   const rest = headline.slice(marker.length);

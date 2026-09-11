@@ -15,6 +15,10 @@ describe("standalone headline subjects", () => {
   it("does not mistake partial English words for names", () => {
     expect(headline("An ineffable new world", title, { locale: "en" })).toBe("Fable: An ineffable new world");
   });
+  it("does not accept institutions mentioned only as timing context", () => {
+    expect(headline("Switch 2版在Nintendo Direct结束后上线", title, { entities: ["Nintendo Direct"] })).toBe("《神鬼寓言》：Switch 2版在Nintendo Direct结束后上线");
+    expect(headline("Nintendo Direct结束后上线", title, { entities: ["Nintendo Direct"] })).toBe("《神鬼寓言》：Nintendo Direct结束后上线");
+  });
   it("retains archive and degraded recovery markers", () => {
     expect(headline("日报｜全新世界亮相", title, { archive: true })).toBe("日报｜《神鬼寓言》：全新世界亮相");
     expect(headline("[自动事实清单] 新内容公布", title)).toBe("[自动事实清单] 《神鬼寓言》：新内容公布");

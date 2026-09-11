@@ -1,4 +1,4 @@
-import { auditShowcase } from "./showcase.mjs";
+import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
@@ -201,9 +201,10 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       if (timeError) throw new Error(`included ${decision.eventKey}: ${timeError}`);
     }
     const title = displayTitle(decision);
+    const showcaseRefs = packetItem?.showcaseRefs?.map(ref => ({ ...ref, ...(packetItem.showcaseFacts?.length ? { factIds: decision.coveredFactIds || [] } : {}) }));
     const previous = authorizedLatestRevision
       ? packetItem?.showcaseRefs?.length
-        ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => packetItem.showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId))))
+        ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
         : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
@@ -214,13 +215,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     if (!previous) counters.set(decision.section, index + 1);
     entryByEvent.set(decision.eventKey, id);
     if (previous && packet.continuation?.preservePublished === true) {
-      return { ...previous, showcaseRefs: [...new Map([...(previous.showcaseRefs || []), ...(packetItem?.showcaseRefs || [])].map(ref => [`${ref.showcaseId}:${ref.announcementId}`, ref])).values()] };
+      return { ...previous, showcaseRefs: mergeShowcaseRefs([...(previous.showcaseRefs || []), ...(showcaseRefs || [])]) };
     }
     const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
     return {
       id,
       section: decision.section,
-      ...(packetItem?.showcaseRefs ? { showcaseRefs: [...new Map([...(previous?.showcaseRefs || []), ...packetItem.showcaseRefs].map(ref => [`${ref.showcaseId}:${ref.announcementId}`, ref])).values()], showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
+      ...(showcaseRefs ? { showcaseRefs: mergeShowcaseRefs([...(previous?.showcaseRefs || []), ...showcaseRefs]), showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
       title,
       headline,
       summary: localizeRegisteredTitles(decision.summary),
@@ -269,7 +270,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
   const leadEntryId = packet.continuation?.preservePublished && authorizedLatestRevision ? latest.leadEntryId : entryByEvent.get(editorial.leadEventKey) || entries[0].id;
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
-  const archiveTitle = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(packet.continuation?.preservePublished && authorizedLatestRevision ? latest.archiveTitle : editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
+  const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
+    ? latest.archiveTitle
+    : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")
@@ -293,7 +296,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     schemaVersion: 2,
     sourceReport: {
       checked: ["程序化来源注册表、事件账本与受限证据包", ...(editorial.checkedExtra || [])],
-      limited: [...limitedSources, ...(editorial.limitedExtra || [])],
+      limited: [...limitedSources, ...(editorial.limitedExtra || []), ...(input.budget?.omittedItems ? [`本编辑包还有 ${input.budget.omittedItems} 个候选未处理，已进入持久队列；不代表已完成收录。`] : [])],
       checkedGroups: ["已配置的 active 官方与活动来源", "已配置的 active 中英日媒体与发现源", "相邻期去重与持续事件账本", "固定截止前最终候选与已打开证据包"],
       trackingResults: included.filter((item) => item.tracking).map((item) => `${item.headline}：继续追踪。`),
       excludedMajorCandidates: editorial.decisions.filter((item) => item.decision !== "include").map((item) => `${item.eventKey}：${item.reason}`),

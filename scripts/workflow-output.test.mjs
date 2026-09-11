@@ -32,7 +32,8 @@ describe("scheduled edition output protocol", () => {
       for (const command of commands) expect(command).not.toContain("GITHUB_OUTPUT");
       expect(workflow).toMatch(/--edition=[^\n]+ >> "\$GITHUB_OUTPUT"/);
       if (file === "brief-sla-watchdog") {
-        expect(workflow).toContain("- name: Install packet recovery dependencies\n        if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'\n        run: npm ci");
+        expect(workflow).toContain("- name: Install packet recovery dependencies\n        run: npm ci");
+        expect(workflow.indexOf("Install packet recovery dependencies")).toBeLessThan(workflow.indexOf("Advance due showcase supplements"));
         expect(workflow.indexOf("Install packet recovery dependencies")).toBeLessThan(workflow.indexOf("Rebuild a missing, stale, or invalid packet"));
       }
     }

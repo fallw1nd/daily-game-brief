@@ -38,6 +38,7 @@ export const localeDictionary = {
 };
 
 const regionLabels = new Map([
+  ["来源所述范围", "Scope stated by the source"],
   ["全球", "Global"],
   ["日本", "Japan"],
   ["中国大陆", "Mainland China"],
@@ -54,6 +55,15 @@ const regionLabels = new Map([
 ]);
 
 const releaseTypeLabels = new Map([
+  ["免费内容更新", "Free content update"],
+  ["开发访谈", "Developer interview"],
+  ["新作公布", "Game announcement"],
+  ["重制版公布", "Remake announcement"],
+  ["产业动态", "Industry news"],
+  ["平台移植上线", "Platform port release"],
+  ["产业资助计划", "Industry funding program"],
+  ["移植版定档", "Platform port release date"],
+  ["发售日公布", "Release date announcement"],
   ["正式发售", "Full release"],
   ["正式上线", "Launch"],
   ["版本更新", "Version update"],

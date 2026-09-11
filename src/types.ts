@@ -21,7 +21,7 @@ export interface GameTitle {
   edition_zh?: string;
 }
 export interface BriefEntry {
-  showcaseRefs?: { showcaseId: string; announcementId: string }[];
+  showcaseRefs?: { showcaseId: string; announcementId: string; factIds?: string[] }[];
   showcaseBrief?: boolean;
   id: string; section: SectionKey; title: GameTitle; headline: string; summary: string; beijingTime: string; timeEvidenceAt?: string; timeNote: string;
   fact_status: FactStatus; time_status: TimeStatus; entry_flags: EntryFlag[]; platforms: string[]; region: string; releaseType?: string; sources: SourceLink[];

@@ -147,6 +147,26 @@ function degradedYoungSunsEntry() {
 }
 
 describe("authorized same-edition revision overlay", () => {
+  it("appends a different fact for the same showcase game without replacing manual copy", () => {
+    const scoped = structuredClone(packet);
+    scoped.continuation = { scope: "showcase", preservePublished: true };
+    const ref = { showcaseId: "direct", announcementId: "halloween" };
+    scoped.editorialInput.packages = [{ ...scoped.editorialInput.packages[0], showcaseRefs: [ref], showcaseFacts: [{ id: "demo" }] }];
+    const draft = structuredClone(editorial);
+    draft.decisions = [{ ...draft.decisions[0], coveredFactIds: ["demo"] }];
+    const latest = structuredClone(currentLatest);
+    latest.archiveTitle = "日报｜人工保留的期标题";
+    latest.leadEntryId = latest.entries[0].id;
+    latest.entries[0].showcaseRefs = [{ ...ref, factIds: ["release"] }];
+    const result = buildEdition({ packet: scoped, editorial: draft, latest, manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries).toHaveLength(3);
+    expect(result.edition.entries[0]).toEqual(latest.entries[0]);
+    expect(result.edition.entries[2].showcaseRefs[0].factIds).toEqual(["demo"]);
+    expect(result.edition.archiveTitle).toBe(latest.archiveTitle);
+    expect(result.edition.leadEntryId).toBe(latest.leadEntryId);
+    expect(result.edition.upcoming).toEqual(latest.upcoming);
+  });
+
   it("replaces matching titles in place, preserves omitted canonical stories/media, and appends new entries", () => {
     const result = buildEdition({
       packet,

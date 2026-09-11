@@ -8,12 +8,22 @@ function fixture() {
   let state = createEditionState(editionId);
   state = applyEditionStateEvent(state, "packet-ready", { packetBlobSha: "1".repeat(40) });
   state = applyEditionStateEvent(state, "editorial-timeout", { packetBlobSha: "1".repeat(40) });
-  state = applyEditionStateEvent(state, "publication-committed", { mainSha: "2".repeat(40), source: "degraded" });
+  state = applyEditionStateEvent(state, "publication-committed", { mainSha: "2".repeat(40), source: "degraded", at: "2026-09-10T04:00:00Z" });
   const window = expectedEditorialWindow(editionId);
   const packet = JSON.stringify({ schemaVersion: 3, mode: "chatgpt-handoff", finalizedAt: "2026-09-10T04:00:00Z", coverageThrough: window.windowEnd, outputSchema: {}, continuation: { scope: "showcase", preservePublished: true }, editorialInput: { schemaVersion: 2, window, trackingQueue: [], packages: [{ eventKey: "announcement", showcaseRefs: [{ showcaseId: "direct", announcementId: "announcement" }] }] } });
   return { state, queue: { editionId, totalAnnouncements: 1, batches: [{ name: "batch.json", scope: "showcase", status: "pending", eventKeys: ["announcement"] }] }, canonical: { id: editionId, entries: [] }, packets: { "batch.json": packet } };
 }
 describe("durable showcase queue", () => {
+  it("retries unresolved initial announcements at 30 minutes without rewriting the window", () => {
+    const input = fixture();
+    input.queue.batches[0].status = "awaiting_retry";
+    const early = advanceShowcaseQueue({ ...input, now: "2026-09-10T04:29:59Z" });
+    expect(early.packet).toBeNull();
+    const due = advanceShowcaseQueue({ ...input, queue: early.queue, now: "2026-09-10T04:30:00Z" });
+    expect(due.packet).toBe(input.packets["batch.json"]);
+    expect(due.queue.batches[0].retryAttempts).toBe(1);
+    expect(due.state.fixedWindow).toEqual(input.state.fixedWindow);
+  });
   it("opens exactly one scoped packet and repeated advancement leaves it in flight", () => {
     const input = fixture();
     const result = advanceShowcaseQueue(input);
