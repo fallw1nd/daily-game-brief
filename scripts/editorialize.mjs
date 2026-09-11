@@ -128,6 +128,7 @@ await mkdir(dirname(PACKET_PATH), { recursive: true });
 await writeFile(PACKET_PATH, JSON.stringify(packet, null, 2) + "\n");
 const batchDirectory = resolve(dirname(PACKET_PATH), "editorial-batches");
 await mkdir(batchDirectory, { recursive: true });
+await writeFile(resolve(batchDirectory, "showcase-evidence.json"), JSON.stringify(showcaseReport, null, 2) + "\n");
 const queue = { schemaVersion: 1, editionId: editorialInput.window.id, totalAnnouncements: showcaseManifest.announcements.length, initialEventKeys: editorialInput.packages.map(item => item.eventKey), batches: [] };
 queue.requiredFacts = Object.fromEntries(showcaseManifest.announcements.map(item => [item.id, (item.factUnits || []).map(fact => fact.id)]));
 const initialShowcase = editorialInput.packages.filter(item => item.showcaseRefs?.length);

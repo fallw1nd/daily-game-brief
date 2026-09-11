@@ -120,9 +120,6 @@ jobs:
       - name: Install packet recovery dependencies
         run: npm ci
 
-      - name: Advance due showcase supplements without extra scheduled runs
-        run: bash scripts/update-showcase-queue-branch.sh
-
       - name: Rebuild a missing, stale, or invalid packet
         id: recovery
         if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'
@@ -334,6 +331,12 @@ jobs:
             gh issue close "$number" --comment "The archive and deployed manifest now contain ${{ steps.sla.outputs.expected }}."
           fi
 
+      - name: Advance due showcase supplements without extra scheduled runs
+        id: showcase_recovery
+        if: success()
+        continue-on-error: true
+        run: bash scripts/update-showcase-queue-branch.sh
+
       - name: Write SLA summary
         if: always()
         shell: bash
@@ -353,6 +356,7 @@ jobs:
             echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
             echo "- Pages re-dispatched: ${{ steps.fallback.outputs.deploy_retriggered || 'false' }}"
             echo "- Ledger feedback: ${{ steps.ledger_feedback.outcome || 'not run' }}"
+            echo "- Showcase recovery: ${{ steps.showcase_recovery.outcome || 'not run' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage audit

@@ -1,0 +1,42 @@
+name: Showcase source rehearsal
+on:
+  push:
+    branches: [codex/showcase-completeness]
+    paths:
+      - '.github/workflows/showcase-source-rehearsal.yml'
+      - 'scripts/rehearse-showcase-sources.mjs'
+permissions:
+  contents: read
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: node scripts/rehearse-showcase-sources.mjs
+      - name: Query at most 20 unique titles using the configured provider
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          NEWS_EVIDENCE_PATH: artifacts/showcase-source-rehearsal/naming-evidence.json
+          TITLE_HINTS_PATH: artifacts/showcase-source-rehearsal/title-hints.json
+          TITLE_CACHE_PATH: artifacts/showcase-source-rehearsal/title-cache.json
+        run: node scripts/build-title-hints.mjs
+      - name: Report actual provider execution
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('artifacts/showcase-source-rehearsal/title-hints.json'));
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Source rehearsal only; full editorial acceptance is still pending.\n\nProvider enabled: ${report.searchEnabled}; queried: ${report.queriedSubjects}; verified hints: ${report.hints.length}; queued: ${report.queuedSubjects}; limitations: ${report.limited.length}.\n`);
+          if (!report.searchEnabled) throw new Error('Configured title search provider is unavailable');
+          NODE
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: showcase-source-rehearsal
+          path: artifacts/showcase-source-rehearsal/
+          retention-days: 14
+          if-no-files-found: warn

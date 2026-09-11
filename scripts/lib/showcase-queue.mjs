@@ -7,7 +7,7 @@ import { showcaseRetryDue, mergeShowcaseRefs } from "./showcase.mjs";
 export function advanceShowcaseQueue({ queue, state, canonical, packets, now = new Date().toISOString() }) {
   if (queue.editionId !== state.editionId || canonical.id !== queue.editionId) throw new Error("showcase queue requires the same current edition");
   const nextQueue = structuredClone(queue);
-  const known = new Set(queue.batches.filter(batch => batch.scope === "showcase").flatMap(batch => batch.eventKeys));
+  const known = new Set(queue.requiredFacts ? Object.keys(queue.requiredFacts) : queue.batches.filter(batch => batch.scope === "showcase").flatMap(batch => batch.eventKeys));
   const covered = new Set(mergeShowcaseRefs(canonical.entries.flatMap(entry => entry.showcaseRefs || [])).filter(ref => known.has(ref.announcementId) && (queue.requiredFacts?.[ref.announcementId] || []).every(id => ref.factIds?.includes(id))).map(ref => ref.announcementId));
   if (!nextQueue.firstPublishedAt && state.publication.status === "committed") nextQueue.firstPublishedAt = state.publication.updatedAt;
   nextQueue.processedAnnouncements = covered.size;

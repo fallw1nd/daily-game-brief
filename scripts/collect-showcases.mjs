@@ -92,5 +92,5 @@ for (const event of events) {
 await mkdir(dirname(OUTPUT), { recursive: true });
 const output = { schemaVersion: 1, window: report.window, generatedAt: new Date().toISOString(), events, announcements: mergeShowcaseAnnouncements(announcements), coverage };
 await writeFile(OUTPUT, JSON.stringify(output, null, 2) + "\n");
-await writeFile(OUTPUT.replace(/\.json$/, "-pages.json"), JSON.stringify(openedPages, null, 2) + "\n");
+if (process.env.SHOWCASE_SAVE_PAGES !== "false") await writeFile(OUTPUT.replace(/\.json$/, "-pages.json"), JSON.stringify(openedPages, null, 2) + "\n");
 console.log(`Showcase discovery: ${events.length} events; ${output.announcements.length} announcement fragments; failed=${coverage.filter(item => item.status === "failed").length}`);

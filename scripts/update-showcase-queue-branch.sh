@@ -9,7 +9,7 @@ for attempt in 1 2 3; do
     git worktree remove "$state_dir"
     exit 0
   fi
-  node scripts/advance-showcase-queue.mjs --state-root="$state_dir"
+  node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --refresh-sources
   git -C "$state_dir" config user.name "daily-game-brief[bot]"
   git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
   git -C "$state_dir" add automation/batches automation/packets automation/status
