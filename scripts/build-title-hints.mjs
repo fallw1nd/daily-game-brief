@@ -1,3 +1,4 @@
+import { parseTitleSearchResponse } from "./lib/title-search-response.mjs";
 import { titleLookupDue, titleLookupRecord } from "./lib/title-knowledge.mjs";
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -92,73 +93,29 @@ async function fetchTitleEvidence(input, label) {
   };
 }
 
-function outputText(response) {
-  return (response.output || [])
-    .filter((item) => item.type === "message")
-    .flatMap((item) => item.content || [])
-    .filter((part) => part.type === "output_text")
-    .map((part) => part.text || "")
-    .join("");
-}
-
 async function searchTitle(subject) {
-  const schema = {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      candidates: {
-        type: "array",
-        maxItems: 2,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            name: { type: "string" },
-            urls: {
-              type: "array",
-              maxItems: 3,
-              items: { type: "string" },
-            },
-          },
-          required: ["name", "urls"],
-        },
-      },
-    },
-    required: ["candidates"],
-  };
-
-  const response = await fetch("https://api.deepseek.com/responses", {
-    method: "POST",
-    signal: AbortSignal.timeout(30_000),
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-      "Content-Type": "application/json",
-      "User-Agent": USER_AGENT,
-    },
+  // DeepSeek's official harness uses the native Messages search tool. A plain
+  // model response is never evidence that a search actually took place.
+  const response = await fetch("https://api.deepseek.com/anthropic/v1/messages", {
+    method: "POST", redirect: "error", signal: AbortSignal.timeout(30_000),
+    headers: { Accept: "application/json", "x-api-key": DEEPSEEK_API_KEY, Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "anthropic-version": "2023-06-01", "Content-Type": "application/json", "User-Agent": USER_AGENT },
     body: JSON.stringify({
-      model: "deepseek-v4-flash",
-      instructions: "Find existing Chinese names for this exact game/entity, matching sequel and subtitle. Prefer mainland Simplified Chinese official/store pages; otherwise require two independent reputable Chinese media. Each name must occur verbatim on every cited page. Return page URLs only, no search links/assets. Never translate or invent names. Return empty candidates if unsupported.",
-      input: JSON.stringify({ title: subject.subjectKey }),
-      tools: [{ type: "web_search" }],
-      tool_choice: { type: "web_search" },
-      reasoning: { effort: "none" },
-      max_output_tokens: 700,
-      temperature: 0.1,
-      text: { format: { type: "json_schema", name: "title_hint_candidates", schema } },
+      model: "deepseek-flash", max_tokens: 700, thinking: { type: "disabled" },
+      system: 'Find existing Chinese names for this exact game/entity, matching sequel and subtitle. Prefer mainland Simplified Chinese official/store pages; otherwise require two independent reputable Chinese media. Never invent names. Return only JSON {"candidates":[{"name":"verbatim Chinese name","urls":["source page URL"]}]}, at most 2 names and 3 URLs each; empty candidates if unsupported.',
+      messages: [{ role: "user", content: [{ type: "text", text: subject.subjectKey }] }],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
     }),
   });
   const body = await response.text();
   if (!response.ok) throw Object.assign(new Error(`DeepSeek title search HTTP ${response.status}`), { status: response.status });
   if (Buffer.byteLength(body) > MAX_HTML_BYTES) throw new Error("DeepSeek title search response is too large");
   const data = JSON.parse(body);
-  for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"], ["totalTokens", "total_tokens"]]) {
+  for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"]]) {
     if (Number.isFinite(data.usage?.[key])) apiUsage[field] = (apiUsage[field] || 0) + data.usage[key];
   }
-  if (data.status === "failed") throw new Error(data.error?.message || "DeepSeek title search failed");
-  const text = outputText(data);
-  if (!text) throw new Error("DeepSeek title search returned no structured output");
-  return (JSON.parse(text).candidates || []).map(item => ({ titleZhCn: item.name, sources: (item.urls || []).map(url => ({ url })) }));
+  if (Number.isFinite(apiUsage.inputTokens) && Number.isFinite(apiUsage.outputTokens)) apiUsage.totalTokens = apiUsage.inputTokens + apiUsage.outputTokens;
+  providerCalls.push({ subjectKey: subject.subjectKey, outputTypes: (data.content || []).map(item => item.type), searchResultBlocks: (data.content || []).filter(item => item.type === "web_search_tool_result" && Array.isArray(item.content)).length });
+  return parseTitleSearchResponse(data);
 }
 
 async function mapLimit(items, limit, worker) {
@@ -195,6 +152,7 @@ let hints = [];
 let queriedSubjects = 0;
 let successfulQueries = 0;
 const apiUsage = {};
+const providerCalls = [];
 let providerBlocked = Date.parse(cache.provider?.retryAt || "") > Date.now();
 if (!providerBlocked) delete cache.provider;
 
@@ -229,7 +187,7 @@ if (DEEPSEEK_API_KEY && subjects.length) {
       cache.records[subject.titleKey] = { ...titleLookupRecord(subject, validated.length && !conflict ? "verified" : sourceFailed ? "error" : "not-found"), hints: conflict ? [] : validated };
       return conflict ? [] : validated;
     } catch (error) {
-      if ([401, 402, 403, 429].includes(error.status)) {
+      if ([401, 402, 403, 429].includes(error.status) || error.code === "SEARCH_NOT_EXECUTED") {
         providerBlocked = true;
         cache.provider = { status: "unavailable", reason: error.message, retryAt: new Date(Date.now() + 6 * 3600000).toISOString() };
       }
@@ -251,6 +209,7 @@ const output = {
   providerStatus: !DEEPSEEK_API_KEY || providerBlocked || (queriedSubjects > 0 && successfulQueries === 0) ? "unavailable" : "available",
   successfulQueries,
   apiUsage,
+  providerCalls,
   ...(cache.provider ? { providerFailure: cache.provider } : {}),
   registryMisses: allSubjects.length,
   queriedSubjects,

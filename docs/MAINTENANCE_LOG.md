@@ -544,3 +544,5 @@
 - **Close when:** 真实查询演练的每个自动采用名称有作品身份、合格来源、原文摘录与核验时间；持久队列续查及网络失败不阻断发布经运行验证，本期和自然期次采用成功且不回写旧归档。
 
 - **2026-09-11 real-run evidence:** [隔离来源演练 34583878030](https://github.com/fallw1nd/daily-game-brief/actions/runs/34583878030)打开 Nintendo Direct 与 State of Play 官方材料，取得 173 个片段；实际调用既有 DeepSeek 搜索服务时 20 个主体全部 HTTP 402，0 个自动采用、107 个未查询保留。首次演练只检查 API key 存在而错误显示成功，现增加服务可用性结果并在 401/402/403/429 后暂停后续查询 6 小时，未执行的主体继续排队。搜索恢复需要账户计费/凭据可用，已经告知用户；维护项仍为 in_progress。[PR #121](https://github.com/fallw1nd/daily-game-brief/pull/121)保持草稿，不以抓取成功替代编辑完整性验收。
+
+- **2026-09-11 provider follow-up:** 用户已恢复计费，并要求精简 API token。[重跑 34584336684](https://github.com/fallw1nd/daily-game-brief/actions/runs/34584336684)20 次 HTTP 成功，服务报告 input 4255/output 171/total 4426 tokens，但全部返回空候选，不能当作名称功能验收成功。进一步核对当前 DeepSeek Responses 文档，其内置搜索已不在支持列表；官方 Harness 的搜索提供器使用 Anthropic Messages `web_search_20250305`。改用同一服务/密钥的该入口，必须取得真实搜索结果块；模型独自回答空数组按服务失败处理。提示和返回字段精简、输出上限 700、关闭推理、最多 2 次搜索工具使用，记录实际用量，不以字符减幅冒充 token 成本减幅。名称成功采用及完整生产验收仍待运行证据。
