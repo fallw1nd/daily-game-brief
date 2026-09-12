@@ -565,3 +565,10 @@
 - 本次另按原证据包人工式编辑 4 条媒体报道，保留 NO.033、原窗口和待核验缺口，继承 6 项日历并生成英文。未完成的候选与旧追踪不冒充已覆盖。合并和部署证据待补。
 
 - 实际编辑补交 [34681387517](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681387517) 暴露第二层死锁：timed_out 在降级发布失败后仍永久拒绝编辑提交。新增仅手动 workflow_dispatch 明确启用的失败恢复参数，只允许 timed_out + publication.failed + 原包身份一致重新进入 submitted；仍必须通过证据、编辑、数据校验才能发布。自动定时任务没有该权限，既有成功稿不受影响。
+
+### 2026-09-12 失败恢复与上线证据 — MNT-20260908-03
+
+- [PR #124](https://github.com/fallw1nd/daily-game-brief/pull/124) 合并 `480f183`，386 项测试与完整检查通过；[实际失败重试 34681566096](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681566096) 在保存审计/事件后正确显示 failure，消除绿色误报。
+- [正式编辑恢复 34681626704](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681626704) 成功通过原始 packet、状态、编辑、数据和英文校验，发布 NO.033（`1c675f0`）。已提交编辑稿留存在 `automation/editorial/2026-09-12-daily`，提交 `8471b15`，其他待核验项通过既有反馈流程保留。
+- [媒体处理 34681676717](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681676717) 成功添加4张核验图；[最终 Pages 34681720093](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681720093) 部署 `aef74d4` 成功。线上最新期为 2026-09-12-daily，中文4条、英文4条、日历6项；窗口仍为(9月11日10:10,9月12日10:10]，图片后首页数据与生产文件一致。
+- 此次手动恢复成功不证明定时编辑已恢复：下一自然期次的双次调用和无人工介入发布仍待核验，继续 in_progress。发布会全量验收、合格译名自动采用亦未完成，不能以本次4条补发替代验收。
