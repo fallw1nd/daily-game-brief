@@ -63,6 +63,21 @@ function invalidStateFor(targetEditionId) {
 }
 
 describe("durable per-edition state machine", () => {
+  it("requires explicit reviewed recovery after failed fallback, preserving the packet and window", () => {
+    const timedOut = applyEditionStateEvent(readyState(), "editorial-timeout", {});
+    const failed = applyEditionStateEvent(timedOut, "publication-failed", { error: "No eligible automatic facts" });
+    const submission = { packetBlobSha: packetSha, submissionSha };
+    expect(() => applyEditionStateEvent(failed, "editorial-submitted", submission)).toThrow("SLA lane");
+    const recovery = { ...submission, reason: "user_authorized_failed_publication_recovery" };
+    expect(() => applyEditionStateEvent(timedOut, "editorial-submitted", recovery)).toThrow("SLA lane");
+    expect(() => applyEditionStateEvent(failed, "editorial-submitted", { ...recovery, packetBlobSha: "4".repeat(40) })).toThrow();
+    const resumed = applyEditionStateEvent(failed, "editorial-submitted", recovery);
+    expect(resumed.editorial.status).toBe("submitted");
+    expect(resumed.fixedWindow).toEqual(failed.fixedWindow);
+    expect(resumed.packet).toEqual(failed.packet);
+    expect(resumed.transitions.at(-1).reason).toBe(recovery.reason);
+    expect(() => applyEditionStateEvent(resumed, "publication-committed", { mainSha, source: "editorial" })).toThrow("valid editorial");
+  });
   it("creates a valid immutable fixed-window state", () => {
     const state = createEditionState(editionId);
     expect(validateEditionState(state)).toEqual([]);
