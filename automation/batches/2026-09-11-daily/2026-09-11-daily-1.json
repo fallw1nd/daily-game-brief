@@ -1,0 +1,892 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-12T09:40:56.694Z",
+  "finalizedAt": "2026-09-12T09:40:56.694Z",
+  "coverageThrough": "2026-09-11 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-11-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-11 12:00",
+      "windowStart": "2026-09-10 10:10",
+      "windowEnd": "2026-09-11 10:10"
+    },
+    "adjacentEdition": "2026-09-10-daily",
+    "packages": [
+      {
+        "eventKey": "e47872a975323aecef90",
+        "eventKind": "release-date",
+        "subjectKey": "メルブラ トワイルミナ",
+        "subject": {
+          "kind": "game",
+          "key": "メルブラ トワイルミナ"
+        },
+        "publishability": "direct",
+        "headline": "『メルブラ：トワイルミナ』発売日が“2027年4月22日”に決定。白レンのビジュアルや対戦シーンが見られる最新PVが公開",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/87690",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/87690",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/87690/thumbnail_aUuy.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『MELTY BLOOD: TWI-LUMINA』（メルティブラッド︓トワイルミナ）発売日が2027年4月22日に決定。あわせて最新映像が見られるPVが公開された。\n『メルブラ：トワイルミナ』発売日が“2027年4月22日”に決定。白レンのビジュアルや対戦シーンが見られる最新PVが公開\n『MELTY BLOOD』シリーズ最新作 2D対戦格闘ゲーム『MELTY BLOOD: TWI-LUMINA』2027年4月22日(木)に発売決定︕最新PVを公開︕\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年09月12日17時〜2026年09月12日18時\nゼルダの伝説 時のオカリナ -Switch2 【Amazon.co.jp限定】 特典 アイテム未定 同梱 & 【パッケージ版早期購入特典】オリジナルアートカードセット/オリジナルステッカー 同梱"
+          }
+        ]
+      },
+      {
+        "eventKey": "b6ee8a425b26957cca42",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Aeterna Lucis launches December 3",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/aeterna-lucis-launches-december-3",
+            "publishedAt": "2026-09-10T17:43:37+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/aeterna-lucis-launches-december-3",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Aeterna-Lucid-Date_09-10-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Side-scrolling action adventure game Aeterna Lucis, the sequel to Aeterna Noctis, will launch for PlayStation 5, Xbox Series, PlayStation 4, Xbox One, Switch, and PC via Steam on December 3 for $24…\nAeterna Lucis launches December 3\nSide-scrolling action adventure game Aeterna Lucis , the sequel to Aeterna Noctis , will launch for PlayStation 5 , Xbox Series , PlayStation 4 , Xbox One , Switch , and PC via Steam on December 3 for $24.99 / €24.99, developer Aeternum Game Studios announced.\n&#8220; Aeterna Lucis is, without question, the most important project in our studio&#8217;s history,&#8221; said the Aeternum Game Studios development team in a press release. &#8220; Taking an additional year wasn&#8217;t an easy choice, but we refused to settle for an ordinary sequel. We wanted to pour every ingredient, every technical breakthrough, and everything we&#8217;ve learned into creating a true jewel. Today, we can finally tell you: on December 3, the wait is officially over.&#8221;\nThe announcement arrives hand-in-hand with heartfelt gratitude from the studio toward the community, media, and industry partners who patiently supported the difficult decision to postpone the game. Far from being a mere delay, this extra year of production has marked a complete reinvention: the development team poured every ounce of experience, craft, and insight gathered across their catalog to transform Aeterna Lucis into their most mature, ambitious, and finely polished work to date.\nThe wait has undeniably paid off. Aeterna Lucis doesn&#8217;t simply iterate on the formula that captivated genre enthusiasts—it rebuilds its core foundations to deliver an uncompromising level of quality:\nHere are the latest details, via Aeternum Game Studios:"
+          }
+        ]
+      },
+      {
+        "eventKey": "fb1e5d0af62b10bb8245",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Holy Horror Mansion launches in 2027 for PS5, Switch 2, and PC",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/holy-horror-mansion-launches-in-2027-for-ps5-switch-2-and-pc",
+            "publishedAt": "2026-09-10T13:19:39+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/holy-horror-mansion-launches-in-2027-for-ps5-switch-2-and-pc",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Holy-Horror-Mansion-Release_09-10-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Holy Horror Mansion will launch for PlayStation 5, Switch, and PC via Steam in 2027, LEVEL-5 announced. It will be playable at Tokyo Game Show 2026, which will run from September 17 to 21 at Makuha…\nHoly Horror Mansion launches in 2027 for PS5, Switch 2, and PC\nHoly Horror Mansion will launch for PlayStation 5 , Switch, and PC via Steam in 2027, LEVEL-5 announced. It will be playable at Tokyo Game Show 2026, which will run from September 17 to 21 at Makuhari Messe in Chiba, Japan.\n&#8220;Almost everything can be interacted with,&#8221; LEVEL-5 CEO Akihiro Hino said during today&#8217;s LEVEL-5 Vision 2026 II Dream broadcast. &#8220;You can turn objects into Mononoke, ghostly creatures that join your party, soften objects and use them like trampolines, or even transform them into dungeons to explore. Explanations likely wouldn&#8217;t do it justice, so let&#8217;s just see it in action.&#8221;\n&#8220;Let&#8217;s try searching while holding a Streetlight Soul Key, as it lets you encounter new Mononoke. This calls for another photo!\n&#8220;And it&#8217;s not just parasols. Even hedges can be playgroundified! Explore every nook and cranny for items and Mononoke. Who knows what you&#8217;ll find?\n&#8220;And when night falls, the town takes on a whole new look. It&#8217;s quite a bit eerier than usual&#8230;! Don&#8217;t miss the formidable boss battles!\n&#8220;Battles are fought to pumping dance music, making for a surprisingly fun and unique experience. Keep an eye out for their unique special moves, too.\nLEVEL-5 is also planning a major line of toys and merchandise as part of a Holy Horror Mansion cross-media project, which it will unveil at a dedicated cross-media presentation to be held at a later date. This presentation was originally planned to be held in early 2026, but according to Hino, was delayed &#8220;to get the products and timing just right.&#8221;\nDuring a gameplay showcase, Hino explained, &#8220;Use Cameron to take pictures of objects with strong souls, and they&#8217;ll come to life as Mononoke. You can befriend the Mononoke you find.\n&#8220;While exploring the town, you&#8217;ll also get a glimpse into the everyday lives of its residents."
+          }
+        ]
+      },
+      {
+        "eventKey": "a4aac79702dbfb7a57bd",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'Justice at last feels within reach:' Fired Rockstar workers rally in Glasgow as union busting tribunal begins",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-developer",
+            "label": "Game Developer",
+            "url": "https://www.gamedeveloper.com/production/-justice-at-last-feels-within-reach-fired-rockstar-workers-rally-in-glasgow-as-union-busting-tribunal-begins",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.gamedeveloper.com/production/-justice-at-last-feels-within-reach-fired-rockstar-workers-rally-in-glasgow-as-union-busting-tribunal-begins",
+            "imageUrl": "https://eu-images.contentstack.com/v3/assets/blt740a130ae3c5d529/blt128d5abde48a23a4/6aa2b6d77bae1a3a1e44c5ef/Rockstar_Rally.png?disable=upscale&width=1200&height=630&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The hearing is expected to conclude on October 16, 2026.\n'Justice at last feels within reach:' Fired Rockstar workers rally in Glasgow as union busting tribunal begins\nFormer Rockstar employees who claim they were fired in November 2025 for engaging in trade union activity held a rally outside Glasgow Tribunal Centre this morning to protest what the Independent Workers&#x27; Union of Great Britain (IWGB) previously described as one of the \"most blatant and ruthless act of union busting in the history of the games industry.\"\nGTA VI developer Rockstar jettisoned over 30 employees last year for allegedly leaking confidential information . The Take-Two Interactive subsidiary, however, has been accused by the ousted cohort of retaliating against them for taking steps to form a union. 34 workers were fired in total, including 31 members of the IWGB union and three people based in Canada who had also been involved in union activity.\nRelated: Rockstar and fired GTA developers outline core arguments during union busting tribunal\nFired Rockstar staffers and their supporters gathered outside tribunal centre in Glasgow, UK—where the hearing is being held—to present a united front as the legal battle reaches its climax.\n\"For almost a year, the truth about what happened to us has been buried by Rockstar and surrounded by speculation. Now we finally get the chance to put it on the record. None of us imagined that talking to each other about our working conditions would turn our lives upside down and catapult us into the centre of a global media storm,\" said Jason Lewis, former Rockstar employee and IWGB Union member.\n\"We have fought tooth and nail to get to this point, not just to be able to win justice for ourselves, but to draw a line in the sand for any employer that thinks it can attack workers for unionising. It has been an emotional journey and it is not over yet, but we can now see the finish line, and justice at last feels within reach.\"\nAs noted above, the hearing will conclude just weeks before the launch of Grand Theft Auto VI on November 19, 2026. The fired employees, who worked on the long-awaited sequel, are seeking reinstatement or compensation as well as a finding that their dismissals were unfair.\nThe legal battle between the two parties will be decided over the next five weeks at an employment tribunal that has commenced today (September 10) and could run until October 16, 2026."
+          }
+        ]
+      },
+      {
+        "eventKey": "97bca1cd048684a3d836",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'Ship a good game, learn from it, and build from there:' Lessons from going indie after a decade at id Software",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-developer",
+            "label": "Game Developer",
+            "url": "https://www.gamedeveloper.com/production/-ship-a-good-game-learn-from-it-and-build-from-there-lessons-from-going-indie-after-a-decade-at-id-software",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.gamedeveloper.com/production/-ship-a-good-game-learn-from-it-and-build-from-there-lessons-from-going-indie-after-a-decade-at-id-software",
+            "imageUrl": "https://eu-images.contentstack.com/v3/assets/blt740a130ae3c5d529/blt94ab2974ddc4cc36/6aa28d833b37a1c79f84b069/Turnkey_Header.png?disable=upscale&width=1200&height=630&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Doom Eternal art director Tony Garza and fellow id Software alum Richard O'Neal discuss the journey indie development with Turnkey Games.\n'Ship a good game, learn from it, and build from there:' Lessons from going indie after a decade at id Software\nWe sit down with Doom Eternal art director Tony Garza and fellow id alum Richard O'Neal to hear about their journey into the world of indie development through Turnkey Games.\nAs major studios continue to jettison workers like a falling dirigible ditching ballast, there&#x27;s an existential quandary facing those employed under the triple-A monoliths: stick or twist?\nThe word &#x27;security&#x27; feels like a distant fever dream in the current job market. Even if you somehow manage to secure a new gig, how long until the cycle begins again? It&#x27;s a valid, daunting question. So, why not try and swerve it entirely? Doom Eternal art director Tony Garza chose to do exactly that when they co-founded Turnkey Games after seeing the writing on the wall at Microsoft subsidiary id Software.\n\"We felt increasingly disconnected from some of the values and decisions we were seeing around us, and the direction of the industry in general prompted us to build something on our own,\" Garza told Game Developer.\nRelated: Rockstar and fired GTA developers outline core arguments during union busting tribunal\nGarza had already made for the exit. Alongside fellow id Software alum Richard O&#x27;Neal (who is also his cousin), Garza established Dallas-based indie studio Turnkey to craft a third-person horror adventure called Apart , where players must traverse a post-apocalyptic world in the guise of a nimble severed arm and modular zombie child.\nIt&#x27;s no secret that bringing any project to market is a miracle in itself, so how are Garza and O&#x27;Neal making their approach while trying to rightsize their careers during a period of massive upheaval?"
+          }
+        ]
+      },
+      {
+        "eventKey": "d237dcd7ee61db5c9bee",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "EA is using genAI for commentator voiceover in NHL 27",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-developer",
+            "label": "Game Developer",
+            "url": "https://www.gamedeveloper.com/business/report-ea-s-nhl-27-is-using-genai-to-create-voiceover-claims-a-sports-commentator",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.gamedeveloper.com/business/report-ea-s-nhl-27-is-using-genai-to-create-voiceover-claims-a-sports-commentator",
+            "imageUrl": "https://eu-images.contentstack.com/v3/assets/blt740a130ae3c5d529/blt079cb2c6910544ff/6aa03816be8d741675b4d3d6/New_Project(35).png?disable=upscale&width=1200&height=630&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "EA says it's using generative AI to expand on recording sessions with John Buccigross and Darren Pang's 'full consent and active collaboration.'\nEA is using genAI for commentator voiceover in NHL 27\nEA says it's using the tech to expand on recording sessions with John Buccigross and Darren Pang's 'full consent and active collaboration.'\nUpdate 09/10 : EA has released a statement regarding the use of generative AI on NHL 27 , which says the following: \"We&#x27;ve been following the discussion around the new commentary team and want to clarify our approach. The broadcast is built on a direct and ongoing partnership with John Buccigross and Darren Pang. With their full consent and active collaboration, we are using AI voice technology to expand on the 50+ recording sessions they have already completed.\nThis process allows us to bring more variety to the game, react faster to league changes, and incorporate player feedback more quickly. Update 1 is our first step in an ongoing commitment to improve authenticity, with fixes for player-name pronunciations and repetitive lines. We will continue to expand player and city-name coverage in future updates.\"\nOriginal story : Veteran spots commentator John Buccigross claims that EA Sports is using generative AI (genAI) to create voiceover for in-game commentary in professional hockey simulator NHL 27 .\nAs reported by IGN (and first spotted by Insider Gaming executive editor Mike Straw), Buccigross told the Chirpin Zebras podcast about his participation in the game. This also led to him mentioning that EA is using genAI, as per an alleged demonstration.\n\"They&#x27;re using some AI now; they played me some stuff back of my voice,\" Buccigross says on the podcast. \"It&#x27;s like &#x27;wow, that&#x27;s pretty good!&#x27; If that means less work but the same check, I&#x27;ll take it.\"\nThe commentator adds that sometimes \"AI will get something wrong,\" referencing an example during the alleged presentation. At one point while playing back his AI voice, it said \"Score! And the crowd gets out of the chairs!\", to which Buccigross said that they&#x27;re called seats instead."
+          }
+        ]
+      },
+      {
+        "eventKey": "506e6282fecbbce08bce",
+        "eventKind": "launch",
+        "subjectKey": "ikea has",
+        "subject": {
+          "kind": "game",
+          "key": "ikea has"
+        },
+        "publishability": "direct",
+        "headline": "Ikea has released a Skyrim mod where players are accompanied by a Kallax shelving unit voiced by Matt Berry",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/ikea-has-released-a-skyrim-mod-where-players-are-accompanied-by-a-kallax-shelving-unit-voiced-by-matt-berry/",
+            "publishedAt": "2026-09-10T10:17:00+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/09/srr-matt-berry.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "“Your inventory woes end here,” the Kallax Storageborn mod promises…\nIkea has released a Skyrim mod where players are accompanied by a Kallax shelving unit voiced by Matt Berry\nIkea has released a mod for Skyrim in the which the player is accompanied by a talking shelving unit.\n&#8220;Your inventory woes end here,&#8221; the Kallax Storageborn mod promises\nKallax Storageborn is a free mod for the game, which can be accessed via the in-game Bethesda Game Studios Creations menu, or on the Skyrim Creations website .\nThe mod adds &#8220;a new quest, new loot and a sentient shelving unit companion&#8221; as players attempt to rid Tamriel of clutter."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 18434,
+      "estimatedInputTokens": 4609,
+      "activeTrackingItems": 0,
+      "candidateItems": 7,
+      "includedItems": 7,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
