@@ -1,5 +1,7 @@
 # Editorial Product Design System v3
 
+Historical classic-view reference. Current default ReadingApp guidance is in `docs/VISUAL_GUIDELINES.md`; this document does not mandate a redesign or skill invocation.
+
 ## 1. Product Direction
 
 The site is a twice-daily games news brief for repeat readers. It is an editorial product, not a marketing landing page, SaaS dashboard, or portal homepage.
