@@ -8,6 +8,7 @@ describe("persistent title evidence", () => {
   it("does not confuse sequel numbers or accept a reprint", () => {
     expect(classifyTitleSource(page("https://www.gamersky.com/news/a", "示例二 Example 20"), subject, "示例二")).toBeNull();
     expect(classifyTitleSource(page("https://www.gamersky.com/news/a", "示例二 Example 2 本文转载"), subject, "示例二")).toBeNull();
+    expect(classifyTitleSource(page("https://bbs.3dmgame.com/thread-1-1.html", "示例二 Example 2"), subject, "示例二")).toBeNull();
     expect(classifyTitleSource(page("https://www.gamersky.com/news/a", "示例二（Example 2）"), subject, "示例二")?.kind).toBe("media");
   });
   it("requires distinct media families, not distinct subdomains", () => {

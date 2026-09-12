@@ -8,6 +8,7 @@ export function classifyTitleSource(source, subject, chinese, rules = config.sou
   const url = new URL(source.url);
   const rule = rules.find(item => item.hosts.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`)));
   if (!rule) return null;
+  if (rule.kind === "media" && /(?:^|\.)(?:bbs|forum|forums|tieba)\.|\/(?:bbs|forum|forums|thread)(?:\/|-)/i.test(url.hostname + url.pathname)) return null;
   const text = String(source.pageText || "");
   const index = text.indexOf(chinese);
   if (index < 0 || /转载自|本文转载|原文来自|本文来源于/.test(text)) return null;
