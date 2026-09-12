@@ -52,5 +52,10 @@ describe("Pages deployment trigger contract", () => {
       "Repository already contains $edition; re-dispatching Pages for deployment recovery.",
     );
     expect(watchdog).toContain('git commit -m "content(brief): publish degraded $edition"');
+    const failureReport = watchdog.slice(watchdog.indexOf('- name: Report unsuccessful publication recovery'));
+    expect(failureReport).toContain("steps.fallback.outcome == 'failure'");
+    expect(failureReport).toContain("steps.packet_ready.outputs.available != 'true'");
+    expect(failureReport).toContain('exit 1');
+    expect(watchdog.indexOf('- name: Report unsuccessful publication recovery')).toBeGreaterThan(watchdog.indexOf('- name: Upload coverage audit'));
   });
 });

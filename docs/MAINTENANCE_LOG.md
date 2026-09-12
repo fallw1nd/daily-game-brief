@@ -550,3 +550,18 @@
 - **2026-09-11 real-run evidence:** [隔离来源演练 34583878030](https://github.com/fallw1nd/daily-game-brief/actions/runs/34583878030)打开 Nintendo Direct 与 State of Play 官方材料，取得 173 个片段；实际调用既有 DeepSeek 搜索服务时 20 个主体全部 HTTP 402，0 个自动采用、107 个未查询保留。首次演练只检查 API key 存在而错误显示成功，现增加服务可用性结果并在 401/402/403/429 后暂停后续查询 6 小时，未执行的主体继续排队。搜索恢复需要账户计费/凭据可用，已经告知用户；维护项仍为 in_progress。[PR #121](https://github.com/fallw1nd/daily-game-brief/pull/121)保持草稿，不以抓取成功替代编辑完整性验收。
 
 - **2026-09-11 provider follow-up:** 用户已恢复计费，并要求精简 API token。[重跑 34584336684](https://github.com/fallw1nd/daily-game-brief/actions/runs/34584336684)20 次 HTTP 成功，服务报告 input 4255/output 171/total 4426 tokens，但全部返回空候选，不能当作名称功能验收成功。进一步核对当前 DeepSeek Responses 文档，其内置搜索已不在支持列表；官方 Harness 的搜索提供器使用 Anthropic Messages `web_search_20250305`。改用同一服务/密钥的该入口，必须取得真实搜索结果块；模型独自回答空数组按服务失败处理。提示和返回字段精简、输出上限 700、关闭推理、最多 2 次搜索工具使用，记录实际用量，不以字符减幅冒充 token 成本减幅。名称成功采用及完整生产验收仍待运行证据。
+
+### 2026-09-12 上线实测 — MNT-20260909-01 / MNT-20260910-01 / MNT-20260910-02
+
+- [PR #121](https://github.com/fallw1nd/daily-game-brief/pull/121) 已合并 main `485b7874b29c529bba8926c66cc4dac005187d7e`；[Pages 34669200793](https://github.com/fallw1nd/daily-game-brief/actions/runs/34669200793) 的构建、部署及状态确认全部成功。合并前完整检查通过 385 项测试、32 期归档、31/32 英文可用与构建。
+- 2026-09-12 15:31 北京时间，线上首页、manifest、9 月 10 日中文及英文归档均 HTTP 200；三个 JSON 与发布文件一致。首页仍指向最新期次，未因历史修订回退。
+- 现有 ChatGPT“游戏圈每日简报”提示词已精简保存，继续读取 main 最新契约；未新增或改变自定义频率。UI 未展示具体双时刻，不能声称已独立核实。
+- 三项继续 in_progress：尚缺发布会独立全场事实清单 100% 对账、合格自动译名采用、恢复及后续自然期次验证。API 整轮预算为软限制；实际调用仍可能超支，不报告未经测量的节省比例。
+
+### 2026-09-12 恢复状态复发 — MNT-20260908-03
+
+- [恢复运行 34681130435](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681130435) 使用原始 9 月 12 日 packet，但没有通过身份核验的 A 级条目；降级构稿因此拒绝发布。[事件 #122](https://github.com/fallw1nd/daily-game-brief/issues/122) 记录了失败，工作流却因 continue-on-error 显示成功。该维护项重新打开为 in_progress。
+- 在日志、状态与审计上传完成后，恢复失败现在明确返回非零状态；不放宽 A 级或主体核验要求。关闭条件：回归通过，实际失败运行显示失败，后续正常恢复和部署得到核验。
+- 本次另按原证据包人工式编辑 4 条媒体报道，保留 NO.033、原窗口和待核验缺口，继承 6 项日历并生成英文。未完成的候选与旧追踪不冒充已覆盖。合并和部署证据待补。
+
+- 实际编辑补交 [34681387517](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681387517) 暴露第二层死锁：timed_out 在降级发布失败后仍永久拒绝编辑提交。新增仅手动 workflow_dispatch 明确启用的失败恢复参数，只允许 timed_out + publication.failed + 原包身份一致重新进入 submitted；仍必须通过证据、编辑、数据校验才能发布。自动定时任务没有该权限，既有成功稿不受影响。
