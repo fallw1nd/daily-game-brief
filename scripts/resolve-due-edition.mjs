@@ -27,12 +27,28 @@ export function resolveDueEdition({ period, now = new Date(), manifest, states =
         && state.packet?.status === "ready"
         && state.publication?.status !== "committed"
         && ["pending", "invalid"].includes(state.editorial?.status))
-      .sort((left, right) => cutoff(left.window) - cutoff(right.window))[0];
+      .sort((left, right) => {
+        const priority = (state) => {
+          if (state.revisionRequest?.reason === "editorial_continuation") return 2;
+          if (state.revisionRequest?.reason === "showcase_completion") return 3;
+          return 1;
+        };
+        return priority(left.state) - priority(right.state) || cutoff(left.window) - cutoff(right.window);
+      })[0];
+    const continuationReason = candidate?.state.revisionRequest?.reason;
     return {
       window: candidate?.window || latestDue,
       needed: Boolean(candidate),
       purpose,
-      editorialMode: candidate ? (candidate.state.editorial.status === "invalid" ? "repair-invalid" : "new-decision") : null,
+      editorialMode: candidate
+        ? candidate.state.editorial.status === "invalid"
+          ? "repair-invalid"
+          : continuationReason === "editorial_continuation"
+            ? "editorial-continuation"
+            : continuationReason === "showcase_completion"
+              ? "showcase-completion"
+              : "new-decision"
+        : null,
       packetBlobSha: candidate?.state.packet.blobSha || null,
       submissionSha: candidate?.state.editorial.status === "invalid" ? candidate.state.editorial.submissionSha : null,
       validationErrors: candidate?.state.editorial.status === "invalid" ? (candidate.state.editorial.validationErrors || []) : [],

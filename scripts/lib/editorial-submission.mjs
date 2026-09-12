@@ -56,7 +56,9 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   if (typeof editorial?.editorialNote !== "string" || !editorial.editorialNote.trim()) {
     errors.push("editorialNote is required");
   }
-  const noOpNewsContinuation = packet?.continuation?.scope === "news" && packet.continuation.preservePublished === true;
+  const noOpNewsContinuation = packet?.continuation?.scope === "news" &&
+    packet.continuation.preservePublished === true &&
+    !(editorial?.decisions || []).some(item => item.decision === "include");
   if (noOpNewsContinuation && ((editorial?.upcoming || []).length || (editorial?.removeUpcomingIds || []).length)) {
     errors.push("news continuation cannot change the release calendar");
   }

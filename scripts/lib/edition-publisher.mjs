@@ -180,6 +180,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
   const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
+  const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
   const previousIds = new Set(previousEntries.map((entry) => entry.id));
   const counters = sectionCounters(previousEntries, window.id);
   const entryByEvent = new Map();
@@ -205,7 +206,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const previous = authorizedLatestRevision
       ? packetItem?.showcaseRefs?.length
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
-        : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
+        : isNewsContinuation
+          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId) : null
+          : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
       throw new Error(`included ${decision.eventKey}: existingEntryId must identify the confirmed subject in this edition`);
@@ -247,6 +250,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     if (prior) {
       // Several regional records can point to the same already published fact.
       // Only append evidence associations here; ordinary duplicate edits still fail.
+      if (isNewsContinuation) throw new Error("multiple news continuation decisions target the same entry; merge the fact into one decision");
       if (packet.continuation?.preservePublished !== true || !previousIds.has(entry.id)) throw new Error("multiple decisions overwrite the same entry; merge announcement evidence into one decision");
       revisedById.set(entry.id, { ...prior, showcaseRefs: mergeShowcaseRefs([...(prior.showcaseRefs || []), ...(entry.showcaseRefs || [])]) });
     } else revisedById.set(entry.id, entry);

@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
-import { buildEdition } from "./lib/edition-publisher.mjs";
+import { buildEdition, editorialDecisionDigest } from "./lib/edition-publisher.mjs";
 import { validateEditorialOutput } from "./lib/editorial-contract.mjs";
 import {
   buildEnglishOverlay,

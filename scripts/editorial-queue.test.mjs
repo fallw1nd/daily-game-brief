@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
 import { applyEditionStateEvent, createEditionState, gitBlobSha } from "./lib/edition-state.mjs";
+import { buildEdition } from "./lib/edition-publisher.mjs";
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
 
 const editionId = "2026-09-11-daily";
@@ -56,6 +57,49 @@ function publishContinuation(state, packetText, mainSha) {
   let next = applyEditionStateEvent(state, "editorial-submitted", { packetBlobSha: packetSha, submissionSha: `${mainSha.slice(0, 39)}1` });
   next = applyEditionStateEvent(next, "editorial-valid", { packetBlobSha: packetSha, submissionSha: `${mainSha.slice(0, 39)}1` });
   return applyEditionStateEvent(next, "publication-committed", { mainSha, source: "editorial" });
+}
+
+const source = { sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher", label: "Publisher", url: "https://publisher.example/fact", canonicalUrl: "https://publisher.example/fact", evidenceText: "A second confirmed fact." };
+
+function buildPacket(eventKey) {
+  return {
+    schemaVersion: 3,
+    mode: "chatgpt-handoff",
+    finalizedAt: "2026-09-11T04:00:00.000Z",
+    coverageThrough: window.windowEnd,
+    outputSchema: {},
+    continuation: { scope: "news", preservePublished: true },
+    editorialInput: { schemaVersion: 2, window, trackingQueue: [], packages: [{ eventKey, subjectKey: "same-game", sources: [source] }] },
+  };
+}
+
+function newsDecision(eventKey, existingEntryId = undefined) {
+  return {
+    eventKey,
+    ...(existingEntryId ? { existingEntryId } : {}),
+    decision: "include",
+    section: "news",
+    titleKey: "same-game",
+    titleZhCn: null,
+    titleEn: "Same Game",
+    titleZhStatus: "unavailable",
+    headline: "《Same Game》公布另一项事实",
+    summary: "开发商确认了另一项信息。",
+    factStatus: "official",
+    timeStatus: "date_only",
+    entryFlags: [],
+    tracking: false,
+    verification: "已打开一手来源。",
+    reason: "同一作品的新事实。",
+    beijingTime: "2026-09-11 09:30",
+    timeNote: "只确认日期。",
+    platforms: ["PC"],
+    region: "全球",
+    releaseType: "更新",
+    sourceIndexes: [0],
+    additionalSources: [],
+    sharedFactFrame: { subjectTitleKey: "same-game", dates: [], times: [], numbers: [existingEntryId ? "1" : "2"], platforms: ["PC"], peopleAndEntities: [], versionsAndTerms: [] },
+  };
 }
 
 describe("durable editorial continuation queue", () => {
@@ -130,6 +174,54 @@ describe("durable editorial continuation queue", () => {
     input.packets["showcase-1.json"] = packet(["showcase-1"], "showcase");
     const result = advanceEditorialQueue(input);
     expect(result.batch).toMatchObject({ name: "news-1.json", scope: "news" });
+  });
+
+  it("adds a different same-title fact but preserves an explicitly matched retry", () => {
+    const existingEntry = {
+      id: "2026-09-11-daily-news-0",
+      section: "news",
+      title: { title_key: "same-game", title_en: "Same Game", title_zh_status: "unavailable" },
+      headline: "《Same Game》旧事实",
+      summary: "原有事实。",
+      sources: [{ label: "Publisher", url: source.url, kind: "primary" }],
+    };
+    const latest = { id: editionId, issueNumber: 40, leadEntryId: existingEntry.id, archiveTitle: "日报｜《Same Game》旧事实", entries: [existingEntry], upcoming: [], tracking: [], sourceReport: {} };
+    const manifest = { schemaVersion: 1, latest: editionId, editions: [{ id: editionId, issueNumber: 40, date: "2026-09-11", period: "daily" }] };
+    const continuationPacket = buildPacket("news-new-fact");
+    const continuation = { ...queueFixture(), packets: { "news-1.json": JSON.stringify(continuationPacket) } };
+    continuation.queue.batches = [{ name: "news-1.json", scope: "news", status: "pending", eventKeys: ["news-new-fact"] }];
+    const activated = advanceEditorialQueue(continuation);
+    const editorial = {
+      contractVersion: 2,
+      packetBlobSha: gitBlobSha(JSON.stringify(continuationPacket)),
+      editionId,
+      archiveTitle: latest.archiveTitle,
+      leadEventKey: "news-new-fact",
+      decisions: [newsDecision("news-new-fact")],
+      upcomingMode: "inherit_and_patch",
+      removeUpcomingIds: [],
+      upcoming: [],
+      checkedExtra: [],
+      limitedExtra: [],
+      editorialNote: "续接包编辑。",
+    };
+    const added = buildEdition({ packet: continuationPacket, editorial, latest, manifest, allowSameEditionRevision: true });
+    expect(added.status).toBe("revised");
+    expect(added.edition.entries).toHaveLength(2);
+    expect(added.edition.entries.some(entry => entry.headline.includes("另一项事实"))).toBe(true);
+    expect(activated.state.revisionRequest.batchName).toBe("news-1.json");
+
+    const retryPacket = buildPacket("news-same-fact");
+    const retry = buildEdition({
+      packet: retryPacket,
+      editorial: { ...editorial, packetBlobSha: gitBlobSha(JSON.stringify(retryPacket)), leadEventKey: "news-same-fact", decisions: [newsDecision("news-same-fact", existingEntry.id)] },
+      latest,
+      manifest,
+      allowSameEditionRevision: true,
+    });
+    expect(retry.status).toBe("revised");
+    expect(retry.edition.entries).toHaveLength(1);
+    expect(retry.edition.entries[0].headline).toBe(existingEntry.headline);
   });
 
   it("does not treat a showcase batch as a news continuation", () => {

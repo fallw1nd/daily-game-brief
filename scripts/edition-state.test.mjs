@@ -54,6 +54,13 @@ function submittedStateFor(targetEditionId) {
   });
 }
 
+function validStateFor(targetEditionId) {
+  return applyEditionStateEvent(submittedStateFor(targetEditionId), "editorial-valid", {
+    packetBlobSha: packetSha,
+    submissionSha,
+  });
+}
+
 function invalidStateFor(targetEditionId) {
   return applyEditionStateEvent(submittedStateFor(targetEditionId), "editorial-invalid", {
     packetBlobSha: packetSha,
@@ -288,6 +295,41 @@ describe("oldest-due edition compensation", () => {
     };
     const result = resolveDueEdition({ period: "am", now, manifest, states, purpose: "editorial" });
     expect(result).toMatchObject({ needed: true, window: { id: "2026-08-30-am" }, editorialMode: "new-decision" });
+  });
+
+  it("prioritizes unpublished Canonical work before old continuations and showcase supplements", () => {
+    let continuation = validStateFor("2026-08-28-am");
+    continuation = applyEditionStateEvent(continuation, "publication-committed", { mainSha, source: "editorial" });
+    continuation = applyEditionStateEvent(continuation, "continuation-opened", {
+      reason: "editorial_continuation",
+      batchName: "news-1.json",
+      batchScope: "news",
+      eventKeys: ["news-1"],
+    });
+    continuation = applyEditionStateEvent(continuation, "packet-ready", { packetBlobSha: "4".repeat(40) });
+
+    let showcase = validStateFor("2026-08-30-am");
+    showcase = applyEditionStateEvent(showcase, "publication-committed", { mainSha, source: "editorial" });
+    showcase = applyEditionStateEvent(showcase, "supplement-opened", { reason: "showcase_completion", announcementIds: ["show-1"] });
+    showcase = applyEditionStateEvent(showcase, "packet-ready", { packetBlobSha: "5".repeat(40) });
+
+    const normal = readyStateFor("2026-08-29-am");
+    const states = {
+      "2026-08-28-am": continuation,
+      "2026-08-29-am": normal,
+      "2026-08-30-am": showcase,
+    };
+    const result = resolveDueEdition({ period: "am", now: new Date("2026-08-30T04:00:00.000Z"), manifest, states, purpose: "editorial" });
+    expect(result).toMatchObject({ needed: true, window: { id: "2026-08-29-am" }, editorialMode: "new-decision" });
+
+    const continuationOnly = resolveDueEdition({
+      period: "am",
+      now: new Date("2026-08-30T04:00:00.000Z"),
+      manifest,
+      states: { "2026-08-28-am": continuation, "2026-08-30-am": showcase },
+      purpose: "editorial",
+    });
+    expect(continuationOnly).toMatchObject({ needed: true, window: { id: "2026-08-28-am" }, editorialMode: "editorial-continuation" });
   });
 });
   it("requires the timeout acknowledgement before degraded publication", () => {

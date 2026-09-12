@@ -41,6 +41,7 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("durable `validationErrors` and `submissionSha`");
     expect(contract).toContain("Copy it unchanged to `packetBlobSha`");
     expect(contract).toContain("Never skip Canonical backlog or derive its identity from runner time");
+    expect(contract).toContain("no `editorial_continuation` or `showcase_completion` request");
   });
 
   it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
@@ -51,7 +52,8 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("`packet_missing_at_handoff`");
     expect(contract).toContain("Then stop the current invocation. A later invocation may consume the acknowledged packet");
     expect(contract).toContain("never wait for or poll Actions inside the wake invocation");
-    expect(contract).toContain("Only when no Canonical decision and no current missing-packet wake is required");
+    expect(contract).toContain("After step 4 proves no current missing-packet wake is needed");
+    expect(contract).toContain("New Canonical work and liveness always outrank both");
     expect(contract).toContain("For `packet.continuation.scope` `news` or `showcase`");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');
@@ -61,7 +63,7 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("`submitted`/`valid` belong to GitHub's publication lane");
     expect(contract).toContain("`timed_out` to its degraded fallback lane");
     expect(contract).toContain("never select or re-edit them");
-    expect(contract).toContain("GitHub Actions owns collection recovery, validation, trusted publication, deployment, state acknowledgement, and incidents");
+    expect(contract).toContain("GitHub owns recovery, validation, publication, deployment, state and incidents");
     expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
   });
 
@@ -71,7 +73,7 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("Narrow naming lookups cannot change facts");
     expect(contract).toContain("Never invent a `requires_subject_identity` subject");
     expect(contract).toContain("complete language-neutral `sharedFactFrame`");
-    expect(contract).toContain("attempt complete `locales.en` by default");
+    expect(contract).toContain("Attempt complete `locales.en` by default");
     expect(contract).toContain("English is nonblocking, but omission is exceptional");
     expect(contract).toContain("omit `locales.en`");
   });
