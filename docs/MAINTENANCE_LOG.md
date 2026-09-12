@@ -580,3 +580,4 @@
 - **Resolution:** 按官方 Astra guidance 和 Eric Provencher 实践建议精简入口、按需读资料、复用有效校验，修正旧文档和路由，保留生产安全边界。详见 docs/ASTRA_INSTRUCTION_REVIEW.md。
 - **Close criteria:** 契约回归和完整检查通过，生产分支更新；后续自然编辑任务验证选择顺序与完整提交，记录实际调用成本后再关闭。文档缩短不等于已证明费用下降。
 - **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.
+- **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
