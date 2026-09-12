@@ -581,3 +581,10 @@
 - **Close criteria:** 契约回归和完整检查通过，生产分支更新；后续自然编辑任务验证选择顺序与完整提交，记录实际调用成本后再关闭。文档缩短不等于已证明费用下降。
 - **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.
 - **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
+
+## MNT-20260912-02 — 历史降级稿正式修订被跳过且重新抓取丢失旧证据
+
+- **Priority / status:** P1 / in_progress.
+- **Evidence:** NO.032仍为7条自动事实清单；publisher只对showcase历史补齐选择目标归档，普通历史修订返回already-exists。重新抓取34686454386未保留原已刊Layton报道。
+- **Resolution:** 所有已授权历史修订选择目标归档并保留latest；显式revision wake可固定到本期历史已ack的packet SHA，经窗口、状态及原有校验后由GitHub重新ack，避免来源列表漂移。
+- **Close criteria:** 跨期/未ack/已消费packet回归通过；NO.032原7条正式中英文稿发布，latest仍为NO.033，期号窗口与其他归档不变，Pages实际验证。
