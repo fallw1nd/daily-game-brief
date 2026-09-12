@@ -10,8 +10,14 @@ const publicationSources = new Set(["editorial", "degraded"]);
 const optionalStatuses = new Set(["pending", "available", "partial", "unavailable", "failed"]);
 const deploymentStatuses = new Set(["pending", "deployed", "failed"]);
 const revisionStatuses = new Set(["open", "completed"]);
-const revisionReason = "user_authorized_same_edition_revision";
-const supplementReason = "showcase_completion";
+export const SAME_EDITION_REVISION_REASON = "user_authorized_same_edition_revision";
+export const SHOWCASE_COMPLETION_REASON = "showcase_completion";
+export const EDITORIAL_CONTINUATION_REASON = "editorial_continuation";
+const revisionReasons = new Set([
+  SAME_EDITION_REVISION_REASON,
+  SHOWCASE_COMPLETION_REASON,
+  EDITORIAL_CONTINUATION_REASON,
+]);
 
 export function gitBlobSha(content) {
   const buffer = Buffer.isBuffer(content) ? content : Buffer.from(String(content));
@@ -84,8 +90,15 @@ export function validateEditionState(state) {
     if (typeof state.revisionRequest !== "object") errors.push("state.revisionRequest must be null or an object");
     else {
       if (!revisionStatuses.has(state.revisionRequest.status)) errors.push("state.revisionRequest.status is invalid");
-      if (![revisionReason, supplementReason].includes(state.revisionRequest.reason)) errors.push("state.revisionRequest.reason is invalid");
-      if (state.revisionRequest.reason === supplementReason && (!Array.isArray(state.revisionRequest.announcementIds) || !state.revisionRequest.announcementIds.length)) errors.push("showcase completion requires scoped announcement identities");
+      if (!revisionReasons.has(state.revisionRequest.reason)) errors.push("state.revisionRequest.reason is invalid");
+      if (state.revisionRequest.reason === SHOWCASE_COMPLETION_REASON && (!Array.isArray(state.revisionRequest.announcementIds) || !state.revisionRequest.announcementIds.length)) errors.push("showcase completion requires scoped announcement identities");
+      if (state.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON) {
+        if (state.revisionRequest.batchScope !== "news") errors.push("editorial continuation must use the news batch scope");
+        if (!/^[\w-]+\.json$/u.test(String(state.revisionRequest.batchName || ""))) errors.push("editorial continuation requires a safe batch name");
+        if (!Array.isArray(state.revisionRequest.eventKeys) || !state.revisionRequest.eventKeys.length || state.revisionRequest.eventKeys.some(key => typeof key !== "string" || !key)) {
+          errors.push("editorial continuation requires scoped event identities");
+        }
+      }
       try { assertSha(state.revisionRequest.previousMainSha, "state.revisionRequest.previousMainSha"); } catch (error) { errors.push(error.message); }
       if (typeof state.revisionRequest.openedAt !== "string" || !state.revisionRequest.openedAt) errors.push("state.revisionRequest.openedAt is required");
       if (state.revisionRequest.status === "completed" && (typeof state.revisionRequest.completedAt !== "string" || !state.revisionRequest.completedAt)) {
@@ -120,12 +133,28 @@ export function applyEditionStateEvent(current, event, data = {}) {
   const initialErrors = validateEditionState(state);
   if (initialErrors.length) throw new Error(`invalid prior edition state: ${initialErrors.join("; ")}`);
 
-  if (event === "revision-opened" || event === "supplement-opened") {
+  if (event === "revision-opened" || event === "supplement-opened" || event === "continuation-opened") {
     if (!current) throw new Error("same-edition revision requires an existing durable state");
-    const reason = event === "supplement-opened" ? supplementReason : revisionReason;
-    if (data.reason !== reason) throw new Error("same-edition revision requires explicit user authorization");
+    const reason = event === "supplement-opened"
+      ? SHOWCASE_COMPLETION_REASON
+      : event === "continuation-opened"
+        ? EDITORIAL_CONTINUATION_REASON
+        : SAME_EDITION_REVISION_REASON;
+    if (data.reason !== reason) {
+      throw new Error(event === "continuation-opened"
+        ? "editorial continuation requires the trusted continuation event"
+        : "same-edition revision requires explicit user authorization");
+    }
     if (event === "supplement-opened" && (!Array.isArray(data.announcementIds) || !data.announcementIds.length || data.announcementIds.some(id => typeof id !== "string" || !id))) throw new Error("supplement requires announcement identities");
-    if (state.revisionRequest?.status === "open") return state;
+    if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || data.batchScope !== "news" || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
+      throw new Error("editorial continuation requires a scoped news batch");
+    }
+    if (state.revisionRequest?.status === "open") {
+      if (event === "continuation-opened" && (state.revisionRequest.reason !== reason || state.revisionRequest.batchName !== data.batchName)) {
+        throw new Error("a different editorial continuation is already open");
+      }
+      return state;
+    }
     if (state.publication.status !== "committed") throw new Error("same-edition revision requires an already committed publication");
     const previousMainSha = state.deployment.mainSha || state.publication.mainSha;
     assertSha(previousMainSha, "previousMainSha");
@@ -140,11 +169,21 @@ export function applyEditionStateEvent(current, event, data = {}) {
       status: "open",
       reason,
       ...(event === "supplement-opened" ? { announcementIds: [...new Set(data.announcementIds)] } : {}),
+      ...(event === "continuation-opened" ? {
+        batchName: data.batchName,
+        batchScope: data.batchScope,
+        eventKeys: [...new Set(data.eventKeys)],
+      } : {}),
       previousMainSha,
       openedAt: at,
       completedAt: null,
     };
-    return record(state, event, at, actor, runId, { reason, previousMainSha });
+    return record(state, event, at, actor, runId, {
+      reason,
+      previousMainSha,
+      ...(event === "supplement-opened" ? { announcementIds: [...new Set(data.announcementIds)] } : {}),
+      ...(event === "continuation-opened" ? { batchName: data.batchName, batchScope: data.batchScope, eventKeys: [...new Set(data.eventKeys)] } : {}),
+    });
   }
   if (event === "packet-ready") {
     assertSha(data.packetBlobSha, "packetBlobSha");

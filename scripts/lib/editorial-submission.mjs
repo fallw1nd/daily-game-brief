@@ -56,6 +56,10 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   if (typeof editorial?.editorialNote !== "string" || !editorial.editorialNote.trim()) {
     errors.push("editorialNote is required");
   }
+  const noOpNewsContinuation = packet?.continuation?.scope === "news" && packet.continuation.preservePublished === true;
+  if (noOpNewsContinuation && ((editorial?.upcoming || []).length || (editorial?.removeUpcomingIds || []).length)) {
+    errors.push("news continuation cannot change the release calendar");
+  }
   for (const [index, decision] of (editorial?.decisions || []).entries()) {
     if (!Array.isArray(decision.sourceIndexes)) errors.push(`decisions[${index}].sourceIndexes must be an array`);
     if (!Array.isArray(decision.additionalSources)) errors.push(`decisions[${index}].additionalSources must be an array`);
@@ -72,7 +76,7 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   const lead = (editorial?.decisions || []).find((item) =>
     item.eventKey === editorial?.leadEventKey && item.decision === "include"
   );
-  if (!lead) errors.push("leadEventKey must reference an included decision");
+  if (!lead && !noOpNewsContinuation) errors.push("leadEventKey must reference an included decision");
   return [...new Set(errors)];
 }
 

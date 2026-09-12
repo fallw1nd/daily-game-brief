@@ -11,10 +11,10 @@ const publisherWorkflow = await readFile(".github/workflows/publish-editorial-de
 describe("Daily scheduled-task orchestration contract", () => {
   it("uses one Daily production task with an hourly-safe second pass", () => {
     expect(contract).toContain("one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 11:20");
-    expect(contract).toContain("GitHub's degraded fallback deadline is 11:40");
-    expect(contract).toContain("There is still only one long-lived ChatGPT task");
+    expect(contract).toContain("fallback is due at 11:40");
+    expect(contract).toContain("one active long-lived ChatGPT editorial task");
     expect(contract).toContain("former PM task is disabled");
-    expect(contract).toContain("public release remains planned for 12:00");
+    expect(contract).toContain("public release is planned for 12:00");
     expect(packetWorkflow).toContain('- cron: "10 2 * * *"');
     expect(slaWorkflow).toContain('- cron: "0 3 * * *"');
     expect(slaWorkflow).toContain('- cron: "40 3 * * *"');
@@ -27,7 +27,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   it("records the first live Daily bridge explicitly", () => {
     expect(contract).toContain("`2026-08-31-daily`");
     expect(contract).toContain("`(2026-08-30 17:00, 2026-08-31 10:10]`");
-    expect(contract).toContain("later Daily editions use `(previous day 10:10, current day 10:10]`");
+    expect(contract).toContain("later editions use `(previous day 10:10, current day 10:10]`");
   });
 
   it("selects oldest pending or invalid work and binds it to one immutable packet", () => {
@@ -44,7 +44,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   });
 
   it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
-    expect(contract).toContain("Priority is Canonical editorial work, current Daily liveness wake, ready showcase_completion, then at most one English repair");
+    expect(contract).toContain("Priority is Canonical work (including one trusted `editorial_continuation` batch), current Daily liveness wake, ready `showcase_completion`, then one English repair");
     expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
     expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
@@ -52,6 +52,7 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("Then stop the current invocation. A later invocation may consume the acknowledged packet");
     expect(contract).toContain("never wait for or poll Actions inside the wake invocation");
     expect(contract).toContain("Only when no Canonical decision and no current missing-packet wake is required");
+    expect(contract).toContain("For `packet.continuation.scope` `news` or `showcase`");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');
   });
@@ -92,8 +93,8 @@ describe("Daily scheduled-task orchestration contract", () => {
   });
 
   it("repairs English against final Canonical IDs instead of mutable event keys", () => {
-    expect(contract).toContain("Final Canonical `entryId` and order are authoritative");
-    expect(contract).toContain("Each English entry uses final Canonical `entryId`");
+    expect(contract).toContain("Final Canonical `entryId`/order are authoritative");
+    expect(contract).toContain("cover each once");
     expect(contract).toContain("`automation/locale/en/<edition-id>`");
     expect(contract).toContain("`automation/locale-inbox/<edition-id>.json`");
     expect(contract).toContain("hash-guards archive/latest/manifest");
