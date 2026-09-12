@@ -102,6 +102,45 @@ describe("editorial submission handoff", () => {
     });
     expect(errors).toContain("editorial packetBlobSha does not match the restored packet blob");
   });
+
+  it("only waives leadEventKey for a true no-include news continuation", () => {
+    const continuationPacket = { ...packet, continuation: { scope: "news", preservePublished: true } };
+    const noInclude = { ...editorial, leadEventKey: "missing", decisions: [{ ...editorial.decisions[0], decision: "exclude", reason: "来源不足" }] };
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet: continuationPacket,
+      editorial: noInclude,
+      packetBlobSha,
+    })).not.toContain("leadEventKey must reference an included decision");
+    const needsReview = { ...noInclude, decisions: [{ ...noInclude.decisions[0], decision: "needs_review", tracking: true, factStatus: "unconfirmed" }] };
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet: continuationPacket,
+      editorial: needsReview,
+      packetBlobSha,
+    })).not.toContain("leadEventKey must reference an included decision");
+
+    const includedWithoutLead = { ...editorial, leadEventKey: "missing" };
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet: continuationPacket,
+      editorial: includedWithoutLead,
+      packetBlobSha,
+    })).toContain("leadEventKey must reference an included decision");
+
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet: continuationPacket,
+      editorial: { ...noInclude, upcoming: [{}] },
+      packetBlobSha,
+    })).toContain("news continuation cannot change the release calendar");
+    expect(validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet: continuationPacket,
+      editorial: { ...editorial, upcoming: [{}] },
+      packetBlobSha,
+    })).toContain("news continuation cannot change the release calendar");
+  });
 });
 
 it("accepts generated Daily fallback through the real submission validator and rejects calendar replacement", () => {

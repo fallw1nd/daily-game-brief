@@ -172,6 +172,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     latest.id === window.id &&
     latest.issueNumber === existingManifestItem.issueNumber
   );
+  if (authorizedLatestRevision && latest.sourceReport?.editorialDecisionDigest === decisionDigest) {
+    return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
+  }
   if (existingManifestItem && !degradedEdition && !authorizedLatestRevision) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
@@ -207,7 +210,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       ? packetItem?.showcaseRefs?.length
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
         : isNewsContinuation
-          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId) : null
+          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key) : null
           : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {

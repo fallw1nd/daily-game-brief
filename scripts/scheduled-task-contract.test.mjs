@@ -45,7 +45,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   });
 
   it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
-    expect(contract).toContain("Priority is Canonical work (including one trusted `editorial_continuation` batch), current Daily liveness wake, ready `showcase_completion`, then one English repair");
+    expect(contract).toContain("Priority is new Canonical work, current Daily liveness wake, trusted `editorial_continuation`, ready `showcase_completion`, then one English repair");
     expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
     expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");

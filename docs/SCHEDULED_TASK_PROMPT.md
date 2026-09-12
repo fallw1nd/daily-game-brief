@@ -2,7 +2,7 @@
 
 Production uses one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 11:20, `Asia/Shanghai`; the former PM task is disabled. Evidence closes at 10:10, fallback is due at 11:40, and public release is planned for 12:00. First Daily `2026-08-31-daily` uses `(2026-08-30 17:00, 2026-08-31 10:10]`; later editions use `(previous day 10:10, current day 10:10]`.
 
-Priority is Canonical work (including one trusted `editorial_continuation` batch), current Daily liveness wake, ready `showcase_completion`, then one English repair.
+Priority is new Canonical work, current Daily liveness wake, trusted `editorial_continuation`, ready `showcase_completion`, then one English repair.
 
 ## 1. Canonical and liveness
 1. First select the oldest already-due Daily edition with `packet.status:"ready"`, publication uncommitted, editorial `pending`/`invalid`, and no `editorial_continuation` or `showcase_completion` request (a user-authorized revision is allowed). `pending` starts a decision; `invalid` repairs one using durable `validationErrors` and `submissionSha`. `submitted`/`valid` belong to GitHub's publication lane and `timed_out` to its degraded fallback lane; never select or re-edit them. Never skip Canonical backlog or derive its identity from runner time.
@@ -25,4 +25,4 @@ Priority is Canonical work (including one trusted `editorial_continuation` batch
 ## 3. One English repair
 Choose the oldest published Daily from `2026-08-31-daily` whose English is unavailable for `editorial-overlay-missing` or `editorial-overlay-invalid`. Final Canonical `entryId`/order are authoritative; cover each once, restate only accepted evidence, and do not rediscover or alter facts. Commit only schema-v1 `locale:"en"` to `automation/locale-inbox/<edition-id>.json` on `automation/locale/en/<edition-id>`. Trusted publisher hash-guards archive/latest/manifest and changes only English state/Overlay. Then stop.
 
-Do not inspect; do not poll Actions, create/delete workflows, edit state, publish Canonical directly, advance editions, or change long-lived tasks. GitHub owns recovery, validation, publication, deployment, state and incidents. A single Canonical or locale failure must never mutate the active Daily task.
+Do not inspect Actions or poll Actions; create/delete workflows, edit state, publish Canonical directly, advance editions, or change long-lived tasks. GitHub owns recovery, validation, publication, deployment, state and incidents. A single Canonical or locale failure must never mutate the active Daily task.

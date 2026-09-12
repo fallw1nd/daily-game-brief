@@ -222,6 +222,36 @@ describe("durable editorial continuation queue", () => {
     expect(retry.status).toBe("revised");
     expect(retry.edition.entries).toHaveLength(1);
     expect(retry.edition.entries[0].headline).toBe(existingEntry.headline);
+
+    const rerun = buildEdition({
+      packet: continuationPacket,
+      editorial,
+      latest: added.edition,
+      manifest: added.manifest,
+      allowSameEditionRevision: true,
+    });
+    expect(rerun.status).toBe("already-exists");
+    expect(rerun.edition).toBeNull();
+
+    const otherEntry = {
+      ...existingEntry,
+      id: "2026-09-11-daily-news-1",
+      title: { title_key: "other-game", title_en: "Other Game", title_zh_status: "unavailable" },
+      headline: "《Other Game》旧事实",
+    };
+    const wrongSubjectPacket = buildPacket("news-wrong-subject");
+    expect(() => buildEdition({
+      packet: wrongSubjectPacket,
+      editorial: {
+        ...editorial,
+        packetBlobSha: gitBlobSha(JSON.stringify(wrongSubjectPacket)),
+        leadEventKey: "news-wrong-subject",
+        decisions: [newsDecision("news-wrong-subject", otherEntry.id)],
+      },
+      latest: { ...latest, entries: [existingEntry, otherEntry] },
+      manifest,
+      allowSameEditionRevision: true,
+    })).toThrow("existingEntryId must identify the confirmed subject");
   });
 
   it("does not treat a showcase batch as a news continuation", () => {

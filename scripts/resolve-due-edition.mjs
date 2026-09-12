@@ -13,13 +13,41 @@ function dateRange(start, end) {
   return values;
 }
 
+function dailyLivenessWindow({ now, manifest, states }) {
+  const latestDue = latestDueWindow("daily", now);
+  const latestDueDate = latestDue.id.slice(0, 10);
+  const published = new Set((manifest?.editions || []).map((item) => item.id));
+  const lastDaily = [...(manifest?.editions || [])]
+    .filter((item) => item.period === "daily")
+    .sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0) || String(a.date).localeCompare(String(b.date)))
+    .at(-1);
+  const lastDailyWindow = lastDaily
+    ? plannedWindow("daily", new Date(`${lastDaily.date}T12:00:00+08:00`))
+    : null;
+  const startDate = lastDaily?.date || latestDueDate;
+  const candidates = dateRange(startDate, latestDueDate)
+    .map((date) => plannedWindow("daily", new Date(`${date}T12:00:00+08:00`)))
+    .filter((window) => cutoffAt(window) <= now.getTime() && (!lastDailyWindow || cutoffAt(window) > cutoffAt(lastDailyWindow)));
+  for (const window of candidates) {
+    if (published.has(window.id)) continue;
+    const state = states[window.id];
+    if (state?.publication?.status === "committed" || state?.packet?.status === "ready") continue;
+    return window;
+  }
+  return null;
+}
+
+function cutoffAt(window) {
+  return Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);
+}
+
 export function resolveDueEdition({ period, now = new Date(), manifest, states = {}, purpose = "publication" }) {
   if (!new Set(["am", "pm", "daily"]).has(period)) throw new Error("period must be am, pm, or daily");
   if (!new Set(["packet", "editorial", "publication"]).has(purpose)) throw new Error("purpose must be packet, editorial, or publication");
   const latestDue = latestDueWindow(period, now);
-  const cutoff = (window) => Date.parse(`${window.windowEnd.replace(" ", "T")}:00+08:00`);
+  const cutoff = cutoffAt;
   if (purpose === "editorial") {
-    const candidate = Object.values(states)
+    const candidates = Object.values(states)
       .map((state) => ({ state, window: expectedEditorialWindow(state?.editionId) }))
       .filter(({ state, window }) => window
         && window.period === period
@@ -27,14 +55,32 @@ export function resolveDueEdition({ period, now = new Date(), manifest, states =
         && state.packet?.status === "ready"
         && state.publication?.status !== "committed"
         && ["pending", "invalid"].includes(state.editorial?.status))
-      .sort((left, right) => {
-        const priority = (state) => {
-          if (state.revisionRequest?.reason === "editorial_continuation") return 2;
-          if (state.revisionRequest?.reason === "showcase_completion") return 3;
-          return 1;
+      ;
+    const priority = (state) => {
+      if (state.revisionRequest?.reason === "editorial_continuation") return 2;
+      if (state.revisionRequest?.reason === "showcase_completion") return 3;
+      return 1;
+    };
+    const normalCandidate = candidates
+      .filter(({ state }) => priority(state) === 1)
+      .sort((left, right) => cutoff(left.window) - cutoff(right.window))[0];
+    const candidate = normalCandidate || candidates
+      .sort((left, right) => priority(left.state) - priority(right.state) || cutoff(left.window) - cutoff(right.window))[0];
+    if (!normalCandidate && period === "daily") {
+      const livenessWindow = dailyLivenessWindow({ now, manifest, states });
+      if (livenessWindow) {
+        return {
+          window: livenessWindow,
+          needed: false,
+          purpose,
+          editorialMode: "liveness-wake",
+          livenessWake: true,
+          packetBlobSha: null,
+          submissionSha: null,
+          validationErrors: [],
         };
-        return priority(left.state) - priority(right.state) || cutoff(left.window) - cutoff(right.window);
-      })[0];
+      }
+    }
     const continuationReason = candidate?.state.revisionRequest?.reason;
     return {
       window: candidate?.window || latestDue,

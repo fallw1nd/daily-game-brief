@@ -331,6 +331,34 @@ describe("oldest-due edition compensation", () => {
     });
     expect(continuationOnly).toMatchObject({ needed: true, window: { id: "2026-08-28-am" }, editorialMode: "editorial-continuation" });
   });
+
+  it("wakes the current Daily before consuming an old continuation when its packet is missing", () => {
+    let continuation = validStateFor("2026-09-10-daily");
+    continuation = applyEditionStateEvent(continuation, "publication-committed", { mainSha, source: "editorial" });
+    continuation = applyEditionStateEvent(continuation, "continuation-opened", {
+      reason: "editorial_continuation",
+      batchName: "news-old.json",
+      batchScope: "news",
+      eventKeys: ["news-old"],
+    });
+    continuation = applyEditionStateEvent(continuation, "packet-ready", { packetBlobSha: "4".repeat(40) });
+    const manifest = {
+      editions: [{ id: "2026-09-11-daily", date: "2026-09-11", period: "daily", issueNumber: 40 }],
+    };
+    const result = resolveDueEdition({
+      period: "daily",
+      now: new Date("2026-09-12T03:00:00.000Z"),
+      manifest,
+      states: { "2026-09-10-daily": continuation },
+      purpose: "editorial",
+    });
+    expect(result).toMatchObject({
+      needed: false,
+      livenessWake: true,
+      editorialMode: "liveness-wake",
+      window: { id: "2026-09-12-daily" },
+    });
+  });
 });
   it("requires the timeout acknowledgement before degraded publication", () => {
     expect(() => applyEditionStateEvent(readyState(), "publication-committed", { mainSha, source: "degraded" }))
