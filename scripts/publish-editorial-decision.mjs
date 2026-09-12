@@ -196,10 +196,10 @@ persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 let publisherLatest = latest;
-const historicalSupplement = allowSameEditionRevision && packet.continuation?.scope === "showcase" && editorial.editionId !== latest.id;
-if (historicalSupplement) {
+const historicalRevision = allowSameEditionRevision && editorial.editionId !== latest.id;
+if (historicalRevision) {
   const target = manifest.editions.find(item => item.id === editorial.editionId);
-  if (!target) throw new Error("showcase supplement target is not an existing archive");
+  if (!target) throw new Error("same-edition revision target is not an existing archive");
   publisherLatest = JSON.parse(await readFile(resolve("public/data", target.path), "utf8"));
 }
 if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
@@ -212,7 +212,7 @@ if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "dai
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
 const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision });
-if (historicalSupplement) result.manifest.latest = manifest.latest;
+if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
@@ -261,7 +261,7 @@ await mkdir(dirname(archiveFile), { recursive: true });
 const editionText = JSON.stringify(result.edition, null, 2) + "\n";
 await Promise.all([
   writeFile(archiveFile, editionText),
-  ...(historicalSupplement ? [] : [writeFile("public/data/latest.json", editionText)]),
+  ...(historicalRevision ? [] : [writeFile("public/data/latest.json", editionText)]),
   writeFile("public/data/manifest.json", JSON.stringify(result.manifest, null, 2) + "\n"),
 ]);
 await writeLocalePlan(result.edition, localePlan, { preservePublished: packet.continuation?.preservePublished === true });
