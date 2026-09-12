@@ -1,4 +1,5 @@
 import { normalizeHeadline } from "./news-pipeline.mjs";
+import { mergeShowcaseRefs } from "./showcase.mjs";
 
 function normalizedUrl(input) {
   try {
@@ -23,6 +24,14 @@ function entryText(entry) {
 }
 
 function isCovered(item, entries) {
+  if (item.showcaseRefs?.length) {
+    const published = mergeShowcaseRefs(entries.flatMap(entry => entry.showcaseRefs || []));
+    return item.showcaseRefs.every(ref => {
+      const match = published.find(candidate => candidate.showcaseId === ref.showcaseId && candidate.announcementId === ref.announcementId);
+      const required = ref.factIds || (item.showcaseFacts || []).map(fact => fact.id);
+      return Boolean(match) && required.every(id => match.factIds?.includes(id));
+    });
+  }
   const sourceUrls = new Set((item.sources || []).flatMap((source) => {
     const values = [source.url, source.canonicalUrl].map(normalizedUrl).filter(Boolean);
     return values;

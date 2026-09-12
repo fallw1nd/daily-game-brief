@@ -147,6 +147,40 @@ function degradedYoungSunsEntry() {
 }
 
 describe("authorized same-edition revision overlay", () => {
+  it("links two regional announcements to one existing story without duplicate entries or lost refs", () => {
+    const scoped = structuredClone(packet);
+    scoped.continuation = { scope: "showcase", preservePublished: true };
+    scoped.editorialInput.packages = ["jp", "us"].map(region => ({ ...packet.editorialInput.packages[0], eventKey: region, showcaseRefs: [{ showcaseId: "direct", announcementId: region }], showcaseFacts: [{ id: region }] }));
+    const latest = structuredClone(currentLatest);
+    latest.archiveTitle = "日报｜人工保留的期标题";
+    latest.leadEntryId = latest.entries[0].id;
+    const draft = structuredClone(editorial);
+    draft.decisions = ["jp", "us"].map(region => ({ ...editorial.decisions[0], eventKey: region, existingEntryId: latest.entries[0].id, coveredFactIds: [region] }));
+    const result = buildEdition({ packet: scoped, editorial: draft, latest, manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries).toHaveLength(2);
+    expect(result.edition.entries[0].headline).toBe(latest.entries[0].headline);
+    expect(result.edition.entries[0].showcaseRefs.map(ref => ref.announcementId)).toEqual(["jp", "us"]);
+  });
+  it("appends a different fact for the same showcase game without replacing manual copy", () => {
+    const scoped = structuredClone(packet);
+    scoped.continuation = { scope: "showcase", preservePublished: true };
+    const ref = { showcaseId: "direct", announcementId: "halloween" };
+    scoped.editorialInput.packages = [{ ...scoped.editorialInput.packages[0], showcaseRefs: [ref], showcaseFacts: [{ id: "demo" }] }];
+    const draft = structuredClone(editorial);
+    draft.decisions = [{ ...draft.decisions[0], coveredFactIds: ["demo"] }];
+    const latest = structuredClone(currentLatest);
+    latest.archiveTitle = "日报｜人工保留的期标题";
+    latest.leadEntryId = latest.entries[0].id;
+    latest.entries[0].showcaseRefs = [{ ...ref, factIds: ["release"] }];
+    const result = buildEdition({ packet: scoped, editorial: draft, latest, manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries).toHaveLength(3);
+    expect(result.edition.entries[0]).toEqual(latest.entries[0]);
+    expect(result.edition.entries[2].showcaseRefs[0].factIds).toEqual(["demo"]);
+    expect(result.edition.archiveTitle).toBe(latest.archiveTitle);
+    expect(result.edition.leadEntryId).toBe(latest.leadEntryId);
+    expect(result.edition.upcoming).toEqual(latest.upcoming);
+  });
+
   it("replaces matching titles in place, preserves omitted canonical stories/media, and appends new entries", () => {
     const result = buildEdition({
       packet,
@@ -160,7 +194,7 @@ describe("authorized same-edition revision overlay", () => {
     expect(result.status).toBe("revised");
     expect(result.edition.entries).toHaveLength(3);
     expect(result.edition.entries[0].id).toBe(`${editionId}-news-0`);
-    expect(result.edition.entries[0].headline).toBe("Updated Halloween headline");
+    expect(result.edition.entries[0].headline).toBe("《Halloween: The Game》：Updated Halloween headline");
     expect(result.edition.entries[0].image_status).toBe("verified");
     expect(result.edition.entries[0].images[0].url).toBe("media/briefs/halloween.jpg");
     expect(result.edition.entries[0].images[0].alt).toBe("Halloween");

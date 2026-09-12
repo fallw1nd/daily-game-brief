@@ -28,6 +28,7 @@ export function assetKey(ownerId, asset) {
 export function factsProjection(edition, sharedFactFrameDigests = {}) {
   return {
     factsProjectionVersion: FACTS_PROJECTION_VERSION,
+    ...(edition.showcases ? { showcases: edition.showcases } : {}),
     edition: {
       id: edition.id,
       issueNumber: edition.issueNumber,
@@ -42,6 +43,7 @@ export function factsProjection(edition, sharedFactFrameDigests = {}) {
     entries: (edition.entries ?? []).map((entry) => ({
       id: entry.id,
       section: entry.section,
+      ...(entry.showcaseRefs ? { showcaseRefs: entry.showcaseRefs, showcaseBrief: entry.showcaseBrief === true } : {}),
       title_key: entry.title?.title_key ?? null,
       title_en: entry.title?.title_en ?? null,
       beijingTime: entry.beijingTime,

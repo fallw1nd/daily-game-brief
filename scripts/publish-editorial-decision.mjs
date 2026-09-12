@@ -1,3 +1,4 @@
+import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -45,7 +46,12 @@ async function previousEnglishOverlay(manifest, editionId) {
   const index = manifest.editions.findIndex((item) => item.id === editionId);
   if (index <= 0) return null;
   const previous = manifest.editions[index - 1];
-  return readOptionalJson(resolve("public/data", localeArchivePath(previous.id)));
+  return readEnglishPresentation(previous.id);
+}
+
+async function readEnglishPresentation(editionId) {
+  return await readOptionalJson(resolve("public/data", localeArchivePath(editionId)))
+    || (await readOptionalJson(resolve("public/data", localeStatusPath(editionId))))?.retainedPresentation || null;
 }
 
 async function writePublicationResult(value) {
@@ -58,7 +64,7 @@ async function rebuildGeneratedIndexes() {
   await run(process.execPath, ["scripts/build-search-index.mjs"]);
 }
 
-async function writeLocalePlan(canonical, localePlan) {
+async function writeLocalePlan(canonical, localePlan, { preservePublished = false } = {}) {
   const overlayFile = resolve("public/data", localeArchivePath(canonical.id));
   const statusFile = resolve("public/data", localeStatusPath(canonical.id));
   if (localePlan.status === "available") {
@@ -73,6 +79,8 @@ async function writeLocalePlan(canonical, localePlan) {
     summary: localePlan.summary,
     observedAt: canonical.generatedAt,
   });
+  const retained = await readEnglishPresentation(canonical.id);
+  if (preservePublished && retained?.editionId === canonical.id) status.retainedPresentation = retained;
   await mkdir(dirname(statusFile), { recursive: true });
   await writeFile(statusFile, JSON.stringify(status, null, 2) + "\n");
   await rm(overlayFile, { force: true });
@@ -87,7 +95,12 @@ async function hasAuthorizedSameEditionRevision(editorial) {
     const state = JSON.parse(stdout);
     return state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
-      state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON &&
+      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || (
+        state.revisionRequest?.reason === "showcase_completion" &&
+        packet.continuation?.scope === "showcase" && packet.continuation?.preservePublished === true &&
+        packet.editorialInput.packages.length > 0 &&
+        packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)))
+      )) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
@@ -129,7 +142,8 @@ if (PUBLICATION_MODE === "locale-repair") {
   };
   let localePlan;
   if (localeRepairDraft) {
-    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft });
+    const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
+    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
   } else {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
     localePlan = buildEnglishOverlay({
@@ -178,9 +192,16 @@ if (PUBLICATION_MODE === "locale-repair") {
   process.exit(0);
 }
 
+persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 let publisherLatest = latest;
+const historicalSupplement = allowSameEditionRevision && packet.continuation?.scope === "showcase" && editorial.editionId !== latest.id;
+if (historicalSupplement) {
+  const target = manifest.editions.find(item => item.id === editorial.editionId);
+  if (!target) throw new Error("showcase supplement target is not an existing archive");
+  publisherLatest = JSON.parse(await readFile(resolve("public/data", target.path), "utf8"));
+}
 if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
   const baseline = await loadCanonicalUpcomingBaseline({
     latest,
@@ -191,6 +212,7 @@ if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "dai
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
 const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision });
+if (historicalSupplement) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
@@ -225,12 +247,13 @@ if (result.status === "already-exists") {
   process.exit(0);
 }
 
-const priorOverlay = await readOptionalJson(resolve("public/data", localeArchivePath(latest.id)));
+const priorOverlay = await readEnglishPresentation(publisherLatest.id);
 const localePlan = buildEnglishOverlay({
   canonical: result.edition,
   editorial,
   entryIdsByEvent: result.entryIdsByEvent,
   previousOverlay: priorOverlay,
+  preservePublished: packet.continuation?.preservePublished === true,
 });
 
 const archiveFile = resolve("public/data", result.archivePath);
@@ -238,10 +261,10 @@ await mkdir(dirname(archiveFile), { recursive: true });
 const editionText = JSON.stringify(result.edition, null, 2) + "\n";
 await Promise.all([
   writeFile(archiveFile, editionText),
-  writeFile("public/data/latest.json", editionText),
+  ...(historicalSupplement ? [] : [writeFile("public/data/latest.json", editionText)]),
   writeFile("public/data/manifest.json", JSON.stringify(result.manifest, null, 2) + "\n"),
 ]);
-await writeLocalePlan(result.edition, localePlan);
+await writeLocalePlan(result.edition, localePlan, { preservePublished: packet.continuation?.preservePublished === true });
 await rebuildGeneratedIndexes();
 await writePublicationResult({
   editionId: editorial.editionId,

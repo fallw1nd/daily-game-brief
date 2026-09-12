@@ -519,3 +519,34 @@
 - **2026-09-09 merged verification:** [PR #118](https://github.com/fallw1nd/daily-game-brief/pull/118)已合并main 2195a3d；[Verify 34345069872](https://github.com/fallw1nd/daily-game-brief/actions/runs/34345069872)成功。344项测试、30期数据与英文校验、构建通过；当期事实投影未变，9条中英文标题补全主语，5个用户译名已写入注册表和日历。自然期次采用效果仍待观察，MNT-20260909-01保持in_progress。
 
 - **Live verification:** [Pages 34345211050](https://github.com/fallw1nd/daily-game-brief/actions/runs/34345211050)成功；线上latest与当期归档逐字段一致，中英文期标题包含主语，五个指定译名均已生效。
+
+### 2026-09-10 recurrence — MNT-20260909-01
+
+- **Evidence:** NO.031仍有“Cosmos免费更新上线”“官方播客详谈…”等依赖主体栏的标题；packet有要求但发布端未执行。提示修改没有消除复发。
+- **Bounded resolution:** 发布端统一检查已确认主体和登记别名，缺少时补全中英文标题及期标题；未知身份报错，降级标记保持，重复执行幂等。英文空新闻日历兼容不受影响。仍为in_progress，等待本期正式修订、线上校验及自然期次。
+- **2026-09-12 release preparation:** 用正式 buildEdition/buildEnglishOverlay 修订 NO.031，8 条中文标题补全或统一已确认主体，14 条英文与 7 项日历通过校验；既有 factsDigest 未变，首页仍为 NO.032。修复常见地区/发售类型标签缺失导致英文整体不可用的问题。本期明确保留发布会尚未全量核验的说明，不把排队或抓取成功视为完整收录。合并/Pages 实测证据待补。
+- **2026-09-12 latest search run:** [34668694333](https://github.com/fallw1nd/daily-game-brief/actions/runs/34668694333)实际检索 3 个名称，122 个留队；input 37010、output 677、缓存读取 10624，合计 48311 tokens。未采纳来源不合格的候选，包括繁中页面、百科和论坛。确认 provider 可超出单次工具次数与整轮软预算；预算仅停止未启动请求，不宣称是硬上限或单次实测降幅。进一步排除媒体域名下的论坛页面，避免把用户帖子当作独立媒体证据。
+
+## MNT-20260910-01 — 发布会合集截断、同源误对账与恢复消费缺口
+
+- **Discovered:** 2026-09-10
+- **Priority:** P1
+- **Status:** in_progress
+- **Evidence:** NO.031证据包30候选仅25进入编辑预算；多游戏合集未拆，原覆盖审计允许同URL匹配不同公告。真实官方HTML回放发现Nintendo日文正文在标题容器外、列表元数据误识别游戏、欧洲无链接卡片遗漏和Sony无障碍图片标题干扰。
+- **Bounded resolution:** 公告身份对账、地区来源状态、独立简讯、持久有界批次及串行受限补齐；程序保护已有人工内容与原窗口。外部编辑任务只有每日两次调用，尚需实际唤醒/恢复验证，不能仅凭持久队列宣称及时补齐。
+- **Close when:** 日美欧独立清单中全部实质事实对应正文或简讯，真实Direct和State of Play隔离演练通过；失败与预算不足恢复、并发人工修订通过；本期部署与后续自然期次均有证据。实现细节和剩余项见docs/SHOWCASE_RECOVERY.md。
+
+## MNT-20260910-02 — 译名候选未持久积累且来源独立性不足
+
+- **Discovered:** 2026-09-10
+- **Priority:** P2
+- **Status:** in_progress
+- **2026-09-11 continued verification:** 隔离发布 CLI 已验证补齐 NO.031 不回退 NO.032 首页，保留原窗口、人工标题和日历。新增跨地区多条证据关联同一已发布正文测试，以及可选归档发布会字段的链接/计数一致性校验。实际定时任务管理页连接失败，仍未完成外部任务调整；不增加第三次定时调用。
+- **2026-09-11 API measurement:** [真实原生搜索 34613358839](https://github.com/fallw1nd/daily-game-brief/actions/runs/34613358839)查询 4 个名称、123 个未查询保留队列；input 29478/output 1191，另有缓存读取 1792 tokens（完整合计 32461），0 个通过来源核验。服务忽略部分 max_uses 限制，现记录缓存用量并计入每轮软预算，未启动请求留队。补修最终文本带解释前缀时的 JSON 解析、商标/标点别名重复查询，以及日历译名未传入编辑包；收紧搜索来源范围。未以 HTTP 成功或预算命中代替译名采用验收。
+- **Evidence:** 旧工具只查最多8个新闻主体，没有持久采用；同机构域名可被视作独立媒体，完整作品身份核验不足。实现检查另发现来源网络失败被缓存为未命中、已核验缓存未输出复用。
+- **Bounded resolution:** 每次20个主体、并发2；新闻/发布会/日历/积压合并，官方简中或两家可靠独立机构打开页面核验后积累，用户名称优先；7天未命中、6小时故障缓存。补测数字续作、转载、同机构子域名、日文原名和新公告重查。
+- **Close when:** 真实查询演练的每个自动采用名称有作品身份、合格来源、原文摘录与核验时间；持久队列续查及网络失败不阻断发布经运行验证，本期和自然期次采用成功且不回写旧归档。
+
+- **2026-09-11 real-run evidence:** [隔离来源演练 34583878030](https://github.com/fallw1nd/daily-game-brief/actions/runs/34583878030)打开 Nintendo Direct 与 State of Play 官方材料，取得 173 个片段；实际调用既有 DeepSeek 搜索服务时 20 个主体全部 HTTP 402，0 个自动采用、107 个未查询保留。首次演练只检查 API key 存在而错误显示成功，现增加服务可用性结果并在 401/402/403/429 后暂停后续查询 6 小时，未执行的主体继续排队。搜索恢复需要账户计费/凭据可用，已经告知用户；维护项仍为 in_progress。[PR #121](https://github.com/fallw1nd/daily-game-brief/pull/121)保持草稿，不以抓取成功替代编辑完整性验收。
+
+- **2026-09-11 provider follow-up:** 用户已恢复计费，并要求精简 API token。[重跑 34584336684](https://github.com/fallw1nd/daily-game-brief/actions/runs/34584336684)20 次 HTTP 成功，服务报告 input 4255/output 171/total 4426 tokens，但全部返回空候选，不能当作名称功能验收成功。进一步核对当前 DeepSeek Responses 文档，其内置搜索已不在支持列表；官方 Harness 的搜索提供器使用 Anthropic Messages `web_search_20250305`。改用同一服务/密钥的该入口，必须取得真实搜索结果块；模型独自回答空数组按服务失败处理。提示和返回字段精简、输出上限 700、关闭推理、最多 2 次搜索工具使用，记录实际用量，不以字符减幅冒充 token 成本减幅。名称成功采用及完整生产验收仍待运行证据。

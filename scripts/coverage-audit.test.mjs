@@ -18,6 +18,16 @@ const baseItem = {
 };
 
 describe("coverage audit", () => {
+  it("requires all showcase facts even when the announcement, subject and URL match", () => {
+    const ref = { showcaseId: "direct", announcementId: "game-update" };
+    const item = { ...baseItem, showcaseRefs: [ref], showcaseFacts: [{ id: "release" }, { id: "demo" }] };
+    const entry = { headline: baseItem.headline, sources: baseItem.sources, showcaseRefs: [{ ...ref, factIds: ["release"] }] };
+    const evidence = { packages: [item] };
+    expect(auditCoverage(evidence, { entries: [entry] }).totals.covered).toBe(0);
+    expect(auditCoverage(evidence, { entries: [entry, { showcaseRefs: [{ ...ref, factIds: ["demo"] }] }] }).totals.covered).toBe(1);
+    expect(auditCoverage(evidence, { entries: [entry, { showcaseRefs: [{ ...ref, announcementId: "other", factIds: ["demo"] }] }] }).totals.covered).toBe(0);
+  });
+
   it("matches an edition entry by normalized source URL", () => {
     const audit = auditCoverage({ window: { id: "2026-08-26-pm" }, packages: [baseItem] }, {
       id: "2026-08-26-pm",

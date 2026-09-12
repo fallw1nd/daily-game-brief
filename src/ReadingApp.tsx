@@ -207,7 +207,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
 
   const lead = edition ? readingLead(edition) : undefined;
   const otherStories = edition?.entries.filter((entry) => entry.id !== lead?.id) ?? [];
-  const sections = sectionOrder.map((key) => ({ key, entries: otherStories.filter((entry) => entry.section === key) })).filter((section) => section.entries.length > 0);
+  const sections = sectionOrder.map((key) => ({ key, entries: otherStories.filter((entry) => entry.section === key && !(entry.showcaseBrief && edition?.showcases?.some(showcase => showcase.entryIds.includes(entry.id)))) })).filter((section) => section.entries.length > 0);
   const results = useMemo(() => searchArchiveEntries(searchIndex?.entries ?? [], query), [query, searchIndex]);
   const archives = [...(manifest?.editions ?? [])].reverse().filter((item) => !english || englishTitles[item.id]);
   const position = archives.findIndex((item) => item.id === edition?.id);
@@ -242,7 +242,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         </article> : <><h1 id="r-edition-title">{edition.archiveTitle || t("游戏日报", "Daily Game Brief")}</h1><p>{t("本期暂无新闻条目。", "There are no stories in this edition.")}</p></>}
       </section>
 
-      {sections.length > 0 && <nav className="r-section-nav" aria-label={t("本期栏目", "Edition sections")}>{sections.map((section) => <a key={section.key} href={`#${section.key === "focus" ? "focus-news" : section.key}`}>{label(sectionNames[section.key], english)}</a>)}</nav>}
+      {(sections.length > 0 || Boolean(edition.showcases?.length)) && <nav className="r-section-nav" aria-label={t("本期栏目", "Edition sections")}>{sections.map((section) => <a key={section.key} href={`#${section.key === "focus" ? "focus-news" : section.key}`}>{label(sectionNames[section.key], english)}</a>)}{edition.showcases?.map(showcase => <a key={showcase.id} href={`#${showcase.id}`}>{english ? showcase.titleEn : showcase.title}</a>)}</nav>}
       {otherStories.length > 0 && <div className="r-news-layout"><div className="r-news-flow">
         {sections.map((section) => <section className="r-department" id={section.key === "focus" ? "focus-news" : section.key} key={section.key} aria-labelledby={`r-section-${section.key}`}>
           <header><h2 id={`r-section-${section.key}`}>{label(sectionNames[section.key], english)}</h2><span>{section.entries.length.toString().padStart(2, "0")}</span></header>
@@ -250,6 +250,12 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
           {section.entries.map((entry) => <Story key={entry.id} entry={entry} english={english} />)}
         </section>)}
       </div><aside className="r-overview"><div className="r-overview-sticky"><h2>{t("本期速览", "In this edition")}</h2><p>{t(`${edition.entries.length} 条新闻`, `${edition.entries.length} stories`)}</p><ol>{otherStories.slice(0, 5).map((entry) => <li key={entry.id}><a href={`#${entry.id}`}><small>{label(sectionNames[entry.section], english)}</small><span>{entry.headline}</span><ArrowDown aria-hidden="true" /></a></li>)}</ol><a className="r-overview-archive" href="#archive"><MagnifyingGlass aria-hidden="true" />{t("查找往期新闻", "Search past stories")}</a></div></aside></div>}
+
+      {edition.showcases?.map(showcase => <section className="r-department r-showcase" id={showcase.id} key={showcase.id} aria-labelledby={`heading-${showcase.id}`}>
+        <header><h2 id={`heading-${showcase.id}`}>{english ? showcase.titleEn : showcase.title}</h2><span>{showcase.covered}</span></header>
+        <p className="r-department-note">{showcase.status === "complete" ? t("本场实质公告已全部收录；重复展示已合并。", "All substantive announcements covered; repeated presentations merged.") : t("本场内容尚在补齐，地区版本与未核验公告仍在核对。", "Coverage is still being completed, including regional broadcasts and unverified announcements.")}</p>
+        {showcase.entryIds.map(id => edition.entries.find(entry => entry.id === id)).filter((entry): entry is BriefEntry => Boolean(entry)).map(entry => entry.showcaseBrief && entry.id !== lead?.id && edition.showcases?.find(group => group.entryIds.includes(entry.id))?.id === showcase.id ? <Story key={entry.id} entry={entry} english={english} /> : <p className="r-showcase-link" key={entry.id}><a href={`#${entry.id}`}>{entry.headline}<ArrowUpRight aria-hidden="true" /></a></p>)}
+      </section>)}
 
       {<section className="r-calendar" id="upcoming" aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${upcoming.length} 款作品`, `${upcoming.length} games`)}</span></header>
         <p className="r-calendar-note">{t(`以本期 ${edition.date} 为基准，展示次日起15天内的发售计划。`, `Scheduled releases in the 15 days after this edition, ${edition.date}.`)}</p>

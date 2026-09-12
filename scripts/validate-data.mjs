@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { windowForEditionId } from "./lib/edition-window.mjs";
 import { verifiedWindowTimeError } from "./lib/time-window.mjs";
+import { validateShowcaseData } from "./lib/showcase-data-validation.mjs";
 
 const dataRoot = resolve("public/data");
 const errors = [];
@@ -186,6 +187,7 @@ function validateEdition(edition, path) {
   }
 
   const requiresImages = edition.schemaVersion === 2;
+  errors.push(...validateShowcaseData(edition).map(error => `${path}: ${error}`));
   const ids = new Set();
   for (const entry of edition.entries) {
     if (!entry?.id) {

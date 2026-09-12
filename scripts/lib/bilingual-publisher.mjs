@@ -1,3 +1,5 @@
+import { normalizeSubjectHeadline } from "./headline-subject.mjs";
+import { programmaticRegionLabel, programmaticReleaseTypeLabel } from "../../src/lib/locale-dictionary.js";
 import { upcomingKey } from "../../src/lib/locale-projection.js";
 import {
   canonicalCopyDigest,
@@ -76,8 +78,16 @@ function finalizeEnglishOverlay(canonical, presentation) {
     factsDigest: factsDigest(canonical),
     canonicalCopyDigest: canonicalCopyDigest(canonical),
     localeDigest: `sha256:${"0".repeat(64)}`,
-    archiveTitle: presentation.archiveTitle,
-    entries: presentation.entries,
+    archiveTitle: canonical.entries.length ? normalizeSubjectHeadline(presentation.archiveTitle, canonical.entries.find(entry => entry.id === canonical.leadEntryId)?.title || canonical.entries[0]?.title, { locale: "en", archive: true }) : presentation.archiveTitle,
+    entries: presentation.entries.map(item => {
+      const entry = canonical.entries.find(entry => entry.id === item.entryId);
+      return entry ? {
+        ...item,
+        headline: normalizeSubjectHeadline(item.headline, entry.title, { locale: "en" }),
+        ...(item.regionLabel === entry.region && programmaticRegionLabel(entry.region) ? { regionLabel: programmaticRegionLabel(entry.region) } : {}),
+        ...(item.releaseTypeLabel === entry.releaseType && programmaticReleaseTypeLabel(entry.releaseType) ? { releaseTypeLabel: programmaticReleaseTypeLabel(entry.releaseType) } : {}),
+      } : item;
+    }),
     upcoming: presentation.upcoming,
     ...(presentation.sourceReport ? { sourceReport: presentation.sourceReport } : {}),
   };
@@ -103,9 +113,13 @@ function finalizeEnglishOverlay(canonical, presentation) {
   };
 }
 
-export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null }) {
+export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null, preservePublished = false }) {
   const draft = editorial?.locales?.en;
   if (!draft) {
+    if (preservePublished && previousOverlay?.editionId === canonical.id
+      && canonical.entries.every(entry => previousOverlay.entries?.some(item => item.entryId === entry.id))) {
+      return finalizeEnglishOverlay(canonical, previousOverlay);
+    }
     return {
       status: "unavailable",
       reasonCode: "editorial-overlay-missing",
@@ -116,7 +130,7 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   }
   const ids = entryIdsByEvent || deriveEntryIdsByEvent(editorial);
   const canonicalOrder = new Map((canonical.entries || []).map((entry, index) => [entry.id, index]));
-  const entries = (draft.entries || []).map((item) => ({
+  let entries = (draft.entries || []).map((item) => ({
     entryId: ids[item.eventKey],
     headline: item.headline,
     summary: item.summary,
@@ -132,15 +146,22 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
     const rightIndex = canonicalOrder.get(right.entryId) ?? Number.MAX_SAFE_INTEGER;
     return leftIndex - rightIndex;
   });
+  if (preservePublished && previousOverlay?.editionId === canonical.id) {
+    const retained = new Map(entries.map(item => [item.entryId, item]));
+    for (const item of previousOverlay.entries || []) {
+      if (canonicalOrder.has(item.entryId)) retained.set(item.entryId, item);
+    }
+    entries = [...retained.values()].sort((left, right) => canonicalOrder.get(left.entryId) - canonicalOrder.get(right.entryId));
+  }
   return finalizeEnglishOverlay(canonical, {
-    archiveTitle: draft.archiveTitle,
+    archiveTitle: preservePublished && previousOverlay?.editionId === canonical.id ? previousOverlay.archiveTitle : draft.archiveTitle,
     entries,
     upcoming: buildUpcomingOverlay(canonical, draft, previousOverlay),
     sourceReport: draft.sourceReport,
   });
 }
 
-export function buildEnglishRepairOverlay({ canonical, draft }) {
+export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentation = null }) {
   if (!draft || draft.schemaVersion !== 1 || draft.locale !== "en" || draft.editionId !== canonical?.id) {
     return {
       status: "unavailable",
@@ -151,7 +172,8 @@ export function buildEnglishRepairOverlay({ canonical, draft }) {
       errors: ["locale repair identity does not match Canonical edition"],
     };
   }
-  const entries = (draft.entries || []).map((item) => ({
+  const retained = retainedPresentation?.editionId === canonical.id ? new Map((retainedPresentation.entries || []).map(item => [item.entryId, item])) : new Map();
+  const entries = (draft.entries || []).map((item) => retained.get(item.entryId) || item).map((item) => ({
     entryId: item.entryId,
     headline: item.headline,
     summary: item.summary,
@@ -174,7 +196,7 @@ export function buildEnglishRepairOverlay({ canonical, draft }) {
     ...(cleanOptional(item.coverAlt) ? { coverAlt: cleanOptional(item.coverAlt) } : {}),
   }));
   const result = finalizeEnglishOverlay(canonical, {
-    archiveTitle: draft.archiveTitle,
+    archiveTitle: retainedPresentation?.editionId === canonical.id ? retainedPresentation.archiveTitle : draft.archiveTitle,
     entries,
     upcoming,
     sourceReport: draft.sourceReport,

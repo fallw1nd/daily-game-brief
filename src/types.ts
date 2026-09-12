@@ -21,6 +21,8 @@ export interface GameTitle {
   edition_zh?: string;
 }
 export interface BriefEntry {
+  showcaseRefs?: { showcaseId: string; announcementId: string; factIds?: string[] }[];
+  showcaseBrief?: boolean;
   id: string; section: SectionKey; title: GameTitle; headline: string; summary: string; beijingTime: string; timeEvidenceAt?: string; timeNote: string;
   fact_status: FactStatus; time_status: TimeStatus; entry_flags: EntryFlag[]; platforms: string[]; region: string; releaseType?: string; sources: SourceLink[];
   verification: string; tracking?: boolean; sharedFactFrameDigest?: string; imageSeed: string; images?: ImageAsset[]; image_status?: ImageAvailabilityStatus; imageNote?: string;
@@ -31,6 +33,7 @@ export interface UpcomingEntry {
 }
 export interface SourceReport { checked: string[]; limited: string[]; note: string; }
 export interface BriefEdition {
+  showcases?: { id: string; title: string; titleEn: string; status: "complete" | "partial"; total: number; covered: number; entryIds: string[] }[];
   schemaVersion?: 1 | 2; archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: EditionPeriod; plannedAt: string;
   generatedAt: string; windowStart: string; windowEnd: string; timezone: "Asia/Shanghai"; nextEditionAt: string; revised: boolean; entries: BriefEntry[];
   upcoming: UpcomingEntry[]; tracking: string[]; sourceReport?: SourceReport;

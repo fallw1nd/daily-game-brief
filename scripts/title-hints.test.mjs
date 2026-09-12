@@ -8,7 +8,7 @@ function pkg(subjectKey, eventKind = "announcement") {
 function source(url, pageText, extra = {}) {
   return {
     url,
-    pageText,
+    pageText: `${pageText} Unregistered Example Game`,
     label: extra.label || new URL(url).hostname,
     pageTitle: extra.pageTitle || "",
     excerpt: extra.excerpt || "",
@@ -16,6 +16,16 @@ function source(url, pageText, extra = {}) {
 }
 
 describe("title hint subject selection", () => {
+  it("deduplicates stable identities and punctuation variants without dropping sequels", () => {
+    expect(selectTitleHintSubjects({ packages: [
+      pkg("Fire Emblem: Fortune’s Weave"),
+      pkg("Fire Emblem: Fortune's Weave"),
+      pkg("LEGO® Batman™: Legacy of the Dark Knight"),
+      { ...pkg("未登録タイトル"), titleKey: "fable" },
+      pkg("Unregistered Example: Game"), pkg("Unregistered Example – Game"),
+      pkg("Unregistered Example: Game 2"),
+    ] }).map(item => item.subjectKey)).toEqual(["Unregistered Example: Game", "Unregistered Example: Game 2"]);
+  });
   it("does not search titles already registered, including the 2026-08-28 regressions", () => {
     const evidence = {
       packages: [
@@ -30,7 +40,7 @@ describe("title hint subject selection", () => {
     expect(selectTitleHintSubjects(evidence)).toEqual([]);
   });
 
-  it("selects only unique unregistered English game subjects and ignores company subjects", () => {
+  it("selects unique unregistered subjects and keeps institutions distinct", () => {
     const evidence = {
       packages: [
         pkg("Unregistered Example Game"),
@@ -46,6 +56,14 @@ describe("title hint subject selection", () => {
         titleKey: "unregistered-example-game",
         headline: "Unregistered Example Game test event",
         eventKind: "announcement",
+        subjectType: "game",
+      },
+      {
+        subjectKey: "Example Holdings",
+        titleKey: "example-holdings",
+        headline: "Example Holdings test event",
+        eventKind: "company",
+        subjectType: "entity",
       },
     ]);
   });
@@ -59,12 +77,12 @@ describe("title hint candidate verification", () => {
       titleZhCn: "示例游戏",
       suggestedStatus: "official_simplified",
       reason: "Official store page uses this title.",
-    }, [source("https://store.example.com/game", `${"页面前文。".repeat(80)}欢迎来到《示例游戏》的官方页面。`)]);
+    }, [source("https://store.steampowered.com/app/999/?l=schinese", `${"页面前文。".repeat(80)}欢迎来到《示例游戏》的官方页面。`)]);
 
     expect(hint).toMatchObject({
       titleZhCn: "示例游戏",
       suggestedStatus: "official_simplified",
-      sources: [{ hostname: "store.example.com" }],
+      sources: [{ hostname: "store.steampowered.com" }],
     });
     expect(hint.sources[0]).not.toHaveProperty("pageText");
     expect(hint.sources[0].excerpt).toContain("示例游戏");
@@ -79,13 +97,13 @@ describe("title hint candidate verification", () => {
     };
 
     expect(validateTitleHintCandidate(subject, candidate, [
-      source("https://media-a.example/game", "我们称本作为《示例译名》。"),
-      source("https://media-a.example/preview", "《示例译名》试玩。"),
+      source("https://gamersky.com/game", "我们称本作为《示例译名》。"),
+      source("https://gamersky.com/preview", "《示例译名》试玩。"),
     ])).toBeNull();
 
     expect(validateTitleHintCandidate(subject, candidate, [
-      source("https://media-a.example/game", "我们称本作为《示例译名》。"),
-      source("https://media-b.example/preview", "《示例译名》试玩。"),
+      source("https://gamersky.com/game", "我们称本作为《示例译名》。"),
+      source("https://3dmgame.com/preview", "《示例译名》试玩。"),
     ])).toMatchObject({ titleZhCn: "示例译名", suggestedStatus: "common_translation" });
   });
 
@@ -93,28 +111,28 @@ describe("title hint candidate verification", () => {
     expect(validateTitleHintCandidate(subject, {
       titleZhCn: "凭空译名",
       suggestedStatus: "official_simplified",
-    }, [source("https://store.example.com/game", "This page never contains the proposed Chinese title.")])).toBeNull();
+    }, [source("https://store.steampowered.com/app/999/?l=schinese", "This page never contains the proposed Chinese title.")])).toBeNull();
 
     expect(validateTitleHintCandidate(subject, {
       titleZhCn: "Example Game",
       suggestedStatus: "official_simplified",
-    }, [source("https://store.example.com/game", "Example Game")])).toBeNull();
+    }, [source("https://store.steampowered.com/app/999/?l=schinese", "Example Game")])).toBeNull();
 
     expect(validateTitleHintCandidate(subject, {
       titleZhCn: "示例游戏",
       suggestedStatus: "machine_translation",
-    }, [source("https://store.example.com/game", "示例游戏")])).toBeNull();
+    }, [source("https://store.steampowered.com/app/999/?l=schinese", "示例游戏")])).toBeNull();
   });
 
   it.each([
-    ["Gravhounds", "重力猎犬", "common_translation", ["https://media-a.example/gravhounds", "https://media-b.example/gravhounds"]],
-    ["Militsioner", "警目如炬", "official_simplified", ["https://store.example.com/militsioner"]],
-    ["Whisper of the House", "呓语小镇", "official_simplified", ["https://store.example.com/whisper"]],
-    ["FOUNTAINS", "永泉传说", "official_simplified", ["https://store.example.com/fountains"]],
-    ["FINAL FANTASY VII EVER CRISIS", "最终幻想7：永恒危机", "official_simplified", ["https://store.example.com/ff7ec"]],
+    ["Gravhounds", "重力猎犬", "common_translation", ["https://gamersky.com/gravhounds", "https://3dmgame.com/gravhounds"]],
+    ["Militsioner", "警目如炬", "official_simplified", ["https://store.steampowered.com/militsioner?l=schinese"]],
+    ["Whisper of the House", "呓语小镇", "official_simplified", ["https://store.steampowered.com/whisper?l=schinese"]],
+    ["FOUNTAINS", "永泉传说", "official_simplified", ["https://store.steampowered.com/fountains?l=schinese"]],
+    ["FINAL FANTASY VII EVER CRISIS", "最终幻想7：永恒危机", "official_simplified", ["https://store.steampowered.com/ff7ec?l=schinese"]],
   ])("validates known regression evidence for %s", (subjectKey, titleZhCn, suggestedStatus, urls) => {
     const knownSubject = { subjectKey, titleKey: subjectKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") };
-    const verified = urls.map((url) => source(url, `页面明确使用《${titleZhCn}》作为作品名称。`));
+    const verified = urls.map((url) => source(url, `${subjectKey} 页面明确使用《${titleZhCn}》作为作品名称。`));
     expect(validateTitleHintCandidate(knownSubject, {
       titleZhCn,
       suggestedStatus,

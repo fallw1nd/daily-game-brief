@@ -46,7 +46,9 @@ describe("final editorial packet workflow", () => {
     expect(hintIndex).toBeGreaterThan(evidenceIndex);
     expect(editorialIndex).toBeGreaterThan(hintIndex);
     expect(workflow).toContain('DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}');
-    expect(workflow).toContain("run: node scripts/build-title-hints.mjs");
+    expect(workflow).toContain("node scripts/build-title-hints.mjs");
+    expect(workflow.indexOf("node scripts/discover-release-calendar.mjs")).toBeLessThan(workflow.indexOf("node scripts/build-title-hints.mjs"));
+    expect(workflow).toContain("REUSE_RELEASE_CALENDAR_REPORT: 'true'");
     expect(workflow).toContain("artifacts/title-hints.json");
     expect(workflow).toContain("Title hint sources are naming evidence only");
   });

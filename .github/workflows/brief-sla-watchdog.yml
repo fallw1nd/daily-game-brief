@@ -118,19 +118,24 @@ jobs:
           fi
 
       - name: Install packet recovery dependencies
-        if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'
         run: npm ci
 
       - name: Rebuild a missing, stale, or invalid packet
         id: recovery
         if: steps.sla.outputs.status != 'healthy' && steps.packet.outputs.available != 'true'
         continue-on-error: true
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         shell: bash
         run: |
           BRIEF_NOW="${{ steps.edition.outputs.reference_now }}" node scripts/collect-news.mjs --period=${{ steps.edition.outputs.period }}
           node scripts/update-event-ledger.mjs
           node scripts/build-evidence.mjs
-          node scripts/editorialize.mjs
+          git show origin/automation/state:automation/ledger/title-lookups.json > artifacts/title-lookup-cache.json 2>/dev/null || echo '{"schemaVersion":1,"records":{},"pending":[]}' > artifacts/title-lookup-cache.json
+          node scripts/collect-showcases.mjs
+          node scripts/discover-release-calendar.mjs
+          node scripts/build-title-hints.mjs
+          REUSE_RELEASE_CALENDAR_REPORT=true node scripts/editorialize.mjs
           node scripts/validate-editorial-packet.mjs \
             --edition=${{ steps.sla.outputs.expected }} \
             --period=${{ steps.edition.outputs.period }}
@@ -144,6 +149,8 @@ jobs:
           ledger="$RUNNER_TEMP/event-ledger.json"
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
+          cp artifacts/title-lookup-cache.json "$RUNNER_TEMP/title-lookups.json"
+          cp -R artifacts/editorial-batches "$RUNNER_TEMP/sla-editorial-batches"
           edition_id="${{ steps.edition.outputs.edition }}"
           period="${{ steps.edition.outputs.period }}"
           success=false
@@ -155,6 +162,9 @@ jobs:
             cp "$packet" "$state_dir/automation/packets/$edition_id.json"
             cp "$packet" "$state_dir/automation/packets/latest-$period.json"
             cp "$ledger" "$state_dir/automation/ledger/events.json"
+            cp "$RUNNER_TEMP/title-lookups.json" "$state_dir/automation/ledger/title-lookups.json"
+            mkdir -p "$state_dir/automation/batches/$edition_id"
+            cp "$RUNNER_TEMP/sla-editorial-batches/"*.json "$state_dir/automation/batches/$edition_id/"
             node scripts/record-edition-state.mjs \
               --state-root="$state_dir" \
               --edition="$edition_id" \
@@ -163,7 +173,7 @@ jobs:
               --run-id="${{ github.run_id }}"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
-            git -C "$state_dir" add automation/packets automation/ledger/events.json "automation/status/$edition_id.json"
+            git -C "$state_dir" add automation/packets automation/batches automation/ledger/events.json automation/ledger/title-lookups.json "automation/status/$edition_id.json"
             if git -C "$state_dir" diff --cached --quiet; then
               success=true
             else
@@ -321,6 +331,12 @@ jobs:
             gh issue close "$number" --comment "The archive and deployed manifest now contain ${{ steps.sla.outputs.expected }}."
           fi
 
+      - name: Advance due showcase supplements without extra scheduled runs
+        id: showcase_recovery
+        if: success()
+        continue-on-error: true
+        run: bash scripts/update-showcase-queue-branch.sh
+
       - name: Write SLA summary
         if: always()
         shell: bash
@@ -340,6 +356,7 @@ jobs:
             echo "- Degraded fallback published: ${{ steps.fallback.outputs.published || 'false' }}"
             echo "- Pages re-dispatched: ${{ steps.fallback.outputs.deploy_retriggered || 'false' }}"
             echo "- Ledger feedback: ${{ steps.ledger_feedback.outcome || 'not run' }}"
+            echo "- Showcase recovery: ${{ steps.showcase_recovery.outcome || 'not run' }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage audit
