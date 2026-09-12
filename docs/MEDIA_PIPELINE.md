@@ -2,7 +2,9 @@
 
 The media pipeline enriches an edition after Canonical publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and publishes the validated data and files directly to `main`. It then dispatches the normal Pages deployment.
 
-For the future Daily cadence, Canonical publication is intentionally scheduled ahead of the 12:00 public release so exact-edition media enrichment can run in the staging interval. Daily evidence closes at 10:10, the editorial handoff runs at 10:20, Canonical SLA recovery is 11:00, scheduled media recovery is 11:10, and Pages holds the Daily deployment until `plannedAt=12:00`. This timing is precutover-only until formal production authorization; legacy AM/PM schedules remain active meanwhile.
+Daily is active. Publication triggers exact-edition media enrichment; Pages holds release until `plannedAt=12:00`. Current editorial and recovery times are defined in `docs/SCHEDULED_TASK_PROMPT.md` and the workflows, not legacy AM/PM migration notes.
+
+Store verified WebP/JPEG assets preferably below 500 KB in `public/media/briefs/YYYY/MM/<edition-id>/`. New v2 media requires meaningful Chinese alt, credit, HTTPS sourceUrl, kind and the verified aspect when supplied; otherwise use image_status/cover_status=unavailable with a specific reason.
 
 ## Cover priority
 

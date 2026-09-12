@@ -44,7 +44,7 @@ describe("Daily scheduled-task orchestration contract", () => {
   });
 
   it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
-    expect(contract).toContain("three bounded checks in order: current Canonical editorial work first, then current Daily liveness wake, then at most one published English repair");
+    expect(contract).toContain("Priority is Canonical editorial work, current Daily liveness wake, ready showcase_completion, then at most one English repair");
     expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
     expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
@@ -75,8 +75,8 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("omit `locales.en`");
   });
 
-  it("requires a validator-shaped pre-submit self-check", () => {
-    expect(contract).toContain("Before committing, self-check every include against the immutable packet");
+  it("keeps the evidence frame and targeted validation repairs", () => {
+    expect(contract).toContain("Check includes against the immutable packet when drafting");
     expect(contract).toContain("`sharedFactFrame.subjectTitleKey`");
     expect(contract).toContain("`sharedFactFrame.platforms`");
     expect(contract).toContain("must exactly match the Canonical title/platform decision");

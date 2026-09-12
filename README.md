@@ -11,4 +11,4 @@ npm install
 npm run dev
 ```
 
-Run `npm run check` before submitting changes. Product data rules are documented in `AGENTS.md`; the visual system is documented in `DESIGN.md`.
+Use `AGENTS.md` for validation scope and product boundaries. Current UI guidance is in `docs/VISUAL_GUIDELINES.md`; `DESIGN.md` documents the classic view.

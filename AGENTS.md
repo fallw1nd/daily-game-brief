@@ -1,39 +1,29 @@
-# Repository Guidelines
+# Project guidance
 
-## Project Structure & Commands
+Vite/React/TypeScript game-news site. Production is `main`; UI is in `src/`, data in `public/data/`, automation in `scripts/` and `.github/workflows/`. Follow nearby code conventions and preserve public field names.
 
-The site is a Vite, React, and TypeScript application. UI code lives in `src/`, production data in `public/data/`, helpers and tests in `src/lib/`, automation scripts in `scripts/`, and contributor documentation at the root or in `docs/`. Run `npm install` once, `npm run dev` locally, `npm test` for Vitest, `npm run typecheck` for strict TypeScript, `npm run validate:data` for archive integrity, and `npm run check` before every push.
+## Working and verification
 
-## Code, Tests & Reviews
+Complete authorized work through verification. Decide routine details independently; clarify only material scope or risk. Load skills for the relevant workflow, not keyword matches; explicit user choices and project requirements override generic recipes.
 
-Use two-space indentation. Name components and types in `PascalCase`, functions and variables in `camelCase`, and routes/assets in `kebab-case`. Preserve boundary fields such as `fact_status`, `time_status`, and `title_key`. Tests must cover Beijing-time windows, continuous issue numbering, adjacent-edition deduplication, title/source rules, append-only archives, keyboard focus, reduced motion, WCAG AA contrast, and 390px layouts. Use Conventional Commits, for example `feat(brief): add evening window calculation`. PRs must state verification commands, schema impact, archive checks, linked issues, and responsive screenshots for UI work.
+Use `package.json` for commands. Run affected checks during development. Before publishing changes to code, data, workflows or machine-consumed editorial instructions, run `npm run check` once on the final implementation. Reuse passing results when only explanatory documentation changes; rerun affected checks for subsequent functional changes or failures. Do not add tests that merely restate the implementation. Keep existing CI and production validation intact.
 
-默认不新增 hash、冻结 contract、baseline 或 gate。只有能说明一个具体失败场景，并说明 Git、版本号、主键、事务、唯一约束、类型和普通测试为什么不足时，才允许加入。不要为了简化而删除已有安全措施。门禁只放在不可逆、跨系统、安全或正式发布边界。前置检查不得挤掉真正的代码执行、模拟或测量。
+Use Conventional Commits; PRs include relevant validation and schema/archive impact. Update the matching `docs/MAINTENANCE_LOG.md` entry for persistent reliability, quality or cost problems; retain history, evidence and closure criteria. Do not turn routine edits into new rules or maintenance work.
 
-## Content & Source Rules
+Prefer existing types, keys, transactions and tests. Add a new hash, frozen contract, baseline or gate only for a demonstrated failure those mechanisms cannot address; preserve existing safeguards. Formal gates belong at publication, security or cross-system boundaries.
 
-Use `Asia/Shanghai` and scheduled—not actual—run times. Never mark an item `official` without opening a primary source, machine-translate game titles, renumber issues, or delete historical editions. Keep rumors structurally distinct and preserve uncertainty in display copy. For UI work only, read `docs/VISUAL_GUIDELINES.md` and `docs/READING_SAMPLE.md`; use the accepted implementation as the current reference.
+## Editorial boundaries
 
-Production is Daily (`YYYY-MM-DD-daily`): Asia/Shanghai evidence window `(previous day 10:10, current day 10:10]`, planned publication 12:00. Never extend the window into production time. Historical AM/PM and the one-time 2026-08-31 migration bridge remain immutable; exact orchestration and bridge are in `docs/SCHEDULED_TASK_PROMPT.md`.
+- Production uses Daily editions: `Asia/Shanghai`, `(previous day 10:10, current day 10:10]`, planned publication 12:00. Preserve packet identity, fixed windows, continuous issue numbers and historical archives. Historical title corrections require explicit user authorization; use the established revision flow.
+- News facts must stay within the acknowledged evidence packet. `official` requires an opened primary source; rumors retain their distinct status and uncertainty. Calendar research and terminology lookups have only the exceptions defined in the editorial contract.
+- User-specified names take priority. Otherwise use verified mainland Simplified Chinese terminology when available; accepted community names are `common_translation`. Never machine-translate game names or invent identities. Reuse the title registry and verified hints before searching; terminology research cannot add event facts.
+- Headlines name their confirmed subject. Archive and manifest share a distinctive period-prefixed `archiveTitle` and valid `leadEntryId`.
+- Each new story/calendar item needs verified media or a specific unavailable reason. Keep meaningful Chinese alt, credit, HTTPS source page and kind; no unrelated art. News is 16:9; covers retain their verified ratio and hide visible credit captions. Source preference and file conventions: `docs/MEDIA_PIPELINE.md`.
 
-A broadly used community or playful Chinese name may be selected when found on the open web; mark it `common_translation`, never official.
+## Read when relevant
 
-Use official mainland Simplified Chinese terminology for titles, versions, characters, classes, modes and mechanics when available. Naming-only lookups may normalize existing terms, never add facts, times, platforms, release claims, source status, tracking decisions or candidates.
+- Scheduled editing/publication: `docs/SCHEDULED_TASK_PROMPT.md`; pipeline/state changes: `docs/DATA_PIPELINE.md` and `docs/AUTOMATION_ARCHITECTURE.md`.
+- Showcase supplementation: `docs/SHOWCASE_RECOVERY.md`; release-calendar discovery: `docs/RELEASE_CALENDAR.md`.
+- UI: `docs/VISUAL_GUIDELINES.md` and the relevant section of `docs/READING_SAMPLE.md`. The accepted ReadingApp is the default reference; use Phosphor icons. Preserve keyboard access, reduced motion, AA contrast and usable 390px layouts. Do not use the Windows browser sandbox for visual QA; provide a focused manual checklist for affected layouts/themes, wrapping, focus and content.
 
-Every edition needs a distinctive period-prefixed `archiveTitle` and valid `leadEntryId`; archive and manifest must agree. Historical title corrections require explicit approval.
-
-## Editorial Media Contract
-
-Each new v2 story and upcoming game must provide verified media or an explicit unavailable reason. Use `images`/`cover` only with meaningful Chinese `alt`, `credit`, HTTPS `sourceUrl`, `kind`, and an optional `aspect`; otherwise set `image_status`/`cover_status` to `unavailable` with a specific note. Never force an unrelated image. Prefer traceable WebP/JPEG files below 500 KB under `public/media/briefs/YYYY/MM/<edition-id>/`. Keep news at 16:9. For covers prefer PSN Hong Kong square, Nintendo eShop Japan square, then Xbox Store rectangle; preserve the verified source ratio as `square`, `portrait`, or `landscape`.
-
-Storefronts are preferred discovery sources, not shape requirements. After listed sources fail, use configured web image search and accept square, portrait, or landscape covers when the game match and source page are clear. Keep cover credit and `sourceUrl` in data, but do not render a visible source caption on cover art.
-
-## Maintenance Ledger
-
-Use `docs/MAINTENANCE_LOG.md` as the append-only operational improvement ledger. When production behavior, Actions/log review, editorial review, or code inspection reveals a persistent reliability bug, data-quality gap, recurring manual burden, cost issue, or misleading observability, add or update a `MNT-*` entry with discovery date, priority, evidence, status, bounded resolution, objective close criteria, and relevant issue/PR/run links.
-
-Do not delete resolved entries or open duplicate entries for the same root cause. A fix PR must reference the existing maintenance entry and, after merge, update that same entry with the resolution and verification evidence. Code written or a PR merged is not sufficient to mark an issue `resolved`; the entry's stated close criteria must be satisfied.
-
-## Visual Acceptance
-
-Do not use the Windows browser sandbox for visual QA. Still run data, type, test, and build checks. Hand UI and design changes to the user with a precise checklist covering desktop/narrow layouts, both themes, hierarchy, wrapping, focus states, and content accuracy. Verified media assets follow the automated Editorial Media Contract above.
+These are task-specific references, not a mandatory reading list for every edit. Historical design/migration notes and bundled example skills do not override current production guidance.

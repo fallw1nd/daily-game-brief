@@ -572,3 +572,11 @@
 - [正式编辑恢复 34681626704](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681626704) 成功通过原始 packet、状态、编辑、数据和英文校验，发布 NO.033（`1c675f0`）。已提交编辑稿留存在 `automation/editorial/2026-09-12-daily`，提交 `8471b15`，其他待核验项通过既有反馈流程保留。
 - [媒体处理 34681676717](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681676717) 成功添加4张核验图；[最终 Pages 34681720093](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681720093) 部署 `aef74d4` 成功。线上最新期为 2026-09-12-daily，中文4条、英文4条、日历6项；窗口仍为(9月11日10:10,9月12日10:10]，图片后首页数据与生产文件一致。
 - 此次手动恢复成功不证明定时编辑已恢复：下一自然期次的双次调用和无人工介入发布仍待核验，继续 in_progress。发布会全量验收、合格译名自动采用亦未完成，不能以本次4条补发替代验收。
+
+## MNT-20260912-01 — 陈旧入口规则与重复验证增加上下文和操作成本
+
+- **Priority / status:** P2 / in_progress.
+- **Evidence:** 工作区根 AGENTS 仍强制 gpt-taste，生产已使用 ReadingApp；媒体补充提示仍要求追加早晚任务；编辑契约对发布会和英文修复顺序存在冲突；每次 push 全量检查会重复验证纯日志更新。
+- **Resolution:** 按官方 Astra guidance 和 Eric Provencher 实践建议精简入口、按需读资料、复用有效校验，修正旧文档和路由，保留生产安全边界。详见 docs/ASTRA_INSTRUCTION_REVIEW.md。
+- **Close criteria:** 契约回归和完整检查通过，生产分支更新；后续自然编辑任务验证选择顺序与完整提交，记录实际调用成本后再关闭。文档缩短不等于已证明费用下降。
+- **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.

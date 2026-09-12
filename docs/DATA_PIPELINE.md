@@ -32,7 +32,7 @@ The fixed evidence windows are:
 
 - AM: previous day 17:00 **exclusive** → current day 10:10 **inclusive**; `plannedAt` 10:10;
 - PM: current day 10:10 **exclusive** → current day 17:00 **inclusive**; `plannedAt` 17:00;
-- Daily, once formally activated: previous day 10:10 **exclusive** → current day 10:10 **inclusive**; `plannedAt` 12:00.
+- Daily (active production): previous day 10:10 **exclusive** → current day 10:10 **inclusive**; `plannedAt` 12:00.
 
 For Daily, `windowEnd` and `plannedAt` are intentionally different. `windowEnd=10:10` is the immutable evidence cutoff and packet start. `plannedAt=12:00` is the public release target. Information first published after 10:10 cannot be pulled backward into that day's Daily even if it is discovered while editorial or media processing is still underway.
 
