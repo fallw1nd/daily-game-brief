@@ -584,7 +584,10 @@
 
 ## MNT-20260912-02 — 历史降级稿正式修订被跳过且重新抓取丢失旧证据
 
-- **Priority / status:** P1 / in_progress.
+- **Priority / status:** P1 / resolved.
 - **Evidence:** NO.032仍为7条自动事实清单；publisher只对showcase历史补齐选择目标归档，普通历史修订返回already-exists。重新抓取34686454386未保留原已刊Layton报道。
 - **Resolution:** 所有已授权历史修订选择目标归档并保留latest；显式revision wake可固定到本期历史已ack的packet SHA，经窗口、状态及原有校验后由GitHub重新ack，避免来源列表漂移。
 - **Close criteria:** 跨期/未ack/已消费packet回归通过；NO.032原7条正式中英文稿发布，latest仍为NO.033，期号窗口与其他归档不变，Pages实际验证。
+
+- **Verified 2026-09-12:** [PR #126](https://github.com/fallw1nd/daily-game-brief/pull/126) merged as `1b7b350`; 389 tests, 33 archives, locale checks and build passed. Real isolated publication preserved all 7 original entry IDs, 6 calendar items, issue/window, latest.json and other archives; both languages passed validation.
+- **Production:** [Pinned evidence 34686744599](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686744599) restored original acknowledged blob `a7f9035`; [trusted publication 34686797086](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686797086) published `eddc154`; [Pages 34686853796](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686853796) and [media 34686854912](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686854912) succeeded. Live Chinese/English NO.032 returned HTTP 200 with 7 formal entries and no fallback headlines; latest remains NO.033. Broader showcase coverage work remains separately open.
