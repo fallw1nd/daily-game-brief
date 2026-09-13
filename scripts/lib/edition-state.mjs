@@ -246,7 +246,13 @@ export function applyEditionStateEvent(current, event, data = {}) {
     if (state.revisionRequest?.status === "open") {
       state.revisionRequest = { ...state.revisionRequest, status: "completed", completedAt: at };
     }
-    return record(state, event, at, actor, runId, { mainSha: data.mainSha, source });
+    return record(state, event, at, actor, runId, {
+      mainSha: data.mainSha,
+      source,
+      ...(data.decisionDigest ? { decisionDigest: data.decisionDigest } : {}),
+      ...(data.packetBlobSha ? { packetBlobSha: data.packetBlobSha } : {}),
+      ...(data.submissionSha ? { submissionSha: data.submissionSha } : {}),
+    });
   }
   if (event === "publication-failed") {
     if (state.publication.status === "committed") return state;

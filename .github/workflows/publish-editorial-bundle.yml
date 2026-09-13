@@ -1,0 +1,120 @@
+name: Publish bounded editorial bundle
+
+on:
+  push:
+    branches:
+      - "automation/editorial/**"
+    paths:
+      - "automation/bundle-inbox/*.json"
+  workflow_dispatch:
+    inputs:
+      edition_id:
+        description: Exact edition ID whose bounded bundle should be resumed
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: editorial-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout trusted publisher from main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve ordered packet candidates from durable state
+        id: resolve
+        env:
+          DISPATCH_EDITION_ID: ${{ inputs.edition_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            edition="${DISPATCH_EDITION_ID:-}"
+            branch="automation/editorial/$edition"
+          else
+            branch="$GITHUB_REF_NAME"
+            if [[ ! "$branch" =~ ^automation/editorial/([0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily))$ ]]; then
+              echo "Invalid editorial bundle branch: $branch" >&2
+              exit 1
+            fi
+            edition="${BASH_REMATCH[1]}"
+          fi
+          if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily)$ ]]; then
+            echo "Invalid editorial bundle edition: $edition" >&2
+            exit 1
+          fi
+          mkdir -p artifacts
+          git fetch origin "$branch:refs/remotes/origin/$branch"
+          git show "refs/remotes/origin/$branch:automation/bundle-inbox/$edition.json" > artifacts/editorial-bundle.json
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+          state_dir="$RUNNER_TEMP/editorial-bundle-state"
+          git worktree add --detach "$state_dir" origin/automation/state
+          trap 'git worktree remove --force "$state_dir"' EXIT
+          EDITORIAL_BRANCH="$branch" EDITORIAL_STATE_ROOT="$state_dir" EDITORIAL_BUNDLE_PATH=artifacts/editorial-bundle.json EDITORIAL_BUNDLE_PLAN_PATH=artifacts/editorial-bundle-plan.json EDITORIAL_BUNDLE_PACKET_DIR=artifacts/editorial-bundle-packets node scripts/prepare-editorial-bundle.mjs
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Publish ordered bundle serially
+        id: bundle
+        env:
+          EDITORIAL_BRANCH: ${{ steps.resolve.outputs.branch }}
+          EDITORIAL_BUNDLE_PLAN_PATH: artifacts/editorial-bundle-plan.json
+          EDITORIAL_BUNDLE_PACKET_DIR: artifacts/editorial-bundle-packets
+          EDITORIAL_BUNDLE_RESULT_PATH: artifacts/editorial-bundle-result.json
+          EDITORIAL_BUNDLE_MAX_MS: 720000
+          # The serial runner advances the durable queue with --no-refresh-sources.
+        run: node scripts/run-editorial-bundle.mjs
+
+      - name: Upload bundle audit
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: editorial-bundle-${{ github.run_id }}
+          path: artifacts/editorial-bundle*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Trigger Pages deployment
+        if: always() && steps.bundle.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main
+
+      - name: Trigger edition-specific media workflow
+        if: always() && steps.bundle.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.bundle.outputs.edition }}
+
+      - name: Summarize bundle publication
+        if: always()
+        run: |
+          {
+            echo "## Editorial bundle publication"
+            echo "- Edition: ${{ steps.bundle.outputs.edition || 'unresolved' }}"
+            echo "- Canonical/data changed: ${{ steps.bundle.outputs.changed || 'false' }}"
+            echo "- Publication status: ${{ steps.bundle.outputs.publication_status || 'unresolved' }}"
+            echo "- Main commit: ${{ steps.bundle.outputs.main_sha || 'unchanged' }}"
+            echo "- Elapsed ms: ${{ steps.bundle.outputs.elapsed_ms || 'unresolved' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

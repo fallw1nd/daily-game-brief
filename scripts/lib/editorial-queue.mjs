@@ -66,20 +66,27 @@ function showcaseCoverage(queue, canonical) {
 }
 
 function nextBatch(queue, nowMs) {
-  // A bounded news continuation is part of the Canonical lane; it must not
-  // be delayed behind an older showcase supplement in the same queue.
-  const pending = queue.batches.find(batch => batch.scope === "news" && batch.status === "pending")
-    || queue.batches.find(batch => batch.status === "pending");
+  // News gets the first continuation turn, then a pending showcase gets the
+  // next turn when one exists. This keeps Canonical progress ahead of a
+  // showcase without allowing a sustained news backlog to starve it.
+  const newsFirst = Number(queue.newsSinceShowcase || 0) < 1;
+  const pendingNews = queue.batches.find(batch => batch.scope === "news" && batch.status === "pending");
+  const pendingShowcase = queue.batches.find(batch => batch.scope === "showcase" && batch.status === "pending");
+  const pending = newsFirst
+    ? pendingNews || pendingShowcase
+    : pendingShowcase || pendingNews;
   if (pending) return pending;
-  return queue.batches.find(batch => batch.scope === "news" && batch.status === "awaiting_retry" && showcaseRetryDue(
-    queue.firstPublishedAt,
-    batch.retryAttempts || 0,
-    nowMs,
-  )) || queue.batches.find(batch => batch.status === "awaiting_retry" && showcaseRetryDue(
+  const dueNews = queue.batches.find(batch => batch.scope === "news" && batch.status === "awaiting_retry" && showcaseRetryDue(
     queue.firstPublishedAt,
     batch.retryAttempts || 0,
     nowMs,
   ));
+  const dueShowcase = queue.batches.find(batch => batch.scope === "showcase" && batch.status === "awaiting_retry" && showcaseRetryDue(
+    queue.firstPublishedAt,
+    batch.retryAttempts || 0,
+    nowMs,
+  ));
+  return newsFirst ? dueNews || dueShowcase : dueShowcase || dueNews;
 }
 
 /**
@@ -149,6 +156,9 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, now = 
       at: now,
     });
   }
+  nextQueue.newsSinceShowcase = batch.scope === "showcase"
+    ? 0
+    : Math.min(1, Number(nextQueue.newsSinceShowcase || 0) + 1);
   nextState = applyEditionStateEvent(nextState, "packet-ready", {
     packetBlobSha: gitBlobSha(packetText),
     at: now,

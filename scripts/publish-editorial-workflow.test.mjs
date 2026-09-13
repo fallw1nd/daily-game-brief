@@ -10,6 +10,8 @@ describe("trusted bilingual publication workflow", () => {
     expect(workflow).toContain("- publish");
     expect(workflow).toContain("- locale-repair");
     expect(workflow).toContain('PUBLICATION_MODE: ${{ steps.submission.outputs.mode }}');
+    expect(workflow).toContain("decision_digest=");
+    expect(workflow).toContain('--decision-digest="${{ steps.publication.outputs.decision_digest }}"');
     expect(workflow).not.toContain("english-publisher");
   });
 

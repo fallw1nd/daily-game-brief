@@ -27,6 +27,7 @@ const packetBlobSha = argument("packet-blob-sha") || decision?.packetBlobSha || 
 const next = applyEditionStateEvent(current, event, {
   editionId, packetBlobSha, submissionSha: argument("submission-sha"), mainSha: argument("main-sha"),
   source: argument("source"), status: argument("status"), reason: argument("reason"), error: argument("error"),
+  decisionDigest: argument("decision-digest"),
   validationErrors: validation?.errors || [], runId: argument("run-id") || process.env.GITHUB_RUN_ID || null,
   actor: argument("actor") || "github-orchestrator", at: argument("at") || new Date().toISOString(),
 });

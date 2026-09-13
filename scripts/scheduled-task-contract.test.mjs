@@ -67,6 +67,18 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(architecture).toContain("Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions");
   });
 
+  it("bounds same-edition continuation bundles without letting the editor choose identities", () => {
+    expect(contract).toContain("up to two same-edition packets");
+    expect(contract).toContain("automation/bundle-inbox/<edition-id>.json");
+    expect(contract).toContain("preserve each resolved packet SHA, queue batch/event keys and per-packet limits");
+    expect(contract).toContain("unprocessed packets remain pending");
+    expect(contract).toContain("Never choose a Git blob or event identity yourself");
+    expect(architecture).toContain("same-edition bundle");
+    expect(architecture).toContain("120,000 serialized characters per packet");
+    expect(architecture).toContain("240,000 serialized characters per bundle");
+    expect(architecture).toContain("not a provider token or cost measurement");
+  });
+
   it("keeps editorial facts bounded while attempting English by default", () => {
     expect(contract).toContain("add nothing outside the packet");
     expect(contract).toContain("Follow live `AGENTS.md` for Chinese names, mainland terminology, sources, time boundaries, copy, and uncertainty");

@@ -209,6 +209,22 @@ describe("durable per-edition state machine", () => {
     expect(applyEditionStateEvent(published, "publication-committed", { mainSha, source: "editorial" })).toEqual(published);
   });
 
+  it("records the exact decision identity on a committed publication transition", () => {
+    const published = applyEditionStateEvent(validState(), "publication-committed", {
+      mainSha,
+      source: "editorial",
+      packetBlobSha: packetSha,
+      submissionSha,
+      decisionDigest: "4".repeat(64),
+    });
+    expect(published.transitions.at(-1)).toMatchObject({
+      event: "publication-committed",
+      packetBlobSha: packetSha,
+      submissionSha,
+      decisionDigest: "4".repeat(64),
+    });
+  });
+
   it("records publication failures and retry ownership", () => {
     const failed = applyEditionStateEvent(validState(), "publication-failed", { error: "push race" });
     expect(failed.publication).toMatchObject({ status: "failed", error: "push race" });

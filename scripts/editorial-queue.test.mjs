@@ -176,6 +176,23 @@ describe("durable editorial continuation queue", () => {
     expect(result.batch).toMatchObject({ name: "news-1.json", scope: "news" });
   });
 
+  it("reserves the next queue turn for showcase after one news activation", () => {
+    const input = queueFixture();
+    input.queue.batches = [
+      { name: "showcase-1.json", scope: "showcase", status: "pending", eventKeys: ["showcase-1"] },
+      ...input.queue.batches,
+    ];
+    input.packets["showcase-1.json"] = packet(["showcase-1"], "showcase");
+    const first = advanceEditorialQueue(input);
+    expect(first.batch).toMatchObject({ name: "news-1.json", scope: "news" });
+    expect(first.queue.newsSinceShowcase).toBe(1);
+
+    const completed = publishContinuation(first.state, first.packet, "6".repeat(40));
+    const second = advanceEditorialQueue({ ...input, queue: first.queue, state: completed, canonical: { id: editionId, entries: [] } });
+    expect(second.batch).toMatchObject({ name: "showcase-1.json", scope: "showcase" });
+    expect(second.queue.newsSinceShowcase).toBe(0);
+  });
+
   it("adds a different same-title fact but preserves an explicitly matched retry", () => {
     const existingEntry = {
       id: "2026-09-11-daily-news-0",
