@@ -1,0 +1,1096 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-13T02:21:29.255Z",
+  "finalizedAt": "2026-09-13T02:21:29.255Z",
+  "coverageThrough": "2026-09-13 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-13-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-13 12:00",
+      "windowStart": "2026-09-12 10:10",
+      "windowEnd": "2026-09-13 10:10"
+    },
+    "adjacentEdition": "2026-09-12-daily",
+    "packages": [
+      {
+        "eventKey": "ccb6dd2e074020023cba",
+        "eventKind": "dlc",
+        "subjectKey": "sonic-racing-crossworlds",
+        "subject": {
+          "kind": "game",
+          "key": "sonic-racing-crossworlds"
+        },
+        "publishability": "direct",
+        "headline": "A listing for Sonic Racing CrossWorlds Year One Edition has been spotted, suggesting a version with all DLC is coming",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/a-listing-for-sonic-racing-crossworlds-year-one-edition-has-been-spotted-suggesting-a-version-with-all-dlc-is-coming/",
+            "publishedAt": "2026-09-12T10:40:33+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2025/06/OwGj3xaA.jpeg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Year one’s paid DLC consisted of six crossover packs containing 18 extra racers…\nA listing for Sonic Racing CrossWorlds Year One Edition has been spotted, suggesting a version with all DLC is coming\nA listing for a potential special edition of Sonic Racing: Crossworlds has been spotted online.\nAs noticed by Sonic Stadium , Amazon UK is currently listing &#8216; Sonic Racing: CrossWorlds &#8211; Year One Edition&#8217;, suggesting a new release of the game with all paid DLC included.\nWhile Sonic Racing: Crossworlds launched with a Deluxe Edition which included access to all paid DLC as and when it was released, this was a digital-only version – all physical copies to date have only included the Standard Edition of the game.\nGiven that the standard, non-discounted price of Sonic Racing: CrossWorlds on the digital stores for PS5 , Xbox Series X/S and Switch 2 is £64.99, and that the Season Pass containing all DLC costs £24.99, this means if the £54.99 price remains unchanged players will be getting a saving of up to £34.99 on the price of the base game and Season Pass combined.\nYear One of Sonic Racing: Crossworlds&#8217; content consisted of six separate DLC packs, each containing a crossover with another IP with characters, vehicles, tracks and music from those brands.\nAs well as the paid characters, Sega has also released 12 free crossover racers, containing characters from other Sega IP. These have included Hatsune Miku, Joker from Persona, Ichiban Kasuga from Like a Dragon, NiGHTS, AiAi from Super Monkey Ball, Tangle and Whisper from the IDW Sonic comic book series, Red from Angry Birds, Goro Majima from Like a Dragon, Arle from Puyo Puyo, ‘Classic’ Sonic, Axel from Crazy Taxi and Amigo from Samba de Amigo.\nSega also confirmed during Summer Game Fest that Sonic Racing: CrossWorlds will be getting a Year 2 pass featuring six further DLC collaborations, revealing that the first two will be based on Godzilla and Evangelion.\nYear one&#8217;s paid DLC consisted of six crossover packs containing 18 extra racers\nThe listing, which lets customers pre-order it now on PS5 (no other versions have been added yet), says the game will cost £54.99 and will be released on November 3."
+          }
+        ]
+      },
+      {
+        "eventKey": "3830c8dc70b4ee3165ed",
+        "eventKind": "announcement",
+        "subjectKey": "楽園追放 心のレゾナンス",
+        "subject": {
+          "kind": "game",
+          "key": "楽園追放 心のレゾナンス"
+        },
+        "publishability": "direct",
+        "headline": "劇場アニメ『楽園追放 心のレゾナンス』劇場限定予告で「アンジェラ・バルザック」の登場が発表。「ガブリエル」のキャラクタービジュアルも公開",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260912o",
+            "publishedAt": "2026-09-12T10:00:30+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260912o",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/0658f2b36013400dd0ff7f2b690f5b2c.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "あわせて、NARASAKI氏監修による劇伴47曲が収録されたオリジナルサウンドトラックも発売決定。11月13日に全国公開予定\n劇場アニメ『楽園追放 心のレゾナンス』劇場限定予告で「アンジェラ・バルザック」の登場が発表。「ガブリエル」のキャラクタービジュアルも公開\n東映アニメーションは9月12日、劇場アニメ 『楽園追放 心のレゾナンス』 の劇場限定予告をWeb公開し、前作の主人公・アンジェラ・バルザックの登場を発表した。あわせて、キャラクタービジュアルやオリジナルサウンドトラックの情報も公開されている。\n『楽園追放 心のレゾナンス』は、2014年に公開された劇場アニメ 『楽園追放 -Expelled from Paradise-』 の続編となる。\n11/13(金)公開『楽園追放心のレゾナンス』 劇場限定予告でアンジェラ・バルザック登場発表! 5 日間連続!キャラクタービジュアル公開決定! 11/13 オリジナルサウンドトラック発売決定!\nこの度、『楽園追放心のレゾナンス』の最新情報が公開されました。\n2014 年 11 月 15 日(土)に劇場公開された『楽園追放 -Expelled from Paradise-』。虚淵玄(ニトロプラス)×水島精二による、初のオリジナル劇場作品にて、人類が肉体や地球を捨て、電脳世界ディーヴァで暮らすようになった⻄暦2400年を舞台に、壮大なSF的ビジョンと、目を見張るアクションが融合したフル 3DCG アニメは、圧倒的なセンスに最先端の映像美が交わり、大ヒットを記録する。2026 年には待望の次回作『楽園追放心のレゾナンス』が公開予定。水島精二監督のもと、脚本虚淵玄(ニトロプラス)、キャラクターデザイン齋藤将嗣、音楽の NARASAKI のメインスタッフ陣が再集結し、“その先の新たな物語”を描く。2026 年 11 月 13 日(金)全国でロードショー予定。\n本日、新情報発信番組「Aniplex One Focus 2026」にて、8 月 28 日(金)より全国の劇場内のみにて上映中の『楽園追放心のレゾナンス』の劇場限定予告映像が WEB 公開され、前作主人公「アンジェラ・バルザック」の登場が発表となりました。こちらの予告は、『劇場版魔法少女まどか☆マギカ〈ワルプルギスの廻天〉』と『楽園追放心のレゾナンス』の 2作品を上映予定の全国劇場(一部を除く)で公開中のもので、映像の終わりには声優を演じる釘宮理恵からのコメント映像も本番組で公開されました。釘宮からは「先日本アフレコも終えて、改めてこの役を演じることができて嬉しい」とコメントが寄せられました。果たして本作にどのようにアンジェラが関わっているのか、今後の続報にご期待下さい。\n2026 年 11 月 13 日(金)の劇場公開に向け、新情報が公開となった『楽園追放心のレゾナンス』。今後の展開にもぜひご期待ください。\n今回公開された映像は、8月28日より対象の劇場で上映されている劇場限定予告となっている。 「Aniplex One Focus 2026」 では、アンジェラ役を務める釘宮理恵さんのコメント映像も公開された。\n釘宮さんは本アフレコを終えたことを明かし、再びアンジェラを演じられたことへの喜びをコメントしている。\nまた、東映アニメーション描き下ろしによる全5種のキャラクタービジュアルが、9月12日から5日間連続で公開される。第1弾として主人公・ガブリエルのビジュアルが披露された。"
+          }
+        ]
+      },
+      {
+        "eventKey": "2358ce76341a9bbc5491",
+        "eventKind": "result",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Final Fantasy 14's funky new roguelike mode has me hyped for Evercold's combat revamp, which'll be a winner if it's even half as weird",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/mmo/final-fantasy-14s-funky-new-roguelike-mode-has-me-hyped-for-evercolds-combat-revamp-whichll-be-a-winner-if-its-even-half-as-weird/",
+            "publishedAt": "2026-09-12T15:20:20Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/mmo/final-fantasy-14s-funky-new-roguelike-mode-has-me-hyped-for-evercolds-combat-revamp-whichll-be-a-winner-if-its-even-half-as-weird/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/UJFsB4QP99i275JiPkYkoV-1920-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Who let the dogs out?\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nYour newsletter sign-up was successful\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "5f2b7f99980f17c9b08c",
+        "eventKind": "launch",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Wardogs sold over 1 million copies in its first 24 hours, making its launch a bright spot in an otherwise tough year for multiplayer shooters",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/fps/wardogs-sold-over-1-million-copies-in-its-first-24-hours-making-its-launch-a-bright-spot-in-an-otherwise-tough-year-for-multiplayer-shooters/",
+            "publishedAt": "2026-09-12T11:15:11Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/fps/wardogs-sold-over-1-million-copies-in-its-first-24-hours-making-its-launch-a-bright-spot-in-an-otherwise-tough-year-for-multiplayer-shooters/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/fQTD7bnbCRNeLVw7XcEoMZ-2560-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Hard cash.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nSubscribe for a weekly digest of the movie and TV news that matters, direct to your inbox. From first-look trailers, interviews, reviews and explainers, we've got you covered.\nWardogs sold over 1 million copies in its first 24 hours, making its launch a bright spot in an otherwise tough year for multiplayer shooters\nAll signs have pointed to Wardogs being a hit for a while now. Its beta weekend in August was rapturously received, with half a million players lining up to check out its prerelease playtest. When the game launched into early access last week, so many people rushed to get on board that it collapsed the game's servers .\nNow, developer Bulkhead has released its initial sales figures for Wardogs, and they are unsurprisingly very strong. The multiplayer FPS sold 1.25 million copies within 24 hours, and that number is likely to be much higher by now.\nBulkhead played it cool while announcing the milestone, simply thanking players and reassuring them that the studio is \"watching everything, monitoring servers, and enjoying watching you play\". That middle point is likely made in response to the flurry of negative reviews Wardogs received in the wake of its server troubles.\nIn March, Bungie released Marathon , which is one of my favourite games of this year and a real triumph of both art and game design. Yet despite its qualities, it's pretty clear that Marathon has not been the success that either Bungie or Sony hoped. Despite numerous experiments to revive the game's fortunes, its concurrent player numbers are now significantly lower than those of Destiny 2 &mdash;which Bungie rather suddenly wrapped development on earlier this year.\nAll of which makes it reassuring to see Wardogs rush out of the gate so strongly. As for the key to its success, I think it lies in the fact that, despite being a blend of ArmA and Battlefield , Wardogs is actually quite laissez-faire in how it lets you play. You're free to approach its massive 100-player battlefields however you like, and instead of forcing teams to work together, it incentivises cooperative play through using cash as a mechanic. You can offer monetary rewards to other players for all manner of different things, ranging from getting a helicopter ride into battle to bribing medics to revive you when downed .\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "4e095b493dca6d354665",
+        "eventKind": "other",
+        "subjectKey": "山食いドワーフ",
+        "subject": {
+          "kind": "game",
+          "key": "山食いドワーフ"
+        },
+        "publishability": "direct",
+        "headline": "「非常に好評」採掘インクリメンタル『山食いドワーフ』ついに日本語対応。ツルハシから“ジャイロコプター”まで総動員、あらゆる手段で山肌を削る",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260912-467031/",
+            "publishedAt": "2026-09-12T05:21:48+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260912-467031/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260912-467031-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Green Wizardは9月12日、『山食いドワーフ』について日本語および韓国語表示に対応するアップデートを配信した。本作はドワーフたちを率いて山を掘り崩し、黄金を集めて勢力を拡大していく採掘インクリメンタルゲームだ。\n「非常に好評」採掘インクリメンタル『山食いドワーフ』ついに日本語対応。ツルハシから“ジャイロコプター”まで総動員、あらゆる手段で山肌を削る\nデベロッパーのGreen Wizardは9月12日、『 山食いドワーフ 』向けアップデートv1.5.0を配信し、日本語および韓国語表示に対応した。対応プラットフォームはPC（Steam）。\n『山食いドワーフ』は、ドワーフたちを率いて山を掘り崩し、黄金を集めて勢力を拡大していく採掘インクリメンタルゲームだ。建物を建設してドワーフや兵器を配備し、山から得た資源をさらなる強化へ投入。山をひとつ食い尽くしては、より巨大な山へ挑んでいく。\nこうした状況のなか、今回のアップデートでゲーム内表示が日本語に対応。チュートリアルや各種施設、ドワーフ、アップグレード、アーティファクト、ステータスなどを日本語で確認できるようになった。そのほか同アップデートでは、ゲーム終盤で数値が膨大になった際に発生しうるクラッシュやタイマーの問題なども修正。パフォーマンス改善や細かな不具合修正も実施されている。ツルハシから爆薬、バリスタ、レーザー砲へと戦力を広げていく『山食いドワーフ』。日本語対応を迎えたこの機会に、ドワーフ軍団を率いて山を平らげてみてはいかがだろうか。\n『山食いドワーフ』はPC（ Steam ）向けに配信中だ。スペシャルプロモーションとして、9月19日までは定価から20％オフとなる税込1080円で購入できる。\nゲームを始めると、まずは拠点となる「グレートホールド」から「鉱夫ギルド」や「地下住居」を建設し、鉱夫を増やしていく。雇われた鉱夫たちは画面右側にそびえる山へ向かい、ツルハシを振るって採掘。山を削ると鉱石が飛び出し、そこから得た黄金を新たな建物やドワーフの雇用、アップグレードへ投入していく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "2bfccfe90b3370d53660",
+        "eventKind": "other",
+        "subjectKey": "カリギュラ",
+        "subject": {
+          "kind": "game",
+          "key": "カリギュラ"
+        },
+        "publishability": "direct",
+        "headline": "『カリギュラ』は「ペルソナ4×初音ミク」から始まった？「弱者には弱者の戦い方がある」 山中拓也氏が語る限られた予算で“一点突破”を目指したゲーム作り",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/interviewsjp/caligula-20260912-466857/",
+            "publishedAt": "2026-09-12T03:56:49+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/interviewsjp/caligula-20260912-466857/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/image-20.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『Caligula -カリギュラ-』がどのようにして生まれたのか、同作を手がけた山中拓也氏、フリューの渡辺拓道氏、集英社ゲームズの河合泰一氏に話を訊いた。\n『カリギュラ』は「ペルソナ4×初音ミク」から始まった？「弱者には弱者の戦い方がある」 山中拓也氏が語る限られた予算で“一点突破”を目指したゲーム作り\nフリューの学園ジュブナイルRPG『Caligula -カリギュラ-（以下、カリギュラ）』が、2026年に10周年を迎えた。同作の企画・プロデュース・ディレクション・シナリオなどを手がけた山中拓也氏は現在、集英社ゲームズの新作『UN:Me』（企画・開発：ヒストリア）の制作に携わっている。 今回AUTOMATONでは山中氏をはじめ、フリューのコンシューマゲームブランドマネージャー渡辺拓道氏、集英社ゲームズの『UN:Me』総合プロデューサー河合泰一氏を迎え、両タイトルについて語る鼎談を実施した。\n本稿では、『カリギュラ』がどのようにして生まれたのか、企画背景や開発当時の苦労、限られた予算のなかで「他のタイトルにはない一点を尖らせる」という方針に至った経緯などを掘り下げている。また発売から10年を経た今だからこそ語れる、当時のゲームシーンにおける立ち位置や、山中氏が10年間のクリエイター活動を通して培ってきた制作思想について話を訊いた。\nなお、『カリギュラ』シリーズの『Caligula Overdose/カリギュラ オーバードーズ』『Caligula2』は9月11日（金）よりニンテンドーストアで最大80％オフとなるセールを実施中。\n『UN:Me』は、山中氏とヒストリアとの『カリギュラ』タッグで開発されているソウル・トリアージ アドベンチャーゲーム。Nintendo Switch 2/PS5/ PC（ Steam ）で発売予定だ。9月17日（木）から開催される「東京ゲームショウ2026」では国内初のプレイアブル試遊が展示されることも話題となっている。\n「ペルソナ4×初音ミク」で企画を通す『カリギュラ』誕生の舞台裏\n山中氏： 僕自身は軸足はゲームにあると考えていますし、「マルチクリエイター」を自称するのは、どうしても怪しさのほうが勝ってしまうので（笑）。ゲーム以外の仕事も多いですが、どこまでいっても自分はゲーム出身の人間ですし、ゲームのインタラクティブ性を体験に盛り込むのが好きなので、肩書の一番最初に「ゲームクリエイター」を名乗るようにしています。実はゲーム制作自体は他タイトルでもしていたんですが、世に出なかったので、『UN:Me』で『Caligula2（以下、カリギュラ2）』から5年ぶりに、ゲームクリエイターを名乗れて嬉しいです。"
+          }
+        ]
+      },
+      {
+        "eventKey": "feeef5063b4c0f35c420",
+        "eventKind": "other",
+        "subjectKey": "カリギュラ",
+        "subject": {
+          "kind": "game",
+          "key": "カリギュラ"
+        },
+        "publishability": "direct",
+        "headline": "『カリギュラ』開発者新作『UN:Me』はめっちゃ怖い。でも決してホラーではない。山中拓也氏が語る、ホラーだと言い張らない明確な理由",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/interviewsjp/unme-20260912-466858/",
+            "publishedAt": "2026-09-12T03:58:24+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/interviewsjp/unme-20260912-466858/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/image-33.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『UN:Me』の開発の経緯、「ひとりの身体に4つの魂」という独自システムや「不安」をテーマとした表現などについて、山中拓也氏、フリューの渡辺拓道氏、集英社ゲームズの河合泰一氏に話を訊いた。\n『カリギュラ』開発者新作『UN:Me』はめっちゃ怖い。でも決してホラーではない。山中拓也氏が語る、ホラーだと言い張らない明確な理由\n学園ジュブナイルRPG『Caligula -カリギュラ-（以下、カリギュラ）』が、2026年に10周年を迎えた。同作の企画・プロデュース・ディレクション・シナリオなどを手がけた山中拓也氏は現在、集英社ゲームズの新作『UN:Me』（企画・開発：ヒストリア）の制作に携わっている。 今回AUTOMATONでは山中氏をはじめ、フリューのコンシューマゲームブランドマネージャー渡辺拓道氏、集英社ゲームズの『UN:Me』総合プロデューサー河合泰一氏を迎え、両タイトルについて語る鼎談を実施した。\n本稿では2026年内の発売を予定している『UN:Me』の、企画の立ち上げから開発の経緯、「ひとりの身体に4つの魂」という独自システムや「不安」をテーマとした表現、山中氏が作品づくりで大切にしていることなどについて訊いている。10周年を迎えた『カリギュラ』から、新作『UN:Me』へとつながる山中氏のクリエイティブに注目してほしい。\nなお、『カリギュラ』シリーズの『Caligula Overdose/カリギュラ オーバードーズ』『Caligula2』は9月11日(金)よりニンテンドーストアで最大80％オフとなるセールを実施中。\n『UN:Me』は、山中氏とヒストリアとの『カリギュラ』タッグで開発されているソウル・トリアージ アドベンチャーゲーム。Nintendo Switch 2/PS5/ PC（ Steam ）で発売予定だ。9月17日（木）から開催される「東京ゲームショウ2026」では国内初のプレイアブル試遊が展示されることも話題となっている。\n集英社ゲームズ・河合泰一（以下、河合）氏： 『UN:Me』は山中さんと、ヒストリア社長の佐々木（瞬）さんから始まった企画です。時期は『Caligula2／カリギュラ2（以下、カリギュラ2）』の後に、企画の骨子が通ったと記憶しています。\n山中拓也（以下、山中）氏： 『カリギュラ2』はヒストリアさんと一緒に開発しましたが、打ち上げの席で「また面白いことやりましょう」と話していたんです。僕は常に企画を考えており、生きている間に消化しきれるのか不安な人間なので、その場で『UN:Me』の原型を話したら「面白そうですね」と。ヒストリアさんとしてもパブリッシャーと会うときに「こういうゲームを考えています」と言えると助かりますし、会社として企画のストックがあったほうが嬉しいとのことでした。\n河合氏： ヒストリアさんは、以前に自分が勤めていた会社でもIPモノの大がかりなプロジェクトをお願いした経験があり、最後まで完成させられるだろうという信頼がありました。山中さんとは直接お仕事をご一緒したことはありませんでしたが、佐々木さんから話を聞いたり、『カリギュラ』の展開を見たりするなかで、一緒に試行錯誤できたら面白そうだと思いました。"
+          }
+        ]
+      },
+      {
+        "eventKey": "06cb05ea04bb760e463f",
+        "eventKind": "other",
+        "subjectKey": "メルブラ",
+        "subject": {
+          "kind": "game",
+          "key": "メルブラ"
+        },
+        "publishability": "direct",
+        "headline": "『メルブラ』新作『MELTY BLOOD: TWI-LUMINA』は来年4月22日発売へ。レンとともに、白レンの参戦も決定",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/melty-blood-twi-lumina-20260912-466969/",
+            "publishedAt": "2026-09-12T03:00:09+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/melty-blood-twi-lumina-20260912-466969/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/melty-blood-twi-lumina-20260912-466969-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "アニプレックスは9月12日、『MELTY BLOOD: TWI-LUMINA』を2027年4月22日に発売すると発表した。あわせて白レンの参戦も発表されている。\n『メルブラ』新作『MELTY BLOOD: TWI-LUMINA』は来年4月22日発売へ。レンとともに、白レンの参戦も決定\nアニプレックスは9月12日、『 MELTY BLOOD: TWI-LUMINA（メルティブラッド：トワイルミナ） 』を2027年4月22日に発売すると告知した。対応プラットフォームはPS4/PS5/XBOX One/Nintendo Switch/Nintendo Switch 2/PC（Steam）。2027年初頭発売予定とされてきたが、正式に発売日が決定となったようだ。\n『メルティブラッド：トワイルミナ』は、『メルティブラッド：タイプルミナ（MELTY BLOOD: TYPE LUMINA）』に新システムや新キャラクターを搭載した、2D対戦格闘ゲームである。\n『メルティブラッド』シリーズは、TYPE-MOONの伝奇ビジュアルノベル『月姫』の世界観をベースに、サークル・フランスパンなどが手がけてきた作品群だ。前作『メルティブラッド：タイプルミナ』は、2019年9月に発売された。同作では、2019年8月に発売された『月姫』リメイク版『月姫 -A piece of blue glass moon-』へ世界観が刷新されていた。シリーズお馴染みのキャラクターたちに加えて、リメイクの新キャラであるノエルやヴローヴ、『Fate/Grand Order（FGO）』のキャラクターたちも登場。ボタン連打でコンボを完走できるシステムや、ロールバックネットコードを採用したオンライン対戦といった遊びやすい仕組みとともに、新たな『月姫』のキャラクターたちによる戦いが繰り広げられていた。"
+          }
+        ]
+      },
+      {
+        "eventKey": "02abd147096d7cf9c61c",
+        "eventKind": "other",
+        "subjectKey": "ロマンシング サガ3 デスティニーユナイテッド",
+        "subject": {
+          "kind": "game",
+          "key": "ロマンシング サガ3 デスティニーユナイテッド"
+        },
+        "publishability": "direct",
+        "headline": "『ロマンシング サガ3 デスティニーユナイテッド』ではコマンダーモード「廃止」。“サラも安心して主人公に出来る”など、公式生放送で続々アンサー",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260913-467079/",
+            "publishedAt": "2026-09-13T01:24:08+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260913-467079/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260913-467079-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "9月12日に放送された「『ロマンシング サガ3 デスティニーユナイテッド』発売決定記念！公式生放送」内では、オリジナル版からの変更点などについて、開発陣からの回答が明かされている。\n『ロマンシング サガ3 デスティニーユナイテッド』ではコマンダーモード「廃止」。“サラも安心して主人公に出来る”など、公式生放送で続々アンサー\nスクウェア・エニックスは9月12日、「『ロマンシング サガ3 デスティニーユナイテッド』発売決定記念！公式生放送」を放送した。本放送にはMCを務めるペンギンズ ノブオさんのほか、本作のプロデューサーを務める田村信一氏、そしてユリアン役の声優を務める榎木淳弥さん、カタリナ役の声優を務める瀬戸麻沙美さんが出演。『ロマンシング サガ3 デスティニーユナイテッド』（以下、デスサガ）同作の発表を受け、改めてどういった作品なのかを紹介。放送内では早くも実機でのプレイも公開されている。\nそしてQ&Aのコーナーでは、旧作ユーザーほど気になる本作の疑問に田村信一氏が回答。そこで旧作にあった「コマンダーモード」の削除と、その仕様変更によってとあるバトルで主人公のひとりであるサラがどう扱われるのかについて語られた。 なお、本稿では『デスサガ』および旧作『ロマンシング サ・ガ3』のネタバレを含むので留意されたい。\n本作は、1995年に発売された『ロマンシング サ・ガ３』のフルリメイク版だ。『デスサガ』の世界では、300年に一度「死食」と呼ばれる災厄が発生しており、その年に生まれた命を奪い尽くしている。ただし、“宿命の子”とされるただ一人は生き延びることができ、その内のひとりはのちに魔王となった。そして先の死食から十数年後、かつて世界を蹂躙した魔王の配下である四魔貴族による世界の崩壊を防ぐため、宿命に導かれた8人の旅が始まる。\n放送内の「ロマサガ3リメイクのここが知りたい！＜Q&A＞」のコーナーの「コマンダーモードはありますか？」という質問に、田村氏が本作にコマンダーモードはないと回答。コマンダーモードとは主人公がバトルに参加せず、残りの仲間たちに指示を与えて戦うモードである。通常の戦闘モードと比べて、戦闘中に陣形を変更したり、ターンごとにHPが回復したり、さらに陣形技を使えたり、上手く使えるようになると強力なモードとなっている。\n『 ロマンシング サガ3 デスティニーユナイテッド 』は、PC（Steam/Microsoft Store）/Nintendo Switch 2/Nintendo Switch/PS5/XBOX Series X|S向けに2027年2月16日発売予定だ（Steam版のみ2月17日配信）。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7dc1911b95159359dab5",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Animated Diablo Show in the Works at Netflix",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/animated-diablo-show-in-the-works-at-netflix",
+            "publishedAt": "2026-09-12T17:49:30.585Z",
+            "canonicalUrl": "https://www.ign.com/articles/animated-diablo-show-in-the-works-at-netflix",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/12/netflix-diablo-1789235581140.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "An animated Diablo show is in the works at Netflix, as announced at Blizzcon 2026, and there could be more to com\nAnimated Diablo Show in the Works at Netflix\nAn animated Diablo show is in the works at Netflix, as announced at Blizzcon 2026, and there could be more to come.\nBlizzard president Johanna Faries revealed the news, alongside a teaser for future series based on some of the company&#x27;s other properties.\n\"We are thrilled to share that we are in development for a new animated series for Diablo with Netflix,\" she told the crowd. \"As a big Diablo player myself, and someone who loves the indulgent darkness of Sanctuary, I am very excited to see this project come to life. It&#x27;s just the beginning; to our Overwatch community, to our Warcraft community, and who knows — perhaps even some of our other universes, just know there are great discussions being had.\n\"And while I begged and pleaded to be able to share more, I can’t spill the beans just yet. I promise, as soon as we can, we will share more details with you.\"\nWe are thrilled to share that we are in development on a new animated series for Diablo with Netflix. pic.twitter.com/F7dKh73f12\n\"After decades of bringing entire universes to life through our games, we’re partnering with some creative powerhouses to tell even more stories beyond gaming across new screens,\" Blizzard said in a press release. \"A new animated series set in the world of Diablo is in development with Netflix. More details will be shared in the future, but this is only the beginning, with even more taking shape across our universes.\"\nA slew of other big reveals were announced for the franchise at Blizzcon, the biggest of which was the reveal of Diablo 5 , set to release in Spring 2029. This game takes place after Sanctuary has fallen, where our big bad, Diablo himself, has won."
+          }
+        ]
+      },
+      {
+        "eventKey": "be725602a101618dd555",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Blizzard Shadow-Drops New Campaign for Warcraft 3 at BlizzCon 2026",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/blizzard-shadow-drops-new-campaign-for-warcraft-3-at-blizzcon-2026",
+            "publishedAt": "2026-09-12T18:51:08.253Z",
+            "canonicalUrl": "https://www.ign.com/articles/blizzard-shadow-drops-new-campaign-for-warcraft-3-at-blizzcon-2026",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/12/wow-1789239058795.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Blizzard has shadow-dropped a brand new campaign for its real-time strategy game Warcraft 3.\nBlizzard Shadow-Drops New Campaign for Warcraft 3 at BlizzCon 2026\nForsaken Kingdom is a two-part prologue for the 24-year-old RTS, which can be bought standalone. It goes live today, September 12, following the BlizzCon 2026 Opening Ceremony.\nThe surprise announcement is part of the 3.0 update for Warcraft 3 Reforged, which is free for all players and includes World Editor updates.\nHere&#x27;s everything announced at BlizzCon 2026 for more.\nWesley is Director, News at IGN. Find him on Twitter at @wyp100. You can reach Wesley at wesley_yinpoole@ign.com or confidentially at wyp100@proton.me."
+          }
+        ]
+      },
+      {
+        "eventKey": "5f6a2484487b1f7dff5f",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Melty Blood: Twi-Lumina launches April 22, 2027",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/melty-blood-twi-lumina-launches-april-22-2027",
+            "publishedAt": "2026-09-12T03:06:23+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/melty-blood-twi-lumina-launches-april-22-2027",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Melty-Blood-Twi-Lumina-Date_09-11-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Fighting game Melty Blood: Twi-Lumina will launch for PlayStation 5, Switch 2, PlayStation 4, Xbox One, Switch, and PC via Steam on April 22, 2027, publisher Aniplex and developer French-Bread anno…\nMelty Blood: Twi-Lumina launches April 22, 2027\nFighting game Melty Blood: Twi-Lumina will launch for PlayStation 5 , Switch 2 , PlayStation 4 , Xbox One , Switch , and PC via Steam on April 22, 2027, publisher Aniplex and developer French-Bread announced. It will support English, French, Spanish, Portuguese, Japanese, Korean Traditional Chinese, and Simplified Chinese language options.\nMelty Blood: Twi-Lumina will also be playable at Tokyo Game Show 2026, which will run from September 17 to 21 at Makuhari Messe in Chiba, Japan.\nThe latest entry in the best-selling Melty Blood series from TYPE-MOON , set in the world of Tsukihime . With refined battle mechanics and new characters joining the fray, the moonlit mania enters the next stage.\nThe cast of Melty Blood: Type Lumina enjoys an upgrade, plus a main story and new characters such as Len have been added!\nA new trailer features battle scenes with playable characters such as Len, Shiki Tohno, Arcueid, and Ciel. It also reveals the new visual style of White Len, as illustrated by character designer Takashi Takeuchi.\nHere is an overview of the game, via Aniplex:"
+          }
+        ]
+      },
+      {
+        "eventKey": "debc2336cb768f3ffe3f",
+        "eventKind": "launch",
+        "subjectKey": "blizzard reveals starcraft open world shooter targeting 2030",
+        "subject": {
+          "kind": "game",
+          "key": "blizzard reveals starcraft open world shooter targeting 2030"
+        },
+        "publishability": "direct",
+        "headline": "Blizzard Reveals StarCraft Open-World Shooter, Targeting 2030 Launch",
+        "tier": "B",
+        "score": 83,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-informer",
+            "label": "Game Informer",
+            "url": "https://gameinformer.com/blizzcon-2026/2026/09/12/blizzard-reveals-starcraft-open-world-shooter-targeting-2030-launch",
+            "publishedAt": null,
+            "canonicalUrl": "https://gameinformer.com/blizzcon-2026/2026/09/12/blizzard-reveals-starcraft-open-world-shooter-targeting-2030-launch",
+            "imageUrl": "https://gameinformer.com/sites/default/files/styles/og_image/public/2026/09/12/22103aa4/starcraft_announce_cinematic_dominion_1-53_screenshot.jpg.webp",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "StarCraft is coming back, though it&#039;s going to be a shooter this time, and it&#039;s still a ways off. - Game Informer\nBlizzard Reveals StarCraft Open-World Shooter, Targeting 2030 Launch\nStarCraft is back, this time as an open-world shooter. During the BlizzCon 2026 keynote today, a new open-world shooter was announced, aiming for a 2030 release and simply called: StarCraft.\nDan Hay, previously a lead producer on the Far Cry series , to announce the new project and the team behind it. Hay said the crew plans to \"re-ignite\" the StarCraft universe, and brought a trailer to show exactly how.\nThis is still a long-term plan, as Blizzard is currently targeting a 2030 launch. It also seems to simply be titled \"StarCraft\", which could cause some confusion down the line related to the RTS. But either way, it's neat to see StarCraft back. Now we'll just have to wait a few years to see what's in store for it.\nThe trailer is delightfully dark, featuring a Marine named Holt training up for the Dominion only to get run over by a Zergling rush when he touches down on a planet. Happens to the best of us. It also sounds like Mengsk shouting over the loudspeakers, and I'm curious to see what other little easter eggs are hiding in the trailer."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 30669,
+      "estimatedInputTokens": 7668,
+      "activeTrackingItems": 0,
+      "candidateItems": 13,
+      "includedItems": 13,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
