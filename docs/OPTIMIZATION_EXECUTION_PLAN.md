@@ -11,20 +11,20 @@
 
 ### 1. Baseline / production stability
 
-- [ ] Read the live automation contract, state schema, packet/editorial/publisher/SLA workflows, and current tests.
+- [x] Read the live automation contract, state schema, packet/editorial/publisher/SLA workflows, and current tests.
 - [ ] Resolve the scheduler-source question: compare repository contracts with the actual configured task/automation times; record any inaccessible or contradictory evidence rather than inferring from docs.
 - [ ] Build a read-only state table for all current Daily editions: packet, editorial, publication, deployment, locale, backlog age, and immutable packet identity.
 - [ ] Reproduce the known failure paths locally: missing/invalid packet, failed degraded publication, timed-out recovery, same-edition revision, and stale/newer edition selection.
-- [ ] Fix only state/identity propagation defects that block later work. Do not relax source, identity, or evidence validation to make a story publish.
+- [x] Fix only state/identity propagation defects that block later work. Do not relax source, identity, or evidence validation to make a story publish.
 - [ ] Record normal and large-run timings, source failures, backlog count, provider/cache token fields, and the limits of local evidence.
 
 ### 2. Bounded throughput and cost
 
-- [ ] Trace the one-packet-per-call path from `editorialize.mjs` and batch artifacts through scheduled-task instructions, branch commits, publisher acknowledgement, and recovery.
-- [ ] Measure how many bounded continuation/showcase batches a pair of Daily invocations can hand off without losing edition identity or starving the current edition.
-- [ ] If a change is required, implement resumable bounded multi-package handoff compatible with the existing trusted GitHub publication lane; keep per-packet limits and make unprocessed work explicit and recoverable.
-- [ ] Keep old tracking state minimal and distinguish provider tokens, cache reuse, character estimates, actual token usage, and actual monetary cost. Never label a soft budget as a hard cap.
-- [ ] Add regression coverage for partial handoff, retry, concurrent revision, backlog priority, and no starvation before changing the maintenance status.
+- [x] Trace the one-packet-per-call path from `editorialize.mjs` and batch artifacts through scheduled-task instructions, branch commits, publisher acknowledgement, and recovery.
+- [x] Measure how many bounded continuation/showcase batches a pair of Daily invocations can hand off without losing edition identity or starving the current edition.
+- [x] If a change is required, implement resumable bounded multi-package handoff compatible with the existing trusted GitHub publication lane; keep per-packet limits and make unprocessed work explicit and recoverable.
+- [x] Keep old tracking state minimal and distinguish provider tokens, cache reuse, character estimates, actual token usage, and actual monetary cost. Never label a soft budget as a hard cap.
+- [x] Add regression coverage for partial handoff, retry, concurrent revision, backlog priority, and no starvation before changing the maintenance status.
 
 ### 3. Showcase / release-calendar / naming evidence
 
@@ -36,11 +36,11 @@
 
 ### 4. Regression and acceptance
 
-- [ ] Run affected tests after each functional change and `npm run check` once on the final implementation.
-- [ ] Produce `docs/OPTIMIZATION_ACCEPTANCE.md` with exact base/head SHAs, changed files, before/after outcomes, commands/results, real source URLs and fetch times, independent announcement checklist path, token/cost sample and measurement definition, failure/backlog recovery evidence, residual risks, and unmet criteria.
-- [ ] Update existing maintenance entries in `docs/MAINTENANCE_LOG.md`; do not prematurely mark natural-run or cost-dependent items resolved and do not open duplicate root-cause items.
-- [ ] If UI changes are unavoidable, provide manual 1440/820/390px, two-theme, keyboard/focus/anchor and reduced-motion checks; otherwise keep the UI untouched.
-- [ ] Send each phase result to the parent task with commit/PR and evidence paths. Final handoff must say `待 Astra 验收` and identify anything that still requires natural production observation.
+- [x] Run affected tests after each functional change and `npm run check` once on the final implementation.
+- [x] Produce `docs/OPTIMIZATION_ACCEPTANCE.md` with exact base/head SHAs, changed files, before/after outcomes, commands/results, real source URLs and fetch times, independent announcement checklist path, token/cost sample and measurement definition, failure/backlog recovery evidence, residual risks, and unmet criteria.
+- [x] Update existing maintenance entries in `docs/MAINTENANCE_LOG.md`; do not prematurely mark natural-run or cost-dependent items resolved and do not open duplicate root-cause items.
+- [x] If UI changes are unavoidable, provide manual 1440/820/390px, two-theme, keyboard/focus/anchor and reduced-motion checks; otherwise keep the UI untouched.
+- [x] Send each phase result to the parent task with commit/PR and evidence paths. Final handoff must say `待 Astra 验收` and identify anything that still requires natural production observation.
 
 ## Initial evidence gaps
 

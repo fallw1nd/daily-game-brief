@@ -536,6 +536,9 @@
 - **Bounded resolution:** 公告身份对账、地区来源状态、独立简讯、持久有界批次及串行受限补齐；程序保护已有人工内容与原窗口。外部编辑任务只有每日两次调用，尚需实际唤醒/恢复验证，不能仅凭持久队列宣称及时补齐。
 - **Close when:** 日美欧独立清单中全部实质事实对应正文或简讯，真实Direct和State of Play隔离演练通过；失败与预算不足恢复、并发人工修订通过；本期部署与后续自然期次均有证据。实现细节和剩余项见docs/SHOWCASE_RECOVERY.md。
 
+- **2026-09-13 local bundle closeout:** 功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 在隔离 bare remote 通过有界 same-edition bundle、serial publish、partial/retry、stale-valid revalidation、main/state split-brain ack recovery、cross-edition rejection 和 feedback conflict/recovery 演练；queue fairness 的有限模拟保持 news 可消费且 showcase 最迟顺延一日。未修改 public data、固定 cron 或实际 Scheduled Task。
+- **2026-09-13 residual:** 以上是代码/隔离证据，不是 live workflow、Pages/media deployment、自然两次调用或发布会独立全量 checklist 验收；真实 provider 成本、title-hint 采用和后续自然期次仍未满足 Close when，条目保持 `in_progress`。
+
 ## MNT-20260910-02 — 译名候选未持久积累且来源独立性不足
 
 - **Discovered:** 2026-09-10
@@ -581,6 +584,8 @@
 - **Close criteria:** 契约回归和完整检查通过，生产分支更新；后续自然编辑任务验证选择顺序与完整提交，记录实际调用成本后再关闭。文档缩短不等于已证明费用下降。
 - **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.
 - **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
+
+- **2026-09-13 local optimization closeout:** 在功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 上加入同 edition bundle 的 identity/state/feedback 事务、显式 partial result、queue fairness 与 24 个文件的回归/演练覆盖；验收记录见 `docs/OPTIMIZATION_ACCEPTANCE.md`。本地完整检查通过后仍不改变本条 status：没有 live workflow/deploy、实际 scheduler 配置、provider cost 或自然运行证据，文档精简和字符边界不等于费用下降。
 
 ## MNT-20260912-02 — 历史降级稿正式修订被跳过且重新抓取丢失旧证据
 
