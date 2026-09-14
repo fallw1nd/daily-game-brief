@@ -1,0 +1,885 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-14T02:26:24.817Z",
+  "finalizedAt": "2026-09-14T02:26:24.817Z",
+  "coverageThrough": "2026-09-14 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-14-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-14 12:00",
+      "windowStart": "2026-09-13 10:10",
+      "windowEnd": "2026-09-14 10:10"
+    },
+    "adjacentEdition": "2026-09-13-daily",
+    "packages": [
+      {
+        "eventKey": "bbf49f7863b949678887",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Overwatch Devs Confirm That Yes, Tracer Is Still The Game’s Mascot",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/overwatch-devs-confirm-that-yes-tracer-is-still-the-games-mascot",
+            "publishedAt": "2026-09-13T19:02:20.415Z",
+            "canonicalUrl": "https://www.ign.com/articles/overwatch-devs-confirm-that-yes-tracer-is-still-the-games-mascot",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/13/overwatch-blizzcon-2026-dev-interview-tracer-1789268684009.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "You heard it here first, folks: Tracer is still the face of Overwatch, despite not being featured in many major collaborations or promotional materials as of late.\nOverwatch Devs Confirm That Yes, Tracer Is Still The Game’s Mascot\nYou heard it here first, folks: Tracer is still the face of Overwatch , despite not being featured in many major collaborations or promotional materials as of late.\nWe got the chance to sit down with the minds behind Overwatch at Blizzcon 2026 to discuss the game’s newest support hero, Doctrine , and the future of the franchise — as well as grill them about Tracer’s role as its supposed mascot.\nWhen you think about Overwatch, you probably think of Tracer. She was essentially the star of the show when the game first launched in 2016, and was consistently featured in marketing materials, merchandise, advertisements, and more. Her iconic silhouette and speedy abilities were inescapable back then… but now, not so much.\nWe directly asked Overwatch’s Lead Hero Producer Kenny Hudson, as well as art director Dion Rogers, if Tracer is still the mascot of the game — or if she was ever really considered its mascot, at all.\nTheir answer was firm and decisive: Tracer is, and always was, the mascot of Overwatch.\n“Tracer is still the mascot for Overwatch. Very much. ‘Tracer orange’ is a quote that the team uses all the time. The little cheeto on top of the sigil is orange. She’s still that girl,” Rogers told us.\nOverwatch just got a brand-new support hero in Doctrine, a vampire-inspired character who has a long history with Doomfist. No, he’s not an actual vampire, but that motif was a key part of his design from the very beginning, says Rogers."
+          }
+        ]
+      },
+      {
+        "eventKey": "3438b40227b56811ecbe",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "World of Warcraft: Forever Devs Explain Why the Game Makes WoW 2 Unlikely",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/world-of-warcraft-forever-wow-2-unlikely",
+            "publishedAt": "2026-09-13T18:11:54.054Z",
+            "canonicalUrl": "https://www.ign.com/articles/world-of-warcraft-forever-wow-2-unlikely",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/13/blizzcon2026-blogroll-1789322991703.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "World of Warcraft: Forever developers Kris Zierhut and Mike Nuthals detail the game&#x27;s new features and explain why a WoW 2 sequel is unnecessary.\nWorld of Warcraft: Forever Devs Explain Why the Game Makes WoW 2 Unlikely\nThe team behind the Classic+ update also breaks down all the new features.\nWorld of Warcraft: Forever, a Classic+ iteration of the long-running franchise that lets players return to an updated vanilla Azeroth featuring new zones, dungeons, raids, and more, was announced at yesterday’s BlizzCon 2026 Opening Ceremony. And now, the game’s developers are revealing why they think the new take on the classic game (along with the numerous other WoW updates announced yesterday) renders the long-speculated World of Warcraft 2 unnecessary.\n“I think one of the things that&#x27;s singularly great about WoW is we have this game and this world and this design that has been continuously developed for the last 25 years,” Zierhut says. “And we keep making it better. We made the graphics better, we made the rendering better, we made the lighting better; all that new stuff we showed on stage today.\n“But we&#x27;ve also made the way the engine draws things move more efficiently. The way the server runs, handling players and moving them around, and all the things that handle spells and combat, all of that&#x27;s been made more efficient and better over the years. We have this incredible engine and server infrastructure driving the game that is second to none. Why would you throw that away and start over?”\nZierhut went on to say that, in addition to the technical advancements in World of Warcraft: Forever, the team is still invested in building the story of the current WoW universe.\n“It’s not like there&#x27;s something wrong with the story,” Zierhut says. “We love the story. So going back to the beginning [with World of Warcraft: Forever], there&#x27;s a chance to explore that story in new and different ways. So it&#x27;s really hard to say, ‘Well, what would a WoW 2 give you that World of Warcraft: Forever isn&#x27;t already giving you?’”\nAs revealed on stage yesterday, World of Warcraft: Forever won’t merely be a rehashed update of the original. In addition to “updated world visuals and lighting,” the game will feature 10 and 20-player raids, more than 1,000 new quests, new race and class combos, a new Skyborne race, and more. Nuthals and Zierhut say there are a few key features they’re most eager for fans to experience."
+          }
+        ]
+      },
+      {
+        "eventKey": "debc2336cb768f3ffe3f",
+        "eventKind": "launch",
+        "subjectKey": "blizzard reveals starcraft open world shooter targeting 2030",
+        "subject": {
+          "kind": "game",
+          "key": "blizzard reveals starcraft open world shooter targeting 2030"
+        },
+        "publishability": "direct",
+        "headline": "Blizzard Reveals StarCraft Open-World Shooter, Targeting 2030 Launch",
+        "tier": "B",
+        "score": 83,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-informer",
+            "label": "Game Informer",
+            "url": "https://gameinformer.com/blizzcon-2026/2026/09/12/blizzard-reveals-starcraft-open-world-shooter-targeting-2030-launch",
+            "publishedAt": null,
+            "canonicalUrl": "https://gameinformer.com/blizzcon-2026/2026/09/12/blizzard-reveals-starcraft-open-world-shooter-targeting-2030-launch",
+            "imageUrl": "https://gameinformer.com/sites/default/files/styles/og_image/public/2026/09/12/22103aa4/starcraft_announce_cinematic_dominion_1-53_screenshot.jpg.webp",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "StarCraft is coming back, though it&#039;s going to be a shooter this time, and it&#039;s still a ways off. - Game Informer\nBlizzard Reveals StarCraft Open-World Shooter, Targeting 2030 Launch\nStarCraft is back, this time as an open-world shooter. During the BlizzCon 2026 keynote today, a new open-world shooter was announced, aiming for a 2030 release and simply called: StarCraft.\nDan Hay, previously a lead producer on the Far Cry series , to announce the new project and the team behind it. Hay said the crew plans to \"re-ignite\" the StarCraft universe, and brought a trailer to show exactly how.\nThis is still a long-term plan, as Blizzard is currently targeting a 2030 launch. It also seems to simply be titled \"StarCraft\", which could cause some confusion down the line related to the RTS. But either way, it's neat to see StarCraft back. Now we'll just have to wait a few years to see what's in store for it.\nThe trailer is delightfully dark, featuring a Marine named Holt training up for the Dominion only to get run over by a Zergling rush when he touches down on a planet. Happens to the best of us. It also sounds like Mengsk shouting over the loudspeakers, and I'm curious to see what other little easter eggs are hiding in the trailer."
+          }
+        ]
+      },
+      {
+        "eventKey": "18d96521a55ee69ec628",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Beneath a Steel Sky review (1994)",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/adventure/beneath-a-steel-sky-review-1994/",
+            "publishedAt": "2026-09-13T06:17:36Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/adventure/beneath-a-steel-sky-review-1994/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/DCNc8qRkx2hrqL7PuXrMgU-2560-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Revisiting Revolution Software's dystopian adventure.\nBeneath a Steel Sky review (1994)\nPC Gamer's got your back Our experienced team dedicates many hours to every review, to really get to the heart of what matters most to you. Find out more about how we evaluate games and hardware.\nSpecial commentary on this classic PC Gamer review provided by:\nRevolution Software is probably best-known among point-and-click fans for the Broken Sword series, and the infamous goat puzzle. (Part of a trilogy of infuriating animal brainbenders along with The Hitch Hiker's Guide to the Galaxy Babel fish and Gabriel Knight 3' cat-hair mustache.) But before that Revolution gave us Lure of the Temptress and Beneath a Steel Sky, the latter a collaboration with comics artist Dave Gibbons.\nAfter a planned Watchmen game fell through, Gibbons instead provided the dystopian cityscape, character designs, and part of the story for Beneath a Steel Sky. The art remains the most convincing thing about it, making me wonder why we ever bothered with 3D graphics.\nThe game itself was full of the kind of puzzles adventure gamers loved and the rest of us slogged through for the sake of the story. Real heads like PC Gamer's reviewer Garry Whitta thrived on distracting guards with unusual uses for inventory items, and to them Beyond a Steel Sky remains a beloved classic. So much so that a sequel was eventually crowdfunded and released in 2020. Beyond a Steel Sky went 3D though, losing the one thing I'd liked about the original. Our reviewer Ian Evenden wasn't put off by that, giving it an 81% almost as enthusiastic as Whitta's take on the original from PC Gamer's debut issue.\nFrom the archives: The review below appears as originally written, with only minor changes in formatting and screenshots. By Garry Whitta\nBeneath a Steel Sky review &ndash; PC Gamer #1 (UK, December 1993)\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals."
+          }
+        ]
+      },
+      {
+        "eventKey": "3734ddc6ee2350dd4845",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Fallout dev Tim Cain says the games industry's volatility is 'always gonna be around': 'What's happening now isn't novel, it isn't new'",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/gaming-industry/fallout-dev-tim-cain-says-the-games-industrys-volatility-is-always-gonna-be-around-whats-happening-now-isnt-novel-it-isnt-new/",
+            "publishedAt": "2026-09-13T17:42:45Z",
+            "canonicalUrl": "https://www.pcgamer.com/gaming-industry/fallout-dev-tim-cain-says-the-games-industrys-volatility-is-always-gonna-be-around-whats-happening-now-isnt-novel-it-isnt-new/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/eSydbFPHpqUmJgWkCbHHDW-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "\"Art and technology constantly changing makes the whole industry unstable.\"\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nFrom the creators of Edge: A free weekly videogame industry newsletter, featuring in-depth news, expert analysis and exclusive interviews\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 16700,
+      "estimatedInputTokens": 3533,
+      "activeTrackingItems": 0,
+      "candidateItems": 5,
+      "includedItems": 5,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Woodo",
+        "subjectKey": "Woodo",
+        "titleKey": "woodo",
+        "titleZhCn": "木木屋",
+        "suggestedStatus": "official_simplified",
+        "reason": "",
+        "sources": [
+          {
+            "label": "store.playstation.com",
+            "url": "https://store.playstation.com/zh-hans-hk/product/EP8923-PPSA25670_00-WOODOXPS5X000000",
+            "hostname": "store.playstation.com",
+            "family": "sony",
+            "kind": "official_simplified",
+            "pageTitle": "木木屋 (泰语, 日语, 韩语, 简体中文, 繁体中文, 英语)",
+            "excerpt": "木木屋 (泰语, 日语, 韩语, 简体中文, 繁体中文, 英语) 搜索 最新 精选 优惠 定期服务 浏览 木木屋 (泰语, 日语, 韩语, 简体中文, 繁体中文, 英语) DAEDALIC ENTERTAINMENT 16/9/2026 03:00 PM UTC PS5 Standard Edition HK$118.40 从原价HK$148.00折扣优惠 HK$148.00 加入PlayStation Plus，立省20% 优惠截至16/9/2026 03:00 PM UTC 过去30天内的最低价格：HK$148.00 HK$148.00 订阅 订阅 离线游玩已启动 1位玩家 支持远程游玩 PS5版本 支持震动功能（DualSen"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Another Eden Begins",
+        "subjectKey": "Another Eden Begins",
+        "titleKey": "another-eden-begins",
+        "titleZhCn": "另一个伊甸：起源",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "www.3dmgame.com",
+            "url": "https://www.3dmgame.com/games/aeb/news/",
+            "hostname": "www.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "另一个伊甸：起源新闻_另一个伊甸：起源最新资讯_3DM游戏网",
+            "excerpt": "另一个伊甸：起源新闻_另一个伊甸：起源最新资讯_3DM游戏网 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 新闻 攻略 资源 图片 《另一个伊甸：起源》免费试玩发布 存档可继承至正式版 WRIGHT FLYER STUDIOS工作室制作并发行，旗下日式RPG新作《另一个伊甸：起源》最新免费试玩发布，本作预定9月17日登陆PC（Steam）/Nintendo Switch发售，敬请期待。《另一个伊甸：起源》：Steam地址《另一个伊甸：起源》是一款跨越古代、现代和未来，以时空穿越为主题的指令战斗式RPG。游戏由曾经带来众多经典作品的加藤正人担纲制作。在“新游戏＋”模式中，玩家可以跟培育的角色一起体验全"
+          },
+          {
+            "label": "0day.ali213.net",
+            "url": "https://0day.ali213.net/html/2026/157859.html",
+            "hostname": "0day.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "另一个伊甸：起源好玩吗_另一个伊甸：起源玩家评价_口碑_虾说_游侠网",
+            "excerpt": "另一个伊甸：起源好玩吗_另一个伊甸：起源玩家评价_口碑_虾说_游侠网 游侠网 资讯 下载 补丁 游戏库 攻略 论坛 商城 网游 手游 页游 大侠号 更多 游侠网APP 首页 游戏发售表 单机游戏排行榜 2026热门游戏 单机下载 暂无专题 PC Switch 另一个伊甸：起源 Another Eden Begins 2026年09月16日PC上市 - 回合制/策略/动漫 2026年09月16日Switch上市 - 回合制/策略/动漫 游戏类型：角色扮演RPG 制作公司： WRIGHT FLYER STUDIOS 游戏语言： 中文/英文/日文/其他 中文/英文/日文/其他 发行公司： WRIGHT FLYER STUDIOS 单人单机"
+          },
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/152035.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "另一个伊甸：起源电脑版下载-Another Eden Begins demo试玩版下载_3DM单机",
+            "excerpt": "另一个伊甸：起源电脑版下载-Another Eden Begins demo试玩版下载_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 角色扮演 > 《另一个伊甸：起源》demo 《另一个伊甸：起源》demo 进入专题 游戏类型： 角色扮演 开发厂商： WRIGHT FLYER STUDIOS 更新时间： 2026-09-08 发售日期： 2026年9月16日 游戏平台： PC 游戏语言： 简中 标签： 动漫 多结局 2.5D 时空旅行 彩色 8.0 已"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
