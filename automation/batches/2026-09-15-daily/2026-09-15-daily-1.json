@@ -1,0 +1,1096 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-15T02:24:06.670Z",
+  "finalizedAt": "2026-09-15T02:24:06.670Z",
+  "coverageThrough": "2026-09-15 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-15-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-15 12:00",
+      "windowStart": "2026-09-14 10:10",
+      "windowEnd": "2026-09-15 10:10"
+    },
+    "adjacentEdition": "2026-09-14-daily",
+    "packages": [
+      {
+        "eventKey": "09f323797cd7527994a0",
+        "eventKind": "delay",
+        "subjectKey": "marathon",
+        "subject": {
+          "kind": "game",
+          "key": "marathon"
+        },
+        "publishability": "direct",
+        "headline": "人気低下ぎみのSIE脱出シューター『Marathon』、“PvE常設大型アプデ”が土壇場延期に。「シーズン更新をもっとユルくする」と表明、立て直しの一手となるか",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260915-467521/",
+            "publishedAt": "2026-09-15T01:54:10+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260915-467521/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260915-467521-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bungieは9月15日、『Marathon（マラソン）』に向けて9月22日に予定されていた大型アップデートを延期し、予定されていたコンテンツを12月8日の「Symbiosis」アップデートに含めることを発表した。\n人気低下ぎみのSIE脱出シューター『Marathon』、“PvE常設大型アプデ”が土壇場延期に。「シーズン更新をもっとユルくする」と表明、立て直しの一手となるか\nデベロッパーのBungieは9月15日、『 Marathon（マラソン） 』に向けて9月22日に予定されていた大型アップデートを延期し、予定されていたコンテンツを12月8日の「Symbiosis」アップデートに含めることを発表した。あわせて今後、厳密なシーズンスケジュールを取りやめることも告知されている。\n『Marathon』はPvPvE形式の脱出型FPSだ。『Destiny』シリーズの開発元として知られるBungieが手がけている。プレイヤーはバイオサイバネティック傭兵「ランナー」となり、惑星タウ・セティIVに残されたコロニーを探索。敵対的な保安部隊やライバルのランナーとの戦いを乗り越え、軌道上に放棄された宇宙移民船「マラソン号」の真実に迫る。\nWe’re making changes to Marathon’s update plans and how we deliver new content. We’re moving away from a strict seasonal schedule to give the team more flexibility to build, test, and improve features before release. Our focus is on delivering bigger, more meaningful updates,…\n『Marathon』はPC（ Steam ）/ PS5 / XBOX Series X|S 向けに発売中。\n本作は今年3月に発売。シーズン制で運営されており、現在は6月に開幕したシーズン2「Nightfall」が展開されている。9月22日に予定されていた大型アップデートにて新シーズンの開幕が期待されていたが、今回は同アップデートが延期されることが発表。あわせて、今後は厳密なシーズンスケジュールを取りやめることも伝えられた。大型アップデートの実施を固定されたシーズンの期限に定めないことで、リリース前の新要素や機能をチームが開発・テスト・改善できるように、より柔軟性をもたせていくと説明されている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "99b70a8c75f04d37ef65",
+        "eventKind": "announcement",
+        "subjectKey": "樹海への道",
+        "subject": {
+          "kind": "game",
+          "key": "樹海への道"
+        },
+        "publishability": "direct",
+        "headline": "日本深夜タクシー運転ホラー『樹海への道』正式発表、2027年発売へ。カーナビなしで乗客探しふらふら迷走、時には“何か”が乗ってくる",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260915-467515/",
+            "publishedAt": "2026-09-15T01:36:47+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260915-467515/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260915-467515-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "tinyBuildは9月15日、Endflameが手掛ける『樹海への道（Road to Jukai）』を正式発表した。\n日本深夜タクシー運転ホラー『樹海への道』正式発表、2027年発売へ。カーナビなしで乗客探しふらふら迷走、時には“何か”が乗ってくる\nパブリッシャーのtinyBuildは9月15日、Endflameが手掛ける『樹海への道（Road to Jukai）』を正式発表した。対応プラットフォームはPC（Steam）で、2027年のリリースを予定。ゲーム内は日本語表示に対応する。本作は2025年12月に『サイレントロード』として発表、このたびタイトルを改め発売時期もあかされた。同時にオープンプレイテストも開催している。\n『樹海への道』は一人称視点の心理ホラーゲームだ。プレイヤーは日本のタクシー運転手として、深夜に呪われた森に囲まれた町を巡り、奇妙な乗客たちを乗せていく。物語は6夜にわたってノンリニアな展開で描かれるという。乗客たちが話す内容は夜ごと不気味さを増していくが、できるだけ要望に応えてあげよう。ときには“何か”が乗り込んでくることもあるかもしれない。\n本作については2025年12月に『サイレントロード』として発表。当時は開発元のEndflameによるセルフパブリッシングとして発表されていたが、このたびtinyBuildとのパブリッシング契約をし、タイトルを『樹海への道』と改め2027年発売予定であると明かされた。\n『樹海への道（Road to Jukai）』はPC（ Steam ）向けに2027年に発売予定だ。なお、執筆時点ではストアページのタイトルが『サイレントロード』のままとなっているため留意して欲しい。\n公開されたトレイラーでは、乗客となった女子高生が何者かに追われる様子が描かれている。そのほかにはコンビニ店員や紫髪の男性、老婆などさまざまな乗客が登場するようだ。老婆の家に上がっているようなシーンも確認でき、必要に応じて乗客を手助けするシーンも登場する。単純な作業だが、安全だと感じられないものになるという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "f0bb79f1cb8aa75a2242",
+        "eventKind": "update",
+        "subjectKey": "drill core 8216 anniversary",
+        "subject": {
+          "kind": "game",
+          "key": "drill core 8216 anniversary"
+        },
+        "publishability": "direct",
+        "headline": "Drill Core &#8216;Anniversary Update&#8217; now available for PS5, Xbox Series, and PC; coming soon for Switch",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/drill-core-anniversary-update-now-available-for-ps5-xbox-series-and-pc-coming-soon-for-switch",
+            "publishedAt": "2026-09-14T15:15:19+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/drill-core-anniversary-update-now-available-for-ps5-xbox-series-and-pc-coming-soon-for-switch",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Drill-Core-Aninversary-Update_09-14-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher tinyBuild and developer Hungry Couch have released the &#8220;Anniversary Update&#8221; for &#8220;strategic mining game&#8221; Drill Core for PlayStation 5, Xbox Series, and PC via Steam…\nDrill Core &#8216;Anniversary Update&#8217; now available for PS5, Xbox Series, and PC; coming soon for Switch\nPublisher tinyBuild and developer Hungry Couch have released the &#8220;Anniversary Update&#8221; for &#8220;strategic mining game&#8221; Drill Core for PlayStation 5 , Xbox Series , and PC via Steam . The Switch version will follow at a later date.\n&#8220;Anniversary Update&#8221; Trailer\nHere are the patch notes, via tinyBuild:\nSeptember 16 @ 7:30 am - 8:30 am EDT"
+          }
+        ]
+      },
+      {
+        "eventKey": "547e6688251c427044a4",
+        "eventKind": "announcement",
+        "subjectKey": "silent hill f",
+        "subject": {
+          "kind": "game",
+          "key": "silent hill f"
+        },
+        "publishability": "direct",
+        "headline": "「SILENT HILL f」が大賞を受賞。「日本ホラーゲーム大賞2026 produced by 百室」，受賞作品を発表",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/991/G999110/20260914034/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/991/G999110/20260914034/",
+            "imageUrl": "https://www.4gamer.net/games/991/G999110/20260914034/SS/001.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "東京ホラー特区!!2026実行委員会は2026年9月11日，あらゆる「ホラー」が一堂に会するイベント「東京ホラー特区!!2026」のメイン企画「日本ホラーゲーム大賞2026 produced by …\n「SILENT HILL f」が大賞を受賞。「日本ホラーゲーム大賞2026 produced by 百室」，受賞作品を発表\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月7日〜9月13日"
+          }
+        ]
+      },
+      {
+        "eventKey": "32e253c5ed44953b8076",
+        "eventKind": "launch",
+        "subjectKey": "the grand book archive tidy up",
+        "subject": {
+          "kind": "game",
+          "key": "the grand book archive tidy up"
+        },
+        "publishability": "direct",
+        "headline": "ピクセルアートで描かれる巨大な書庫で，2990冊の古書を正しい本棚へ収めていくシミュレーション「The Grand Book Archive: Tidy Up」，Steamで体験版配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/042/G104244/20260914011/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/042/G104244/20260914011/",
+            "imageUrl": "https://www.4gamer.net/games/042/G104244/20260914011/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Inblue Gamesは，現在開発中の新作タイトル「The Grand Book Archive: Tidy Up」の体験版をSteamで配信開始した。本作は，ピクセルアートで描かれた巨大な書庫を…\nピクセルアートで描かれる巨大な書庫で，2990冊の古書を正しい本棚へ収めていくシミュレーション「The Grand Book Archive: Tidy Up」，Steamで体験版配信開始\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\n［プレイレポ］「カタン」風な盤面でリソースを産出し，「Balatro」的なコンボで桁外れのスコアを狙え！ 料理を介して両者を組み合わせる「Feed the Scorchpot」の面白さとは\nPS5向け「機動警察パトレイバー the Case Files」，ダウンロード版のアーリーアクセスを開始\n「Delve Survivors: A Dungeon Roguelike」，Steam版を11月12日発売。9つのメインダンジョンと100階の「The Abyss」を収録\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月7日〜9月13日"
+          }
+        ]
+      },
+      {
+        "eventKey": "068881eefa95706620f7",
+        "eventKind": "launch",
+        "subjectKey": "animaly bar no humanity",
+        "subject": {
+          "kind": "game",
+          "key": "animaly bar no humanity"
+        },
+        "publishability": "direct",
+        "headline": "動物に変装した人間をバーから排除する「Animaly Bar: NO HUMANITY!」，Steamで配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/999/G099976/20260914035/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/999/G099976/20260914035/",
+            "imageUrl": "https://www.4gamer.net/games/999/G099976/20260914035/SS/008.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Domnaierは2026年9月14日，PC向け新作タイトル「Animaly Bar: NO HUMANITY!」をSteamで発売した。価格は655円（税込）。本作は，ゴリラのバーテンダーが動物に…\n動物に変装した人間をバーから排除する「Animaly Bar: NO HUMANITY!」，Steamで配信開始\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月7日〜9月13日"
+          }
+        ]
+      },
+      {
+        "eventKey": "8fcc0cdb49b3abe47fec",
+        "eventKind": "launch",
+        "subjectKey": "magical blush",
+        "subject": {
+          "kind": "game",
+          "key": "magical blush"
+        },
+        "publishability": "direct",
+        "headline": "魔術師として崩壊した世界を旅する見下ろし視点のメトロイドヴァニア「Magical Blush」，配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/004/G100422/20260914057/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/004/G100422/20260914057/",
+            "imageUrl": "https://www.4gamer.net/games/004/G100422/20260914057/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "DANGEN Entertainmentは2026年9月10日，新作タイトル「Magical Blush」のPC版をリリースした。本作は，ハイスピード戦闘とメトロイドヴァニア風のアクションを融合させ…\n魔術師として崩壊した世界を旅する見下ろし視点のメトロイドヴァニア「Magical Blush」，配信開始\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月7日〜9月13日"
+          }
+        ]
+      },
+      {
+        "eventKey": "154f66aaac0bf40b1258",
+        "eventKind": "other",
+        "subjectKey": "勇者ローグ",
+        "subject": {
+          "kind": "game",
+          "key": "勇者ローグ"
+        },
+        "publishability": "direct",
+        "headline": "“不思議のダンジョン風”テンポ爆速ローグライク『勇者ローグ』10月31日配信へ。ダッシュも矢稼ぎも識別も、快適化でサクサク死ねる",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260914-467400/",
+            "publishedAt": "2026-09-14T09:12:01+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260914-467400/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260914-467400-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "開発者のどらさ氏は9月12日、『勇者ローグ』を10月31日に配信予定と告知した。\n“不思議のダンジョン風”テンポ爆速ローグライク『勇者ローグ』10月31日配信へ。ダッシュも矢稼ぎも識別も、快適化でサクサク死ねる\n開発者のどらさ（DORASA.NET）氏は9月12日、『勇者ローグ』を10月31日に配信予定と告知した。対応プラットフォームはPC（Steam）。本作はスマートフォン向けにもリリース予定とされているが、「東京ゲームダンジョン14」にあわせてまずはSteam版が配信となるようだ。\n『勇者ローグ』は、独自の快適ダッシュや高速矢稼ぎなど、操作性特化型を謳うターン制のローグライクダンジョンRPGである。本作の舞台は、10年前に勇者により魔王が討伐され、平和になった世界。主人公は、孤島に隔離されていた謎の少年だ。魔物が再び活性化する中、謎の少年は「勇者」として魔王城を目指していく。\nそんな本作『勇者ローグ』では、操作性やテンポ感を重視した内容になっているという。具体的には、アイテムの識別関連でいくつか快適な仕組みが導入されており、アイテムの売値を自動的にアイテム名へ入力してくれる仕組みも用意されているようだ。同ジャンル作品では、アイテムごとにある程度値段が決まっており、アイテムが未識別の場合に販売価格から中身を推測するテクニックがある。本作ではダンジョン内のお店でアイテムを床に置き店主のパンダに話かけると、自動で売値をアイテムにつけてくれるという。同価格帯のアイテム確認機能も用意されており、ショップでの識別がやりやすくなっているわけだ。\n今回はダンジョン内のお店と未識別アイテムの仕様について動画を作りました。 つぶやいていないだけで毎日めちゃくちゃゲーム制作しています。楽しいです #スーパーゲ制デー #勇者ローグ pic.twitter.com/eEyG8Iyk5S\n「勇者ローグ」Steam版発売日決まりました！ #東京ゲームダンジョン14 に合わせて10/31(土)予定です。ゲムダン14用のPV作ったので流します。 あ、全然まだ完成してないです（本気） #スーパーゲ制デー pic.twitter.com/FbvLpLtK4Q\n『勇者ローグ』は、10月31日にPC（ Steam ）向けにリリース予定だ。また本作は、10月31日に開催予定の「東京ゲームダンジョン14」にも出展予定となっている。\n本作ではそんな少年の戦いが、入るたびに構造が変わる自動生成ダンジョンにておこなわれる。ダンジョン内部には、危険なモンスターが存在。武器や盾といった装備品に加えて、アイテムの運用に関わる壺や、振ると特殊効果が発生する杖、本や薬といった多数のアイテムも待ち受けている。拾ったアイテムをうまく活用して危険なダンジョンを踏破する、ターン制のローグライクRPGが繰り広げられる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "333041db4cbeb40ed7a6",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Capcom Opens First U.S. Merch Store as a Pop-Up in Los Angeles",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/capcom-opens-first-us-merch-store-as-a-pop-up-in-los-angeles",
+            "publishedAt": "2026-09-14T15:12:41.201Z",
+            "canonicalUrl": "https://www.ign.com/articles/capcom-opens-first-us-merch-store-as-a-pop-up-in-los-angeles",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/14/capcoron-mascot-plush-megaman-exe-1789399520972.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Capcom, publisher of not one or two but three well-received games so far this year (Resident Evil Requiem, Pragmata, and Onimusha: Way of the Sword) is opening its first retail store in the U.S. It&#x27;ll be a pop-up in Little Akihabara in Little Tokyo, Los Angeles. The grand opening is this Saturday, September 19, and \"a limited number\" of attendees have a chance to play the upcoming Mega Man: Dual Override on Saturday and Sunday. Meanwhile, the first 50 shoppers on the 19th and 20th will receive \"a limited-edition Tokyo Game Show handkerchief featuring popular Capcom games.\"\nCapcom Opens First U.S. Merch Store as a Pop-Up in Los Angeles\nCapcom, publisher of not one or two but three well-received games so far this year (Resident Evil Requiem, Pragmata, and Onimusha: Way of the Sword), is opening its first retail store in the U.S. It&#x27;ll be a pop-up in Little Akihabara in Little Tokyo, Los Angeles. The grand opening is this Saturday, September 19, and \"a limited number\" of attendees have a chance to play the upcoming Mega Man: Dual Override on Saturday and Sunday. Meanwhile, the first 50 shoppers on the 19th and 20th will receive \"a limited-edition Tokyo Game Show handkerchief featuring popular Capcom games.\"\nThe pop-up will run through October 18 at Little Akihabara Popup Shop & Live, located at 319 E 2nd St. #122. Hours are from 12pm–7pm. Merch items include plushies, T-shirts, keychains, and more. Check some of the items out in the gallery below.\nThe company also teased that the store will feature life-size statues of \"fan-favorite\" characters from Street Fighter and Mega Man and additional playable demos of other Capcom games.\nCapcom has had a great year so far, with the aforementioned Resident Evil Requiem topping 7 million units sold , Pragmata topping 2 million units sold in just over two weeks – which Capcom says makes a sequel likely , and Onimusha: Way of the Sword picked up a 10 out of 10 review score from IGN. Moving forward, Capcom wants to \" re-activate IPs that haven’t had a new title launch recently, \" which could mean anything from Dino Crisis to Dead Rising or Lost Planet, to name a few."
+          }
+        ]
+      },
+      {
+        "eventKey": "de70ec8d1b9355841aaa",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Dog Breeders Are Offering Puppies in Exchange for Pokemon Cards",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/dog-breeders-are-offering-puppies-in-exchange-for-pokemon-cards",
+            "publishedAt": "2026-09-14T20:16:13.167Z",
+            "canonicalUrl": "https://www.ign.com/articles/dog-breeders-are-offering-puppies-in-exchange-for-pokemon-cards",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/14/dog-breeders-are-trading-puppies-for-pokemon-cards-1789416324935.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The card collecting community is in an uproar after two dog breeders were caught offering to trade their French Bulldog puppies in exchange for Pokémon cards, highlighting a growing issue within the space.\nDog Breeders Are Offering Puppies in Exchange for Pokemon Cards\n“You’re trading cardboard for a living, breathing animal.”\nDuring the broadcast, Pickleqw33n remarked to her viewers that some collectors were so desperate to get an edge on the card market that they were even trading their dogs for the chance of scoring rare and profitable Pokémon cards.\nNot long after saying this, an attendee walked up to her booth with a gaggle of French Bulldog Puppies, prompting her to give him a free Snubbull sticker.\n“It’s for sale,” he told her, referring to the puppies. “I’ll trade ‘em for a card.”\n“Dog breeders are bringing dogs to trade for Pokémon cards,” the other booth-runner explained.\n“I think it’s unethical,” Pickleqw33n added. “Selling a dog like that — how do you know the person you’re giving the dog to is a good home? You’re trading cardboard for a living, breathing animal.”\nOne such breeder shown on a live stream at a convention and posted online by PICKLEQW33N, a trading card collector with Crimson Card Co. based in South Florida."
+          }
+        ]
+      },
+      {
+        "eventKey": "ca8c553298ba32618b02",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "First Major Cast Member Confirms Appearance in GTA 6, Seemingly Going Off Rockstar's Script",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/first-major-cast-member-confirms-appearance-in-gta-6-seemingly-going-off-rockstars-script",
+            "publishedAt": "2026-09-14T10:14:56.107Z",
+            "canonicalUrl": "https://www.ign.com/articles/first-major-cast-member-confirms-appearance-in-gta-6-seemingly-going-off-rockstars-script",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/14/brian-heder-01-0r-ute88os9k-1789380658191.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The first major cast member has confirmed his appearance in Grand Theft Auto 6, seemingly going off Rockstar’s tightly controlled marketing script.\nFirst Major Cast Member Confirms Appearance in GTA 6, Seemingly Going Off Rockstar&#x27;s Script\nThe first major cast member has confirmed his appearance in Grand Theft Auto 6 , seemingly going off Rockstar’s tightly controlled marketing script.\nStephen Root, who voices Bill Dauterive and Buck Strickland on the animated series King of the Hill, confirmed his involvement in GTA 6 in an interview with the Associated Press .\n“Yeah, you’re gonna see me in it,” he said. “It’s coming out November 19th, is the latest I know of. I think from the first rollout of GTA they were doing maybe almost a year ago they had my character in there. And there are too many people who knew me from King of the Hill and my voice! So I think that secret kind of got divulged then.”\nThat’s a nod to GTA 6 Trailer 2, which featured a character who sounded so much like Root that fans put two and two together and — now we know — came up with the right answer. We know this character to be Brian Heder, a drug trafficker and apparent boatyard owner seen speaking to Jason about paying rent. “Just go get me my cheques!” he shouts as Jason heads indoors.\nWe see much more of Heder in the recent GTA 6 Extended Look, where he offers Jason words of advice. We also meet his wife, Lori Heder. Here’s the official blurb from Rockstar’s GTA 6 website:\n“I’m so happy to be involved with it. It’s an amazing thing to look at,” Root added when asked what it was like working on GTA 6, clearly trying not to give too much away.\nRemarkably, Rockstar has yet to confirm any GTA 6 actors, leading fans to try to work out the cast for themselves. We don’t even know who plays Jason and Lucia, the game’s dual protagonists. Perhaps we won’t until the game is out in November and the credits roll.\n\"I’m so happy to be involved with it.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "f3029e440de3dbd0a600",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Fortnite Kingdom Hearts Collaboration, Including Sora Skin, Lands This Week",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/fortnite-kingdom-hearts-collaboration-including-sora-skin-lands-this-week",
+            "publishedAt": "2026-09-14T14:01:32.840Z",
+            "canonicalUrl": "https://www.ign.com/articles/fortnite-kingdom-hearts-collaboration-including-sora-skin-lands-this-week",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/14/screenshot-2026-09-14-145759-1789394335419.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Fortnite has officially confirmed its long-awaited Kingdom Hearts collaboration, with teases for at least four skins.\nFortnite Kingdom Hearts Collaboration, Including Sora Skin, Lands This Week\nA brief teaser trailer posted to Fortnite&#x27;s social channels shows Kingdom Hearts poster boy Sora picking up the series&#x27; iconic keyblade and posing for the camera. Yep, there&#x27;s no doubt here — Sora is definitely becoming a Fortnite skin.\nText-based teasers also released by developer Epic Games suggest three other Kingdom Hearts characters are also coming along for the ride, including Riku, Kairi and Roxas. (Sadly, there&#x27;s no sign of Mickey yet — though the idea of him cranking 90&#x27;s while holding a shotgun seems unlikely.)\nSORA TEASER TRAILER WITH SOUND pic.twitter.com/5MeCW3WxEA\nKingdom Hearts will be the latest gaming franchise to join Fortnite during Override, its current video game-themed season, which has already added Sonic the Hedgehog, Shadow the Hedgehog, Dr. Robotnik, Crash Bandicoot and Mega Man, among others. Other upcoming additions have also been rumoured, with fans crossing their fingers for representation from Persona and Final Fantasy 7.\nOverride is currently having something of a cooler reception among fans than Runners, Fortnite&#x27;s previous last season which went down as one of the game&#x27;s best. The playerbase seems split over whether Fortnite&#x27;s Pokémon-like Sprites need to be retired or revamped to still feel fresh, and player numbers have dipped slightly from this summer&#x27;s recent highs.\nAs ever, Fortnite is already gearing itself up for its annual end-of-year festivities, with the Halloween-themed Fortnitemares set to arrive next month. One work-in-progress building on the current battle royale Island looks suspiciously like a Five Nights at Freddy&#x27;s reference, which may well be a tie-in for that. And then there are already whispers that the game will transition into another month-long mini-season in November, with One Piece now being tipped as part of the fun."
+          }
+        ]
+      },
+      {
+        "eventKey": "ef078cf07b95bb6c3593",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Lies of P Trademark Appears to Spell Out Sequel's Name",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/lies-of-p-trademark-appears-to-spell-out-sequels-name",
+            "publishedAt": "2026-09-14T15:52:27.307Z",
+            "canonicalUrl": "https://www.ign.com/articles/lies-of-p-trademark-appears-to-spell-out-sequels-name",
+            "imageUrl": "https://assets-prd.ignimgs.com/2023/09/12/lie-of-p-blogroll-1694562231277.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Lies of P looks set to be followed by Wonders of O, according to a new trademark listing.\nLies of P Trademark Appears to Spell Out Sequel&#x27;s Name\nLies of P looks set to be followed by \"Wonders of O,\" according to a new trademark listing.\nDeveloper Neowiz appears to have trademarked the title via the EU Intellectual Property Office , for use in an upcoming game (as spotted by PhraseMaker ).\nAnnounced as being in full development earlier this year , the follow-up to Lies of P has long been expected to center on characters from L. Frank Baum&#x27;s Oz series, which is what our guess for the \"O\" would be. (Sorry, Odyssey fans.)\nIndeed, Lies of P fans have spent the last two years discussing their hopes for what a Wizard of Oz Soulslike might look like, with villains such as the flying monkeys, living trees and, of course, The Wicked Witch of the West. I&#x27;d like to see players take Toto down too.\n\"What if Dorothy needs to return to Oz to purge the corruption that Paracelsus has created?\" wrote a fan in one of the various reddit threads discussing hopes for an Oz-based sequel, many of which date back a couple of years. \"Paracelsus is clearly a deceiver — as was the Wizard of Oz, so they may be one and the same? Or he is continuing the work of the original Wizard of Oz and is the &#x27;new&#x27; Wizard of Oz?\"\nWe had a good time with Lies of P, awarding it 8/10 , while its subsequent expansion Overture also secured a 8/10. \"Even if it’s clearly dancing on the same old strings, Lies of P: Overture is an excellent expansion that adds a whole lot more to a game that was already great.\"\nBut while \"P\" was a reference to Pinocchio, what could \"O\" stand for? Well, fans of the puppet-starring Soulslike already think they know the answer, following various teases pointing to The Wizard of Oz and its character Dorothy — including a cameo from the Kansas heroine during the game&#x27;s post-credits scene."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 27156,
+      "estimatedInputTokens": 6789,
+      "activeTrackingItems": 0,
+      "candidateItems": 13,
+      "includedItems": 13,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
