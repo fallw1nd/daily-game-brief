@@ -1,0 +1,1062 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-16T02:22:44.256Z",
+  "finalizedAt": "2026-09-16T02:22:44.256Z",
+  "coverageThrough": "2026-09-16 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-16-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-16 12:00",
+      "windowStart": "2026-09-15 10:10",
+      "windowEnd": "2026-09-16 10:10"
+    },
+    "adjacentEdition": "2026-09-15-daily",
+    "packages": [
+      {
+        "eventKey": "404d61b211f536734396",
+        "eventKind": "launch",
+        "subjectKey": "plants vs zombies the board game prepares to",
+        "subject": {
+          "kind": "game",
+          "key": "plants vs zombies the board game prepares to"
+        },
+        "publishability": "direct",
+        "headline": "Plants vs. Zombies: The Board Game Prepares to Launch on Kickstarter",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/plants-vs-zombies-the-board-game-prepares-to-launch-on-kickstarter",
+            "publishedAt": "2026-09-15T20:04:37.805Z",
+            "canonicalUrl": "https://www.ign.com/articles/plants-vs-zombies-the-board-game-prepares-to-launch-on-kickstarter",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/15/pvz-1789503662583.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "PopCap&#x27;s popular, long-running PvE video game series Plants vs. Zombies is getting the tabletop board game treatment, courtesy of Mantic Games. The project is set to launch on Kickstarter on October 14.\nPlants vs. Zombies: The Board Game Prepares to Launch on Kickstarter\nThe popular PvE series heads to tabletop.\nMantic, who has previously adapted numerous IPs to tabletop including Worms, Halo, Hellboy, The Walking Dead, and Invincible, describes the adaptation as \"a fast-paced co-op tabletop game that captures the comedy and chaos of the series.\" It&#x27;s for 1-4 players (just like the video games) in which \"players work together to overcome a series of increasingly challenging levels, each featuring unique setups, objectives, and Zombie hordes to defeat. It&#x27;ll be a card-based game where cards have unique effects when played. There will be Plant cards, with examples given of firing off the Peashooter plants or exploding Cherry Bombs. These will be joined by Tool cards like a shovel that can reorganize your garden&#x27;s defenses or a lawnmower that can cut down a lane of zombies.\nPlaying Zombie cards, meanwhile, moves them closer to your home while simultaneously showing players the paths they&#x27;ll move along, presumably allowing you to best prepare your defenses. You have to play all of your Zombie cards simultaneously, which should add to the tension and chaos of each game.\nThere will be new Plants, Zombies, and challenges to unlock along the way, with each new level pitting players against a fresh Zombie horde. Players lose if any Zombies reach the house. Mantic is preparing a Deluxe Edition that includes pre-assembled miniatures of \"fan-favorite Plants and Zombies\" along with a Night Edition standalone expansion that includes more Plants, Zombies, and other content.\nThe last Plants vs. Zombies game was last years Plants vs. Zombies Replanted, a remake of the original that we thought was good . The last new entry in the series was 2024&#x27;s Plants vs. Zombies 3, a free-to-play mobile game that&#x27;s relaunched multiple times ."
+          }
+        ]
+      },
+      {
+        "eventKey": "4fa44d75330ac2654309",
+        "eventKind": "release-date",
+        "subjectKey": "wo long 2 wings of ember gets",
+        "subject": {
+          "kind": "game",
+          "key": "wo long 2 wings of ember gets"
+        },
+        "publishability": "direct",
+        "headline": "Wo Long 2: Wings of Ember Gets Release Date, Demo Available Now",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/wo-long-2-wings-of-ember-gets-release-date-demo-available-now",
+            "publishedAt": "2026-09-16T01:54:46.897Z",
+            "canonicalUrl": "https://www.ign.com/articles/wo-long-2-wings-of-ember-gets-release-date-demo-available-now",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/16/wolong2-1789523679076.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Wo Long 2: Wings of Ember, the upcoming action-soulslike sequel from Team Ninja (Nier, Ninja Gaiden), will be released on March 4, 2027 for PC, PS5, Xbox Series X|S (including day one on Xbox Game Pass Ultimate), and Nintendo Switch 2. Meanwhile, a free playable alpha demo is available now on PS5, Xbox Series X|S, and PC. The demo will only be active for a limited time, from now through September 30.\nWo Long 2: Wings of Ember Gets Release Date, Demo Available Now\nThe original Wo Long was released in early 2023 and our resident soulslike superfan Mitchell Saltzman thought it was great , saying, \"When it comes to the clashing of melee weapons, Wo Long is among the best in the genre, full stop.\" We also had it at #6 in our list of top-10 soulslikes published later in 2023.\nWo Long 2 was announced at this year&#x27;s Xbox Showcase.\nTeam Ninja says that the demo includes an in-progress character creator to try out as well as online multiplayer for up to three players. \"Fans can explore the open field of Changban, join forces with Liu Bei’s army in fierce battles against the pursuing forces of Cao Cao, and encounter demons inspired by legendary Chinese classics,\" the developer said. In addition, anyone who plays and completes the demo will unlock the Fledgling Phoenix Helmet cosmetic item for use in the full game."
+          }
+        ]
+      },
+      {
+        "eventKey": "d2d8a09ce03a69b24492",
+        "eventKind": "launch",
+        "subjectKey": "cleaner company",
+        "subject": {
+          "kind": "game",
+          "key": "cleaner company"
+        },
+        "publishability": "direct",
+        "headline": "宇宙を飛び回り，危険な現場に挑む4人協力お掃除ゲーム「Cleaner Company」，デモ版をSteamで配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/992/G099236/20260914049/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/992/G099236/20260914049/",
+            "imageUrl": "https://www.4gamer.net/games/992/G099236/20260914049/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Wildflame Studioは2026年9月14日，開発中の新作タイトル「Cleaner Company」のデモ版を配信開始した。本作は，最大4人でのマルチプレイに対応した，オンライン協力型の一…\n宇宙を飛び回り，危険な現場に挑む4人協力お掃除ゲーム「Cleaner Company」，デモ版をSteamで配信開始\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\nお題に沿った絵を描きまくれ！「Draw it+」“絵心”とは違ったところに，勝利へのカギがある（今日から始めろApple Arcade #83）"
+          }
+        ]
+      },
+      {
+        "eventKey": "fb177a3a1e19f91ee44a",
+        "eventKind": "launch",
+        "subjectKey": "graveyard keeper 2",
+        "subject": {
+          "kind": "game",
+          "key": "graveyard keeper 2"
+        },
+        "publishability": "direct",
+        "headline": "死体を埋めて，町を再建して，利益を出す。中世墓地管理シム「Graveyard Keeper 2」，体験版を配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/997/G099775/20260915024/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/997/G099775/20260915024/",
+            "imageUrl": "https://www.4gamer.net/games/997/G099775/20260915024/SS/004.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "tinyBuildとLazy Bear Gamesは本日，中世墓地管理シム「Graveyard Keeper 2」の体験版を配信開始した。体験版では，墓地運営やクラフト，町の再建に加え，遺骸から素材…\n死体を埋めて，町を再建して，利益を出す。中世墓地管理シム「Graveyard Keeper 2」，体験版を配信開始\n9月17日から開催される「東京ゲームショウ2026」に合わせて，さまざまな番組が配信。忘れずに見たい「今週の公式配信番組」ピックアップ\nAccess Accepted第872回：AIが加速させるゲーム供給過多，冷めていくゲーマーの心と財布\n【今週のモチベ】「Marvel's Wolverine」や「空の軌跡 the 2nd」が発売される 2026年9月14日〜9月20日\nお題に沿った絵を描きまくれ！「Draw it+」“絵心”とは違ったところに，勝利へのカギがある（今日から始めろApple Arcade #83）"
+          }
+        ]
+      },
+      {
+        "eventKey": "7eea4c4eb6bfe1473c49",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'This Is a Place You Come to Work Hard' — Wardogs CEO Justifies Crunch as a Balancing Act",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/this-is-a-place-you-come-to-work-hard-wardogs-ceo-justifies-crunch-as-a-balancing-act",
+            "publishedAt": "2026-09-16T00:14:34.597Z",
+            "canonicalUrl": "https://www.ign.com/articles/this-is-a-place-you-come-to-work-hard-wardogs-ceo-justifies-crunch-as-a-balancing-act",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/10/wardogs-1786382120921.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Joe Brammer, the CEO of Wardogs developer Bulkhead, has stated that the studio avoids hiring people that aren&#x27;t willing to crunch.\n&#x27;This Is a Place You Come to Work Hard&#x27; — Wardogs CEO Justifies Crunch as a Balancing Act\nJoe Brammer, the CEO of Wardogs developer Bulkhead, has stated that the studio avoids hiring people who aren&#x27;t willing to crunch.\nIn an interview with The Game Business , Brammer was asked about the studio&#x27;s approach to crunch. He noted that he values balance, but not in the way people may think. Instead of traditional work weeks, the team will push harder for a handful of months, but then have the opportunity to take their foot off the gas without fear of retaliation.\n\"For the last three months, Wardogs has been a lot more important than a lot of their family lives,\" said Brammer. \"It has been, because that&#x27;s what pays the money for them. But now Bulkhead has to acknowledge that it needs to go the other way. For example, everyone is pushing us to get console out earlier.\n\"We&#x27;ve just said, &#x27;No, you don&#x27;t understand, that&#x27;s not how it&#x27;s going to work. We can&#x27;t push them more. We&#x27;re not doing that. It&#x27;s going to release in 2028 when we say it&#x27;s going to release.&#x27; So, for me it&#x27;s about balance and helping people and making sure they have a company where they can say, &#x27;I&#x27;m tapping out,&#x27; and not feel like they&#x27;re going to get fired for tapping out.\"\nBrammer went on to note that it has become harder to crunch due to the team getting older and trying to start families. He stated that they initially offered 10-week paternity leave, but eventually had to ditch it because the employees&#x27; partners were struggling to handle them going back to work. Instead, Bulkhead now offers 2-weeks of paternity leave and gives half-days to employees as a way of making the transition easier for the families.\n\"A lot of people who may have an issue with crunch — rightly so, I understand that issue, we always try and avoid it, but we don’t hide that this is going to happen at some point — they often don&#x27;t make it in the door,\" he says. \"We want to be known for that: this is a place you come to work hard. If you care about the work you’re making and the result of what you make here, you&#x27;ll feel really valued. If you don&#x27;t, you will feel slave-driven.\"\n\"If we&#x27;re going to be a company who says, &#x27;we do crunch&#x27;, then we have to also say, &#x27;but you get something for it,&#x27;\" he said. \"We want people to know that those people who do work hard get that return, and it is life-changing.\"\n\"For the last three months, [it&#x27;s] been a lot more important than a lot of their family lives.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "2e913e4a4cdfbef0679c",
+        "eventKind": "other",
+        "subjectKey": "steam deck 2",
+        "subject": {
+          "kind": "game",
+          "key": "steam deck 2"
+        },
+        "publishability": "direct",
+        "headline": "“Steam Deck 2”開発者いわく、メモリ危機下でも「開発目標」は変わらない。明確な性能向上なくして、Steam Deck 2なし",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260915-467603/",
+            "publishedAt": "2026-09-15T04:24:38+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260915-467603/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260915-467603-haeder.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ValveのエンジニアがSteam Deckの後継機に関して言及。昨今のメモリ不足から、計画がそれほど影響を受けていないことを伝えている。\n“Steam Deck 2”開発者いわく、メモリ危機下でも「開発目標」は変わらない。明確な性能向上なくして、Steam Deck 2なし\nValveのエンジニアが米IGNのインタビューにて、開発が進められているSteam Deckの後継機の計画に関して言及。昨今のメモリ不足の影響を訊かれ、計画や目標がそれほど影響を受けていないことを伝えている。\nSteam DeckはValveが手がける携帯型ゲーミングPCだ。専用に調整されたSteamOSが採用され、ユーザーは自らのSteamライブラリにアクセスし、互換性のあるPCゲームをどこでも楽しめる。2022年に液晶ディスプレイ（LCD）モデルがリリースされ、2023年には有機ELディスプレイ（OLED）搭載の新モデル「Steam Deck OLED」が発売されている。国内ではSteam Deck公式販売パートナーであるKOMODOより販売中。\nSteam Deckは後継機となる、いわば“Steam Deck 2”が開発中であると明かされている。今回はValveでエンジニアを務めるPierre-Loup Griffais氏に対して 米IGN が取材を実施。Steam Deck 2の開発が昨今のメモリ需給のひっ迫の影響を受けているかどうかを訊かれた同氏は、「それほどでもありません（Not really）」と返答している。\nSteam Deck 2についてGriffais氏は過去のインタビューでその構想を語っていたことがある。次世代のSteam Deckとしてかなりはっきりとしたイメージがあるものの、現時点ではSoC（システム・オン・チップ）の分野において“真の次世代性能のSteam Deck”を実現できるような選択肢は存在していないとのこと（ 関連記事 ）。かつてValveの別のスタッフからも「CPUの世代交代待ち」といった技術の進歩次第であることが語られていたが（ 関連記事 ）、そうした方針は変わっていないようだ。\n今回もGriffais氏は、性能が明確に向上したと確実に感じられるものにしたいという展望を説明。状況を見ながら、Steam Deckの次世代機はいつ、どのように提供できるのかを検討していくと伝えている。\nなお今年6月に発売されたSteam Machineはもっとも安価な512GBモデルでも税込18万9980円であり、価格設定の背景に過去1年でメモリとストレージのコストが大幅に上昇したことが伝えられていた。またメモリについては調達が難しいことからゲーミングPCでよく採用される8GB×2のデュアルチャネルではなく、16GB（DDR5-5600）メモリのシングルチャネルを採用したことも明かされていた（ 関連記事1 、 関連記事2 ）。なお本日発売されたSteam Frameは19万9980円という価格設定であり、Steam Machineも含めて、ユーザーからはそれぞれスペックと比べて高額であるといった不満の声も見受けられる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "d7f97e33ef7cc4e1ab7e",
+        "eventKind": "other",
+        "subjectKey": "コンパス",
+        "subject": {
+          "kind": "game",
+          "key": "コンパス"
+        },
+        "publishability": "direct",
+        "headline": "『#コンパス』のNHN PlayArtの新作は、Steam/モバイル向け爆速カードバトルRPG『OVER RUSH』。「プレイしてすぐ楽しい」理念を貫く、開発者に聞いた",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/interviewsjp/over-rush-20260915-467678/",
+            "publishedAt": "2026-09-15T08:17:48+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/interviewsjp/over-rush-20260915-467678/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/over-rush-20260915-467678-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本作の開発プロデューサーを務める寺田康太氏にインタビューを実施。本作の開発経緯や特徴について、興味深いお話をうかがうことができた。\n『#コンパス』のNHN PlayArtの新作は、Steam/モバイル向け爆速カードバトルRPG『OVER RUSH』。「プレイしてすぐ楽しい」理念を貫く、開発者に聞いた\nNHN PlayArtは新作ハイスピードカードバトル 『OVER RUSH』 をiOS/Android/PC（Steam）向けに配信する予定だ。あわせて、本作のオープンβテストが9月17日10時から24日14時59分にかけて実施される。\n『OVER RUSH』は、ローグライク要素のある高速カードバトルRPGだ。本作の舞台は、AIロボットと人が共存する近未来都市「シンクシティ」。そこでは、人々の生活を支えるはずのAIロボット「ワークロイド」の一部が暴走し、人々に危害を加える事件が多発。プレイヤーは対ワークロイド特殊部隊「R.U.S.H」の隊長として、独立思考型ワークロイドの「バディ」とともに、この暴走事件に立ち向かうことになる。\nゲームプレイとしては、スピーディーで直感的なカードバトルが特徴だ。戦闘は、暴走ワークロイドに対してタップでカードを切っていくだけの簡単操作で進行する。カードには赤・青・緑の3色があり、同色のカードを4枚連続で使ってコンボを繋げると「リンクレベル」が上昇し、強力な攻撃を発動可能。また、リンクレベルの上昇によって発動できる「RUSHモード」では、攻撃力と攻撃速度が大幅にアップし、さらにスピード感のあるバトルが展開される。加えて、敵の攻撃をカウンターすることも可能で、状況に応じた素早い判断とカードさばきが求められる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6b0f8ef3d6af7254c6b8",
+        "eventKind": "other",
+        "subjectKey": "escape from tarkov",
+        "subject": {
+          "kind": "game",
+          "key": "escape from tarkov"
+        },
+        "publishability": "direct",
+        "headline": "『Escape from Tarkov』にいよいよ“ランク制”導入、新システム「リーグ」が今夜開幕へ。昇格を賭けて50人で競い合う、“毎週決着”経験値レース",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260915-467700/",
+            "publishedAt": "2026-09-15T08:21:59+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260915-467700/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260915-467700-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Battlestate Gamesは9月15日、『Escape from Tarkov』に向けて、アップデート1.1.5.1のサーバーメンテナンスを開始したと発表した。\n『Escape from Tarkov』にいよいよ“ランク制”導入、新システム「リーグ」が今夜開幕へ。昇格を賭けて50人で競い合う、“毎週決着”経験値レース\nBattlestate Gamesは9月15日、『 Escape from Tarkov 』に向けて、アップデート1.1.5.1のサーバーメンテナンスを開始した。4～6時間を予定しており、メンテナンス終了は日本時間で今夜20時～22時となる見込み。同アップデートでは、経験値に応じてランクが上下する「リーグ」システムが導入される。\n『Escape from Tarkov』は、PvPvE要素をもつハードコア脱出シューターだ。本作の舞台となるのは、政治的混乱から無法地帯となり隔離された架空の都市Tarkov。プレイヤーはNPCやほかのプレイヤーと戦いつつ貴重な戦利品を獲得して、最終的にマップから脱出することを目指す。本作ではキャラクターがレイド中に死亡した場合、装備や戦利品をロストしてしまう。そうしたハードコアなゲームルールも特徴だ。\n経験値はPMCやSCAV、ボスのキルのほか、タスクを完了したり、アイテムを調べたりすることによっても手に入る。生存重視でタスクをこなすのか、それともアグレッシブに戦闘に挑むのか、経験値効率を求めてさまざまなプレイスタイルでリーグに挑戦できそうだ。なお、『Escape from Tarkov: Arena』で得られた経験値はリーグには加算されないとのこと。\nLeagues are launching soon in the seasonal mode of #EscapefromTarkov ! Each week, you’ll compete against 50 players of the same rank. The top 25 players with the most XP will be promoted and compete within the next rank the following week. Any in-game action that earns XP will… pic.twitter.com/6kxwaGdhov\n『Escape from Tarkov』はPC（ 公式サイト / Steam ）向けに配信中。メンテナンスは4～6時間を予定しており、日本時間で今夜20時～22時に終了する見込みだ。\n『Escape from Tarkov』にいよいよ&ldquo;ランク制&rdquo;導入、新システム「リーグ」が今夜開幕へ。昇格を賭けて50人で競い合う、&ldquo;毎週決着&rdquo;経験値レース\n今回のアップデートでは、以前より内容が告知されていた「リーグ」システムが実装される。シーズンキャラクターでのみ利用可能なこのシステムでは、最初のレイドが終了した際、プレイヤーは50人ごとのグループに割り振られる。各グループには独自のリーダーボードが存在し、一週間の獲得経験値を他のプレイヤーと競い合うことになる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "05e4abf6a0dc89bff8b4",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Apex Legends Art Director Says Street Fighter 6 Pushed Devs to Give Characters the 'Thickest Thighs' They've Ever Had",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/apex-legends-art-director-says-street-fighter-6-pushed-devs-to-give-characters-the-thickest-thighs-theyve-ever-had",
+            "publishedAt": "2026-09-15T15:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/apex-legends-art-director-says-street-fighter-6-pushed-devs-to-give-characters-the-thickest-thighs-theyve-ever-had",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/10/apex-legends-street-fighter-interview-thick-thighs-save-lives-1789078248626.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Apex Legends art director Alisa Rastorgueva revealed that the developers pushed the limits of the game’s character models so far for its collaboration with Street Fighter 6 that its heroes became “thicker” than ever.\nApex Legends Art Director Says Street Fighter 6 Pushed Devs to Give Characters the &#x27;Thickest Thighs&#x27; They&#x27;ve Ever Had\nApex Legends art director Alisa Rastorgueva says developers pushed the limits of the game’s character models so far for its collaboration with Street Fighter 6 that its heroes became “thicker” than ever.\nStreet Fighter 6 is coming to Apex Legends with special character skins, a decked-out POI, an ambitious Wildcard Takover, weapon skins, and more on September 22.\nTo celebrate, a handful of Legends are getting the Street Fighter treatment, transforming them into characters from Capcom’s beloved fighting game franchise: Sparrow is Ryu; Alter is Chun-Li; Mirage is Luke; Caustic is Blanka; Wattson is Cammy; Gibraltar is Akuma; Bangalore is Elena; and Pathfinder is Dhalsim.\nEach fighter in this delightful selection of characters boasts a striking silhouette with the muscles to match (they are martial artists, after all) — and that was something that challenged the art team when it came to literally breaking the mold of their Legends to make them look like their Street Fighter counterparts.\nIn a closed session with the media, Apex Legends art director Alisa Rastorgueva revealed that these Street Fighter skins were so muscular that the Legends now have the thickest thighs they’ve ever made for the game.\n“There’s always a new challenge with every collab that we do, and it’s always different,” she told us. “With Gundam, it was trying to fit our Legends into these big mechs. For Street Fighter, a big challenge was trying to find a balance between pushing the body types, especially the muscle definition. All of us know that Street Fighter characters are muscular and their proportions are pushed a lot. We tried to do that, as well. Our legends have some of the thickest thighs we’ve ever done. To take an IP with that much history behind it and put it into Apex Legends — our game is semi-realistic, it definitely has a different visual style than Street Fighter has in a lot of their games, and for us, that was one of our biggest challenges. But it was a fun one.”\nShe also delved into the selection process for choosing these specific Street Fighter characters, explaining that there were many fighters the team considered bringing into the game, but only a few made sense to pair with their Legends."
+          }
+        ]
+      },
+      {
+        "eventKey": "a43fc6d11b42ee68f66d",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Apex Legends VS Street Fighter Brings Chun-Li, Ryu, Akuma, and More to the Outlands",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/apex-legends-vs-street-fighter-brings-chun-li-ryu-akuma-and-more-to-the-outlands",
+            "publishedAt": "2026-09-15T15:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/apex-legends-vs-street-fighter-brings-chun-li-ryu-akuma-and-more-to-the-outlands",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/10/apex-legends-vs-street-fighter-collab-details-1789083291111.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Street Fighter is coming to Apex Legends on September 22, bringing its high-kicking action to the first-person battle royale with special skins, a decked-out POI, a Wildcard Takeover, and more.\nApex Legends VS Street Fighter Brings Chun-Li, Ryu, Akuma, and More to the Outlands\nThis collaboration hurricane-kicks its way into the Outlands on Tuesday, September 22 at 10am PT / 1pm ET. We’ve outlined everything you can expect from Apex Legends’ Street Fighter makeover below.\nPlayers will have the chance to nab eight Iconic Skins in the Reward Shop that transform their Legends into characters from Capcom’s beloved fighting game franchise, as well as one Epic Skin for Lifeline as Li-Fen, Chun-Li’s protege in Street Fighter 6’s World Tour story mode. We’ve included a list of all these characters below, as well as comments about the skins from Apex Legends’ art director, Alisa Rastorgueva, from a closed session with the media:\n● Sparrow as Ryu: “We’re really thinking about personality, playstyle, silhouette when matching our Apex Legends with their Street Fighter counterparts. Sparrow felt the closest to Ryu&#x27;s grisly self in Street Fighter 6 specifically, and we really wanted to push the muscle definition for this skin.”\n● Alter as Chun-Li: “We wanted to make sure Alter could do Chun-Li justice. We pushed the silhouettes of these models and bodies.”\n● Mirage as Luke: “Luke is Street Fighter 6’s breakout character, so we really wanted to feature him. Mirage felt like an obvious match in terms of personality, since they never take themselves seriously.”\n● Gibraltar as Akuma: “This was definitely a fun skin for Gibby. His size and silhouette gave us a good canvas to bring that to life.”\nSkins, Mythic Cosmetics, Emotes & More"
+          }
+        ]
+      },
+      {
+        "eventKey": "d99d9fefcc6aedad5048",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Every Fourth Wing Board Game Adaption You Can Buy Right Now",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/all-fourth-wing-board-game-adaptions",
+            "publishedAt": "2026-09-16T01:02:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/all-fourth-wing-board-game-adaptions",
+            "imageUrl": "https://assets-prd.ignimgs.com/2025/08/04/81c1clgh4ml-ac-sl1500-1754322796796.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Every Fourth Wing Board Game Adaption You Can Buy Right Now\nRebecca Yarros&#x27; Empyrean series has taken the romantasy genre by storm over the past few years. With three books so far, an upcoming graphic novel, and a TV show in the works, there&#x27;s never been a better time to be a fan of Fourth Wing.\nAnd while the TV series is likely the most exciting adaptation the books will ever see, Fourth Wing has already quietly been making its way into the tabletop space over the last couple of years. There are now four Fourth Wing board games you can buy, and probably more on their way.\nThe rise of romantasy tabletop games is a fairly recent thing. For the Empyrean series it all began with the release of Priorities Fourth Wing Edition last year. Since then we&#x27;ve gotten an original strategy game and two branded Monopoly games out of the franchise. This same tabletop arc also seems to be happening for Sarah J. Maas&#x27; ACOTAR series simultaneously.\nFourth Wing: Rise of the Wingleader\nFourth Wing: Rise of the Wingleader is the only original board game for the series so far. Created by Goliath Games, Rise of the Wingleader is a strategy board game that incorporates cards with custom artwork, dragon pieces, and a round game board. You also get a nice metal bookmark alongside the board game itself.\nPriorities Fourth Wing Edition\nPriorities is a popular party game that requires players to essentially rank their \"priorities\" of certain topics. The Fourth Wing version of that is a re-skin of the original game and is just as straightforward. There&#x27;s a huge stack of cards featuring things from the books and players pull five cards and rank them from best to worst. This is a cooperative game , so everyone in the squad is in this together."
+          }
+        ]
+      },
+      {
+        "eventKey": "e9d99f773ee7c187b9e6",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Every Persona Game and Spin-Off in Order",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/persona-games-in-order",
+            "publishedAt": "2026-09-15T16:32:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/persona-games-in-order",
+            "imageUrl": "https://assets1.ignimgs.com/2021/02/12/persona5strikers-blogroll-1613157755666_160w.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "A complete timeline of Shin Megami Tensei&#x27;s most beloved spin-off.\nEvery Persona Game and Spin-Off in Order\nBeginning its life as a Shin Megami Tensei spin-off, the Persona series has become one of the biggest names in modern RPGs. From multiple major sequels and remakes to anime adaptations and even stage plays, Persona is a multimedia sensation, and its popularity doesn’t seem to be slowing down anytime soon.\nWith the official announcement of both Persona 4 Revival and Persona 6 , new players are probably wondering where’s the best place to start. Below, we’ll give you a full rundown of every game and spin-off, including the best entry point for newcomers and both the chronological and release order of the series.\nWhich modern Persona game is the best?\nHow Many Persona Games Are There?\nIn total, there are currently 21 Persona games . Several of these are expanded versions of the mainline entries in the series, whether that’s in the form of re-releases featuring new story content or remakes. While we won’t include direct ports or remasters, we’ll make sure to note every alternate version of each game when listing them below.\nEvery Persona Game and Spin-Off in Release Order"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 29193,
+      "estimatedInputTokens": 7299,
+      "activeTrackingItems": 0,
+      "candidateItems": 12,
+      "includedItems": 12,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
