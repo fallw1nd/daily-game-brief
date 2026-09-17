@@ -1,3 +1,6 @@
+import { titleIdentity } from "./release-calendar-discovery.mjs";
+import { getRegisteredTitleTranslation } from "./title-translations.mjs";
+
 function slug(value) {
   const normalized = String(value || "untitled").normalize("NFKD").toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 72);
@@ -41,6 +44,89 @@ function nullableDecision(item, reason) {
     beijingTime: null, timeNote: null, platforms: [], region: null, releaseType: null,
     sourceIndexes: [], additionalSources: [],
   };
+}
+
+function validHttps(value) {
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
+}
+
+function withinDiscoveryWindow(date, window) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date || "") &&
+    date >= window.startInclusive && date <= window.endInclusive;
+}
+
+function sourceLabel(candidate) {
+  if (candidate.family === "steam" || candidate.sourceId?.startsWith("steam")) return "Steam";
+  if (candidate.family === "nintendo" || candidate.sourceId?.startsWith("nintendo")) return "Nintendo";
+  if (candidate.family === "xbox" || candidate.sourceId?.startsWith("xbox")) return "Xbox";
+  return candidate.sourceId || "官方商店";
+}
+
+function preferredPlatforms(candidates) {
+  const values = [...new Set(candidates.flatMap((item) => item.platforms || []).filter(Boolean))];
+  const switch2OnlyPage = candidates.every((item) => /switch-2(?:\/|$)/i.test(item.url || ""));
+  if (switch2OnlyPage && values.includes("Nintendo Switch 2")) {
+    return values.filter((value) => value !== "Nintendo Switch");
+  }
+  return values;
+}
+
+export function buildDegradedUpcomingPatch(input) {
+  const discovery = input?.upcomingDiscovery;
+  if (!discovery?.window || !Array.isArray(discovery.candidates)) return [];
+
+  const baselineNames = new Set((input.upcomingBaseline?.items || []).flatMap((item) => [
+    item?.title?.title_en,
+    item?.title?.title_zh_cn,
+  ]).filter(Boolean).map(titleIdentity));
+  const grouped = new Map();
+  for (const candidate of discovery.candidates) {
+    const identity = titleIdentity(candidate?.title);
+    if (!identity) continue;
+    const list = grouped.get(identity) || [];
+    list.push(candidate);
+    grouped.set(identity, list);
+  }
+
+  const patch = [];
+  for (const [identity, group] of grouped) {
+    if (baselineNames.has(identity)) continue;
+    const dates = new Set(group.map((item) => item?.date).filter((date) =>
+      withinDiscoveryWindow(date, discovery.window)
+    ));
+    // A disagreement anywhere in discovery is enough to keep the title for human review.
+    if (dates.size !== 1) continue;
+    const [date] = dates;
+    const eligible = group.filter((item) =>
+      item?.kind === "primary" &&
+      (item.knownTitle === true || item.crossSource === true) &&
+      item.date === date &&
+      validHttps(item.url)
+    );
+    if (!eligible.length) continue;
+
+    const selected = [...eligible].sort((left, right) =>
+      Number(right.priority || 0) - Number(left.priority || 0) ||
+      String(left.sourceId || "").localeCompare(String(right.sourceId || ""))
+    )[0];
+    const titleKey = slug(selected.title);
+    const registered = getRegisteredTitleTranslation(titleKey, selected.title);
+    patch.push({
+      id: `upcoming-${titleKey}`,
+      date: date.slice(5).replace("-", "."),
+      titleKey,
+      titleZhCn: registered?.titleZhCn || null,
+      titleEn: selected.title,
+      titleZhStatus: registered?.titleZhCn && registered?.titleZhStatus ? registered.titleZhStatus : "unavailable",
+      platforms: preferredPlatforms(eligible),
+      region: selected.region === "US" ? "美国" : (selected.region || "来源地区"),
+      releaseType: "正式发售",
+      source: { label: sourceLabel(selected), url: selected.url, kind: "primary" },
+      note: "无AI降级日历仅采用官方一手列表中的明确日期；未据此泛化其他平台、地区或版本。",
+    });
+  }
+
+  return patch.sort((left, right) => left.date.localeCompare(right.date) || left.titleEn.localeCompare(right.titleEn));
 }
 
 export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
@@ -87,6 +173,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
   if (!included.length) throw new Error("No high-confidence A-level event is eligible for degraded publication");
   const prefix = archivePrefix(input.window.period);
   const leadName = included[0].titleEn || "自动事实清单";
+  const upcoming = input.window.period === "daily" ? buildDegradedUpcomingPatch(input) : [];
   return {
     contractVersion: 2,
     packetBlobSha,
@@ -95,7 +182,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
     leadEventKey: included[0].eventKey,
     decisions,
     upcomingMode: upcomingMode(input.window.period),
-    removeUpcomingIds: [], upcoming: [],
+    removeUpcomingIds: [], upcoming,
     checkedExtra: ["无AI缺期兜底：仅使用已经打开的证据页"],
     limitedExtra: ["本期为自动事实清单，未执行中文编辑、传闻判断或最后15分钟人工式补查。"],
     editorialNote: "正常ChatGPT定时任务未在SLA前完成；系统只发布高置信事实以避免整期缺失，等待后续编辑修订。",
