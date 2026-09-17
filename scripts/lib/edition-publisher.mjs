@@ -83,11 +83,17 @@ function sourcesFor(decision, packetItem) {
 }
 
 function upcomingTimestamp(editionDate, value) {
-  if (!/^\d{2}\.\d{2}$/.test(value || "")) return NaN;
-  const [month, day] = value.split(".").map(Number);
+  const normalized = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return Date.parse(`${normalized}T00:00:00Z`);
+  if (!/^\d{2}\.\d{2}$/.test(normalized)) return NaN;
+  const [month, day] = normalized.split(".").map(Number);
   const baseYear = Number(editionDate.slice(0, 4));
   const baseMonth = Number(editionDate.slice(5, 7));
   return Date.UTC(month < baseMonth ? baseYear + 1 : baseYear, month - 1, day);
+}
+
+function canonicalUpcomingDate(value) {
+  return String(value || "").replace(/\b\d{4}-(\d{2})-(\d{2})\b/g, "$1.$2");
 }
 
 function inUpcomingWindow(item, editionDate) {
@@ -274,8 +280,10 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const previous = previousUpcoming.find((candidate) => candidate.id === item.id || candidate.title?.title_key === item.titleKey);
     upcomingMap.set(item.id, upcomingEntry(item, previous));
   }
-  const upcoming = [...upcomingMap.values()].filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
-    .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]));
+  const upcoming = [...upcomingMap.values()]
+    .filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
+    .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]))
+    .map((item) => ({ ...item, date: canonicalUpcomingDate(item.date) }));
   const leadEntryId = packet.continuation?.preservePublished && authorizedLatestRevision ? latest.leadEntryId : entryByEvent.get(editorial.leadEventKey) || entries[0].id;
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
   const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
