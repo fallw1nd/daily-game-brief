@@ -1,0 +1,1132 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-17T02:25:41.065Z",
+  "finalizedAt": "2026-09-17T02:25:41.065Z",
+  "coverageThrough": "2026-09-17 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-17-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-17 12:00",
+      "windowStart": "2026-09-16 10:10",
+      "windowEnd": "2026-09-17 10:10"
+    },
+    "adjacentEdition": "2026-09-16-daily",
+    "packages": [
+      {
+        "eventKey": "26c4f17173aee74c5991",
+        "eventKind": "release-date",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Video: Here&#8217;s a look at the Wo Long 2 alpha demo, which is available today to mark its release date announcement",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/video-heres-a-look-at-the-wo-long-2-alpha-demo-which-is-available-today-to-mark-its-release-date-announcement/",
+            "publishedAt": "2026-09-16T10:37:09+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/09/wo-long-2.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Koei Tecmo has announced that Wo Long 2 will release in March 2027…\nVideo: Here&#8217;s a look at the Wo Long 2 alpha demo, which is available today to mark its release date announcement\nKoei Tecmo has announced that Wo Long 2 will release in March 2027\nKoei Tecmo has revealed the release date for Wo Long 2: Wings of Ember, along with the release of a new Alpha Demo of the game.\nThe publisher announced that the game will be released on March 4, 2027 on Xbox Series X/S , PlayStation 5 , Switch 2 and PC .\nThe game will also be available on Xbox Game Pass on the day of release.\nVGC went hands-on with the Alpha Demo while at Gamescom last month, and we&#8217;ve captured footage from it so you can see it in action. You can either watch this in the video embedded above, or via VGC&#8217;s YouTube channel .\nThe demo is available to download now on PC, PS5 and Xbox Series X/S, but will only last until September 30.\nKoei Tecmo also announced that the game will have a Digital Deluxe Edition which includes the base game, a Season Pass and a Creator God Armor Set, as well as a Digital Artbook, Digital Mini Soundtrack and Shitieshou Hat."
+          }
+        ]
+      },
+      {
+        "eventKey": "1cd7e66f9e6149186785",
+        "eventKind": "launch",
+        "subjectKey": "忌品管理部",
+        "subject": {
+          "kind": "game",
+          "key": "忌品管理部"
+        },
+        "publishability": "direct",
+        "headline": "舞台はさまざまな人の遺品を管理する施設。母の死に隠された謎を暴くADV「忌品管理部」，Steamで配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/020/G102092/20260916008/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/020/G102092/20260916008/",
+            "imageUrl": "https://www.4gamer.net/games/020/G102092/20260916008/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "zentac studioは本日，PC用ソフト「忌品管理部」の配信をSteamで開始した。本作は，母の死に隠された謎と施設に眠る闇に迫る物語を描いたアドベンチャーゲームだ。施設では，さまざまな事故や…\n舞台はさまざまな人の遺品を管理する施設。母の死に隠された謎を暴くADV「忌品管理部」，Steamで配信開始\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\nスマホゲームのセルラン分析（2026年9月3日〜9月9日）。今週の1位は「ポケモンGO」。4月〜6月の全世界DL数ランキングも紹介\nそうだ アニメ，見よう：第268回はシンエイ動画制作の「これ描いて死ね」。漫画の楽しさと厳しさを描く，伊豆王島の少女たちの青春グラフィティ\n「週刊VTuberファイル」File.138：歩音ティナ【ユニバースプロダクション】"
+          }
+        ]
+      },
+      {
+        "eventKey": "6bc7012ceb94a932a880",
+        "eventKind": "launch",
+        "subjectKey": "クレイジー クライマー",
+        "subject": {
+          "kind": "game",
+          "key": "クレイジー クライマー"
+        },
+        "publishability": "direct",
+        "headline": "落下物やゴリラを避けて超高層ビルを登れ。8ビット家庭用版「クレイジー・クライマー」がコンソールアーカイブスで9月17日に配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/043/G104339/20260916029/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/043/G104339/20260916029/",
+            "imageUrl": "https://www.4gamer.net/games/043/G104339/20260916029/SS/005.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ハムスターは本日，「コンソールアーカイブス クレイジー・クライマー」を2026年9月17日に配信すると発表した。本作は，1986年にニチブツから8ビット家庭用ゲーム機向けに発売されたアクションゲーム…\n落下物やゴリラを避けて超高層ビルを登れ。8ビット家庭用版「クレイジー・クライマー」がコンソールアーカイブスで9月17日に配信開始\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\nスマホゲームのセルラン分析（2026年9月3日〜9月9日）。今週の1位は「ポケモンGO」。4月〜6月の全世界DL数ランキングも紹介\nそうだ アニメ，見よう：第268回はシンエイ動画制作の「これ描いて死ね」。漫画の楽しさと厳しさを描く，伊豆王島の少女たちの青春グラフィティ\n「週刊VTuberファイル」File.138：歩音ティナ【ユニバースプロダクション】"
+          }
+        ]
+      },
+      {
+        "eventKey": "5756f22a45ddab1bf13b",
+        "eventKind": "launch",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "魔法生物を収集しながら世界を冒険し，バトルや謎解きに挑もう。「アニモ」，PC / コンソール版で配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/918/G091819/20260916042/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/918/G091819/20260916042/",
+            "imageUrl": "https://www.4gamer.net/games/918/G091819/20260916042/SS/007.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Pawprint Studioは本日（2026年9月16日），新作タイトル「アニモ」の，PC / コンソール版のグローバル正式サービスを開始した。本作は，アニモと呼ばれる“魔法の生き物”を集めながら…\n魔法生物を収集しながら世界を冒険し，バトルや謎解きに挑もう。「アニモ」，PC / コンソール版で配信開始\nモンスター収集RPG「アニモ」は，不思議な生物を捕まえるだけでなく，”モンスターの視点で世界を見られる”ことが最大の特徴［BW2026］\n中国・上海で7月10日から12日まで開催された「Bilibili World 2026」にて，Pawprint Studioが手がけるオープンワールドモンスター収集RPG 「アニモ」 がプレイアブル出展されていた。最大の特徴は， “モンスターの視点で世界を見られる” ことだ。\n［プレイレポ］不思議な生物たちと，オープンワールドの冒険の旅へ。モンスター収集RPG「アニモ」の手触りをCBT前にお届け\nPawprint Studioがクローズドβテストを予定している，オープンワールドモンスター収集RPG 「アニモ」 。不思議な生物たちを相棒に，広大な世界を冒険する本作の プレイレポート を，CBTに先駆けてご紹介しよう。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7a47a08e877c5e4cc9f8",
+        "eventKind": "result",
+        "subjectKey": "ファイアーエムブレム 万紫千紅",
+        "subject": {
+          "kind": "game",
+          "key": "ファイアーエムブレム 万紫千紅"
+        },
+        "publishability": "direct",
+        "headline": "『ファイアーエムブレム 万紫千紅』本日発売！大剣闘祭の優勝を目指す4人の戦士と、魔神「バロール」と戦う主人公「救世主」の物語が描かれる",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260917o",
+            "publishedAt": "2026-09-16T15:00:55+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260917o",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/6cff977dbe22f90673707318f9321e06b9d3a5de8ee9192ccf4b45ddf9ee91a3.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "世界が滅びゆくなか、「救世主」は運命の女神「フォトナ」と5年前へとさかのぼる。価格はDL版が8980円、パッケージ版が9980円\n『ファイアーエムブレム 万紫千紅』本日発売！大剣闘祭の優勝を目指す4人の戦士と、魔神「バロール」と戦う主人公「救世主」の物語が描かれる\n9月17日、シミュレーションRPG『ファイアーエムブレム』の最新作 『ファイアーエムブレム 万紫千紅』 が発売される。本作はNintendo Switch 2向けに発売、価格は通常版の パッケージ版 が9980円（税込）、 ダウンロード版 が8980円（税込）となる。\n（画像は 『ファイアーエムブレム 万紫千紅』Nintendo Storeページ より）\n9月14日には、本作の紹介映像がNintendo公式チャンネルで投稿されている。\nプレイヤーは「カイ」「セオドラ」「ディートリヒ」「レダ」異なる特徴を持つ4人の主人公からひとりを選び、それぞれの視点で大剣闘祭の優勝を目指す物語が描かれる。\nまた、この4人の物語から5年後、異なる主人公「救世主」の視点から、世界を滅ぼさんとする魔神「バロール」との戦いを描く物語もあわせて描かれる。時を操る神「フォトナ」の力で5年前の過去に干渉し、4人の戦士のうち最後まで物語をプレイした戦士は「バロール」との戦いに仲間として連れて行くことができる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "1484dfc731c933edf124",
+        "eventKind": "launch",
+        "subjectKey": "all active aniimo codes for",
+        "subject": {
+          "kind": "game",
+          "key": "all active aniimo codes for"
+        },
+        "publishability": "direct",
+        "headline": "All active Aniimo codes for launch, September 2026",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/rpg/aniimo-codes/",
+            "publishedAt": "2026-09-16T14:54:32Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/rpg/aniimo-codes/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/k2DwinkZgMgJUHH7YLuXqb-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Get more Glimmer and other freebies with these Aniimo gift codes.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nSubscribe for a weekly digest of the movie and TV news that matters, direct to your inbox. From first-look trailers, interviews, reviews and explainers, we've got you covered.\nAll active Aniimo codes for launch, September 2026\nAniimo codes can help you buy items to alter the stats or appearance of your adorable (only occasionally intimidating) Aniimo companions, or just straight up give you the items to do so. Whatever gift codes contain, they're free! So even if you don't need the rewards right now, it's best to redeem Aniimo codes as soon as pawsible, before they expire and your rewards are gone furever.\nAniimo codes are redeemed in-game from the settings menu, which is accessed from the main phone menu. You also need to complete \"Chasing The Clouds\" with Dr. Lewis to unlock the in-game mail menu to receive your rewards, though.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "4d7ba0250d2c080e7eff",
+        "eventKind": "launch",
+        "subjectKey": "world of warcraft forever beta",
+        "subject": {
+          "kind": "game",
+          "key": "world of warcraft forever beta"
+        },
+        "publishability": "direct",
+        "headline": "World of Warcraft: Forever beta launch times: How to sign up and play Blizzard's twist on WoW Classic",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/world-of-warcraft/world-of-warcraft-forever-beta-launch-times-how-to-sign-up-and-play-blizzards-twist-on-wow-classic/",
+            "publishedAt": "2026-09-16T17:20:51Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/world-of-warcraft/world-of-warcraft-forever-beta-launch-times-how-to-sign-up-and-play-blizzards-twist-on-wow-classic/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/F2Vr74L9EDyrQyczqYRoie-1920-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Here's how to get an early taste at the classic-ish MMO.\nWorld of Warcraft: Forever beta launch times: How to sign up and play Blizzard's twist on WoW Classic\nSeptember 16 at 5:50 pm PT: I've updated the WoW: Forever launch time below.\nWorld of Warcraft: Forever is a new branch of the MMO that's making its debut this week in a month-long beta before the whole thing drops in November. It will be the first opportunity to experience some of the new quests, dungeons, and class abilities that Blizzard has added to a version of the MMO that will never move on past the original game.\nHere's everything you need to know about the WoW: Forever beta, how to get access, and what's available in it.\nWhen does the World of Warcraft: Forever beta start?\nThe WoW: Forever beta begins on Thursday, September 17 on PC. Anyone who has preordered the Skyborne Epic Pack or the Warcraft Forever Collection will have access as soon as it opens. Blizzard says the WoW: Forever beta will go live after the live Q&A at 10:30 am PT . It's unclear how long the stream will go, but I'd expect it to last around 30 minutes. Here are the stream times across regions on September 17:\nYou'll have about a month to try the game out before the beta ends on October 21.\nHow to access the World of Warcraft: Forever beta\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "64baea4f36120b912de6",
+        "eventKind": "other",
+        "subjectKey": "roadhouse simulator",
+        "subject": {
+          "kind": "game",
+          "key": "roadhouse simulator"
+        },
+        "publishability": "direct",
+        "headline": "“治安悪め”酒場経営シム『Roadhouse Simulator』9月22日配信へ。酒を注いで拳を振るう、用心棒からの成り上がり稼業",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260916-468013/",
+            "publishedAt": "2026-09-16T08:45:41+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260916-468013/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260916-468013-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "DRAGO entertainmentは9月16日、ロードハウス経営シミュレーションゲーム『Roadhouse Simulator』を9月21日に配信すると発表した。\n“治安悪め”酒場経営シム『Roadhouse Simulator』9月22日配信へ。酒を注いで拳を振るう、用心棒からの成り上がり稼業\nデベロッパーのDRAGO entertainmentは、ロードハウス経営シミュレーションゲーム『 Roadhouse Simulator 』を9月21日に配信予定。対応プラットフォームはPC（Steam/GOG.com）。Steamストアページによると、日本では時差の関係で9月22日配信となるようだ。\n『Roadhouse Simulator』にてプレイヤーは、米国のルート66沿いに建つ寂れたロードハウスで働く主人公となり、最初は用心棒として働く。そして接客などもこなしながら、やがてロードハウス全体を取り仕切るようになり、このハイウェイで一番の人気スポットへと発展させることを目指す。\n本作の開発元DRAGO entertainmentは、人気ガソリンスタンド経営シミュレーションゲーム『ガスステーションシミュレーター』などで知られるスタジオだ。本作『Roadhouse Simulator』は、『ガスステーションシミュレーター』と世界観を共有する前日譚的な作品になるという。同様の位置付けの新作はほかに『Road Diner Simulator』も現在開発中だが、今回まずは本作から展開されることが決定した格好だ。\n『Roadhouse Simulator』は、PC（ S t eam / GOG.com ）向けに9月22日配信予定だ。また、Steamでは体験版が現在配信中である。\n本作は、幹線道路沿いにある酒場であるロードハウスを営むゲームだ。同じ開発元の人気作『ガスステーションシミュレーター』と世界観を共有する作品である。"
+          }
+        ]
+      },
+      {
+        "eventKey": "dfa91c95af8679ceda70",
+        "eventKind": "review-score",
+        "subjectKey": "火焰纹章 万缕千丝",
+        "subject": {
+          "kind": "game",
+          "key": "火焰纹章 万缕千丝"
+        },
+        "publishability": "direct",
+        "headline": "《火焰纹章：万缕千丝》M站暂获89分 并列系列第二",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "3dmgame",
+            "label": "3DM游戏新闻",
+            "url": "https://www.3dmgame.com/news/202609/3953472.html",
+            "publishedAt": "2026-09-16T21:15:03.000Z",
+            "canonicalUrl": "https://www.3dmgame.com/news/202609/3953472.html",
+            "imageUrl": null,
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "《火焰纹章：万缕千丝》的Metacritic媒体均分目前为89分，与《火焰纹章：风花雪月》持平，并列《火焰之纹章》系列第二高分。系列最高纪录仍由《火焰之纹章：觉醒》保持，该作的Metacritic评分\n《火焰纹章：万缕千丝》的Metacritic媒体均分目前为89分，与《火焰纹章：风花雪月》持平，并列《火焰之纹章》系列第二高分。系列最高纪录仍由《火焰之纹章：觉醒》保持，该作的Metacritic评分为92分。\n截至统计时，《火焰纹章：万缕千丝》共收录60篇媒体评测，其中15篇按照各自评分标准给出满分，IGN和Eurogamer均在其列。当前最低的三项评分为7分（满分10分）。\n本作延续了系列的战术角色扮演玩法，并进一步拓展《火焰纹章：风花雪月》的多路线结构。故事此次由四名主角共同推进，整体规模也较前作有所扩大。\n按照目前收录的媒体评分，《火焰纹章：万缕千丝》尚未超过《火焰纹章：觉醒》的92分，但已追平《火焰纹章：风花雪月》，暂居系列并列第二。\n自由撰稿人Alan Wen为本作给出四星评价（满分五星）。他认为，游戏以更大的规模发展了《火焰之纹章：风花雪月》的多路线框架，故事和战斗具有吸引力，但数量较多的杂务内容拖慢了整体节奏。"
+          }
+        ]
+      },
+      {
+        "eventKey": "a9c374e6e477747d2155",
+        "eventKind": "review-score",
+        "subjectKey": "空之轨迹 the 2nd",
+        "subject": {
+          "kind": "game",
+          "key": "空之轨迹 the 2nd"
+        },
+        "publishability": "direct",
+        "headline": "《空之轨迹 the 2nd》M站最高93分领跑年度新作",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "3dmgame",
+            "label": "3DM游戏新闻",
+            "url": "https://www.3dmgame.com/news/202609/3953508.html",
+            "publishedAt": "2026-09-17T02:01:51.000Z",
+            "canonicalUrl": "https://www.3dmgame.com/news/202609/3953508.html",
+            "imageUrl": null,
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "《空之轨迹 the 2nd》首批媒体评价陆续公开。游戏PC版目前在Metacritic获得93分，暂时成为该站2026年评分最高的新作。截至相关数据统计时，PC版的93分来\n《空之轨迹 the 2nd》获M站最高93分暂居年度新作榜首\n《空之轨迹 the 2nd》首批媒体评价陆续公开。游戏PC版目前在Metacritic获得93分，暂时成为该站2026年评分最高的新作。\n在汇总不同平台评测的OpenCritic上，本作目前同样取得92分。按照两个评分网站现有数据，《空之轨迹 the 2nd》均排在2026年新作前列。\n本作是日本Falcom推进《空之轨迹》系列重制计划的第二部作品，原作已有约20年历史。系列首部重制作品《空之轨迹 the 1st》于2025年推出，并获得了相近的积极评价。\n日本Falcom社长此前表示，《空之轨迹 the 1st》的表现让公司希望继续推进一段时间的重制计划。《空之轨迹 the 2nd》定于9月17日正式发售。\n截至相关数据统计时，PC版的93分来自10篇评测。PS5版收录13篇评测，评分为92分；Switch 2版则为84分，但收录的评测数量更少。由于后续评价仍在陆续加入，各版本分数还可能发生变化。"
+          }
+        ]
+      },
+      {
+        "eventKey": "3d33a676af00422bfa71",
+        "eventKind": "other",
+        "subjectKey": "陶芸マスター",
+        "subject": {
+          "kind": "game",
+          "key": "陶芸マスター"
+        },
+        "publishability": "direct",
+        "headline": "「圧倒的に好評」の陶芸＆経営シム『陶芸マスター』、“約7年”の時を経てついに正式リリース。好きな形の「渾身の陶器」を作りあげ、展示会/売上で資金稼ぎ",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260916-468054/",
+            "publishedAt": "2026-09-16T10:20:52+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260916-468054/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260916-468054-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "AZGamesは9月11日、陶芸シミュレーター『陶芸マスター』を正式リリースした。本作は陶芸をテーマにした創作・経営シミュレーションゲームだ。\n「圧倒的に好評」の陶芸＆経営シム『陶芸マスター』、“約7年”の時を経てついに正式リリース。好きな形の「渾身の陶器」を作りあげ、展示会/売上で資金稼ぎ\nデベロッパーのAZGamesは9月11日、陶芸シミュレーター『 陶芸マスター 』を正式リリースした。対応プラットフォームはPC（Steam）で、ゲーム内の日本語表記に対応している。\n『陶芸マスター』は陶芸をテーマにした創作・経営シミュレーションゲームだ。唯一無二の陶芸作品を作り上げ、展示会を経営する。その過程では、展示会に来たお客さんから陶芸品の販売を求められることもある。展示会の収入や、陶芸品の売上などから資金を集め、新たな素材を購入したり、展示スペースを拡張していく。こうして陶芸家としてのスキルを高めていくのだ。\n『陶芸マスター』はPC向け（ Steam ）に発売中だ。リリース記念セールとして9月21日まで定価の15%オフとなる595円で発売している。\n本作は2019年11月11日に早期アクセスの配信を開始、Steamでは「圧倒的に好評」ステータスを得るなど高い評価を集めていた。早期アクセス開始から7年目越しの正式リリースとなった。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7704925edf9409ab93f3",
+        "eventKind": "other",
+        "subjectKey": "fate extra record",
+        "subject": {
+          "kind": "game",
+          "key": "fate extra record"
+        },
+        "publishability": "direct",
+        "headline": "『Fate/EXTRA Record』TGS先行プレイ感想。バトルは「3すくみのじゃんけん」から「デッキ構築」へ。読み合いは形を変える",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/fate-extra-record-20260917-467923/",
+            "publishedAt": "2026-09-17T02:00:04+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/fate-extra-record-20260917-467923/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/fate-extra-record-20260917-467923-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "今回は原作ファンである筆者が『Fate/EXTRA Record』を試遊。実際にプレイして分かった手触りや、原作から大きく変化したバトルシステムを中心に紹介していきたい。\n『Fate/EXTRA Record』TGS先行プレイ感想。バトルは「3すくみのじゃんけん」から「デッキ構築」へ。読み合いは形を変える\n『Fate/EXTRA Record』 は、アニプレックスより2027年1月28日に発売予定のダンジョン探索型RPGだ。2010年に発売されたPSP向け『Fate/EXTRA』をフルリメイクした作品として長らく開発が続けられてきたが、度重なる発売延期に加え、2026年3月にはバンダイナムコエンターテインメントからの販売中止が発表。さらに企画・監督を務めていた新納一哉氏の退社など紆余曲折を経て、アニプレックスを販売元として再始動した形だ。そのような経緯があるため、待望のリメイクでありつつどのような形に仕上がっているのか、期待と不安の両方を抱いているファンも少なくないだろう。\n筆者はTYPE-MOON作品のファンであり、『Fate/EXTRA』も発売当時にプレイした一人だ。今回は原作ファンである筆者が『Fate/EXTRA Record』を東京ゲームショウで試遊する機会を得た。本稿では実際にプレイして分かった手触りや、原作から大きく変化したバトルシステムを中心に紹介していきたい。\nまず『Fate/EXTRA Record』を語るうえで、触れておきたいのが、16年という時間を経たことで変化した『Fate/EXTRA』の立ち位置だ。2010年にPSP向けソフトとして発売された本作は、『Fate』シリーズ初のRPG作品として、『Fate/stay night』とは異なる世界を舞台にした聖杯戦争を描いた。月面に存在する霊子虚構世界「SE.RA.PH」を舞台に、主人公はセイバー、キャスター、アーチャーのサーヴァント3騎からパートナーを選び、聖杯戦争に挑むことになった。\n当時、セイバー、キャスター、アーチャーは『Fate/EXTRA』という新たな世界で出会うサーヴァントであり、主人公との関係を築いていくなかで、過去や価値観・人物像を少しずつ知っていった。誰が味方で誰が敵なのか、目の前にいるサーヴァントが何者なのか。主人公と同じ視点から情報を集め、サーヴァントへの理解を深めていく過程が、『Fate/EXTRA』の物語におけるポイントだった。\nだが16年が経った現在では、『Fate』シリーズを取り巻く環境が大きく変化している。特に『Fate/Grand Order（以下、FGO）』をはじめとした関連作品を通じて、セイバー、キャスター、アーチャーの存在を知り、真名まで把握した状態で『Fate/EXTRA Record』に触れるプレイヤーも少なくないだろう。原作では「サーヴァントは何者なのか」という疑問を主人公と共有しながら物語を進めていたのに対し、現在のプレイヤーは、セイバー、キャスター、アーチャーについて別作品で描かれた姿や設定を知ったうえで『Fate/EXTRA』の世界に入ることになる人も多いだろう。原作当時と同じ意味での新鮮味は薄れる一方、『Fate/EXTRA』という世界でセイバー、キャスター、アーチャーがどのような立場にあり、主人公とどのような関係を築いていたのかを改めて見ることで、既に知っているキャラクターの別の側面を掘り下げる機会にもなるかもしれない。\n逆に原作を遊んだプレイヤーにとっては、16年という時間そのものが新たな意味を持つだろう。『Fate/EXTRA』で出会ったセイバー、キャスター、アーチャーを、以降さまざまな『Fate』作品で見てきたうえで、改めてパートナーとして迎えることになるからだ。当時は知らなかった姿や、別作品で描かれた人物像を知ったからこそ、『Fate/EXTRA Record』では原作とは異なる印象を抱く可能性がある。本作はかつてPSPの画面で体験していた物語と、キャラクターを現代の表現で描き直すだけでなく、『Fate/EXTRA』を見つめ直す機会にもなりそうだ。"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 24002,
+      "estimatedInputTokens": 5235,
+      "activeTrackingItems": 0,
+      "candidateItems": 12,
+      "includedItems": 12,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Moving Simulator",
+        "subjectKey": "Moving Simulator",
+        "titleKey": "moving-simulator",
+        "titleZhCn": "搬家模拟器",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2025/moving-simulator/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "搬家模拟器_搬家模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "搬家模拟器_搬家模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com 搬家模拟器 Moving Simulator 分享 QQ 微博 微信 综合 资讯 攻略 下载 专区 社区 查看全部16 截图 壁纸 原画 设定图 其他 视频 1/2 《搬家模拟器》让你掌控自己的搬家公司！体验管理家庭搬迁的刺激与挑战——从打包纸箱、拆卸家具到小心地将物品装入卡车。每一次搬家都会带来新的惊喜、搞笑的事故和意想不到的障碍，考验你的解决问题能力和耐心。 PC 发布时间 2026-01-16 PC 2026-01-16 游戏时长 未知 游戏类型 模拟游戏 官方中文 支持 制作发行 Corpix Games,PlayWay S.A./Pla"
+          },
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/145638.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "搬家模拟器电脑版下载-Moving Simulator demo试玩版下载_3DM单机",
+            "excerpt": "搬家模拟器电脑版下载-Moving Simulator demo试玩版下载_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 模拟经营 > 《搬家模拟器》demo 《搬家模拟器》demo 游戏类型： 模拟经营 开发厂商： PlayWay S.A.,Corpix Games 更新时间： 2025-07-28 发售日期： 2026年1月16日 游戏平台： PC 游戏语言： 简中 标签： 驾驶 生活模拟 物理 7.9 已有 25 人评分 您还未评分！ 本地下载"
+          },
+          {
+            "label": "3g.ali213.net",
+            "url": "https://3g.ali213.net/news/html/927947.html",
+            "hostname": "3g.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "单人搬家模拟《搬家模拟器》 搬坏东西要赔钱不可乱来_游侠网",
+            "excerpt": "单人搬家模拟《搬家模拟器》 搬坏东西要赔钱不可乱来_游侠网 首页 资讯 专题 手游 攻略 游戏 论坛 硬件 图库 视频 补丁 下载 热门搜索： 单人搬家模拟《搬家模拟器》 搬坏东西要赔钱不可乱来 2025-05-11 09:48:16 来源：马里奥小皮卡 0 虽然市面上已有不少搬家或装修题材的游戏，但Steam平台近日出现了一款专注于搬家 模拟 体验的新作《搬家模拟器》（Moving Simulator），由知名模拟游戏发行商PlayWay负责发行。 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;本作的特色可总结为三个要素： 第一人称 视角、一人公司经营，以及\"只有你一人赔钱\"的独特设定。 《搬家模拟器》是Co"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Death Simulator",
+        "subjectKey": "Death Simulator",
+        "titleKey": "death-simulator",
+        "titleZhCn": "死神模拟器",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2024/trainee-death-simulator/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "死神模拟器_死神模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "死神模拟器_死神模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com 死神模拟器 Trainee Death Simulator 分享 QQ 微博 微信 综合 资讯 攻略 下载 专区 社区 查看全部7 截图 壁纸 原画 设定图 其他 视频 1/2 你将扮演一位见习死神，收割灵魂偿还债务。随机的抉择事件为你提供多种选择：反正灵魂还不完，躺在床上摆摆烂。跟着前辈赚外快，收集衣服换着穿。见习死神的命不是命，重来的次数无穷尽。 PC 发布时间 2024-11-13 PC 2024-11-13 游戏时长 未知 游戏类型 角色扮演 策略游戏 官方中文 支持 制作发行 Bone Nail 骨钉工作室《死神模拟器》参加今日Stea"
+          },
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/141544.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "死神模拟器官方版中文下载-死神模拟器官网版下载安装_3DM单机",
+            "excerpt": "死神模拟器官方版中文下载-死神模拟器官网版下载安装_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 角色扮演 > 《死神模拟器》官方版 《死神模拟器》官方版 进入专题 游戏类型： 角色扮演 开发厂商： Bone Nail 更新时间： 2026-01-06 发售日期： 2024年11月13日 游戏平台： PC 游戏语言： 简中 标签： 卡牌游戏 独立 国产 哥特 7.8 已有 12 人评分 您还未评分！ 本地下载 普通http下载，速度慢 去论坛 看专题"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
