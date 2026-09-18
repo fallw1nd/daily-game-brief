@@ -1,0 +1,1300 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-18T02:21:47.348Z",
+  "finalizedAt": "2026-09-18T02:21:47.348Z",
+  "coverageThrough": "2026-09-18 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-18-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-18 12:00",
+      "windowStart": "2026-09-17 10:10",
+      "windowEnd": "2026-09-18 10:10"
+    },
+    "adjacentEdition": "2026-09-17-daily",
+    "packages": [
+      {
+        "eventKey": "cee9542af30b313f9124",
+        "eventKind": "announcement",
+        "subjectKey": "bloomwalker",
+        "subject": {
+          "kind": "game",
+          "key": "bloomwalker"
+        },
+        "publishability": "direct",
+        "headline": "「歩く家」クラフト冒険ゲーム『Bloomwalker』正式発表。汚染された世界を浄化する旅、『二ノ国』関連新作",
+        "tier": "A",
+        "score": 128,
+        "timeRelation": "window",
+        "readiness": "two-media-no-primary",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468389/",
+            "publishedAt": "2026-09-17T10:34:14+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468389/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468389-header3.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Netmarbleは8月21日、『Bloomwalker』を正式発表した。\n「歩く家」クラフト冒険ゲーム『Bloomwalker』正式発表。汚染された世界を浄化する旅、『二ノ国』関連新作\nNetmarbleは9月17日、『 ブルームウォーカー（Bloomwalker） 』を正式発表した。『二ノ国』IPの新作になるという。対応プラットフォームはPC（Steam/Microsoft Store）/PS5/Xbox Series X|S/Nintendo Switch 2/Nintendo Switch。\n本作は2025年8月に『Project Bloomwalker』として発表。このたび『Bloomwalker』というタイトルで正式発表された。本作は『二ノ国』IPの新作になることが明かされており、今回のトレイラーではレベルファイブの権利表記のほか、「LEVEL 5 Ni no Kuni」との表記も見られる。ちなみに、先述したイマージェンやフニャは『二ノ国』シリーズにも登場していたキャラクターだ。\n『ブルームウォーカー（Bloomwalker）』はPC（ Steam / Microsoft Store ）/ PS5 / Xbox Series X|S /Nintendo Switch 2/Nintendo Switch向けに開発中。\n『ブルームウォーカー』は、クラフト要素のあるアドベンチャーゲームだ。舞台となるのは、汚染により荒れ果てたルミノアの聖域。プレイヤーは大地を癒す旅人として、小さな自然の精霊「フニャ」たちと共に世界を巡り、汚染を浄化していくことになる。\n本作の特徴は家が移動するシステムだ。主人公は家と共に聖域から聖域へと渡り歩き、旅を進めるほどに家の新たな機能や外見を手に入れられる。家の扉は「Pocket Dimension」なる特別な空間と繋がっており、職人のイマージェンとフニャたちとともに暮らすうちに賑やかな場所に発展していく。イマージェンとの交流で絆を深めれば、新たなレシピや設備も解放されていくという。またフニャは世界の回復が進むほど増えていき、餌と寝床を与えてお世話をすることで、素材を集めてくれる。そんな素材を設備を用いて加工し、アイテムを得ることが可能となる。"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/043/G104379/20260917061/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/043/G104379/20260917061/",
+            "imageUrl": "https://www.4gamer.net/games/043/G104379/20260917061/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ネットマーブルは本日（2026年9月17日），新作「Bloomwalker」を発表し，トレイラーを公開した。荒廃した世界ルミノアを舞台に，移動する家と共に旅をしながら，大地に広がる汚染を浄化していく…\nクラフトアドベンチャー「Bloomwalker」が正式発表。歩く家と共に旅をしながら，汚染された世界ルミノアを浄化していく［TGS2026］\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\nスマホゲームのセルラン分析（2026年9月3日〜9月9日）。今週の1位は「ポケモンGO」。4月〜6月の全世界DL数ランキングも紹介\nそうだ アニメ，見よう：第268回はシンエイ動画制作の「これ描いて死ね」。漫画の楽しさと厳しさを描く，伊豆王島の少女たちの青春グラフィティ\n剣戟アクション「鬼武者 Way of the Sword」も快適動作。LenovoのノートPC「Legion Pro 5 Gen 10」は頼もしいゲーマーの相棒だ【PR】"
+          }
+        ]
+      },
+      {
+        "eventKey": "f7e87e22f10b665e66da",
+        "eventKind": "other",
+        "subjectKey": "文字遊戯",
+        "subject": {
+          "kind": "game",
+          "key": "文字遊戯"
+        },
+        "publishability": "direct",
+        "headline": "Nintendo Switch 2/Switch向けセールに約560本どっさり追加。『文字遊戯』『戦場のフーガ3』などが最安値級、魔女っ子との“作業ゲーム”も最安値更新でお求めやすい",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468344/",
+            "publishedAt": "2026-09-17T07:11:10+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468344/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468344-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ニンテンドーeショップにて9月17日、Nintendo Switch 2/Nintendo Switch向けタイトルの新たなセールが開始された。対象タイトルは約560本。\nNintendo Switch 2/Switch向けセールに約560本どっさり追加。『文字遊戯』『戦場のフーガ3』などが最安値級、魔女っ子との“作業ゲーム”も最安値更新でお求めやすい\n『 文字遊戯 』 ・文字だけで構成された世界を冒険するテキストアドベンチャーゲーム。プレイヤーは勇者である「我」を操作して世界を救うことを目指す。道中ではさまざまな文章が登場し、魔導具を駆使した謎解きに挑戦。特定の文字を剣で斬って消したり、押してほかの場所へ移動させたり、あるいは漢字を分解したり組み合わせたりして、文章の意味を変えて難所を突破していく。 税込2880円/20％オフ（ ストアページ ）\nニンテンドーeショップにて9月17日、Nintendo Switch 2/Nintendo Switch向けタイトルの新たなセールが開始された。対象タイトルは約560本。本記事では、その中から注目タイトルをいくつか紹介する。\n今回のセールには、インディーゲームなど国内外の比較的小規模な作品が多数ラインナップ。その中で人気作もお安くなっている。その中で、タイトーやサイバーコネクトツー、MAGES.なども参加している。\nまずは最安値を更新したタイトルから見ていこう。今回が初セールとなったタイトルもここで紹介する。"
+          }
+        ]
+      },
+      {
+        "eventKey": "5741eee198da68514504",
+        "eventKind": "launch",
+        "subjectKey": "デストロイ オール ヒューマンズ 2 8211 リプローブド",
+        "subject": {
+          "kind": "game",
+          "key": "デストロイ オール ヒューマンズ 2 8211 リプローブド"
+        },
+        "publishability": "direct",
+        "headline": "エイリアン地球侵略ACT『デストロイ オール ヒューマンズ！２ &#8211; リプローブド』Switch 2版配信開始。兵器や異能で地球荒らし放題、日本では”コジラ”とも戦う",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468353/",
+            "publishedAt": "2026-09-17T07:36:28+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468353/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468353-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "THQ Nordicは9月17日、『Destroy All Humans! 2 - Reprobed』のNintendo Switch2版の配信を開始した。\nエイリアン地球侵略ACT『デストロイ オール ヒューマンズ！２ &#8211; リプローブド』Switch 2版配信開始。兵器や異能で地球荒らし放題、日本では”コジラ”とも戦う\nパブリッシャーのTHQ Nordicは9月17日、『Destroy All Humans! 2 &#8211; Reprobed』のNintendo Switch2版の配信を開始した。本作はPC（Steam/Epic Gamesストア/GOG.com）/PlayStation 5/Xbox Series X|S向けにもすでにリリースされていた。Nintendo Switch2版では、2種類の追加コンテンツがあらかじめ収録される形となっている。\n本作は、2006年に海外PS2/Xbox向けに発売されたアクションアドベンチャーゲーム『Destroy All Humans! 2』のリメイク版だ。ユーモアあふれる作風に定評のある『Destroy All Humans!』シリーズの人気作が、グラフィックを一新し、装いを新たにして復活する。\n本作の舞台となるのは、前作から10年後の1969年の世界。ソ連KGBに母艦を破壊された宇宙人クリプトが、復讐を果たすため地球で暴れまわる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "417e257df96c6044cf54",
+        "eventKind": "other",
+        "subjectKey": "hyper light drifter",
+        "subject": {
+          "kind": "game",
+          "key": "hyper light drifter"
+        },
+        "publishability": "direct",
+        "headline": "人気作『Hyper Light Drifter』開発元Heart Machine、「スタッフほぼ全員レイオフ」する事態に。新作の開発中止重なり、スタジオ存続の危機",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468228/",
+            "publishedAt": "2026-09-17T02:20:20+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468228/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468228-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "パブリッシャーが未発表の新作の開発中止を決め、主要な資金源を失ったことが背景にあるという。\n人気作『Hyper Light Drifter』開発元Heart Machine、「スタッフほぼ全員レイオフ」する事態に。新作の開発中止重なり、スタジオ存続の危機\nHeart Machineは米国・ロサンゼルスを拠点とするインディースタジオだ。2016年にリリースされた2DアクションRPG『Hyper Light Drifter』は本稿執筆時点でSteamで1万5000件のレビューを受け、うち93％が好評とする「非常に好評」ステータスを獲得。マルチプラットフォーム展開もされ、高く評価されてきた。\n一方で、近年では資金面での厳しい状況も報告されており、2024年11月には一部の従業員を対象にレイオフを実施。その後2025年1月には『Hyper Light Drifter』と世界観を共有する続編『Hyper Light Breaker』を早期アクセス配信するも、同年10月には同作の段階的な開発終了を知らせるとともに、再びレイオフを実施した。さらには、別の新作『Possessor(s)』のリリースを目前に控えるタイミングで、追加のレイオフが実施することに（ GameDeveloper ）。『Possessor(s)』ではこのレイオフでチームの大部分が離脱し、発売後数か月でアップデート対応を終了している。\n過去にはパブリッシャーの組織再編によって振り回される状況に苦言を呈していたこともあったPreston氏（ GamesRadar+ ）。『Hyper Light Breaker』の開発中止を発表した際には、「制御の及ばないより広範な力（broader forces beyond our control）」に言及し、原因が外部にあることを示唆していた（ GameDeveloper ）。今回未発表タイトルの中止を決めたパブリッシャーについては公表されていないが、苦難の道を歩んできたスタジオにとって、またしても大きな危機が訪れているようだ。\nデベロッパーのHeart Machineは9月17日、スタジオのほぼ全員をレイオフする決断に至ったことを発表した。パブリッシャーが未発表の新作の開発中止を決め、主要な資金源を失ったことが背景にあるという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "dd71507ee3e229682ca9",
+        "eventKind": "launch",
+        "subjectKey": "lumi master",
+        "subject": {
+          "kind": "game",
+          "key": "lumi master"
+        },
+        "publishability": "direct",
+        "headline": "基本プレイ無料・“モンスター捕獲✕育成”冒険RPG『Lumi Master』配信開始。農業もバトルも片手でサクッと、100種超えの「るぅみ」と送る気まま冒険生活",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/lumi-master-20260917-468226/",
+            "publishedAt": "2026-09-17T03:00:26+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/lumi-master-20260917-468226/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/lumi-master-20260917-468226-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "BILIBILI HK LIMITEDは9月17日、『Lumi Master（るぅみマスター）』を配信開始した。\n基本プレイ無料・“モンスター捕獲✕育成”冒険RPG『Lumi Master』配信開始。農業もバトルも片手でサクッと、100種超えの「るぅみ」と送る気まま冒険生活\n人気タイトル『トリッカル・もちもちほっペ大作戦』をはじめ、さまざまなゲームタイトルの展開・運営に携わるBILIBILI&nbsp;HK&nbsp;LIMITEDは9月17日、『 Lumi Master（るぅみマスター） 』を配信開始した。対応プラットフォームはiOS/Androidで、基本プレイ無料で提供されている。\n『 Lumi Master（るぅみマスター） 』は、不思議な生き物「るぅみ」を捕まえて育てるモンスター捕獲✕育成 冒険RPGだ。舞台となるのは、森林や砂漠、火山などさまざまな土地が広がる「るみあ大陸」。プレイヤーは各地を冒険し、100種類以上のるぅみを集めながら、自分だけのチームを育てていく。\n・公式サイト： https://lumi.biligames.com/jp/#p-1 ・公式X： https://x.com/lumimasterjp ・YouTube： https://www.youtube.com/@LumiMasterJP ・TikTok： https://www.tiktok.com/@lumimasterjp ・公式Discord： https://discord.gg/aazsP7FnE8\n『 Lumi Master（るぅみマスター） 』は iOS / Android 向けに基本プレイ無料で配信中。\nるぅみは見た目だけでなく、それぞれ異なる属性やスキル、進化形態を持つ。タマゴを入手して孵化させるほか、フィールドで出会ったるぅみを捕獲したり、特殊ミッションを通じて仲間にしたりすることも可能だ。捕獲時にはカードを投げ、仲間にしたるぅみは育成によって姿を変えていく。たとえば炎をまとった小型のるぅみが、成長とともに大柄なドラゴンのような姿へ変化するなど、複数段階の進化も用意されている。\nバトルでは、相手の属性にあわせて出撃するるぅみを切り替えながら戦う。属性の組み合わせや相性を活かし、るぅみごとに用意された技を繰り出して敵に挑むことになる。また、冒険やバトルにはランダム要素も盛り込まれており、毎回異なる展開が発生するという。各地には多数のるぅみが生息しており、図鑑を埋めながら広大な大陸を巡っていくのだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "befd02f37c15c3184d79",
+        "eventKind": "result",
+        "subjectKey": "if you can t get enough of record breaking emmy",
+        "subject": {
+          "kind": "game",
+          "key": "if you can t get enough of record breaking emmy"
+        },
+        "publishability": "direct",
+        "headline": "If you can't get enough of record-breaking Emmy winner Matthew Rhys, his newest TV series is based on an '80s Sega game, and is out now",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/movies-tv/if-you-cant-get-enough-of-record-breaking-emmy-winner-matthew-rhys-his-newest-tv-series-is-based-on-an-80s-sega-game-and-is-out-now/",
+            "publishedAt": "2026-09-17T22:46:35Z",
+            "canonicalUrl": "https://www.pcgamer.com/movies-tv/if-you-cant-get-enough-of-record-breaking-emmy-winner-matthew-rhys-his-newest-tv-series-is-based-on-an-80s-sega-game-and-is-out-now/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/PKKtR6MR6JFJVFS2bshyt9-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Rhys plays dwarf warrior Gilius Thunderhead in the new Paramount+ comedy based on Sega's Golden Axe games.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!\nSave on your next hardware purchase\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nYour newsletter sign-up was successful\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nKeep exploring and earning more as a member."
+          }
+        ]
+      },
+      {
+        "eventKey": "9d9ad4a5290b8096a993",
+        "eventKind": "launch",
+        "subjectKey": "twitch ceo says gta 6 multiplayer will",
+        "subject": {
+          "kind": "game",
+          "key": "twitch ceo says gta 6 multiplayer will"
+        },
+        "publishability": "direct",
+        "headline": "Twitch CEO says GTA 6 multiplayer will launch in 2027",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/grand-theft-auto/twitch-ceo-says-gta-6-multiplayer-will-launch-in-2027/",
+            "publishedAt": "2026-09-17T18:19:36Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/grand-theft-auto/twitch-ceo-says-gta-6-multiplayer-will-launch-in-2027/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/mGAbwHEYqU99h2xFrdszPL-2560-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "That soon? Twitch CEO Dan Clancy sounds pretty sure of it.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nTwitch CEO says GTA 6 multiplayer will launch in 2027\nIn an interview with Bloomberg , Twitch CEO Dan Clancy said that Grand Theft Auto 6 multiplayer will launch next year, in 2027.\nRockstar hasn't made any official announcement about GTA 6 multiplayer, what's going to happen with GTA Online, or when we can expect the PC version. It's a safe bet that Clancy is not authorized to make such an announcement, but his comment doesn't sound speculative.\n\"We spent a lot of time talking with Rockstar about their plans, and also helping them think about how they can engage our creators,\" Clancy told the publication. \"You are going to see this big bump with GTA 6, but then an even bigger one next year when they launch multiplayer.\"\nI've reached out to Rockstar and Twitch for comment.\nGTA 6 guide : Everything we know GTA 6 cars : The garage lineup GTA 6 characters : Your anti-hero cast GTA 6 map : Confirmed Vice City locales GTA 6 PC release : When's it going to happen?\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-18T10:21:10+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "1ac143d7642faaf4125d",
+        "eventKind": "other",
+        "subjectKey": "gladio mori",
+        "subject": {
+          "kind": "game",
+          "key": "gladio mori"
+        },
+        "publishability": "direct",
+        "headline": "“自作モーションで闘う”物理演算剣戟アクション『Gladio Mori』ついに正式リリース。動脈や臓器を狙ってKO、「売上約2億円」のヒット作",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468333/",
+            "publishedAt": "2026-09-17T06:34:22+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468333/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468333-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bonus Stage Publishingは9月16日、Plebeian Studioが手がける『Gladio Mori』を正式リリースした。\n“自作モーションで闘う”物理演算剣戟アクション『Gladio Mori』ついに正式リリース。動脈や臓器を狙ってKO、「売上約2億円」のヒット作\nパブリッシャーのBonus Stage Publishingは9月16日、Plebeian Studioが手がける『 Gladio Mori 』を正式リリースした。対応プラットフォームはPC（Steam）/PS5/XBOX Series X|S。ゲーム内は日本語表示に対応している。\n『Gladio Mori』は、物理演算をベースとした剣戟アクションゲームだ。プレイヤーは剣や槍、鈍器などを手にした闘士となり、AIやほかのプレイヤーとアリーナで戦う。武器や防具を選び、自分なりの戦闘スタイルを組み立てながら勝利を目指すのだ。\nなお、正式リリース後も開発は継続されるとのこと。9月17日に公開されたロードマップによると、今後新たなアリーナや武器を追加するほか、コンソール版へのムーブエディター実装、定期的な大型アップデートなどを予定しているようだ。約1年10か月の早期アクセスを経て正式版となった『Gladio Mori』。自作ムーブで斬り合う物理演算剣戟は、今後もさらに拡張されていくことになりそうだ。\n『Gladio Mori』はPC（ Steam ）/ PS5 / XBOX Series X|S 向けに配信中。\n本作には一般的な体力バーがなく、筋肉や動脈、重要な臓器など身体の各部位に個別でダメージが与えられる。たとえば筋肉を傷つければ、その部位が発揮できる力が低下。動脈を切れば出血し、心臓などの重要な臓器を刺せば致命傷となる。防具も物理的に機能し、プレートアーマーは刃物を通しにくい。そのため、装甲の隙間を狙ったり、鈍器を使ったりと、相手の装備に応じた攻撃が必要になる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "24b185e88aa26f658a2f",
+        "eventKind": "other",
+        "subjectKey": "俺だけレベルアップな件 karma",
+        "subject": {
+          "kind": "game",
+          "key": "俺だけレベルアップな件 karma"
+        },
+        "publishability": "direct",
+        "headline": "「俺レべ」のローグライトACT『俺だけレベルアップな件：KARMA』はレベルアップの勢いがおかしい。“ライトな『Hades』”かと思いきや、暴力的インフレ成長",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468263/",
+            "publishedAt": "2026-09-17T03:30:17+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468263/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468263-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『俺だけレベルアップな件：KARMA』は、すさまじい勢いでキャラが成長していくローグライト・アクションだった。\n「俺レべ」のローグライトACT『俺だけレベルアップな件：KARMA』はレベルアップの勢いがおかしい。“ライトな『Hades』”かと思いきや、暴力的インフレ成長\n『 俺だけレベルアップな件：KARMA 』は、ネットマーブルが手がけるローグライト・アクションRPGだ。対応プラットフォームはiOS/Android。昨年7月のAnime Expo 2025で制作が発表された本作は、TVアニメ「俺だけレベルアップな件」をモチーフにした完全オリジナルストーリーで展開される。原作では描かれていない「次元の狭間」を舞台に、プレイヤーは主人公の「水篠旬」として、知られざる27年間の「君主戦争」を戦い抜いていく。\n本作の原作となる『俺だけレベルアップな件』は、Chugong氏原作・原案による韓国の小説・漫画作品だ。舞台は異次元と現世界を結ぶ「ゲート」が出現した現代。ゲートの出現によって覚醒した人間たちが次々とハンターになり、ゲート内のモンスターたちを倒して対価を得られる世界となっていた。\n今回、『俺だけレベルアップな件：KARMA』を試遊して、そのハイスピードな戦闘体験と、レベルアップ感がダイレクトに感じられるビルドシステムの魅力に触れることができた。特に戦闘中のレベルアップ感が、ローグライトにおけるビルド強化要素と上手く噛み合っていたのは見事だった。原作を深く知らない筆者でも、本作にローグライト要素が取り入れられた理由が分かったように思う。\n『 俺だけレベルアップな件：KARMA 』はiOS/Android向けにリリース予定だ。\nハンターとして覚醒しながらも、最も低いランクであるE級ハンターとして日々懸命に生き延びていた主人公の「水篠旬」は、思いがけないきっかけで「自分だけがレベルアップする」という特殊能力を手に入れることになる。そして、その日を境に最強のS級ハンターへと成長していくのだった。\nこのたび弊誌は、本作を試遊プレイする機会に恵まれた。今回のプレイでは、戦闘における無双感や、ハイスピードバトルに組み込まれたビルドシステムの一部を楽しむことができた。本稿ではストーリーモードのチャプター1までとサバイバルモードを体験して感じたことを、『俺レべ』に初めて触れる筆者の視点でお伝えしていきたい。なお本稿における本作の説明はそれぞれ試遊版における仕様となるため留意してほしい。"
+          }
+        ]
+      },
+      {
+        "eventKey": "3cabb811897975a1b1ef",
+        "eventKind": "other",
+        "subjectKey": "ワロタ 俺の家のとなり魔王城www",
+        "subject": {
+          "kind": "game",
+          "key": "ワロタ 俺の家のとなり魔王城www"
+        },
+        "publishability": "direct",
+        "headline": "「隣にアイドル魔王が住む」村づくりARPG『ワロタ、俺の家のとなり魔王城www』11月13日早期アクセス配信へ。“帽子”を被って代わる代わる職変更、「熱狂魔族」を退ける",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260917-468288/",
+            "publishedAt": "2026-09-17T04:13:59+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260917-468288/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260917-468288-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ワンオアエイトは9月16日、Team EARTH WARSが手がける『ワロタ、俺の家のとなり魔王城www』を11月13日に早期アクセス配信すると発表した。本作は村づくりと戦闘を組み合わせたアクションRPGだ。\n「隣にアイドル魔王が住む」村づくりARPG『ワロタ、俺の家のとなり魔王城www』11月13日早期アクセス配信へ。“帽子”を被って代わる代わる職変更、「熱狂魔族」を退ける\n株式会社ワンオアエイトは9月16日、Team EARTH WARSが手がける『 ワロタ、俺の家のとなり魔王城www 』を11月13日に早期アクセス配信すると発表した。対応プラットフォームはPC（Steam）。なお、Nintendo Switch 2/PS5版は2027年に発売予定だ。\n『ワロタ、俺の家のとなり魔王城www』は、村づくりと戦闘を組み合わせたアクションRPGだ。消えかけていた魂を女神に救われた主人公は、異世界「ルナ」へと召喚される。創造の力を持つ「バウンダー」として降り立った先にあったのは、荒れ果てた一軒の家。そこから家を直し、仲間を集め、畑を耕しながら村を発展させていくことになる。\n『 ワロタ、俺の家のとなり魔王城www 』はPC（ Steam ）向けに、11月13日早期アクセス配信予定だ。価格は税込2800円で、ローンチセールとして11月20日23時59分までは定価から10％オフで購入できる予定だ。また、Steam Nextフェスにも参加予定となっている。Nintendo Switch 2/PS5版は2027年発売予定。\n村ではフィールドで集めた素材を使い、家具や施設をクラフトできる。建築できるものは30種類以上用意されており、施設が増えるにつれて住人も増加。農作物を育てる畑を作ったり、さまざまな建物を配置したりしながら、自分たちの生活拠点を広げていく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "c65c3790fbc3642ec37c",
+        "eventKind": "other",
+        "subjectKey": "call-of-duty-modern-warfare-4",
+        "subject": {
+          "kind": "game",
+          "key": "call-of-duty-modern-warfare-4"
+        },
+        "publishability": "direct",
+        "headline": "Activision Calls Call of Duty: Modern Warfare 4 'The Epic Conclusion,' Leaving Fans Wondering What's Next",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/activision-calls-call-of-duty-modern-warfare-4-the-epic-conclusion-leaving-fans-wondering-whats-next",
+            "publishedAt": "2026-09-17T18:09:52.929Z",
+            "canonicalUrl": "https://www.ign.com/articles/activision-calls-call-of-duty-modern-warfare-4-the-epic-conclusion-leaving-fans-wondering-whats-next",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/05/27/cod-mp-preview-br2-1779914695480.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Call of Duty: Modern Warfare 4 is being advertised as the \"epic conclusion,\" suggesting an end of an era for the franchise.\nActivision Calls Call of Duty: Modern Warfare 4 &#x27;The Epic Conclusion,&#x27; Leaving Fans Wondering What&#x27;s Next\nIn the social copy for the latest trailer for Call of Duty: Modern Warfare 4 , Activision stated that the game will be an \"epic conclusion\" for the Modern Warfare saga. It&#x27;s unclear if this is the permanent end to the current Modern Warfare universe, or if this is just the end of the ongoing storyline that began back in 2019 with the rebooted Modern Warfare.\nSome fans are already waving goodbye to the current Modern Warfare series. \"Reboot it again,\" joked one fan in a post on the Call of Duty subreddit . \"They should do a COD Ghosts 2 or Infinite Warfare 2, both underrated campaigns,\" suggested another who may or may not be joking.\nIf Modern Warfare and Black Ops are truly coming to an end, it will be the first time the series hasn&#x27;t had at least one existing sub-franchise in the rotation since the creation of Black Ops in 2010. Although we don&#x27;t know what Sledgehammer Games is working on, it is likely a brand new subfranchise as Advanced Warfare and the studio&#x27;s subsquent World War II games failed to catch on.\nThe original Modern Warfare series came to a close after just three games back in 2011. Although the team kicked around ideas for a fourth game back then, they didn&#x27;t get very far and opted to create something new with Call of Duty: Ghosts.\nAfter Ghosts and Infinity Ward&#x27;s subsquent game, Infinite Warfare, failed to please fans, the studio went back to old faithful and rebooted Modern Warfare. 2019&#x27;s effort is largely credited for pulling Call of Duty out of a multi-year rut where fans were beginning to lose faith in the series. It also gave birth to Warzone, the massively popular battle royale mode that has helped carry the series since launch.\nDuring the Xbox Tokyo Game Show 2026 broadcast, Activision confirmed Death Stranding star Mads Mikkelsen is a major antagonist in Call of Duty: Modern Warfare 4 . It&#x27;s due out on PC and consoles - but not Xbox Game Pass - on October 23.\nAll good things come to an end.\nAlthough it&#x27;s likely just a marketing buzz term, the branding comes at an interesting time. Earlier this week, Treyarch design director Kevin Drew stated that the studio was ready to \"make something new and something that nobody&#x27;s ever experienced before.\" The comments come as the studio waved goodbye to two back-to-back Black Ops games, with the most recent one being regarded as an underwhelming misfire for the series. The comments led fans to speculate that the Black Ops series may be coming to an end, or at least taking a break, allowing Treyarch to make its first new subfranchise in nearly 20 years."
+          }
+        ]
+      },
+      {
+        "eventKey": "5b84966c244bcde3b19e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Brandon Sanderson Is Eager to Adapt His Books into a Video Game, Calling Himself a 'Lifelong Gamer'",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/brandon-sanderson-is-eager-to-adapt-his-books-into-a-video-game-calling-himself-a-lifelong-gamer",
+            "publishedAt": "2026-09-17T18:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/brandon-sanderson-is-eager-to-adapt-his-books-into-a-video-game-calling-himself-a-lifelong-gamer",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/17/mistborn-video-game-ign-3-1789650261140.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "“Lifelong gamer” Brandon Sanderson details his excitement about adapting Mistborn into a video game, explaining why its magic mechanics fit naturally. But only if he can find the right studio to partner with. Any takers?\nBrandon Sanderson Is Eager to Adapt His Books into a Video Game, Calling Himself a &#x27;Lifelong Gamer&#x27;\nDuring an exclusive interview with IGN, Brandon Sanderson has expressed interest in potentially adapting his Mistborn book series into a video game, but only if he can find the right studio to partner with.\nAsked if he&#x27;d ever given any thought to a video game adaptation of his work, Sanderson said:\n\"As a lifelong gamer, suffice it to say that yes, I&#x27;ve thought about this a lot.\n\"The key will be the right partner. Video games, even the smaller indie games, are huge investments these days.\n\"Mistborn would almost certainly be the first thing I would try, as the mechanics of the magic and world very naturally lend themselves to such an adaptation – but again, I&#x27;d need the right partner.\"\nSo it doesn&#x27;t sound like we&#x27;ll be getting a Mistborn game anytime soon, but it&#x27;s certainly on the cards for the distant future after Sanderson&#x27;s recent comments.\nThis wouldn&#x27;t be the first time Mistborn stepped out into other mediums either, with the Mistborn film adaptation in the works after Sanderson recently finished the screenplay ( but also saying there&#x27;s \"still a lot of work to do\" ), alongside board games, and the recently released Cosmere RPG tabletop series that&#x27;s soon getting a Mistborn expansion in November .\nBut he&#x27;d \"need the right partner.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "205d4b67296910c205dd",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Brandon Sanderson Says He 'Would Love to' Create Tabletop Adaptations of His Cytoverse Books",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/brandon-sanderson-says-he-would-love-to-create-tabletop-adaptations-of-his-cytoverse-books",
+            "publishedAt": "2026-09-17T20:56:07.221Z",
+            "canonicalUrl": "https://www.ign.com/articles/brandon-sanderson-says-he-would-love-to-create-tabletop-adaptations-of-his-cytoverse-books",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/05/21/81ualu6laol-sl1500-1-1779379333131.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Brandon Sanderson Says He &#x27;Would Love to&#x27; Create Tabletop Adaptations of His Cytoverse Books\nBrandon Sanderson has been heavily invested in making tabletop adaptations of his Cosmere books . Most recently, he&#x27;s been collaborating with Brotherwise Games on standalone board games as well as a larger Cosmere TTRPG. It&#x27;s unsurprising, then, that his interest in such adaptations expands beyond his most popular literary universe.\nIGN recently had the chance to interview Sanderson , and we asked him if he&#x27;s considered making tabletop adaptations of Skyward and the rest of the Cytoverse.\n\"I would love to! We&#x27;ve talked about it. However, I also want to be aware of asking my fans for too much,\" Sanderson told IGN. \"There are a lot of great books out there, and a lot of great games. I don&#x27;t want or need it to be all Brandon Sanderson all the time. We try to be very deliberate and careful about these kinds of collaborations, to only be doing what will feel the most exciting to my fans.\"\nSanderson&#x27;s answer here doesn&#x27;t rule out the possibility of a Cytoverse tabletop adaptation, but it certainly indicates that it won&#x27;t be happening any time soon. The release of Blightfall marks the first official book expansion into the Cytoverse, and it was recently revealed that a Skyward TV series is in the works.\nWhile Sanderson&#x27;s YA sci-fi series isn&#x27;t nearly as popular as The Cosmere, it definitely has potential to grow in the future. If the Skyward TV series is able to find success on streaming , it seems inevitable that some sort of tabletop collab would follow. That being said, we&#x27;re still looking at a long wait before that TV adaptation actually happens. The Mistborn movie, for example, is looking at a release date of 2031 or later , and that&#x27;s further along than the Skyward series.\nDespite no future plans for tabletop adaptations for the Cytoverse, Sanderson still has some exciting upcoming projects in the works with Brotherwise. The Cosmere RPG is officially getting its Mistborn expansion in November , and a massive War for Roshar strategy game is also in the works. If you&#x27;re a fan of Sanderson&#x27;s books and tabletop games, there&#x27;s a lot of great stuff coming your way."
+          }
+        ]
+      },
+      {
+        "eventKey": "17d6f289bfda53a24be5",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Bungie Denies Rumor It Plans to Merge the Destiny and Marathon IPs, Confirms Marathon December and March 2027 Updates Are Free",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bungie-denies-rumor-it-plans-to-merge-the-destiny-and-marathon-ips-confirms-marathon-december-and-march-2027-updates-are-free",
+            "publishedAt": "2026-09-17T13:07:30.130Z",
+            "canonicalUrl": "https://www.ign.com/articles/bungie-denies-rumor-it-plans-to-merge-the-destiny-and-marathon-ips-confirms-marathon-december-and-march-2027-updates-are-free",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/17/screenshot-2026-09-17-140655-1789650442135.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bungie has stepped in to deny a rumor that it planned to merge the Destiny and Marathon IPs amid continued questions about the future of both franchises.\nBungie Denies Rumor It Plans to Merge the Destiny and Marathon IPs, Confirms Marathon December and March 2027 Updates Are Free\nThe rumor, which has been doing the rounds online this week, was that Bungie was testing reworking Marathon and Destiny into a single IP. But, according to Marathon creative director Julia Nardin, that’s untrue.\n“As someone who’s worked on both Destiny and Marathon, I can confirm that the “leak” about us merging the two IPs is fake,” Nardin said in a post on Twitter / X. “They share a lot of the same Bungie DNA, but like siblings they’re also their own independent entities. Please don’t believe everything you read online.”\nIt has of course been a tumultuous time for Bungie, Destiny, and Marathon. Marathon began life as an ultra hardcore extraction shooter, but Bungie has been retooling it to play more like Destiny since as the game has struggled for players. Meanwhile, Bungie stopped work on Destiny 2 to focus on Marathon — upsetting Destiny fans in the process. Livestreams from Bungie parent company Sony Interactive Entertainment have been overrun by calls for Bungie to return to the world of Destiny , either to continue with Destiny 2 or work on Destiny 3.\nThis week, Bungie announced a move away from seasonal content , a focus on PvE, and a significant delay for Marathon’s next update. It was slated to release on September 22, but will now arrive on December 8. A further significant update will be released in March. On October 6, Marathon will get a smaller update that resets progression and the in-game economy to prepare for an overhaul.\nIn a social media follow-up , Bungie clarified that the December and March updates are free, not paid DLC. “If you own Marathon, the December and March updates will be available at no additional cost,” the studio said. “That includes gameplay content such as new zones, weapons, and Runners.”\nWhich begs the question: why issue this clarification? Some believe it suggests a move to free-to-play supported by paid expansions, and these updates should not be confused with expansion-type content. However, Bungie hasn&#x27;t announced any expansions for Marathon. Perhaps the plan is for different editions of Marathon, some paid, that would sit alongside a free offering. These might offer different tiers of content, allowing players to pick and choose."
+          }
+        ]
+      },
+      {
+        "eventKey": "56d57926bd4a8da41c48",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Get Final Fantasy VII Remake Intergrade Switch 2 Edition for Under $9 by Following This 1 Easy Step",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/final-fantasy-7-remake-intergrade-for-switch-2-deal",
+            "publishedAt": "2026-09-17T19:50:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/final-fantasy-7-remake-intergrade-for-switch-2-deal",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/17/tifa-1789673498112.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "We&#x27;re getting close to wrapping up this trilogy.\nGet Final Fantasy VII Remake Intergrade Switch 2 Edition for Under $9 by Following This 1 Easy Step\nIf there&#x27;s any game you should get from the under-$10 bargain bin, this would unquestionably be a truly worthy pickup. From now until September 30, Nintendo eShop is offering a digital copy of Final Fantasy VII Remake Intergrade Switch 2 edition for $9.99. That&#x27;s already a stellar deal since it&#x27;s currently selling for $39.99 everywhere else. But there&#x27;s a way to get it for an even better price. Head on over to Amazon and pick up a $10 Nintendo eShop digital gift card for just $8.98. Use that gift card on this purchase and you&#x27;re effectively paying $8.98.\nFinal Fantasy VII Remake was the first installment of the completely overhauled FFVII trilogy. It originally launched on PlayStation 4 back in 2020. The \"Intergrade\" edition was released in 2021 for the PlayStation 5 console, with enhanced 4K graphics, higher 60fps frame rate, faster loading times, and most importantly, new DLC content starring FFVII fan favorite Yuffie. Not until January of this year did the Intergrade edition port over to the Nintendo Switch 2 console. In his Final Fantasy VII Remake Intergrade Switch 2 re-review , he noted that the Switch 2 handles the game quite well.\nThis sale is the perfect opportunity to starting catching up on the FFVII trilogy. Earlier this year Sony announced the final chapter - Final Fantasy VII Revelation - with a launch date in April of 2027. This time around, Switch 2 gamers won&#x27;t have to wait because the Switch 2 launch will coincide with all the other platforms . Revelation will close the loop on Cloud&#x27;s story and will culminate in clashes with the gargantuan Weapons and the final battle with Sephiroth himself."
+          }
+        ]
+      },
+      {
+        "eventKey": "9d28e329737da7319edc",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "GTA 6 Soundtrack Gets Physical CD and Vinyl Release, Rockstar Confirms",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/gta-6-leak-reveals-physical-release-for-its-music-album",
+            "publishedAt": "2026-09-17T12:06:45.092Z",
+            "canonicalUrl": "https://www.ign.com/articles/gta-6-leak-reveals-physical-release-for-its-music-album",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/27/mega-3-1787855175829.jpeg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Rockstar will launch a physical edition of the Grand Theft Auto 6 soundtrack, a new leak has revealed.\nGTA 6 Soundtrack Gets Physical CD and Vinyl Release, Rockstar Confirms\nRockstar will launch a $125 physical edition of the Grand Theft Auto 6 soundtrack, available on limited edition vinyl.\nThe news was broken this afternoon by the ever-reliable billbil-kun at Dealabs , while Rockstar announced the soundtrack itself a few minutes later. The collection of music will be published by Rockstar Games and Atlantic Records on November 19 — the same day as GTA 6 hits digital game stores.\nA double LP vinyl edition will be sold for $50, while a double CD version will sell for $20. For collectors, though, there&#x27;s the limited edition vinyl set which contains \"two transparent magenta discs filled with blue liquid,\" plus exclusive artwork. This is the one you&#x27;ll pay $125 for. All editions are available for preorder now.\nThis news is somewhat ironic, considering the fact that GTA 6 itself will not get a physical launch on a disc , something that has sparked complaints from fans who want to own an actual copy of the upcoming blockbuster rather than an empty box.\nToday&#x27;s announcement follows a spate of teases by music streaming service Spotify both online and across billboards in New York, Los Angeles, and Miami. The teases continued online via the social media accounts of an array of artists, including Travis Scott and Keith Richards , that suggested they were also involved somehow with GTA 6. Now, we know why.\nTravis Scott and Keith Richards are among the first batch of artists confirmed to have contributed music to the new album, with more tracks to be announced. Spotify will be one of the many places to stream the soundtrack online, meanwhile.\nIndeed, Grand Theft Auto 6: The Album is now available for pre-save via major streaming services , where you can also listen to the first six tracks."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 42690,
+      "estimatedInputTokens": 10155,
+      "activeTrackingItems": 0,
+      "candidateItems": 17,
+      "includedItems": 17,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Dune Awakening",
+        "subjectKey": "Dune Awakening",
+        "titleKey": "dune-awakening",
+        "titleZhCn": "沙丘：觉醒",
+        "suggestedStatus": "official_simplified",
+        "reason": "",
+        "sources": [
+          {
+            "label": "store.playstation.com",
+            "url": "https://store.playstation.com/zh-hans-hk/product/EP1833-PPSA02391_00-DUNEAWAKENING000",
+            "hostname": "store.playstation.com",
+            "family": "sony",
+            "kind": "official_simplified",
+            "pageTitle": "Dune: Awakening 沙丘：觉醒 (日语, 韩语, 简体中文, 繁体中文, 英语)",
+            "excerpt": "Dune: Awakening 沙丘：觉醒 (日语, 韩语, 简体中文, 繁体中文, 英语) 搜索 最新 精选 优惠 定期服务 浏览 Dune: Awakening 沙丘：觉醒 (日语, 韩语, 简体中文, 繁体中文, 英语) Funcom Oslo AS 22/9/2026 12:00 PM UTC PS5 标准版 PS5 Pro增强 HK$398.00 预购 预购 在线游玩需要PS Plus 需要在线游玩 支持多达60位PS Plus在线玩家 1位玩家 支持远程游玩 辅助功能(24) 辅助功能 PS5版本 支持震动功能和扳机效果（DualSense无线控制器） PS5 Pro增强 查看全部 使用酒精饮料/烟草, 重度暴力, 恐怖"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Well Dweller",
+        "subjectKey": "Well Dweller",
+        "titleKey": "well-dweller",
+        "titleZhCn": "黯井微光",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2026/well-dweller/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "黯井微光_黯井微光下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "黯井微光_黯井微光下载_中文_攻略_视频_评价_游民星空 Gamersky.com 黯井微光 Well Dweller 分享 QQ 微博 微信 综合 资讯 攻略 下载 专区 社区 查看全部10 截图 壁纸 原画 设定图 其他 视频 1/2 《Well Dweller》是一款暗黑童话风格的类银河城游戏，由《Crypt Custodian》和《Islets》的原班人马倾力打造。在森林深处、井底之地，栖息着唯一敢于挑战女王的生灵。玩家将扮演一只手持火柴棒的小鸟——格林默，踏上焚灭邪恶女王、拯救家族的旅程。探索充满暗黑童话气息的世界，与居住在王国底层之中的迷人角色成为朋友。与可怖的怪兽激战，习得新能力，拓展你的地图。解开谜题，发现秘密，揭开"
+          },
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/150102.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "黯井微光电脑版下载-Well Dweller demo试玩版下载_3DM单机",
+            "excerpt": "黯井微光电脑版下载-Well Dweller demo试玩版下载_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 动作游戏 > 《黯井微光》demo 《黯井微光》demo 游戏类型： 动作游戏 开发厂商： Kyle Thompson 更新时间： 2026-04-24 发售日期： 2026年9月22日 游戏平台： PC 游戏语言： 简中 标签： 中世纪 类银河战士恶魔城 哥特 探索 横向滚屏 8.0 已有 88 人评分 您还未评分！ 本地下载 普通http"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
