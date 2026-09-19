@@ -40,13 +40,15 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P0
 - **Area:** scheduling / SLA / packet collection
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** `Brief publication SLA watchdog` 的 PM cron 配置为 `35 9 * * *`（北京时间 17:35），但 run [33110883167](https://github.com/fallw1nd/daily-game-brief/actions/runs/33110883167) 实际到 2026-08-28 03:56 左右才启动。workflow 仍正确识别 `period=pm`，但 `scripts/check-brief-sla.mjs` 使用 runner 实际 `new Date()` 调用 `plannedWindow(period, now)`，因此把这次迟到的 2026-08-27 PM 检查算成了尚未到截止时间的 `2026-08-28-pm`。随后产生了错误 incident [#26](https://github.com/fallw1nd/daily-game-brief/issues/26)。`scripts/editorialize.mjs` 的 cutoff guard 阻止了未来期 packet 被提前 finalized，因此生产数据未被污染。2026-08-29 AM 再次暴露同一根因的另一侧：ChatGPT 一次性恢复在固定 10:10 截止前启动 `Final editorial packet` run [33228209388](https://github.com/fallw1nd/daily-game-brief/actions/runs/33228209388)，run 于北京时间约 10:08:48 开始且所有步骤最终成功，但 `workflow_dispatch` 只传 `period=am`，`scripts/collect-news.mjs` 因而按当时的 `latestDueWindow()` 选择最近已到期的 `2026-08-28-am`。持久化日志明确提交了 `chore(automation): persist 2026-08-28-am editorial packet`，而 `automation/packets/2026-08-29-am.json` 始终不存在，导致 2026-08-29 早报在 15 分钟上限后停止。该次恢复没有改动 `main` 或生产数据。
 - **Risk:** 任何只传 `period`、再按 runner 实际日期/时刻计算窗口的入口都可能在严重延迟、跨日或截止前抖动时漂移期次。静态 cutoff 校验能阻止部分错误发布，但不能保证 recovery 生成的是请求的 exact edition；结果可能是假成功、错误 state packet、空跑和漏期。
 - **Proposed resolution:** schedule 入口继续使用统一 `latestDueWindow(period, now)`，用于吸收 GitHub cron 延迟；manual/recovery `workflow_dispatch` 必须支持并优先使用显式 `edition + period`，且两者必须一致。为兼容尚未更新的现有 period-only recovery prompt，dispatch 仅可锁定 runner 当天同 period 的计划 edition：若距离其 cutoff 不超过五分钟则等待到截止再采集，若更早则显式失败，绝不回退到前一天。新 recovery 契约一律传 exact edition。
 - **Close when:** 原跨午夜迟到 cron 回归仍解析为最近已到期 edition；北京时间 2026-08-29 10:08:48 的 period-only AM recovery 锁定 `2026-08-29-am` 并等待截止，不得写 `2026-08-28-am`；显式 edition 在跨日迟到时仍保持原目标；period/edition 不一致和明显过早调用 fail closed；完整 Verify 通过；恢复链至少一次用 exact edition 或安全 legacy fallback 生成正确生产 packet 后再标记 `resolved`。
 - **Resolution:** [PR #29](https://github.com/fallw1nd/daily-game-brief/pull/29) / commit [`855f7b7`](https://github.com/fallw1nd/daily-game-brief/commit/855f7b7b335948077f86231724a58a181b4d3885) 先为 schedule/SLA 路径增加统一 `latestDueWindow(period, now)`；2026-08-29 生产复发证明 manual recovery 的 exact-edition 部分并未完成，因此本条重新打开。[PR #40](https://github.com/fallw1nd/daily-game-brief/pull/40) / commit [`3e880a4`](https://github.com/fallw1nd/daily-game-brief/commit/3e880a40cf9ca2482c9880b880abcba840fbdeaa) 补齐 manual/recovery 路径：`workflow_dispatch` 可接收 exact `edition`，新 recovery 契约要求同时传 `period + edition`；旧 period-only 调用只锁定 runner 当天同 period 的计划 edition，截止前五分钟内等待到 cutoff，更早则 fail closed。正常 schedule 仍使用 `latestDueWindow()`。未修改固定 cron、Scheduled Task、生产数据或 schema。
 - **Verification:** PR #29 Verify run [33150626972](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150626972) 与 Pages run [33150718591](https://github.com/fallw1nd/daily-game-brief/actions/runs/33150718591) 均成功，但 2026-08-29 run [33228209388](https://github.com/fallw1nd/daily-game-brief/actions/runs/33228209388) 证明原关闭条件只覆盖了迟到 schedule，未覆盖 early manual recovery，因此原 `resolved` 状态撤回。PR #40 Verify run [33235305863](https://github.com/fallw1nd/daily-game-brief/actions/runs/33235305863) 通过完整 `npm run check`；回归直接使用北京时间 2026-08-29 10:08:48，确认 legacy AM recovery 目标为 `2026-08-29-am` 且等待 72 秒，并覆盖显式 edition 跨日迟到、period/edition 不匹配和明显过早调用。合并后 Pages run [33235357282](https://github.com/fallw1nd/daily-game-brief/actions/runs/33235357282) 的 append-only guard、`Check and build` 与 Deploy 全部成功。尚未人为重跑已失败的 2026-08-29 AM 生产恢复，以避免修改当前 state；等待下一次真实 recovery 生成正确 packet 后再满足最后关闭条件。
+
+- **2026-09-19 closeout:** PR #40 的 exact-edition/legacy guard 已长期留在生产；后续 2026-09-13、14、15、18、19 的真实 Daily packet 均由 `automation/editorial/<exact-edition>-daily` 的 `daily-wake` push 生成并确认到同一期 durable state，未再出现 period-only 回退到前一期。既有边界回归、完整 Verify 与真实恢复链关闭条件均已满足。
 
 ### MNT-20260828-02 — Pages 下游触发是否存在可消除的重复执行
 
@@ -66,7 +68,7 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P1
 - **Area:** ChatGPT Scheduled / packet recovery latency
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 2026-08-28 AM 固定截止为 10:10，但正常 GitHub packet schedule 没有及时提供 packet；ChatGPT 独立恢复最终触发 `Final editorial packet` run [33135297994](https://github.com/fallw1nd/daily-game-brief/actions/runs/33135297994)，该 run 在约 10:14:21 开始，约 10:14:32 已把 packet 写入 `automation/state`。collector 本身只需数秒，主要延迟发生在 Scheduled Task 先读取其他状态再判断是否需要 recovery 的阶段。
 - **Risk:** GitHub schedule 缺失时会无意义地增加几分钟开刊延迟，同时消耗更多 ChatGPT 读取/判断步骤。
 - **Proposed resolution:** 将 Scheduled Task 输入阶段拆成极速 preflight：先检查 exact packet 是否存在且合法，再检查 matching collector 是否 queued/in_progress；两者都没有时立即执行已有 edition-scoped one-shot recovery。packet 可用后才读取 manifest/latest/title registry 和完整编辑输入。保持 15 分钟总上限、race guard 与固定窗口不变。
@@ -74,18 +76,22 @@
 - **Resolution:** [PR #33](https://github.com/fallw1nd/daily-game-brief/pull/33) / commit [`f121e74`](https://github.com/fallw1nd/daily-game-brief/commit/f121e743deeaadcbe315df12c3d2750eb37edb03) 将 `docs/SCHEDULED_TASK_PROMPT.md` 改为 packet-first preflight，并新增 `scripts/scheduled-task-contract.test.mjs` 锁定 packet present、active collector 与 missing packet recovery 三条路径。随后直接更新现有早报 Scheduled Task `6a86ccc265fc8191a6c72a6bab1cdcea` 与晚报 Scheduled Task `6a86cce353708191be251b6cf545fcc9` 的 prompt：第一阶段只读 exact packet；仅在 packet 缺失/非法时检查 matching collector；packet 可用后才加载 AGENTS / contract / manifest / latest / title registry。未改变任务数量、启用状态、Asia/Shanghai 时区、10:10/17:00 执行时间、固定窗口或生产数据。
 - **Verification:** PR #33 Verify run [33159527832](https://github.com/fallw1nd/daily-game-brief/actions/runs/33159527832) 通过完整 `npm run check`；合并后 Pages run [33159595929](https://github.com/fallw1nd/daily-game-brief/actions/runs/33159595929) 成功。Scheduled 配置回读确认早报仍为 `DTSTART;TZID=Asia/Shanghai:20260821T101000`、晚报仍为 `DTSTART;TZID=Asia/Shanghai:20260821T170000`，两者均 `exact_schedule` 且 `is_enabled=true`。静态契约已满足前置读取与不重复触发条件；仍需等待下一次真实 packet missing 生产事件记录 recovery 启动延迟后才能按 Close when 标记 `resolved`。
 
+- **2026-09-19 closeout:** 真实缺包路径已经获得生产证据：2026-09-13 wake run 34732802472 于北京时间约10:20触发并在约1分钟内写出 exact packet，2026-09-14/15/18/19 同类路径重复成功；packet-present/active-run 防重复契约仍由现有回归覆盖。关闭条件满足。
+
 ### MNT-20260828-04 — 新作品首次出现时中文名解析仍依赖编辑层临时查询
 
 - **Discovered:** 2026-08-28
 - **Priority:** P1
 - **Area:** title resolution / editorial input
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 2026-08-28 AM 初始 editorial decision 将 `Gravhounds`、`Militsioner`、`Whisper of the House`、`FOUNTAINS`、`FINAL FANTASY VII EVER CRISIS` 等多项保持为 `unavailable`；随后 PR [#27](https://github.com/fallw1nd/daily-game-brief/pull/27) 才补入《重力猎犬》《警目如炬》《呓语小镇》《永泉传说》《最终幻想7：永恒危机》等已确认名称。现有 registry 能稳定复用“已经知道的名称”，但首次遇到的新 title 仍可能漏掉已有官方简中名。
 - **Risk:** 新作第一次进入日报时更容易以英文名发布，之后再 backfill，形成不必要的人工返工与 revision。
 - **Proposed resolution:** 在 packet 前加入受限 `titleHints` 阶段：registry miss 时只查询作品名，优先官方简中发行商/平台/商店页；返回候选中文名、status 和证据 URL，不允许借此加入任何事件事实、时间、平台或新候选。ChatGPT 仍负责最终采用 `official_simplified` / `common_translation` / `unavailable`。
 - **Close when:** 新 title 的 hint 有明确 schema 与来源边界；registry hit 不重复查询；至少用本期上述已知案例回归，能够在不扩展事件证据的情况下命中官方名；不存在机器直译自动入库路径。
 - **Resolution:** [PR #35](https://github.com/fallw1nd/daily-game-brief/pull/35) / commit [`f859315`](https://github.com/fallw1nd/daily-game-brief/commit/f859315491d9420496d4988575db690ef9394b49) 已在 `Final editorial packet` 的 evidence → editorialize 之间加入受限 title-only hint 阶段。只对 registry miss 搜索，复用既有 DeepSeek Responses/Web Search 作为候选来源页发现器；每个接受的页面由代码打开并要求候选中文名逐字出现在正文中，`common_translation` 至少需要两个不同 hostname。输出仅以紧凑 naming evidence 加入 `editorialInput.titleHints`，不自动写入 registry，`suggestedStatus` 只供编辑判断，ChatGPT 仍决定 `official_simplified` / `common_translation` / `unavailable`。hint 来源不得补充事件事实、时间、平台、发行信息、source classification、tracking 或新候选。保持 finalized packet schema v3、editorialInput schema v2 与既有输入预算；未修改 Scheduled Task、固定窗口或 `public/data`。
 - **Verification:** PR #35 最终 Verify run [33161253861](https://github.com/fallw1nd/daily-game-brief/actions/runs/33161253861) 通过完整 `npm run check`。回归覆盖上述五个 2026-08-28 已知名称、registry hit 不重复搜索、未知英文标题才进入 hint、候选中文名必须在已打开页面逐字命中、`common_translation` 双独立 host、拒绝 machine_translation/无证据候选、命中名称可见摘录，以及带可选 `titleHints` 的 finalized packet 仍通过现有 preflight validator。合并后 Pages run [33161354443](https://github.com/fallw1nd/daily-game-brief/actions/runs/33161354443) 成功。尚未人为重跑已发布的 2026-08-28 PM collector，以避免为测试覆盖当前 `automation/state`；等待下一次正常生产出现 registry miss 后观察真实 hint 产出与编辑采用结果，再决定是否满足关闭条件。
+
+- **2026-09-19 closeout:** 后续持久译名系统已覆盖并强化本条 titleHints 目标。`Well Dweller` 于2026-09-18通过两个独立媒体页面逐字核验为“黯井微光”，带原文摘录与核验时间写入译名注册表，并在2026-09-19正式 Canonical 日历中采用；registry hit 复用、失败不自动机翻/入库等边界继续受测试保护。关闭条件满足。
 
 ### MNT-20260828-05 — title backfill 后自动生成图片 alt 可能保留旧英文标题
 
@@ -99,6 +105,8 @@
 - **Close when:** 本期已确认 stale alt 被修正；测试区分 auto-generated 与 manual alt；未来 title backfill 后不存在旧英文主体残留的自动 alt。
 - **Resolution:** [PR #37](https://github.com/fallw1nd/daily-game-brief/pull/37) / commit [`2e04cc4`](https://github.com/fallw1nd/daily-game-brief/commit/2e04cc4bde91830966697879a0834460475e690c) 已实现后续防复发路径：新增 `scripts/lib/media-alt.mjs` 识别当前系统生成的 editorial alt 模板，并在 `titles:backfill` 完成 title/headline/summary 本地化后同步刷新。只有现有 `kind: "editorial"` alt 经既有标题本地化后精确等于当前自动模板时才重建；人工或来源自带的视觉描述、cover alt 均不覆盖。未修改 Scheduled Task、固定窗口、schema、title/fact/time status 或历史生产数据。
 - **Verification:** PR #37 最终 Verify run [33163086458](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163086458) 通过完整检查；回归覆盖真实 `Gravhounds`、`FOUNTAINS` / `Shattered Shape` stale 模板，并验证 manual editorial alt 与 cover alt 保持不变。合并后 Pages run [33163142898](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163142898) 成功。实施过程中曾尝试直接修正 `2026-08-28-am` 历史 JSON，但 diff review 发现同时带入一处无关 cover sourceUrl 变化，因此该数据改动在合并前整体撤销，最终 PR 不包含任何 `public/data` 变更。已发布的已知 stale alt 因而仍未满足本条 `Close when`，本条保持 `in_progress`，后续须通过可独立验证的安全数据路径修正后才能关闭。
+
+- **2026-09-19 closeout:** 已授权修复历史已知实例。本分支仅修改 `2026-08-28-am` 两个模板型 editorial alt：`Gravhounds`→“重力猎犬”、`FOUNTAINS`→“永泉传说”，不触碰图片来源、事实、标题、期号或窗口；防复发逻辑仍沿用 PR #37。合并并通过完整检查/Pages 后即可标记 resolved。
 
 ### MNT-20260828-06 — `localizeRegisteredTitles()` 全局字符串替换存在误伤风险
 
@@ -262,6 +270,8 @@
 - **2026-09-01 close-state update:** 本条继续保持 `in_progress`。正常 Daily、degraded fallback、same-edition revision 与 locale repair 已有真实生产证据，但仍需修复 deployment acknowledgement 的 edition/commit 归属和 publication incident 自动收敛，并满足 exact wake 生产验收与连续无人干预 Daily 的既定关闭条件后才能 `resolved`。
 
 ---
+
+- **2026-09-19 closeout:** 本轮复核确认 Daily wake、durable packet、11:20 normal editorial、publication/locale/media 与连续自然期次已具备真实证据，且实际长期任务为唯一启用的“游戏圈每日简报”，精确 10:20/11:20 Asia/Shanghai；旧 PM 任务已禁用。但 deployment attribution 仍真实复现：普通代码部署会把 latest edition 顶层 deployment mainSha 覆写为无关代码 commit。本分支将 deploy acknowledgement 改为仅接受显式 `edition_id` 的 workflow_dispatch；publisher/media/bundle/SLA 均传递 exact edition，普通 main push 只部署站点、不再修改 edition state。合并后需用一次显式 edition 部署验证回执并确认普通 push 不污染状态，满足后关闭。
 
 ## MNT-20260901-01 — event ledger 错记窗口并漏识别平台级主体
 
@@ -435,7 +445,7 @@
 - **Discovered:** 2026-09-08
 - **Priority:** P2
 - **Area:** release calendar / reading sample
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 本地归档9月1日至7日upcoming均为空，9月7日sourceReport说明以replace提交空列表；8月31日有27条，10条仍处于9月7日之后15天范围内。原站和样例以数组长度隐藏入口与栏目。
 - **Proposed resolution:** 样例保留栏目，沿用最近非空快照中仍在窗口内的记录并明确未重新核验；独立显示加载失败和空状态。后续编辑生产流程应调查持续空清单的原因。
 - **Close when:** 窗口边界/跨年/来源提示/失败重试测试通过；允许环境完成人工验收并集成；生产编辑恢复持续核验发售清单，有实际期次证据。
@@ -458,6 +468,8 @@
 
 用户在本次系统审查前明确确认“人工验收完成”。结合各条既有回归、PR #111/#113 和部署证据，上述三个展示问题关闭；保留此前未验收的历史记录。MNT-20260908-02 的展示验收完成，但持续日历核验仍等待自然期次证据。
 
+- **2026-09-19 closeout:** 原“空数组导致整栏消失/无法持续核验”问题已完成生产闭环。NO.038/039/040 的日历分别恢复到7/10/13项，并在2026-09-19同时含 PC、Xbox Series X|S、PS5、Nintendo Switch 2；PR #129/#130 修复 degraded refresh 与完整日期 patch。发现层仍明确标记 partial/omitted，这属于设计边界而非本条故障，不宣称全球全平台穷尽覆盖。
+
 ## MNT-20260908-03 — 定时选期 JSON 污染 Actions output 与恢复依赖缺失
 
 - **Discovered:** 2026-09-08
@@ -473,7 +485,7 @@
 - **Discovered:** 2026-09-08
 - **Priority:** P2
 - **Area:** source health / discovery coverage
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** automation/state bc68bb2 的18次观察中 Rockstar、gamescom 均请求成功但平均候选为0；BAFTA 连续失败18次。PC Gamer 有16/18次成功和3条累计独立候选，电ファミ有18/18次成功和2条累计独立候选；本地复核两源各解析40项。active 的 shadow contribution 零值不能解释为没有贡献。
 - **Bounded resolution:** 新增 dataStatus、最近有数据时间、最近空响应连续次数与有效响应率，标记贡献指标测量范围，在 Actions summary 展示空/失败来源；PC Gamer、电ファミ转 active，保留可信度和发布核验门槛。BAFTA 的403不绕过访问限制，季节性空源不武断删除。
 - **Close when:** 指标兼容/恢复回归通过并合并；自然采集输出独立的数据可用性摘要，新增来源进入候选且继续经过原事实/时间/去重校验。没有采用记录前不宣称提升已发布覆盖率。
@@ -507,11 +519,13 @@
 
 - **Live verification / closure:** [Pages 34343682100](https://github.com/fallw1nd/daily-game-brief/actions/runs/34343682100)成功。2026-09-09线上latest、当期归档、英文索引及英文当期文件均HTTP 200，正文与日历分别9/13，英文索引当期available。MNT-20260908-03的回归、合并、自然选期、实际恢复与正式发布条件已满足，标为resolved；保留上述托管调度延迟限制。发布后完整npm run check通过344项测试、30期归档与英文校验及构建。
 
+- **2026-09-19 closeout:** 来源健康指标已持续落盘到 `automation/health/sources.json`；截至2026-09-19，`denfaminico` 为 active/available 且31/31成功，`pcgamer-news` 为 active/available。NO.040《SophieChat:AI》正式正文实际采用“電ファミニコゲーマー News”作为第二来源，证明新增来源已进入候选并通过原事实/时间/去重与编辑发布链。关闭条件满足。
+
 ## MNT-20260909-01 — 标题依赖主体栏导致独立阅读缺少主语
 
 - **Discovered:** 2026-09-09
 - **Priority:** P2
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 用户指出NO.030标题缺少主语，如“公开由MAPPA制作的片头动画主视觉”，归档/搜索脱离主体栏无法辨别游戏。
 - **Bounded resolution:** 按用户授权补全本期9条中英文标题和期标题，同步latest/归档/manifest/英文副本与自动图片alt；在packet提示及编辑契约各加入一句独立可读要求。另记录用户提供的5个中文译名和出处，采用common_translation，不未经核验升为官方。
 - **Close when:** 本期数据/英文校验、完整检查及上线一致性通过；后续自然期次标题采用明确主语。保留观察状态，避免仅凭提示变更宣称已杜绝复发。
@@ -527,6 +541,8 @@
 - **2026-09-12 release preparation:** 用正式 buildEdition/buildEnglishOverlay 修订 NO.031，8 条中文标题补全或统一已确认主体，14 条英文与 7 项日历通过校验；既有 factsDigest 未变，首页仍为 NO.032。修复常见地区/发售类型标签缺失导致英文整体不可用的问题。本期明确保留发布会尚未全量核验的说明，不把排队或抓取成功视为完整收录。合并/Pages 实测证据待补。
 - **2026-09-12 latest search run:** [34668694333](https://github.com/fallw1nd/daily-game-brief/actions/runs/34668694333)实际检索 3 个名称，122 个留队；input 37010、output 677、缓存读取 10624，合计 48311 tokens。未采纳来源不合格的候选，包括繁中页面、百科和论坛。确认 provider 可超出单次工具次数与整轮软预算；预算仅停止未启动请求，不宣称是硬上限或单次实测降幅。进一步排除媒体域名下的论坛页面，避免把用户帖子当作独立媒体证据。
 
+- **2026-09-19 closeout:** 发布端主体约束经过连续自然期次验证。2026-09-13至09-19的日报正文标题均明确带游戏、公司或人物主体，未再复现“Cosmos免费更新上线”式脱离主体栏不可读标题；对应期次均通过数据/英文校验并完成 Pages 部署。关闭条件满足。
+
 ## MNT-20260910-01 — 发布会合集截断、同源误对账与恢复消费缺口
 
 - **Discovered:** 2026-09-10
@@ -539,11 +555,13 @@
 - **2026-09-13 local bundle closeout:** 功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 在隔离 bare remote 通过有界 same-edition bundle、serial publish、partial/retry、stale-valid revalidation、main/state split-brain ack recovery、cross-edition rejection 和 feedback conflict/recovery 演练；queue fairness 的有限模拟保持 news 可消费且 showcase 最迟顺延一日。未修改 public data、固定 cron 或实际 Scheduled Task。
 - **2026-09-13 residual:** 以上是代码/隔离证据，不是 live workflow、Pages/media deployment、自然两次调用或发布会独立全量 checklist 验收；真实 provider 成本、title-hint 采用和后续自然期次仍未满足 Close when，条目保持 `in_progress`。
 
+- **2026-09-19 closeout:** 本轮确认积压并非 parser 失败，而是两个编辑槽位长期被“10:20 missing-packet wake + 11:20 Canonical”占满；截至2026-09-19，9月11/13/14/15/16/17/18/19仍有7/13/5/13/12/12/17/16个 news event identities pending。#133 已具备当期 Canonical+next-news bundle，但历史积压缺稳定消费槽。本分支改为全局只维持一个最旧 continuation lane，publisher/bundle 完成后自动激活最旧待办；10:20 若刚写 current wake，不轮询当前包，而可在同一次调用消费一个此前已 ready 的历史 continuation。保持每日两次任务、每次最多一个历史 continuation，下一自然期次需观察 pending 总量实际下降后再关闭。
+
 ## MNT-20260910-02 — 译名候选未持久积累且来源独立性不足
 
 - **Discovered:** 2026-09-10
 - **Priority:** P2
-- **Status:** in_progress
+- **Status:** resolved
 - **2026-09-11 continued verification:** 隔离发布 CLI 已验证补齐 NO.031 不回退 NO.032 首页，保留原窗口、人工标题和日历。新增跨地区多条证据关联同一已发布正文测试，以及可选归档发布会字段的链接/计数一致性校验。实际定时任务管理页连接失败，仍未完成外部任务调整；不增加第三次定时调用。
 - **2026-09-11 API measurement:** [真实原生搜索 34613358839](https://github.com/fallw1nd/daily-game-brief/actions/runs/34613358839)查询 4 个名称、123 个未查询保留队列；input 29478/output 1191，另有缓存读取 1792 tokens（完整合计 32461），0 个通过来源核验。服务忽略部分 max_uses 限制，现记录缓存用量并计入每轮软预算，未启动请求留队。补修最终文本带解释前缀时的 JSON 解析、商标/标点别名重复查询，以及日历译名未传入编辑包；收紧搜索来源范围。未以 HTTP 成功或预算命中代替译名采用验收。
 - **Evidence:** 旧工具只查最多8个新闻主体，没有持久采用；同机构域名可被视作独立媒体，完整作品身份核验不足。实现检查另发现来源网络失败被缓存为未命中、已核验缓存未输出复用。
@@ -576,6 +594,8 @@
 - [媒体处理 34681676717](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681676717) 成功添加4张核验图；[最终 Pages 34681720093](https://github.com/fallw1nd/daily-game-brief/actions/runs/34681720093) 部署 `aef74d4` 成功。线上最新期为 2026-09-12-daily，中文4条、英文4条、日历6项；窗口仍为(9月11日10:10,9月12日10:10]，图片后首页数据与生产文件一致。
 - 此次手动恢复成功不证明定时编辑已恢复：下一自然期次的双次调用和无人工介入发布仍待核验，继续 in_progress。发布会全量验收、合格译名自动采用亦未完成，不能以本次4条补发替代验收。
 
+- **2026-09-19 closeout:** 持久译名队列已真实运行：`automation/ledger/title-lookups.json` 已有持久 records/pending；`Well Dweller` 的自动采用记录含作品身份、两个独立来源、原文摘录和 `checkedAt`，随后注册表写入 automated_verified 并在下一自然期次采用。同期 `not-found`/`error` 查询没有阻断2026-09-18/19发布，也未自动回写旧归档。关闭条件满足。
+
 ## MNT-20260912-01 — 陈旧入口规则与重复验证增加上下文和操作成本
 
 - **Priority / status:** P2 / in_progress.
@@ -586,6 +606,8 @@
 - **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
 
 - **2026-09-13 local optimization closeout:** 在功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 上加入同 edition bundle 的 identity/state/feedback 事务、显式 partial result、queue fairness 与 24 个文件的回归/演练覆盖；验收记录见 `docs/OPTIMIZATION_ACCEPTANCE.md`。本地完整检查通过后仍不改变本条 status：没有 live workflow/deploy、实际 scheduler 配置、provider cost 或自然运行证据，文档精简和字符边界不等于费用下降。
+
+- **2026-09-19 closeout:** 实际调度器已独立回读：唯一启用长期任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 为 Asia/Shanghai 精确10:20与11:20，旧 PM 任务禁用；2026-09-13至19多期自然提交验证当前选择顺序与完整提交可工作。功能/调度验收已满足，唯一剩余关闭条件是“实际调用成本/usage”测量；当前 Automations 接口不暴露每次 Scheduled Task token/费用，因此不能伪造成本下降结论，继续 in_progress 仅等待可获得的真实 usage 证据。
 
 ## MNT-20260912-02 — 历史降级稿正式修订被跳过且重新抓取丢失旧证据
 
@@ -599,7 +621,7 @@
 
 ## MNT-20260917-01 — bundle handoff/recovery hardening and overlong archive-title validation
 
-- **Priority / status:** P1 / in_progress.
+- **Priority / status:** P1 / resolved.
 - **Evidence:** The Sep16 publication run [35051724442](https://github.com/fallw1nd/daily-game-brief/actions/runs/35051724442) validated the editorial submission but `npm run validate:data` rejected its 41-character `archiveTitle` (`日报｜《Wo Long 2: Wings of Ember》定档2027年3月4日`). Submission validation only checked the period prefix, leaving durable editorial state `valid` while publication remained pending; the observed deployment was `c971636` / run `35072647135`, so this is recorded as a state/publication split rather than a successful release.
 - **Bounded resolution in this candidate:** Reuse the shared 8–40 Unicode-character archive-title rule during editorial submission validation so the workflow records `editorial-invalid` before publication and leaves a targeted, repairable packet. Same-edition news continuation reuse now requires a confirmed same fact (shared fact digest plus event identity or exact copy), while independent facts omit `existingEntryId`. Bundle feedback carries the durable publication timestamp and decision identity, protecting later same-edition manual decisions and making replay idempotent.
 - **Recovery scope:** The trusted handoff writes a real `bundle-plan.json` beside packet batches and persists it with `automation/state`; Initial Canonical plus next-news plans are rechecked; absent/stale plans and later continuations use single inbox, without a claim of automatic plan regeneration. Queue order remains the fairness authority, showcase start/replay is covered, and the SLA watchdog scans due queues across editions with one bounded refresh/activation instead of filtering only the current day. Older editorial branches must use the existing single-inbox publisher path until the bundle workflow is present on both trusted `main` and the target editorial branch.
@@ -607,3 +629,5 @@
 - **Close when:** Astra accepts the candidate, it is merged without altering the fixed-window/publication contract, Sep16 is repaired through the trusted publisher, and live Actions/Pages confirm no recurrence. Showcase full-source completeness, natural two-pass scheduling, provider cost, title-hint adoption and cross-platform calendar coverage remain separate open criteria; this entry does not claim those validations.
 
 - **2026-09-19 reviewed scope:** Synced production 69ba3b4; Sep16 formal repair acaf72d already exists. Initial Canonical + next news only; later continuations remain single inbox. The old four-slot/day simulation is not a release guarantee. Shared archive-title validation and build-failure acknowledgement passed npm run check (83 files / 419 tests / 40 bilingual archives); feedback conflict recovery preserved all six concurrent files. Full-source completeness and measured cost remain open; release evidence is recorded in docs/OPTIMIZATION_ACCEPTANCE.md and the PR.
+
+- **2026-09-19 closeout:** PR #133 已合并 main（b7fbcdc），Verify 35439433649 成功；2026-09-16 正式稿已由 trusted publisher 以 acaf72d 修复并完成 media/Pages 35197448570；共享 archiveTitle 校验、build failure acknowledgement 与 bundle recovery 均已进入生产。该条自身 Close when 全部满足；发布会完整性、自然吞吐、成本等继续由各自维护项追踪。
