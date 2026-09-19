@@ -36,7 +36,7 @@ The fixed evidence windows are:
 
 For Daily, `windowEnd` and `plannedAt` are intentionally different. `windowEnd=10:10` is the immutable evidence cutoff and packet start. `plannedAt=12:00` is the public release target. Information first published after 10:10 cannot be pulled backward into that day's Daily even if it is discovered while editorial or media processing is still underway.
 
-Neither English generation, locale repair, media enrichment, retry logic, nor the noon deployment gate may alter these windows or issue sequencing.
+Neither English generation, locale repair, media enrichment, retry logic, nor the noon deployment gate may alter these windows or issue sequencing.\n\nRelease-calendar discovery remains a bounded pre-editorial aid. Its source-specific health ledger is stored on `automation/state` separately from news source health, and may affect candidate ordering but never waive the minimum PC / PlayStation / Xbox / Nintendo checks or the primary-evidence requirement. Candidate-cap omissions and packet-budget omissions are reported separately; neither authorizes publication from snippets alone.
 
 ## English Overlay contract
 
