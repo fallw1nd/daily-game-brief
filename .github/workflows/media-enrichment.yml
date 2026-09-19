@@ -100,7 +100,14 @@ jobs:
         if: steps.publication.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yml --ref main
+          EDITION_ID: ${{ steps.publication.outputs.edition || inputs.edition_id }}
+        shell: bash
+        run: |
+          if [ -z "$EDITION_ID" ]; then
+            echo "Media deployment requires an exact edition ID"
+            exit 1
+          fi
+          gh workflow run deploy.yml --ref main -f edition_id="$EDITION_ID"
 
       - name: Acknowledge nonblocking media lane
         if: always()
