@@ -81,6 +81,90 @@ describe("idempotent edition publisher", () => {
     expect(result.decisionDigest).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("keeps full-date Daily calendar patches and writes canonical MM.DD dates", () => {
+    const dailyPacket = {
+      editorialInput: {
+        ...packet.editorialInput,
+        window: {
+          id: "2026-09-17-daily",
+          period: "daily",
+          plannedAt: "2026-09-17 12:00",
+          windowStart: "2026-09-16 10:10",
+          windowEnd: "2026-09-17 10:10",
+        },
+      },
+    };
+    const dailyEditorial = {
+      ...editorial,
+      editionId: "2026-09-17-daily",
+      archiveTitle: "日报｜《Example Game》正式公布",
+      decisions: [{ ...editorial.decisions[0], beijingTime: "2026-09-17 09:30" }],
+      upcomingMode: "inherit_and_patch",
+      upcoming: [
+        {
+          id: "2026-09-29-transport-fever-3-pc",
+          date: "2026-09-29",
+          titleKey: "transport-fever-3",
+          titleZhCn: "狂热运输3",
+          titleEn: "Transport Fever 3",
+          titleZhStatus: "common_translation",
+          platforms: ["PC"],
+          region: "全球",
+          releaseType: "launch",
+          source: { label: "Transport Fever 3 Official Site", url: "https://www.transportfever3.com/", kind: "primary" },
+          note: "官方网站确认日期。",
+        },
+        {
+          id: "outside-wrong-year",
+          date: "2027-09-29",
+          titleKey: "outside-wrong-year",
+          titleZhCn: null,
+          titleEn: "Outside Wrong Year",
+          titleZhStatus: "unavailable",
+          platforms: ["PC"],
+          region: "全球",
+          releaseType: "launch",
+          source: { label: "Store", url: "https://store.example/outside", kind: "primary" },
+          note: "应被窗口过滤。",
+        },
+      ],
+    };
+    const current = {
+      id: "2026-09-17-daily",
+      issueNumber: 38,
+      entries: [],
+      upcoming: [{
+        id: "upcoming-existing",
+        date: "09.24",
+        title: { title_key: "existing", title_en: "Existing", title_zh_status: "unavailable" },
+        platforms: ["PC"], region: "全球", releaseType: "正式发售",
+        source: { label: "Store", url: "https://store.example/existing", kind: "primary" },
+        note: "",
+        cover_status: "unavailable",
+      }],
+    };
+    const dailyManifest = {
+      schemaVersion: 1,
+      updatedAt: "2026-09-17 12:00",
+      latest: "2026-09-17-daily",
+      editions: [{ id: "2026-09-17-daily", issueNumber: 38 }],
+    };
+    const result = buildEdition({
+      packet: dailyPacket,
+      editorial: dailyEditorial,
+      latest: current,
+      manifest: dailyManifest,
+      allowSameEditionRevision: true,
+      now: new Date("2026-09-17T10:14:00Z"),
+    });
+    expect(result.status).toBe("revised");
+    expect(result.edition.issueNumber).toBe(38);
+    expect(result.edition.upcoming.map((item) => [item.id, item.date])).toEqual([
+      ["upcoming-existing", "09.24"],
+      ["2026-09-29-transport-fever-3-pc", "09.29"],
+    ]);
+  });
+
   it("uses the registered Chinese title when editorial output is unavailable", () => {
     const fableEditorial = {
       ...editorial,

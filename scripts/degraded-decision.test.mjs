@@ -27,6 +27,33 @@ describe("zero-AI degraded decision", () => {
     expect(output.upcomingMode).toBe("inherit_and_patch");
   });
 
+  it("keeps a safe deterministic Daily calendar patch instead of dropping discovery", () => {
+    const value = packet({}, { id: "2026-09-17-daily", period: "daily" });
+    value.editorialInput.upcomingBaseline = {
+      items: [{ id: "upcoming-existing", title: { title_en: "Existing Game", title_key: "existing-game" } }],
+    };
+    value.editorialInput.titleHints = [{
+      titleEn: "Known Game", subjectKey: "Known Game", titleZhCn: "已知游戏", suggestedStatus: "common_translation",
+    }];
+    value.editorialInput.upcomingDiscovery = {
+      window: { startInclusive: "2026-09-18", endInclusive: "2026-10-02" },
+      candidates: [
+        { title: "Known Game", date: "2026-09-29", url: "https://store.steampowered.com/app/1/", platforms: ["PC"], region: "US", sourceId: "steam-popular", family: "steam", kind: "primary", priority: 3, knownTitle: true, crossSource: true },
+        { title: "Known Game", date: "2026-09-29", url: "https://example.com/calendar", platforms: ["PC", "PS5"], region: "source-listed", sourceId: "media-calendar", family: "media", kind: "discovery", priority: 3, knownTitle: true, crossSource: true },
+        { title: "Conflict Game", date: "2026-10-01", url: "https://store.steampowered.com/app/2/", platforms: ["PC"], region: "US", sourceId: "steam-popular", family: "steam", kind: "primary", priority: 3, crossSource: true },
+        { title: "Conflict Game", date: "2026-10-02", url: "https://example.com/calendar", platforms: ["PS5"], region: "source-listed", sourceId: "media-calendar", family: "media", kind: "discovery", priority: 3, crossSource: true },
+        { title: "Random Game", date: "2026-09-20", url: "https://store.steampowered.com/app/3/", platforms: ["PC"], region: "US", sourceId: "steam-popular", family: "steam", kind: "primary", priority: 3, knownTitle: false, crossSource: false },
+        { title: "Existing Game", date: "2026-09-24", url: "https://store.steampowered.com/app/4/", platforms: ["PC"], region: "US", sourceId: "steam-popular", family: "steam", kind: "primary", priority: 3, knownTitle: true, crossSource: true },
+      ],
+    };
+    const output = buildDegradedDecision(value);
+    expect(output.upcoming).toEqual([expect.objectContaining({
+      id: "upcoming-known-game", date: "09.29", titleZhCn: "已知游戏", titleZhStatus: "common_translation",
+      source: { label: "Steam", url: "https://store.steampowered.com/app/1/", kind: "primary" },
+    })]);
+    expect(output.checkedExtra.join(" ")).toContain("未来15天日历");
+  });
+
   it("preserves legacy AM and PM degraded semantics", () => {
     const morning = buildDegradedDecision(packet());
     const evening = buildDegradedDecision(packet({}, { id: "2026-08-27-pm", period: "pm" }));
