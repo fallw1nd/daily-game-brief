@@ -104,13 +104,18 @@ jobs:
         if: always() && steps.bundle.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yml --ref main
+        run: gh workflow run deploy.yml --ref main -f edition_id=${{ steps.bundle.outputs.edition }}
 
       - name: Trigger edition-specific media workflow
         if: always() && steps.bundle.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run media-enrichment.yml --ref main -f edition_id=${{ steps.bundle.outputs.edition }}
+
+      - name: Activate one oldest pending continuation
+        if: always() && steps.bundle.outputs.publication_status != 'partial-failure'
+        shell: bash
+        run: bash scripts/update-showcase-queue-branch.sh --no-refresh-sources
 
       - name: Summarize bundle publication
         if: always()
