@@ -51,6 +51,7 @@ export function createEditorialBundleSmokeDriver({ root, editionId }) {
       const validation = validationPath ? JSON.parse(await readFile(resolve(root, validationPath), "utf8")) : { errors: [] };
       const next = applyEditionStateEvent(current, event, {
         editionId,
+        at: argumentValue(args, "at") || new Date().toISOString(),
         packetBlobSha: argumentValue(args, "packet-blob-sha"),
         submissionSha: argumentValue(args, "submission-sha"),
         mainSha: argumentValue(args, "main-sha"),
