@@ -3,6 +3,7 @@ import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
 import { applyEditionStateEvent, createEditionState, gitBlobSha } from "./lib/edition-state.mjs";
 import { buildEdition } from "./lib/edition-publisher.mjs";
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
+import { projectionDigest } from "./lib/locale-digest.mjs";
 
 const editionId = "2026-09-11-daily";
 const window = expectedEditorialWindow(editionId);
@@ -73,7 +74,7 @@ function buildPacket(eventKey) {
   };
 }
 
-function newsDecision(eventKey, existingEntryId = undefined) {
+function newsDecision(eventKey, existingEntryId = undefined, factToken = existingEntryId ? "fact-1" : "fact-2") {
   return {
     eventKey,
     ...(existingEntryId ? { existingEntryId } : {}),
@@ -98,7 +99,7 @@ function newsDecision(eventKey, existingEntryId = undefined) {
     releaseType: "更新",
     sourceIndexes: [0],
     additionalSources: [],
-    sharedFactFrame: { subjectTitleKey: "same-game", dates: [], times: [], numbers: [existingEntryId ? "1" : "2"], platforms: ["PC"], peopleAndEntities: [], versionsAndTerms: [] },
+    sharedFactFrame: { subjectTitleKey: "same-game", dates: [], times: [], numbers: [factToken], platforms: ["PC"], peopleAndEntities: [], versionsAndTerms: [] },
   };
 }
 
@@ -194,13 +195,15 @@ describe("durable editorial continuation queue", () => {
   });
 
   it("adds a different same-title fact but preserves an explicitly matched retry", () => {
+    const sameFactDecision = newsDecision("news-same-fact", undefined, "fact-1");
     const existingEntry = {
       id: "2026-09-11-daily-news-0",
       section: "news",
       title: { title_key: "same-game", title_en: "Same Game", title_zh_status: "unavailable" },
-      headline: "《Same Game》旧事实",
-      summary: "原有事实。",
+      headline: sameFactDecision.headline,
+      summary: sameFactDecision.summary,
       sources: [{ label: "Publisher", url: source.url, kind: "primary" }],
+      sharedFactFrameDigest: projectionDigest(sameFactDecision.sharedFactFrame),
     };
     const latest = { id: editionId, issueNumber: 40, leadEntryId: existingEntry.id, archiveTitle: "日报｜《Same Game》旧事实", entries: [existingEntry], upcoming: [], tracking: [], sourceReport: {} };
     const manifest = { schemaVersion: 1, latest: editionId, editions: [{ id: editionId, issueNumber: 40, date: "2026-09-11", period: "daily" }] };
@@ -268,7 +271,7 @@ describe("durable editorial continuation queue", () => {
       latest: { ...latest, entries: [existingEntry, otherEntry] },
       manifest,
       allowSameEditionRevision: true,
-    })).toThrow("existingEntryId must identify the confirmed subject");
+    })).toThrow("existingEntryId must identify the confirmed same fact");
   });
 
   it("does not treat a showcase batch as a news continuation", () => {

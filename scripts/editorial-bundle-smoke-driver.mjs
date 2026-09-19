@@ -90,13 +90,15 @@ export function createEditorialBundleSmokeDriver({ root, editionId }) {
       await commitState();
     },
 
-    async persistFeedback({ submission, planPath, packetDir }) {
+    async persistFeedback({ submission, planPath, packetDir, decidedAt, decisionIdentity }) {
       const status = await persistEditorialFeedback({
         root,
         editionId,
         submissionIndex: submission.index,
         planPath,
         packetDir,
+        decidedAt,
+        decisionIdentity,
         runnerTemp: resolve(root, "runner-temp"),
         runId: process.env.GITHUB_RUN_ID || "bundle-smoke",
         maxAttempts: 3,

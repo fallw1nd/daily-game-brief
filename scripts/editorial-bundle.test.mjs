@@ -29,6 +29,7 @@ function packet(eventKey, continuation = null) {
       window,
       trackingQueue: [],
       packages: [{ eventKey, subjectKey: eventKey, sources: [source] }],
+      budget: { maxInputChars: 120000, usedInputChars: 600 },
     },
   };
 }

@@ -145,6 +145,18 @@ function entryMedia(previous, imageSeed, nextRecord) {
   };
 }
 
+function normalizeFactText(value) {
+  return String(value || "").normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function confirmedSameFact(entry, decision) {
+  const digest = decision?.sharedFactFrame ? projectionDigest(decision.sharedFactFrame) : null;
+  if (!digest || !entry?.sharedFactFrameDigest || entry.sharedFactFrameDigest !== digest) return false;
+  if (entry.eventKey) return entry.eventKey === decision.eventKey;
+  return normalizeFactText(entry.headline) === normalizeFactText(decision.headline)
+    && normalizeFactText(entry.summary) === normalizeFactText(decision.summary);
+}
+
 function sectionCounters(entries, windowId) {
   const counters = new Map();
   for (const entry of entries || []) {
@@ -210,11 +222,12 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       ? packetItem?.showcaseRefs?.length
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
         : isNewsContinuation
-          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key) : null
+          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key && confirmedSameFact(entry, decision)) : null
           : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
-      throw new Error(`included ${decision.eventKey}: existingEntryId must identify the confirmed subject in this edition`);
+      const identity = isNewsContinuation ? "confirmed same fact" : "confirmed subject";
+      throw new Error(`included ${decision.eventKey}: existingEntryId must identify the ${identity} in this edition; omit it to create an independent entry`);
     }
     const index = counters.get(decision.section) || 0;
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;

@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.mjs";
 import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calendar-discovery.mjs";
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
+import { gitBlobSha } from "./lib/edition-state.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
@@ -122,8 +123,9 @@ const packet = {
   outputSchema: editorialSchema,
   editorialInput,
 };
+const packetText = JSON.stringify(packet, null, 2) + "\n";
 await mkdir(dirname(PACKET_PATH), { recursive: true });
-await writeFile(PACKET_PATH, JSON.stringify(packet, null, 2) + "\n");
+await writeFile(PACKET_PATH, packetText);
 const batchDirectory = resolve(dirname(PACKET_PATH), "editorial-batches");
 await mkdir(batchDirectory, { recursive: true });
 await writeFile(resolve(batchDirectory, "showcase-evidence.json"), JSON.stringify(showcaseReport, null, 2) + "\n");
@@ -148,5 +150,31 @@ for (const [index, input] of continuationInputs.entries()) {
   queue.batches.push({ name, scope: continuation.continuation.scope, status: "pending", eventKeys: input.packages.map(item => item.eventKey) });
 }
 await writeFile(resolve(batchDirectory, "queue.json"), JSON.stringify(queue, null, 2) + "\n");
+// Preserve the durable queue's fairness order in the handoff hint. GitHub
+// remains authoritative and re-resolves this candidate after any queue change.
+const secondBatch = queue.batches.find(batch => batch.status !== "completed");
+const bundlePlan = {
+  schemaVersion: 1,
+  editionId: editorialInput.window.id,
+  generatedAt,
+  source: "trusted-editorial-packet-builder",
+  submissions: [
+    {
+      index: 0,
+      scope: "canonical",
+      batchName: null,
+      packetBlobSha: gitBlobSha(packetText),
+      eventKeys: editorialInput.packages.map(item => item.eventKey),
+    },
+    ...(secondBatch ? [{
+      index: 1,
+      scope: secondBatch.scope,
+      batchName: secondBatch.name,
+      packetBlobSha: gitBlobSha(await readFile(resolve(batchDirectory, secondBatch.name), "utf8")),
+      eventKeys: secondBatch.eventKeys,
+    }] : []),
+  ],
+};
+await writeFile(resolve(batchDirectory, "bundle-plan.json"), JSON.stringify(bundlePlan, null, 2) + "\n");
 console.log(`Editorial packet: ${editorialInput.packages.length} packages; title hints=${titleHints.length}; estimated reading=${editorialInput.budget.estimatedInputTokens} tokens`);
 console.log(`Packet: ${PACKET_PATH}`);

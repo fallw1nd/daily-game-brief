@@ -1,5 +1,6 @@
 import { validateEditorialOutput } from "./editorial-contract.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
+import { archiveTitlePrefix, hasValidArchiveTitle } from "./archive-title.mjs";
 
 const editionPattern = /^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/;
 
@@ -9,12 +10,6 @@ function isHttps(value) {
 
 function editionPeriod(editionId) {
   return String(editionId || "").split("-").at(-1) || "";
-}
-
-function archivePrefix(period) {
-  if (period === "am") return "早报｜";
-  if (period === "pm") return "晚报｜";
-  return "日报｜";
 }
 
 export function validateEditorialSubmission({ branchName, packet, editorial, packetBlobSha, publicationMode = "publish" }) {
@@ -44,9 +39,9 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
     if (!/^[0-9a-f]{40}$/u.test(String(editorial?.packetBlobSha || ""))) errors.push("normal editorial submission requires packetBlobSha");
     if (editorial?.packetBlobSha !== packetBlobSha) errors.push("editorial packetBlobSha does not match the restored packet blob");
   }
-  const prefix = archivePrefix(period);
-  if (typeof editorial?.archiveTitle !== "string" || !editorial.archiveTitle.startsWith(prefix)) {
-    errors.push(`archiveTitle must start with ${prefix}`);
+  const prefix = archiveTitlePrefix(period);
+  if (!hasValidArchiveTitle(editorial?.archiveTitle, period)) {
+    errors.push(`archiveTitle must use ${prefix} and contain 8–40 characters`);
   }
   for (const key of ["decisions", "removeUpcomingIds", "upcoming", "checkedExtra", "limitedExtra"]) {
     if (!Array.isArray(editorial?.[key])) errors.push(`${key} must be an array`);

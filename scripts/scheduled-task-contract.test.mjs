@@ -74,9 +74,11 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("unprocessed packets remain pending");
     expect(contract).toContain("Never choose a Git blob or event identity yourself");
     expect(architecture).toContain("same-edition bundle");
-    expect(architecture).toContain("120,000 serialized characters per packet");
-    expect(architecture).toContain("240,000 serialized characters per bundle");
+    expect(architecture).toContain("120,000-character provider-facing input budget");
+    expect(architecture).toContain("240,000; the serialized packet/editorial transport envelope has separate 240,000-per-packet and 480,000-per-bundle safety limits");
     expect(architecture).toContain("not a provider token or cost measurement");
+    expect(contract).toContain("GitHub rebuilds absent old-queue plans");
+    expect(contract).toContain("otherwise use the existing single `automation/inbox/<edition-id>.json` publisher path");
   });
 
   it("keeps editorial facts bounded while attempting English by default", () => {

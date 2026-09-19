@@ -60,4 +60,13 @@ describe("final editorial packet workflow", () => {
     expect(editorialize).toContain("outputSchema: editorialSchema");
     expect(editorialize).not.toContain("legacyCompatibleEditorialSchema");
   });
+
+  it("persists a pre-confirmed bounded bundle plan with the packet handoff", () => {
+    expect(editorialize).toContain('resolve(batchDirectory, "bundle-plan.json")');
+    expect(editorialize).toContain('source: "trusted-editorial-packet-builder"');
+    expect(editorialize).toContain("packetBlobSha: gitBlobSha(packetText)");
+    expect(editorialize).toContain("secondBatch = queue.batches.find");
+    expect(workflow).toContain('cp "$RUNNER_TEMP/editorial-batches/"*.json "$state_dir/automation/batches/$edition_id/"');
+    expect(workflow).toContain("artifacts/editorial-batches/");
+  });
 });

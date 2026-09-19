@@ -98,19 +98,30 @@ async function reconcileAlreadyPublished(submission, state, submissionSha) {
   if (state.value.publication?.status !== "committed" && currentDigestMatches) {
     const mainSha = (await command("git", ["rev-parse", "HEAD"])).stdout.trim();
     repairedMainSha = mainSha;
+    const publicationAt = state.value.transitions?.find(item => item.event === "publication-committed" && item.decisionDigest === editorialDecisionDigest(submission.editorial))?.at
+      || state.value.publication.updatedAt
+      || new Date().toISOString();
     await updateState("publication-committed", [
       `--main-sha=${mainSha}`,
       "--source=editorial",
       `--packet-blob-sha=${submission.packetBlobSha}`,
       `--submission-sha=${submissionSha}`,
       `--decision-digest=${editorialDecisionDigest(submission.editorial)}`,
+      `--at=${publicationAt}`,
     ]);
     const localePath = resolve("public/data", `locales/en/archive/${bundle.editionId.slice(0, 4)}/${bundle.editionId.slice(5, 7)}/${bundle.editionId}.json`);
     let localeStatus = "unavailable";
     try { await readFile(localePath); localeStatus = "available"; } catch (error) { if (error.code !== "ENOENT") throw error; }
     await updateState("locale-status", [`--status=${localeStatus}`, `--reason=${localeStatus === "available" ? "reconciled" : "retained-existing-state"}`]);
   }
-  return { changed: false, status: "already-exists", feedbackEligible: true, mainSha: committedRecord?.mainSha || state.value.publication?.mainSha || repairedMainSha };
+  return {
+    changed: false,
+    status: "already-exists",
+    feedbackEligible: true,
+    mainSha: committedRecord?.mainSha || state.value.publication?.mainSha || repairedMainSha,
+    feedbackAt: committedRecord?.at || state.value.publication?.updatedAt || null,
+    decisionIdentity: editorialDecisionDigest(submission.editorial),
+  };
 }
 
 async function publishOne(submission) {
@@ -156,6 +167,7 @@ async function publishOne(submission) {
   let publication = null;
   let mainSha = null;
   let changed = false;
+  let publicationAt = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     await command(process.execPath, ["scripts/publish-editorial-decision.mjs"], { env: { ...process.env, EDITORIAL_PACKET_PATH: "artifacts/editorial-packet.json", EDITORIAL_DECISION_PATH: "artifacts/editorial-decisions.json", PUBLICATION_RESULT_PATH: "artifacts/publication-result.json" } });
     const npmFile = process.platform === "win32" ? process.execPath : "npm";
@@ -171,9 +183,10 @@ async function publishOne(submission) {
     }
     await command("git", ["add", "public/data", "config/title-translations.json"]);
     await command("git", ["commit", "-m", `content(brief): publish ${bundle.editionId} bundle ${submission.index}`]);
+    const committedSha = (await command("git", ["rev-parse", "HEAD"])).stdout.trim();
     try {
       await command("git", ["push", "origin", "HEAD:main"]);
-      mainSha = (await command("git", ["rev-parse", "HEAD"])).stdout.trim();
+      mainSha = committedSha;
       changed = true;
       break;
     } catch (error) {
@@ -183,6 +196,7 @@ async function publishOne(submission) {
     }
   }
   if (!mainSha) throw new Error(`bundle candidate ${submission.index} did not produce a main commit`);
+  publicationAt = new Date().toISOString();
   try {
     if (process.env.EDITORIAL_BUNDLE_FAIL_AFTER_MAIN_INDEX === String(submission.index)) {
       throw new Error(`intentional bundle smoke failure after main commit for submission ${submission.index}`);
@@ -193,6 +207,7 @@ async function publishOne(submission) {
       `--packet-blob-sha=${submission.packetBlobSha}`,
       `--submission-sha=${submissionSha}`,
       `--decision-digest=${editorialDecisionDigest(submission.editorial)}`,
+      `--at=${publicationAt}`,
     ]);
     await updateState("locale-status", [`--status=${publication.localeStatus || "unavailable"}`, `--reason=${publication.localeReasonCode || "none"}`]);
     await advanceQueue();
@@ -202,10 +217,19 @@ async function publishOne(submission) {
       status: publication.status,
       mainSha,
       feedbackEligible: publication.feedbackEligible === true,
+      feedbackAt: publicationAt,
+      decisionIdentity: editorialDecisionDigest(submission.editorial),
     };
     throw error;
   }
-  return { changed, status: publication.status, mainSha, feedbackEligible: publication.feedbackEligible === true };
+  return {
+    changed,
+    status: publication.status,
+    mainSha,
+    feedbackEligible: publication.feedbackEligible === true,
+    feedbackAt: publicationAt,
+    decisionIdentity: editorialDecisionDigest(submission.editorial),
+  };
 }
 
 const bundle = JSON.parse(await readFile(planPath, "utf8"));
@@ -217,16 +241,24 @@ const results = [];
 let changed = false;
 let feedbackEligible = false;
 
-async function persistOneFeedback(submission) {
+async function persistOneFeedback(submission, publicationResult) {
   if (!submission || submission.index == null) return "skipped";
   const driver = await stateDriver();
-  if (driver) return driver.persistFeedback({ submission, planPath, packetDir });
+  if (driver) return driver.persistFeedback({
+    submission,
+    planPath,
+    packetDir,
+    decidedAt: publicationResult?.feedbackAt,
+    decisionIdentity: publicationResult?.decisionIdentity,
+  });
   return persistEditorialFeedback({
     root,
     editionId: bundle.editionId,
     submissionIndex: submission.index,
     planPath,
     packetDir,
+    decidedAt: publicationResult?.feedbackAt,
+    decisionIdentity: publicationResult?.decisionIdentity,
     runnerTemp: process.env.RUNNER_TEMP || tmpdir(),
     runId: process.env.GITHUB_RUN_ID || "local",
     maxAttempts: 3,
@@ -262,7 +294,7 @@ try {
     results.push(resultItem);
     changed ||= result.changed === true;
     feedbackEligible ||= result.feedbackEligible === true;
-    if (result.feedbackEligible === true) resultItem.feedbackStatus = await persistOneFeedback(submission);
+    if (result.feedbackEligible === true) resultItem.feedbackStatus = await persistOneFeedback(submission, result);
     await writeBundleResult("partial");
   }
 } catch (error) {

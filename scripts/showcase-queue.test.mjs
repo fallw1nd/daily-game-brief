@@ -24,6 +24,13 @@ describe("durable showcase queue", () => {
     expect(due.queue.batches[0].retryAttempts).toBe(1);
     expect(due.state.fixedWindow).toEqual(input.state.fixedWindow);
   });
+  it("finds a due old queue when recovery is not limited to the current edition", () => {
+    const input = fixture();
+    input.queue.batches[0].status = "awaiting_retry";
+    input.queue.firstPublishedAt = "2026-09-10T04:00:00Z";
+    const result = advanceShowcaseQueue({ ...input, now: "2026-09-15T04:31:00Z" });
+    expect(result.packet).toBe(input.packets["batch.json"]);
+  });
   it("opens exactly one scoped packet and repeated advancement leaves it in flight", () => {
     const input = fixture();
     const result = advanceShowcaseQueue(input);

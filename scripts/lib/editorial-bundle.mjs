@@ -4,8 +4,12 @@ import { gitBlobSha } from "./edition-state.mjs";
 
 export const EDITORIAL_BUNDLE_SCHEMA_VERSION = 1;
 export const MAX_BUNDLE_SUBMISSIONS = 2;
-export const MAX_PACKET_SERIALIZED_CHARS = 120000;
-export const MAX_BUNDLE_SERIALIZED_CHARS = 240000;
+export const MAX_EDITORIAL_INPUT_CHARS = 120000;
+export const MAX_BUNDLE_INPUT_CHARS = MAX_EDITORIAL_INPUT_CHARS * MAX_BUNDLE_SUBMISSIONS;
+// Input budgets cover the provider-facing editorialInput. These larger limits
+// cover the JSON transport envelope and the editor's response alongside it.
+export const MAX_PACKET_SERIALIZED_CHARS = 240000;
+export const MAX_BUNDLE_SERIALIZED_CHARS = MAX_PACKET_SERIALIZED_CHARS * MAX_BUNDLE_SUBMISSIONS;
 
 const SAFE_BATCH_NAME = /^[\w-]+\.json$/u;
 const SHA = /^[0-9a-f]{40}$/u;
@@ -24,6 +28,20 @@ function resolvedScope(packet) {
 
 function serializedChars(packet, editorial) {
   return JSON.stringify({ packet, editorial }).length;
+}
+
+function inputBudget(packet, index, errors) {
+  const budget = packet?.editorialInput?.budget;
+  const used = Number(budget?.usedInputChars);
+  const max = Number(budget?.maxInputChars);
+  if (!Number.isFinite(used) || !Number.isFinite(max)) {
+    errors.push(`submissions[${index}] editorialInput.budget must expose numeric usedInputChars and maxInputChars`);
+    return 0;
+  }
+  if (max > MAX_EDITORIAL_INPUT_CHARS) errors.push(`submissions[${index}] editorialInput.budget.maxInputChars exceeds ${MAX_EDITORIAL_INPUT_CHARS}`);
+  if (used > max) errors.push(`submissions[${index}] editorialInput.budget.usedInputChars exceeds its declared input budget`);
+  if (used > MAX_EDITORIAL_INPUT_CHARS) errors.push(`submissions[${index}] editorialInput input exceeds ${MAX_EDITORIAL_INPUT_CHARS} characters`);
+  return used;
 }
 
 function completedCycleAt(transitions, index) {
@@ -114,6 +132,7 @@ export function validateEditorialBundle(bundle, { branchName, packetTextsBySha =
   const seenBlobs = new Set();
   const seenEvents = new Set();
   let totalChars = 0;
+  let totalInputChars = 0;
   for (const [index, submission] of bundle.submissions.entries()) {
     if (!submission || typeof submission !== "object") {
       errors.push(`submissions[${index}] must be an object`);
@@ -135,7 +154,8 @@ export function validateEditorialBundle(bundle, { branchName, packetTextsBySha =
     const editorial = submission.editorial;
     const packetChars = serializedChars(packet, editorial);
     totalChars += packetChars;
-    if (packetChars > MAX_PACKET_SERIALIZED_CHARS) errors.push(`submissions[${index}] serialized packet/editorial input exceeds ${MAX_PACKET_SERIALIZED_CHARS} characters`);
+    totalInputChars += inputBudget(packet, index, errors);
+    if (packetChars > MAX_PACKET_SERIALIZED_CHARS) errors.push(`submissions[${index}] serialized packet/editorial envelope exceeds ${MAX_PACKET_SERIALIZED_CHARS} characters`);
     errors.push(...identityErrors(submission, packet, index));
     if (editorial?.editionId !== bundle.editionId) errors.push(`submissions[${index}].editorial editionId does not match the bundle`);
     const decisionErrors = validateEditorialSubmission({
@@ -152,6 +172,7 @@ export function validateEditorialBundle(bundle, { branchName, packetTextsBySha =
     if (index > 0 && resolvedScope(packet) === "canonical") errors.push("only the first bundle submission may be normal Canonical work");
     if (index > 0 && resolvedScope(packet) === "news" && bundle.submissions[index - 1]?.scope === "showcase") errors.push("news cannot follow a showcase slot in one bundle");
   }
+  if (totalInputChars > MAX_BUNDLE_INPUT_CHARS) errors.push(`editorial bundle editorialInput exceeds ${MAX_BUNDLE_INPUT_CHARS} characters`);
   if (totalChars > MAX_BUNDLE_SERIALIZED_CHARS) errors.push(`editorial bundle serialized input exceeds ${MAX_BUNDLE_SERIALIZED_CHARS} characters`);
   if (bundle.serializedChars != null && Number(bundle.serializedChars) !== totalChars) errors.push("editorial bundle serializedChars does not match the resolved packet/editorial bytes");
   return [...new Set(errors)];

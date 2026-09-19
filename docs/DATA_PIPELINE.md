@@ -8,7 +8,7 @@ The website reads `public/data/latest.json` at runtime. Every published Canonica
 
 ## ChatGPT task handoff
 
-The scheduled ChatGPT task does **not** write archive/latest/manifest or recovery state. It selects the oldest acknowledged pending edition from `automation/status/`, consumes the exact finalized packet by the state's immutable Git blob SHA, applies the live editorial contract, and commits only one structured decision to `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`.
+The scheduled ChatGPT task does **not** write archive/latest/manifest or recovery state. It selects the oldest acknowledged pending edition from `automation/status/`, consumes the exact finalized packet by the state's immutable Git blob SHA, reads the optional trusted `automation/batches/<edition-id>/bundle-plan.json`, applies the live editorial contract, and commits one structured decision or the ordered bounded bundle to the edition-scoped editorial branch.
 
 For new normal submissions:
 

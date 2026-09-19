@@ -7,11 +7,14 @@ const queueScript = await readFile("scripts/advance-showcase-queue.mjs", "utf8")
 const queueLib = await readFile("scripts/lib/editorial-queue.mjs", "utf8");
 const stateLib = await readFile("scripts/lib/edition-state.mjs", "utf8");
 const publisherLib = await readFile("scripts/publish-editorial-decision.mjs", "utf8");
+const queueUpdater = await readFile("scripts/update-showcase-queue-branch.sh", "utf8");
 
 describe("editorial continuation queue orchestration", () => {
   it("advances only the edition that just published and at most one batch", () => {
     expect(publisher).toContain('node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --edition="${{ steps.submission.outputs.edition }}" --max-activations=1');
-    expect(sla).toContain('bash scripts/update-showcase-queue-branch.sh "${{ steps.edition.outputs.edition }}"');
+    expect(sla).toContain("bash scripts/update-showcase-queue-branch.sh --refresh-sources");
+    expect(queueUpdater).toContain('edition_filter=""');
+    expect(queueUpdater).toContain('queue_args+=(--edition="$edition_filter")');
     expect(queueScript).toContain('--max-activations=');
     expect(queueScript).toContain('advanceEditorialQueue');
   });

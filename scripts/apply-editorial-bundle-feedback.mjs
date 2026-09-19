@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { applyEditorialFeedback } from "./lib/event-ledger.mjs";
+import { editorialDecisionDigest } from "./lib/locale-digest.mjs";
 
 const bundle = JSON.parse(await readFile(process.env.EDITORIAL_BUNDLE_PATH, "utf8"));
 const packetDir = process.env.EDITORIAL_BUNDLE_PACKET_DIR;
@@ -16,6 +17,7 @@ for (const submission of submissions) {
   const packet = JSON.parse(await readFile(`${packetDir}/${submission.packetBlobSha}.json`, "utf8"));
   ledger = applyEditorialFeedback(ledger, submission.editorial, packet, {
     decidedAt: process.env.EDITORIAL_DECIDED_AT || new Date().toISOString(),
+    decisionIdentity: process.env.EDITORIAL_DECISION_IDENTITY || editorialDecisionDigest(submission.editorial),
   });
 }
 await mkdir(dirname(ledgerPath), { recursive: true });

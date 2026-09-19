@@ -9,7 +9,7 @@ import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
 
 const run = promisify(execFile);
 const sourceRoot = resolve(".");
-const editionId = "2026-09-13-daily";
+const editionId = "2026-09-17-daily";
 const window = expectedEditorialWindow(editionId);
 const source = {
   sourceIndex: 0,
@@ -26,7 +26,7 @@ function packetFor(eventKey, scope = null) {
   return {
     schemaVersion: 3,
     mode: "chatgpt-handoff",
-    finalizedAt: "2026-09-13T04:00:00.000Z",
+    finalizedAt: "2026-09-17T04:00:00.000Z",
     coverageThrough: window.windowEnd,
     outputSchema: {},
     ...(scope ? { continuation: { scope, preservePublished: true } } : {}),
@@ -38,12 +38,23 @@ function packetFor(eventKey, scope = null) {
         eventKey,
         subjectKey: "bundle-game",
         sources: [source],
+        ...(scope === "showcase" ? {
+          showcaseRefs: [{ showcaseId: "direct", announcementId: eventKey }],
+          showcaseFacts: [{ id: `${eventKey}-fact` }],
+        } : {}),
       }],
+      ...(scope === "showcase" ? {
+        showcases: {
+          events: [{ id: "direct", kind: "nintendo-direct", date: "2026-09-17", sources: [] }],
+          announcements: [{ id: eventKey, showcaseId: "direct", factUnits: [{ id: `${eventKey}-fact` }] }],
+        },
+      } : {}),
+      budget: { maxInputChars: 120000, usedInputChars: 1000 },
     },
   };
 }
 
-function editorialFor(eventKey, packetBlobSha) {
+function editorialFor(eventKey, packetBlobSha, scope = null) {
   return {
     contractVersion: 2,
     packetBlobSha,
@@ -66,16 +77,17 @@ function editorialFor(eventKey, packetBlobSha) {
       tracking: false,
       verification: "已打开发行方一手来源。",
       reason: "一手来源确认。",
-      beijingTime: "2026-09-13 11:00",
+      beijingTime: "2026-09-17 11:00",
       timeNote: "只确认日期。",
       platforms: ["PC"],
       region: "全球",
       releaseType: "更新",
       sourceIndexes: [0],
       additionalSources: [],
+      ...(scope === "showcase" ? { coveredFactIds: [`${eventKey}-fact`] } : {}),
       sharedFactFrame: {
         subjectTitleKey: "bundle-game",
-        dates: ["2026-09-13"],
+        dates: ["2026-09-17"],
         times: [],
         numbers: [eventKey],
         platforms: ["PC"],
@@ -106,11 +118,17 @@ async function copyRuntimeFiles(root) {
     "scripts/lib/editorial-queue.mjs",
     "scripts/lib/edition-state.mjs",
     "scripts/lib/editorial-bundle.mjs",
+    "scripts/lib/edition-publisher.mjs",
+    "scripts/lib/event-ledger.mjs",
+    "scripts/lib/locale-digest.mjs",
     "scripts/lib/editorial-feedback-transaction.mjs",
     "scripts/editorial-bundle-smoke-driver.mjs",
     "scripts/prepare-editorial-bundle.mjs",
     "scripts/run-editorial-bundle.mjs",
     "scripts/apply-editorial-bundle-feedback.mjs",
+    "scripts/editorial-bundle.test.mjs",
+    "scripts/editorial-queue.test.mjs",
+    "scripts/event-ledger.test.mjs",
   ];
   for (const file of files) {
     await mkdir(resolve(root, file, ".."), { recursive: true });
@@ -118,7 +136,7 @@ async function copyRuntimeFiles(root) {
   }
 }
 
-async function createScenario(label) {
+async function createScenario(label, continuationScope = "news") {
   const root = await mkdtemp(join(tmpdir(), `daily-game-brief-bundle-${label}-`));
   const remote = await mkdtemp(join(tmpdir(), `daily-game-brief-bundle-remote-${label}-`));
   await run("git", ["init", "--bare", remote], { cwd: sourceRoot });
@@ -128,36 +146,42 @@ async function createScenario(label) {
   await run("git", ["config", "user.email", "bundle-smoke@example.invalid"], { cwd: root });
   await symlink(join(sourceRoot, "node_modules"), join(root, "node_modules"), "junction");
   await copyRuntimeFiles(root);
+  // The fixture edition is deliberately treated as unpublished even when the
+  // source checkout already contains that historical archive after a main merge.
+  const fixtureManifest = await readJson(join(root, "public/data/manifest.json"));
+  fixtureManifest.editions = fixtureManifest.editions.filter(item => item.id !== editionId);
+  await writeJson(join(root, "public/data/manifest.json"), fixtureManifest);
 
   const normalPacket = packetFor("daily-fact");
-  const newsPacket = packetFor("news-fact", "news");
+  const continuationEventKey = continuationScope === "showcase" ? "showcase-fact" : "news-fact";
+  const newsPacket = packetFor(continuationEventKey, continuationScope);
   const normalPacketText = jsonText(normalPacket);
   const newsPacketText = jsonText(newsPacket);
   const normalPacketSha = gitBlobSha(normalPacketText);
   const newsPacketSha = gitBlobSha(newsPacketText);
   const normalEditorial = editorialFor("daily-fact", normalPacketSha);
-  const newsEditorial = editorialFor("news-fact", newsPacketSha);
-  const stateAt = "2026-09-13T04:30:00.000Z";
+  const newsEditorial = editorialFor(continuationEventKey, newsPacketSha, continuationScope);
+  const stateAt = "2026-09-17T04:30:00.000Z";
   let state = createEditionState(editionId, stateAt);
   state = applyEditionStateEvent(state, "packet-ready", { packetBlobSha: normalPacketSha, at: stateAt });
   const queue = {
     schemaVersion: 1,
     editionId,
-    totalAnnouncements: 0,
-    requiredFacts: {},
-    batches: [{ name: "news-1.json", scope: "news", status: "pending", eventKeys: ["news-fact"] }],
+    totalAnnouncements: continuationScope === "showcase" ? 1 : 0,
+    requiredFacts: continuationScope === "showcase" ? { [continuationEventKey]: [`${continuationEventKey}-fact`] } : {},
+    batches: [{ name: `${continuationScope}-1.json`, scope: continuationScope, status: "pending", eventKeys: [continuationEventKey] }],
   };
   await writeJson(join(root, "automation/status", `${editionId}.json`), state);
   await writeJson(join(root, "automation/batches", editionId, "queue.json"), queue);
   await mkdir(join(root, "automation/packets"), { recursive: true });
   await writeFile(join(root, "automation/packets", `${editionId}.json`), normalPacketText);
-  await writeFile(join(root, "automation/batches", editionId, "news-1.json"), newsPacketText);
+  await writeFile(join(root, "automation/batches", editionId, `${continuationScope}-1.json`), newsPacketText);
   await writeJson(join(root, "automation/bundle-inbox", `${editionId}.json`), {
     schemaVersion: 1,
     editionId,
     submissions: [
       { requestedScope: "canonical", editorial: normalEditorial },
-      { requestedScope: "news", requestedBatchName: "news-1.json", editorial: newsEditorial },
+      { requestedScope: continuationScope, requestedBatchName: `${continuationScope}-1.json`, editorial: newsEditorial },
     ],
   });
   await run("git", ["add", "automation"], { cwd: root });
@@ -288,6 +312,41 @@ async function executeSuccess() {
   }
 }
 
+async function executeShowcaseStartAndReplay() {
+  const scenario = await createScenario("showcase-start", "showcase");
+  try {
+    await prepare(scenario);
+    const plan = await readJson(scenario.planPath);
+    if (plan.submissions.length !== 2 || plan.submissions[0].scope !== "canonical" || plan.submissions[1].scope !== "showcase" || plan.submissions[1].batchName !== "showcase-1.json") {
+      throw new Error("prepare did not resolve a showcase continuation batch from the durable queue");
+    }
+    const initialRun = await runBundle(scenario);
+    if (!initialRun.ok) throw new Error(`showcase-start bundle failed: ${initialRun.error}`);
+    const initialResult = await readJson(scenario.resultPath);
+    const queueAfterPublish = await readJson(join(scenario.root, "automation/batches", editionId, "queue.json"));
+    if (queueAfterPublish.batches[0]?.status !== "completed") throw new Error("showcase batch was not completed after publication");
+
+    await prepare(scenario);
+    const replayPlan = await readJson(scenario.planPath);
+    if (replayPlan.submissions[1]?.scope !== "showcase" || replayPlan.submissions[1]?.batchName !== "showcase-1.json") {
+      throw new Error("prepare did not resolve the historical showcase batch during replay");
+    }
+    const replayRun = await runBundle(scenario);
+    if (!replayRun.ok) throw new Error(`showcase replay bundle failed: ${replayRun.error}`);
+    const replayResult = await readJson(scenario.resultPath);
+    return {
+      initialPlan: plan.submissions.map(item => ({ index: item.index, scope: item.scope, batchName: item.batchName, packetBlobSha: item.packetBlobSha })),
+      replayPlan: replayPlan.submissions.map(item => ({ index: item.index, scope: item.scope, batchName: item.batchName, packetBlobSha: item.packetBlobSha })),
+      initial: { results: initialResult.results, changed: initialResult.changed },
+      replay: { results: replayResult.results, changed: replayResult.changed, allItemsIdempotent: replayResult.results.every(item => item.status === "already-exists") },
+      queue: { batch: queueAfterPublish.batches[0].name, status: queueAfterPublish.batches[0].status },
+    };
+  } finally {
+    await rm(scenario.root, { recursive: true, force: true });
+    await rm(scenario.remote, { recursive: true, force: true });
+  }
+}
+
 async function executePackageTwoRetry() {
   const scenario = await createScenario("packet-two-retry");
   try {
@@ -309,12 +368,12 @@ async function executePackageTwoRetry() {
     staleState = applyEditionStateEvent(staleState, "editorial-submitted", {
       packetBlobSha: scenario.newsPacketSha,
       submissionSha: oldSubmissionSha,
-      at: "2026-09-13T05:00:00.000Z",
+      at: "2026-09-17T05:00:00.000Z",
     });
     staleState = applyEditionStateEvent(staleState, "editorial-valid", {
       packetBlobSha: scenario.newsPacketSha,
       submissionSha: oldSubmissionSha,
-      at: "2026-09-13T05:01:00.000Z",
+      at: "2026-09-17T05:01:00.000Z",
     });
     await writeJson(scenario.statePath, staleState);
     await commitStateFixture(scenario, "test(automation): seed stale valid bundle decision");
@@ -401,6 +460,7 @@ async function executeCrossEditionReject() {
 const output = {
   editionId,
   success: await executeSuccess(),
+  showcaseStartAndReplay: await executeShowcaseStartAndReplay(),
   packetTwoRetry: await executePackageTwoRetry(),
   ackRecovery: await executeAckRecovery(),
   crossEdition: await executeCrossEditionReject(),

@@ -28,6 +28,8 @@ export async function persistEditorialFeedback({
   packetDir,
   runnerTemp = tmpdir(),
   runId = "local",
+  decidedAt = null,
+  decisionIdentity = null,
   runCommand = (file, args, options = {}) => exec(file, args, { cwd: root, maxBuffer: 20 * 1024 * 1024, ...options }),
   maxAttempts = 3,
 }) {
@@ -41,6 +43,8 @@ export async function persistEditorialFeedback({
       await runCommand("git", ["worktree", "add", "--detach", stateDir, "origin/automation/state"]);
       worktreeAdded = true;
       owned.add(stateDir);
+      await runCommand("git", ["-C", stateDir, "config", "user.name", "daily-game-brief[bot]"]);
+      await runCommand("git", ["-C", stateDir, "config", "user.email", "daily-game-brief[bot]@users.noreply.github.com"]);
       await runCommand(process.execPath, ["scripts/apply-editorial-bundle-feedback.mjs"], {
         env: {
           ...process.env,
@@ -48,6 +52,8 @@ export async function persistEditorialFeedback({
           EDITORIAL_BUNDLE_PACKET_DIR: packetDir,
           EDITORIAL_BUNDLE_ONLY_INDEX: String(submissionIndex),
           EVENT_LEDGER_PATH: join(stateDir, "automation/ledger/events.json"),
+          ...(decidedAt ? { EDITORIAL_DECIDED_AT: decidedAt } : {}),
+          ...(decisionIdentity ? { EDITORIAL_DECISION_IDENTITY: decisionIdentity } : {}),
         },
       });
       await runCommand("git", ["-C", stateDir, "add", "automation/ledger/events.json"]);

@@ -10,6 +10,8 @@ describe("bounded same-edition editorial bundle workflow", () => {
     expect(workflow).toContain('"automation/bundle-inbox/*.json"');
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("Exact edition ID whose bounded bundle should be resumed");
+    expect(workflow).toContain('git config user.name "daily-game-brief[bot]"');
+    expect(workflow).toContain('git config user.email "daily-game-brief[bot]@users.noreply.github.com"');
     expect(workflow).toContain('group: editorial-publication');
     expect(workflow).toContain("cancel-in-progress: false");
     expect(workflow).not.toContain("automation/inbox/");

@@ -63,6 +63,34 @@ async function queuePackets() {
   return packets;
 }
 
+function packetQueueKeys(packet) {
+  if (packet.continuation?.scope === "showcase") {
+    return [...new Set((packet.editorialInput?.packages || []).flatMap(item => (item.showcaseRefs || []).map(ref => ref.announcementId)))].sort();
+  }
+  return [...new Set((packet.editorialInput?.packages || []).map(item => item.eventKey))].sort();
+}
+
+function queueBatchForPacket(packetText, preferredName = null) {
+  const packet = JSON.parse(packetText);
+  const scope = packet.continuation?.scope || "canonical";
+  if (scope === "canonical" || !queue) return null;
+  const keys = packetQueueKeys(packet).join("\u0000");
+  const matches = queue.batches.filter(batch => batch.scope === scope && [...new Set(batch.eventKeys || [])].sort().join("\u0000") === keys);
+  if (preferredName) {
+    const preferred = matches.find(batch => batch.name === preferredName);
+    if (preferred) return preferred;
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function trustedBatchForPacket(packetText, preferredName = null) {
+  const packet = JSON.parse(packetText);
+  if ((packet.continuation?.scope || "canonical") === "canonical") return null;
+  const batch = queueBatchForPacket(packetText, preferredName);
+  if (!batch) throw new Error(`trusted ${packet.continuation.scope} packet has no unique queue batch identity`);
+  return batch;
+}
+
 function candidateFromPacket({ packetText, batch = null, snapshot }) {
   const packet = JSON.parse(packetText);
   return {
@@ -87,9 +115,10 @@ function assertStateCanBeEdited(current) {
 async function activeCandidate(current, snapshot) {
   assertStateCanBeEdited(current);
   const text = await readPacketBySha(current.packet.blobSha);
-  const batch = current.revisionRequest?.status === "open" && current.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON
-    ? { name: current.revisionRequest.batchName || null, scope: current.revisionRequest.batchScope || null, eventKeys: current.revisionRequest.eventKeys || [] }
-    : null;
+  const batch = trustedBatchForPacket(text,
+    current.revisionRequest?.status === "open" && current.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON
+      ? current.revisionRequest.batchName
+      : queue?.activeBatchName || null);
   return candidateFromPacket({ packetText: text, batch, snapshot });
 }
 
@@ -117,9 +146,7 @@ async function alreadyPublishedCandidate(requested, current, snapshot, index, to
   if (expectedCycle?.ready?.packetBlobSha !== requestedSha) return null;
   const text = await readPacketBySha(requestedSha);
   const continuation = priorContinuation(transitions, expectedCycle.ready.revision);
-  const batch = continuation?.event === "continuation-opened"
-    ? { name: continuation.batchName || null, scope: continuation.batchScope || null, eventKeys: continuation.eventKeys || [] }
-    : null;
+  const batch = trustedBatchForPacket(text, continuation?.batchName || null);
   return candidateFromPacket({ packetText: text, batch, snapshot });
 }
 

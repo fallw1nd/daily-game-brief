@@ -103,6 +103,16 @@ describe("editorial submission handoff", () => {
     expect(errors).toContain("editorial packetBlobSha does not match the restored packet blob");
   });
 
+  it("rejects an archive title that the data validator would reject", () => {
+    const errors = validateEditorialSubmission({
+      branchName: "automation/editorial/2026-08-27-am",
+      packet,
+      editorial: { ...editorial, archiveTitle: "早报｜《Wo Long 2: Wings of Ember》定档2027年3月4日" },
+      packetBlobSha,
+    });
+    expect(errors).toContain("archiveTitle must use 早报｜ and contain 8–40 characters");
+  });
+
   it("only waives leadEventKey for a true no-include news continuation", () => {
     const continuationPacket = { ...packet, continuation: { scope: "news", preservePublished: true } };
     const noInclude = { ...editorial, leadEventKey: "missing", decisions: [{ ...editorial.decisions[0], decision: "exclude", reason: "来源不足" }] };
