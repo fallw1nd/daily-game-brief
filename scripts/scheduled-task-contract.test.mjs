@@ -46,15 +46,15 @@ describe("Daily scheduled-task orchestration contract", () => {
 
   it("keeps current Daily liveness ahead of English repair and allows a later pass", () => {
     expect(contract).toContain("Priority is new Canonical work, current Daily liveness wake, trusted `editorial_continuation`, ready `showcase_completion`, then one English repair");
-    expect(contract).toContain("derive the immediate next missing Daily from current `main` before English repair");
-    expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
+    expect(contract).toContain("derive the immediate next missing Daily from current `main`");
+    expect(contract).toContain("if that exact edition lacks acknowledged `packet.status:\"ready\"`");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
     expect(contract).toContain("`packet_missing_at_handoff`");
     expect(contract).toContain("After committing it, this invocation may handle one continuation that was already ready beforehand");
-    expect(contract).toContain("never wait for or poll Actions inside the wake invocation");
+    expect(contract).toContain("Do not wait or poll for the wake");
     expect(contract).toContain("Once current liveness is healthy or signaled");
     expect(contract).toContain("Never wait for the new wake");
-    expect(contract).toContain("New Canonical work and liveness always outrank both");
+    expect(contract).toContain("Canonical and current liveness outrank both");
     expect(contract).toContain("For `packet.continuation.scope` `news` or `showcase`");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');
