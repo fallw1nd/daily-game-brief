@@ -73,6 +73,8 @@ function decision(eventKey, titleKey, titleEn, headline) {
 const currentLatest = {
   id: editionId,
   issueNumber: 21,
+  archiveTitle: "日报｜人工保留的期标题",
+  leadEntryId: `${editionId}-news-0`,
   entries: [
     {
       id: `${editionId}-news-0`,

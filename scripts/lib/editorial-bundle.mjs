@@ -34,7 +34,7 @@ function inputBudget(packet, index, errors) {
   const budget = packet?.editorialInput?.budget;
   const used = Number(budget?.usedInputChars);
   const max = Number(budget?.maxInputChars);
-  if (!Number.isFinite(used) || !Number.isFinite(max)) {
+  if (!Number.isFinite(used) || !Number.isFinite(max) || used < 0 || max <= 0) {
     errors.push(`submissions[${index}] editorialInput.budget must expose numeric usedInputChars and maxInputChars`);
     return 0;
   }

@@ -5,7 +5,7 @@
 - Working branch: `codex/optimization-closeout`.
 - Local baseline: `82edca6` (`origin/main` at checkout time, 2026-09-13 Asia/Shanghai).
 - `git fetch origin main` was attempted twice; GitHub returned `Recv failure: Connection was reset`. The local remote-tracking ref is therefore evidence of the checked-out baseline, not proof that remote `main` is newer.
-- The work must preserve the Daily edition window, continuous issue/archive identity, packet-bound evidence, existing publisher ownership, Phosphor/UI rules, and one long-lived editorial task with two invocations. No merge, production push, schedule mutation, or historical correction is authorized here.
+- The work must preserve the Daily edition window, continuous issue/archive identity, packet-bound evidence, existing publisher ownership, Phosphor/UI rules, and one long-lived editorial task with two invocations. The initial implementation handoff prohibited deployment; subsequent user instructions explicitly authorize this task to review, merge and deploy. Fixed schedules remain unchanged in this release.
 
 ## Checkpoints
 

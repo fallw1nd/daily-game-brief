@@ -152,7 +152,8 @@ for (const [index, input] of continuationInputs.entries()) {
 await writeFile(resolve(batchDirectory, "queue.json"), JSON.stringify(queue, null, 2) + "\n");
 // Preserve the durable queue's fairness order in the handoff hint. GitHub
 // remains authoritative and re-resolves this candidate after any queue change.
-const secondBatch = queue.batches.find(batch => batch.status !== "completed");
+const nextBatch = queue.batches.find(batch => batch.status !== "completed");
+const secondBatch = nextBatch?.scope === "news" ? nextBatch : null;
 const bundlePlan = {
   schemaVersion: 1,
   editionId: editorialInput.window.id,

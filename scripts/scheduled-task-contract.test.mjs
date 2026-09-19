@@ -77,7 +77,8 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(architecture).toContain("120,000-character provider-facing input budget");
     expect(architecture).toContain("240,000; the serialized packet/editorial transport envelope has separate 240,000-per-packet and 480,000-per-bundle safety limits");
     expect(architecture).toContain("not a provider token or cost measurement");
-    expect(contract).toContain("GitHub rebuilds absent old-queue plans");
+    expect(contract).toContain("Later continuations use single inbox");
+    expect(contract).toContain("both trusted `main` and the target editorial branch");
     expect(contract).toContain("otherwise use the existing single `automation/inbox/<edition-id>.json` publisher path");
   });
 

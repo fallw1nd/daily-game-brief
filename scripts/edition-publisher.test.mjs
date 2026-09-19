@@ -69,6 +69,12 @@ const latest = {
 const manifest = { schemaVersion: 1, updatedAt: "2026-08-26 17:04", latest: "2026-08-26-pm", editions: [{ id: "2026-08-26-pm", issueNumber: 12 }] };
 
 describe("idempotent edition publisher", () => {
+  it("rejects an archive title that exceeds the limit after adding its confirmed subject", () => {
+    const draft = structuredClone(editorial);
+    draft.archiveTitle = "早报｜" + "公告".repeat(15);
+    expect([...draft.archiveTitle].length).toBeLessThanOrEqual(40);
+    expect(() => buildEdition({ packet, editorial: draft, latest, manifest })).toThrow("normalized archiveTitle");
+  });
   it("builds the next edition and preserves valid upcoming entries", () => {
     const result = buildEdition({ packet, editorial, latest, manifest, now: new Date("2026-08-27T02:12:00Z") });
     expect(result.status).toBe("built");

@@ -1,4 +1,5 @@
 import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
+import { hasValidArchiveTitle } from "./archive-title.mjs";
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
@@ -309,6 +310,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
     ? latest.archiveTitle
     : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
+  if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error("normalized archiveTitle must contain 8–40 characters with the matching period prefix");
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")
