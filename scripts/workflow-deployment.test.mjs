@@ -11,6 +11,9 @@ describe("Pages deployment trigger contract", () => {
 
     expect(deploy).toMatch(/push:\s*\n\s*branches:\s*\[main\]/);
     expect(deploy).toMatch(/\n\s*workflow_dispatch:\s*\n/);
+    expect(deploy).toContain("edition_id:");
+    expect(deploy).toContain("github.event_name == 'workflow_dispatch' && inputs.edition_id != ''");
+    expect(deploy).not.toContain("Unable to resolve deployed edition from public/data/latest.json");
   });
 
   it("holds a staged Daily build until its noon plannedAt without delaying legacy editions", async () => {
@@ -29,6 +32,7 @@ describe("Pages deployment trigger contract", () => {
       "if: steps.publication.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && steps.submission.outputs.mode == 'publish')",
     );
     expect(publisher.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(1);
+    expect(publisher).toContain("gh workflow run deploy.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}");
     expect(publisher).toContain(
       "if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success'",
     );
@@ -42,12 +46,14 @@ describe("Pages deployment trigger contract", () => {
 
     expect(media).toContain("if: steps.publication.outputs.changed == 'true'");
     expect(media.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(1);
+    expect(media).toContain('gh workflow run deploy.yml --ref main -f edition_id="$EDITION_ID"');
   });
 
   it("SLA recovery retains explicit Pages dispatch for both redeploy and degraded publication", async () => {
     const watchdog = await workflow("brief-sla-watchdog.yml");
 
     expect(watchdog.match(/gh workflow run deploy\.yml --ref main/g)).toHaveLength(2);
+    expect(watchdog.match(/gh workflow run deploy\.yml --ref main -f edition_id=\$edition/g)).toHaveLength(2);
     expect(watchdog).toContain(
       "Repository already contains $edition; re-dispatching Pages for deployment recovery.",
     );

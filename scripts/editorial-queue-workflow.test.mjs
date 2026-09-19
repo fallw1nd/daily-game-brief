@@ -10,11 +10,15 @@ const publisherLib = await readFile("scripts/publish-editorial-decision.mjs", "u
 const queueUpdater = await readFile("scripts/update-showcase-queue-branch.sh", "utf8");
 
 describe("editorial continuation queue orchestration", () => {
-  it("advances only the edition that just published and at most one batch", () => {
+  it("advances the publishing edition and keeps one oldest global continuation lane", () => {
     expect(publisher).toContain('node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --edition="${{ steps.submission.outputs.edition }}" --max-activations=1');
+    expect(publisher).toContain("Activate one oldest pending continuation");
+    expect(publisher).toContain("bash scripts/update-showcase-queue-branch.sh --no-refresh-sources");
     expect(sla).toContain("bash scripts/update-showcase-queue-branch.sh --refresh-sources");
     expect(queueUpdater).toContain('edition_filter=""');
     expect(queueUpdater).toContain('queue_args+=(--edition="$edition_filter")');
+    expect(queueScript).toContain("(a.issueNumber || 0) - (b.issueNumber || 0)");
+    expect(queueScript).toContain('"continuation-already-open"');
     expect(queueScript).toContain('--max-activations=');
     expect(queueScript).toContain('advanceEditorialQueue');
   });

@@ -13,9 +13,24 @@ if (!Number.isInteger(maxActivations) || maxActivations < 1) throw new Error("ma
 const manifest = JSON.parse(await readFile("public/data/manifest.json", "utf8"));
 let refreshed = false;
 let activations = 0;
-const editions = requestedEdition
+let editions = requestedEdition
   ? manifest.editions.filter(edition => edition.id === requestedEdition)
-  : [...manifest.editions].sort((a, b) => (b.issueNumber || 0) - (a.issueNumber || 0) || b.id.localeCompare(a.id));
+  : [...manifest.editions].sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0) || a.id.localeCompare(b.id));
+
+if (!requestedEdition) {
+  for (const edition of editions) {
+    const statePath = resolve(root, `automation/status/${edition.id}.json`);
+    let existingState;
+    try { existingState = JSON.parse(await readFile(statePath, "utf8")); }
+    catch (error) { if (error.code === "ENOENT") continue; throw error; }
+    if (existingState.revisionRequest?.status === "open"
+      && ["editorial_continuation", "showcase_completion"].includes(existingState.revisionRequest.reason)) {
+      console.log(JSON.stringify({ editionId: edition.id, activated: false, reason: "continuation-already-open" }));
+      editions = [];
+      break;
+    }
+  }
+}
 for (const edition of editions) {
   if (activations >= maxActivations) break;
   const canonical = JSON.parse(await readFile(resolve("public/data", edition.path), "utf8"));
