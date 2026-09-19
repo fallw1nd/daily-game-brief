@@ -98,7 +98,7 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P2
 - **Area:** media metadata / accessibility / localization
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 当前 `2026-08-28-am` 的 `gravhounds` 条目已经改为 `title_zh_cn: "重力猎犬"`、headline 也已经是《重力猎犬》，但同一 verified image 的 `alt` 仍为 `Gravhounds：《Gravhounds》公布……相关配图`。这是 title 修订后媒体元数据没有同步更新的直接实例。
 - **Risk:** 图片加载失败文本、屏幕阅读器文本与正文语言不一致，也违反仓库“meaningful Chinese alt”的媒体契约精神。
 - **Proposed resolution:** 对系统自动生成的模板型 alt 建立可识别格式或 provenance；title/headline backfill 时同步重建这类 alt。人工撰写或具有额外视觉描述的信息不得被机械覆盖。
@@ -107,6 +107,8 @@
 - **Verification:** PR #37 最终 Verify run [33163086458](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163086458) 通过完整检查；回归覆盖真实 `Gravhounds`、`FOUNTAINS` / `Shattered Shape` stale 模板，并验证 manual editorial alt 与 cover alt 保持不变。合并后 Pages run [33163142898](https://github.com/fallw1nd/daily-game-brief/actions/runs/33163142898) 成功。实施过程中曾尝试直接修正 `2026-08-28-am` 历史 JSON，但 diff review 发现同时带入一处无关 cover sourceUrl 变化，因此该数据改动在合并前整体撤销，最终 PR 不包含任何 `public/data` 变更。已发布的已知 stale alt 因而仍未满足本条 `Close when`，本条保持 `in_progress`，后续须通过可独立验证的安全数据路径修正后才能关闭。
 
 - **2026-09-19 closeout:** 已授权修复历史已知实例。本分支仅修改 `2026-08-28-am` 两个模板型 editorial alt：`Gravhounds`→“重力猎犬”、`FOUNTAINS`→“永泉传说”，不触碰图片来源、事实、标题、期号或窗口；防复发逻辑仍沿用 PR #37。合并并通过完整检查/Pages 后即可标记 resolved。
+
+- **2026-09-19 final verification:** PR #135 已合并为 `92f02f619ece88357acc14fcc8f7333aa62ecc9a`，Verify #736 完整通过（83/83 test files、419/419 tests、40期数据/locale、production build）；随后 Pages run 35446346218 成功。`2026-08-28-am` 已确认不再含 `Gravhounds：《Gravhounds》` 或 `FOUNTAINS：《FOUNTAINS》` 的旧模板 alt，而分别使用“重力猎犬”“永泉传说”；PR #37 的自动模板识别继续防复发。本条 Close when 已满足。
 
 ### MNT-20260828-06 — `localizeRegisteredTitles()` 全局字符串替换存在误伤风险
 
@@ -256,7 +258,7 @@
 - **Discovered:** 2026-08-30
 - **Priority:** P0
 - **Area:** scheduling / orchestration / publication identity / observability
-- **Status:** in_progress
+- **Status:** resolved
 - **Evidence:** 从零审计确认两个外部 ChatGPT Scheduled Tasks 与八个 GitHub schedules 之间只通过 mutable packet path、分支观察和运行日志协作；没有逐期 packet blob、editorial validation、publication commit、deployment result 的共同耐久状态。旧 ChatGPT prompt 还允许自行检查 Actions 并动态创建 one-shot workflow，形成两个恢复 owner。后续契约复核又发现 `editorial.invalid` 不在任务选择集，且 normal Canonical 检查晚于 inbox 提交；前者会把可修复 decision 留给 degraded SLA，后者会在 `automation/state` 落后 `main` 时产生不必要的重复编辑。2026-08-31 上线前复核进一步确认“GitHub schedule 本身”不能作为 12:00 硬发布承诺：`Final editorial packet` AM run [33301136497](https://github.com/fallw1nd/daily-game-brief/actions/runs/33301136497) 对应 10:10 计划点却到北京时间约16:15才启动，PM run [33315900986](https://github.com/fallw1nd/daily-game-brief/actions/runs/33315900986) 对应17:00计划点也到约22:05才启动；因此 Daily 若只依赖 GitHub cron，10:10 packet、11:00 SLA 都可能被同一调度器一起拖延。
 - **Risk:** cron 延迟、跨日、重复执行、并发 push、旧分支提交、invalid decision 或部分成功会造成漏期、错期、重复编辑、重复恢复或“内容已提交但下游不知道”的 split-brain；可选英文/媒体失败还可能被误认为 Canonical 发布失败。Daily 额外存在单调度器 liveness 风险：若 10:10 packet 与11:00 SLA 都因 GitHub schedule 严重迟到，现有10:20 ChatGPT handoff 又只能读取 ready packet，则12:00公开发布没有独立唤醒路径。
 - **Proposed resolution:** 在 `automation/status/<edition-id>.json` 建立 schema v1 状态机，用 Git blob SHA 绑定 finalized packet，用 submission/main SHA 绑定验证与发布；所有 state 写入使用三次 fetch/rebuild/push；GitHub Actions 独占 packet/degraded recovery；ChatGPT 按最旧顺序消费 `pending`，或依据 durable `validationErrors` 对同一期、同一 packet 的 `invalid` decision 做修复，明确排除 `submitted`/`valid`/`timed_out`；packet preflight 后以 current `main` Canonical 做生成前幂等检查；collector 成功后延迟 dispatch exact-edition SLA，cron 只作冗余唤醒；英文和媒体保持独立非阻塞 lane。Daily 正式切换后再启用一个受限 liveness backstop：10:20 Daily task 若没有 acknowledged ready packet，只能从 current `main` 推导“最新健康 AM/Daily 的直接后继”，在该 edition-scoped editorial branch 写入固定 schema v1 的 `automation/wake/<edition-id>.json` 后立即停止；现有 GitHub packet workflow 只接受 `automation/editorial/*-daily` + wake path，重新校验 branch edition / payload，并用 exact `period=daily + edition` 调用 resolver。wake 只是第二调度器信号，真正 collection、state、SLA、degraded publication、deployment 仍全部归 GitHub Actions。
@@ -272,6 +274,8 @@
 ---
 
 - **2026-09-19 closeout:** 本轮复核确认 Daily wake、durable packet、11:20 normal editorial、publication/locale/media 与连续自然期次已具备真实证据，且实际长期任务为唯一启用的“游戏圈每日简报”，精确 10:20/11:20 Asia/Shanghai；旧 PM 任务已禁用。但 deployment attribution 仍真实复现：普通代码部署会把 latest edition 顶层 deployment mainSha 覆写为无关代码 commit。本分支将 deploy acknowledgement 改为仅接受显式 `edition_id` 的 workflow_dispatch；publisher/media/bundle/SLA 均传递 exact edition，普通 main push 只部署站点、不再修改 edition state。合并后需用一次显式 edition 部署验证回执并确认普通 push 不污染状态，满足后关闭。
+
+- **2026-09-19 final verification:** PR #135 将 Pages deployment acknowledgement 改为只有显式 `edition_id` 的 `workflow_dispatch` 才能写 edition state，publisher/media/bundle/SLA 均传递 exact edition；普通 `main` push 只部署站点。合并后的真实 Pages run 35446346218 成功，`Acknowledge deployment outcome` 步骤按设计为 skipped；同时 `automation/status/2026-09-19-daily.json` 的 deployment 仍保持此前内容发布 `mainSha=b7fbcdc72f771d64a8c55fad96cb9afae5fd274b`、runId 35439551149，没有被代码合并 `92f02f6…` 覆写。结合既有 exact wake、durable packet、Canonical/locale/media、连续 Daily 与单一长期 Scheduled Task 证据，本条剩余 deployment attribution 缺口已闭合，Close when 已满足。
 
 ## MNT-20260901-01 — event ledger 错记窗口并漏识别平台级主体
 
@@ -556,6 +560,8 @@
 - **2026-09-13 residual:** 以上是代码/隔离证据，不是 live workflow、Pages/media deployment、自然两次调用或发布会独立全量 checklist 验收；真实 provider 成本、title-hint 采用和后续自然期次仍未满足 Close when，条目保持 `in_progress`。
 
 - **2026-09-19 closeout:** 本轮确认积压并非 parser 失败，而是两个编辑槽位长期被“10:20 missing-packet wake + 11:20 Canonical”占满；截至2026-09-19，9月11/13/14/15/16/17/18/19仍有7/13/5/13/12/12/17/16个 news event identities pending。#133 已具备当期 Canonical+next-news bundle，但历史积压缺稳定消费槽。本分支改为全局只维持一个最旧 continuation lane，publisher/bundle 完成后自动激活最旧待办；10:20 若刚写 current wake，不轮询当前包，而可在同一次调用消费一个此前已 ready 的历史 continuation。保持每日两次任务、每次最多一个历史 continuation，下一自然期次需观察 pending 总量实际下降后再关闭。
+
+- **2026-09-19 post-merge verification:** PR #135 已合并并通过完整 Verify/Pages，最旧 continuation 单一激活与 10:20 wake 后复用既有 ready backlog 的生产代码已经上线；当前仍保持 `in_progress`，只等待下一次自然 Scheduled Task / publisher 周期证明 pending event identity 总量实际下降，未提前宣称吞吐问题已关闭。
 
 ## MNT-20260910-02 — 译名候选未持久积累且来源独立性不足
 
