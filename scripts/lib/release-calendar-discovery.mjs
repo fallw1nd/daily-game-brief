@@ -210,7 +210,7 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
     const crossSource = record.families.length > 1;
     const dateConflict = (dateSets.get(titleIdentity(record.title))?.size || 0) > 1;
     const primarySource = record.sourceRefs.some(ref => ref.kind === "primary");
-    const healthScore = Math.max(...record.sources.map(sourceId => priorSourceHealthScore(sourceId, sourceHealth)), 0);
+    const healthSignals = record.sources.map(sourceId => priorSourceHealthScore(sourceId, sourceHealth));\n    const healthScore = healthSignals.length ? Math.max(...healthSignals) : 0;
     const score = Number(record.knownTitle) * 3 + Number(crossSource) * 3 + Number(!record.inBaseline) * 2 + Number(primarySource) * 2 + record.priority + healthScore - Number(dateConflict);
     return { ...record, crossSource, dateConflict, primarySource, healthScore, score, platformFamilies: platformFamilies(record.platforms) };
   }).sort((a, b) => b.score - a.score || a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
