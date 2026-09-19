@@ -1,0 +1,1214 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-19T02:23:46.507Z",
+  "finalizedAt": "2026-09-19T02:23:46.507Z",
+  "coverageThrough": "2026-09-19 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-19-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-19 12:00",
+      "windowStart": "2026-09-18 10:10",
+      "windowEnd": "2026-09-19 10:10"
+    },
+    "adjacentEdition": "2026-09-18-daily",
+    "packages": [
+      {
+        "eventKey": "ef05fab222843df922c9",
+        "eventKind": "launch",
+        "subjectKey": "twitch ceo says grand theft auto 6 8217 s multiplayer mode will",
+        "subject": {
+          "kind": "game",
+          "key": "twitch ceo says grand theft auto 6 8217 s multiplayer mode will"
+        },
+        "publishability": "direct",
+        "headline": "Twitch CEO says Grand Theft Auto 6&#8217;s multiplayer mode will launch next year",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/twitch-ceo-says-grand-theft-auto-6s-multiplayer-mode-will-launch-next-year/",
+            "publishedAt": "2026-09-18T11:18:55+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/09/gta6.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Dan Clancy says he’s “spent a lot of time talking with Rockstar about their plans”…\nTwitch CEO says Grand Theft Auto 6&#8217;s multiplayer mode will launch next year\nDan Clancy says he&#8217;s &#8220;spent a lot of time talking with Rockstar about their plans&#8221;\nThe CEO of Twitch has stated that Grand Theft Auto 6&#8217;s multiplayer mode will be released in 2027.\nClancy suggested that publishers who opt for the latter option may have to wait longer than expected, because when GTA 6&#8217;s multiplayer mode arrives it will only see Rockstar&#8217;s game surge in popularity even more.\n&#8220;You are going to see this big bump with GTA 6, but then an even bigger one next year when they launch multiplayer.&#8221;\nIt&#8217;s not clear whether Clancy was explicitly confirming that GTA 6 will be getting multiplayer next year or merely making an educated guess, but his claim that Twitch has been &#8220;talking with Rockstar about their plans&#8221; suggests at least some degree of knowledge about what lies in the future.\nElsewhere in the interview, Clancy said he was confident that the release of GTA 6 will have a major impact on Twitch viewership, including the return of users who haven&#8217;t visited Twitch in a while.\nGrand Theft Auto 6 is set to release on November 19 on PS5 and Xbox Series X , and will be a single-player only game at launch.\nIn an interview with Bloomberg , Dan Clancy was discussing other game publishers deciding to avoid GTA 6 by either releasing their games in October or holding them back until after the launch period of Rockstar &#8216;s game cools down."
+          }
+        ]
+      },
+      {
+        "eventKey": "9642c1dbc498d389970c",
+        "eventKind": "update",
+        "subjectKey": "狐ト蛙ノ旅",
+        "subject": {
+          "kind": "game",
+          "key": "狐ト蛙ノ旅"
+        },
+        "publishability": "direct",
+        "headline": "2027年前半のリリースに向け，大幅にアップデートされた「狐ト蛙ノ旅」プレイレポート。物語は，生活感がありすぎるアパートの一室から始まる［TGS2026］",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer Reviews",
+            "url": "https://www.4gamer.net/games/649/G064919/20260918027/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/649/G064919/20260918027/",
+            "imageUrl": "https://www.4gamer.net/games/649/G064919/20260918027/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "東京ゲームショウ2026のroom6ブースに出展されている「狐ト蛙ノ旅 アダシノ島のコトロ鬼」は，闇に包まれる島に流れ着いたキツネの少女が，相棒のカエルとともに家に帰る方法を探すアドベンチャー。大幅…\n2027年前半のリリースに向け，大幅にアップデートされた「狐ト蛙ノ旅」プレイレポート。物語は，生活感がありすぎるアパートの一室から始まる［TGS2026］\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\nスマホゲームのセルラン分析（2026年9月3日〜9月9日）。今週の1位は「ポケモンGO」。4月〜6月の全世界DL数ランキングも紹介\n［プレイレポ］「CONTROL Resonant」の舞台はマンハッタンへ。物語のスケールもバトルアクションも前作から大きく変貌を遂げた超常世界を堪能しよう"
+          }
+        ]
+      },
+      {
+        "eventKey": "0f881d38df571bc2d0c8",
+        "eventKind": "other",
+        "subjectKey": "control-resonant",
+        "subject": {
+          "kind": "game",
+          "key": "control-resonant"
+        },
+        "publishability": "direct",
+        "headline": "Control Resonant Review",
+        "tier": "B",
+        "score": 103,
+        "timeRelation": "window",
+        "readiness": "two-media-no-primary",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/control-resonant-review",
+            "publishedAt": "2026-09-18T13:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/control-resonant-review",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/18/controlresonant-review-blogroll-1789695360175.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Remedy&#x27;s follow-up to 2019&#x27;s Control moves to action combat in an open world and tells a more character-focused story with its paranatural edge intact.\nParanatural phenomena, Objects of Power, and interdimensional threats all defying the laws of physics – developer Remedy has built its reputation on these kinds of concepts, and none more intriguing than the fantastic Control in 2019 . The subtleties in its SCP-adjacent mysteries are what left a lasting impact, so in many regards, Control Resonant is an antithesis. Not only has the series moved from metroidvania-esque shooter to open-world stylish-action, it also goes for a more straightforward story focused on the lives of its characters. It&#x27;s not always elegant in its action, and can even range from frustrating to somewhat dull in certain stretches. Still, I came away impressed by how conceptually consistent it is with Control while also being radically different. Remedy could&#x27;ve played it safe, but Control Resonant dares to be bold where it counts, with swings that land alongside some of this studio&#x27;s best.\nControl Resonant is centered around Dylan Faden, the brother of the first game&#x27;s lead Jesse Faden, who backflipped into becoming the director of the Federal Bureau of Control, and it uses his perspective to fill in a lot blanks from the jump. He goes from being Jesse&#x27;s tortured brother who was the subject of abusive FBC experiments gone awry to a fully formed character with thoughts, feelings, and dark memories he confronts as he tries to salvage whatever life he has left. He&#x27;s treated as subhuman and initially seen as dangerous with superpowers he can&#x27;t always control , but still volunteers to be a tool of the FBC with what&#x27;s effectively a shock collar bolted onto the back of his head.\nWith this as the foundation, Control Resonant treats much of its paranatural conspiracy as a matter of fact. The Oldest House couldn&#x27;t contain the Hiss outbreak as it spills into a New York City that&#x27;s been folded in on itself in interdimensional isolation, which turns out to be a swift and effective setup as Dylan tries to find Jesse, who&#x27;s been lost over the last seven years. And while this story does expand on what we know about things like the Hiss and AWEs, it resonates more as an exploration about what you would do in the aftermath of a life and world fallen apart.\nControl Resonant&#x27;s RPG edge is the equalizer here, offering progression and some build crafting through both Dylan&#x27;s own skill tree and weapon upgrades paths. Some of my favorite powers were as satisfying as they were effective, like summoning a minion that I can throw like a massive bomb to inflict significant Falter damage (this game&#x27;s stagger meter) and clear mobs of pesky Hiss. Once I unlocked the Ignite power that let me set weapons ablaze to quickly inflict Burn status and melt enemies into piles of Faltered targets to execute, the action changed significantly. Instead of feeling vulnerable and picking my windows of opportunity to strike, Dylan became the real threat as my Spin Edge combo and Hammer charge scorched anything that was once deadly. (It also helped that Ignite sheds off mold poison, which gave me so much trouble early on.)\nThe handful of bosses you&#x27;ll find in story quests, are quite striking and most of them play extremely well into the otherworldlyness of Control&#x27;s phasing realities. Their attack patterns and movesets aren&#x27;t anything out of the ordinary for action games of this style, but their unsettling and imposing presence is certainly seen and felt. However, encounter design is where Control Resonant falters most. Roughly half the bosses are spongy slogs that are less about testing your mastery and more about grinding out a war of attrition. Once you see their handful of tricks, you just have to rinse and repeat as you chip away at their health bar and hope you don&#x27;t trip up in the repetitive cycle t"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/action/control-resonant-review/",
+            "publishedAt": "2026-09-18T13:00:00Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/action/control-resonant-review/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/jRtX8C9cWuzL2afYg6C2oj-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "[Redacted] is the better Faden.\nIn the first minutes of Control Resonant, Dylan Faden&mdash;prototypical sadboy, perpetually kicked puppy, and regretful mass murderer (he got better)&mdash;is thrust into a metaphysical war when Jesse, his psychokinetic former protagonist sister, wakes him from a seven year coma by stabbing a magical shape into his chest. She promptly disappears, leaving the Federal Bureau of Control directorless, outgunned, and forced to rely on the man who once killed hundreds of its staff to confront the cataclysm of interdimensional forces violently reshaping Manhattan into a labyrinth of otherworldly logics.\nDylan and the FBC might be going through it, but Remedy is flexing all its finest talents: sculpting uncanny hellscapes, placing tactical redactions in bureaucratic lore collectibles, and capturing endearingly human performances in circumstances beyond human comprehension. Unfortunately, melee combat isn't on that list of strong suits&mdash;and Resonant's open world expects you to do a lot of it.\nRemedy's environmental artists and lighting tech specialists are at the height of their powers in Resonant: The stark, brutalist surrealism that saturated the Oldest House in the first game has boiled out of its breached walls and onto New York's streets, reconstructing blocks of brownstones and downtown shopping districts into a sprawling, dreamlike mazework of impossible architecture and alternative physics.\nI wanted to enjoy the concept of Resonant's combat. While Jesse wielded a manifold pseudogun in the OG Control, Dylan employs a different sort of shape-shifting weapon technique courtesy of the object his sister impaled in his sternum. It's called the Aberrant, and in his hands, it can assume and discard the shapes of different melee weapons on demand: Depending on your preference, it can be a hatchet; a scythe, a pair of short swords, a hammer, a drill, an orbiting, levitating sawblade, and more.\nWhile eventual unlocks add necessary depth and variety, Resonant's opening hours suffer from the cardinal sin of its combat design: It's an action game where basic attacks don't have the juice. On its own, pushing the attack button won't achieve much except lightly grazing the heavy enemies that need to be killed to finish each fight. Instead, Dylan has to pile on temporary damage bonuses&mdash;granted most easily by staggering and executing lesser enemies&mdash;to make swinging his magical mystery club worthwhile.\nResonant's handful of boss fights are more engaging threats to navigate (though the sheer heft of their health bars still feels like a slog). But the endless rounds of generic creep culling that make up the bulk of playtime don't provide particularly interesting problems to solve. Instead, they're the same predicament with a binary outcome: Either you've stacked enough damage buffs that hitting a heavy enemy will accomplish something, or you can spend your time whittling away at its health bar until you get a chance to set yourself up properly.\nI'll be staggered enough times by the sheer volume of Mold monster projectiles that I'll miss my peak damage Goldilocks window. An enemy will teleport away just as I'm winding up a triple-buffed finishing combo. Or, after watching the same enemy's execution animation a few dozen too many times, it'll just feel like another few seconds separating me from the parts of Control I'm actually interested in seeing.\nEven without those irritations, the spectacle of Dylan's repetitive executions can't sustain Resonant's 30+ hour playtime. Its combat isn't compelling enough to seek out&mdash;but it expects that I'm eager to do so. As I beelined towards the story leads and sidequests that most caught my interest, I'd enter areas where the enemies had scaled past my current level&mdash;a nebulous figure calculated from my current number of weapon upgrades, spent talent points, and collectible health and power increases.\nYour membership journey starts here.\nKeep exploring a"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-19T10:23:20+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "76263585317357c46e47",
+        "eventKind": "other",
+        "subjectKey": "celestay craft 038 slowlife",
+        "subject": {
+          "kind": "game",
+          "key": "celestay craft 038 slowlife"
+        },
+        "publishability": "direct",
+        "headline": "“海上タワー”デスクトップ放置釣りゲーム『CELESTAY Craft&#038;Slowlife』10月9日配信へ。釣って建ててやがて空へ、夜は”星座を眺める“水没世界スローライフ",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/celestay-craft-and-slowlife-20260918-468684/",
+            "publishedAt": "2026-09-18T08:17:31+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/celestay-craft-and-slowlife-20260918-468684/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/celestay-craft-and-slowlife-20260918-468684-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "BUBBLE GUMは9月18日、『CELESTAY Craft&Slowlife』を10月8日に配信開始すると発表した。本作は放置要素を備えたスローライフゲームだ。\n“海上タワー”デスクトップ放置釣りゲーム『CELESTAY Craft&Slowlife』10月9日配信へ。釣って建ててやがて空へ、夜は”星座を眺める“水没世界スローライフ\nデベロッパーのBUBBLE GUMは9月18日、『 CELESTAY Craft&Slowlife 』を10月8日に配信開始すると発表した。日本では時差の関係で10月9日となるようだ。対応プラットフォームはPC（Steam）。ゲーム内は日本語表示および字幕に対応予定で、現在はデモ版が配信中。\n『CELESTAY Craft&Slowlife』は、水に沈んだ世界で釣りをしながら家を空へと伸ばしていく、放置要素を備えたスローライフゲームだ。デスクトップの端に置いて遊べる作品となっており、魚を釣り、木材などの素材を集めながら建物を少しずつ増築していく。家が高くなるにつれて見える景色も変化し、それまで見えなかった星座も観察できるようになる。\n『CELESTAY Craft&Slowlife』については、2025年12月にSteamストアページを公開。その後、Steam Nextフェスにあわせてデモ版を配信し、6月15日には新たな釣りモード「ねらってフィッシング」を追加した。さらに6月25日には、ウィッシュリスト登録数が1万7000件を突破したことを報告している。魚を釣っては家を建て、気づけば少しだけ空に近づいている。そんな穏やかな暮らしの先に待つ、水没世界の物語にも注目したい。\n『CELESTAY Craft&Slowlife』はPC（ Steam ）向けに、10月9日配信予定。ゲーム内は日本語表示および字幕に対応予定で、現在はデモ版が配信中。\n釣りには、大きく分けて2種類の遊び方が用意されている。「のんびりフィッシング」では、釣りを始めたあと時間の経過を待つことで魚を獲得可能。作業などをしながらゲームを眺めておきたい場合に向いたモードとなっている。一方の「ねらってフィッシング」では魚を1匹消費して釣りを開始し、動く浮きを青いバーの中で止めることで魚を釣り上げる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "a2a3a04461279a578b2e",
+        "eventKind": "other",
+        "subjectKey": "バークール",
+        "subject": {
+          "kind": "game",
+          "key": "バークール"
+        },
+        "publishability": "direct",
+        "headline": "「もふもふスパイ犬」アクション『バークール』は“元軍用犬をモーキャプ”した特殊部隊わんこムーブ、時々はしゃぐ。ハイテクメカ活用ステルスゲーム、デモ版配信中",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/20260918-468590/",
+            "publishedAt": "2026-09-18T03:48:51+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/20260918-468590/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260918-468590-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "VARSAV Game Studiosは、『BARKOUR（バークール）』を今年第4四半期に配信予定だ。\n「もふもふスパイ犬」アクション『バークール』は“元軍用犬をモーキャプ”した特殊部隊わんこムーブ、時々はしゃぐ。ハイテクメカ活用ステルスゲーム、デモ版配信中\nデベロッパーのVARSAV Game Studiosは、『 BARKOUR（バークール） 』を今年第4四半期に配信予定だ。対応プラットフォームはPC（Steam/Epic Gamesストア）/PS5/XBOX Series X|S。ゲーム内は日本語表示および字幕に対応予定で、Steamでは現在デモ版が配信中。\n『バークール』は、ステルスとパルクールを組み合わせた三人称視点のアクションゲームだ。主人公となるのは、秘密組織M.A.N.に所属する犬のエージェントT.H.U.N.D.E.R.（以下、サンダー）。パルクールの訓練を受け、さまざまなスパイガジェットを使いこなす凄腕のエージェントとして、世界を救うためのミッションへ挑んでいく。\n本作の開発を手がけるVARSAV Game Studiosは、ポーランドを拠点とするデベロッパーだ。2016年に設立され、約40人の開発者が所属。過去にはミツバチを主人公とする『Bee Simulator』などを手がけており、人間以外の生き物を主人公としたゲーム制作を得意としている。『バークール』については約4年にわたり開発が進められているという。\n『 BARKOUR（バークール） 』はPC（ Steam /Epic Gamesストア）/ PS5 /XBOX Series X|S向けに今年第4四半期配信予定。ゲーム内は日本語表示および字幕に対応予定で、Steamではデモ版が配信中だ。\nとはいえ、サンダーはどこまでいっても犬である。自信満々に任務へ挑む一方、物音に反応したり、犬らしい仕草を見せたりと、スパイとしての格好良さと動物としての愛嬌が同居している。開発元はサンダーのアニメーション制作にあたり、元ポーランド特殊部隊「GROM」に所属していた軍用犬からモーションキャプチャ―したことを明かしている。また、開発チームには犬や猫を飼っているメンバーも多く、サンダーの好奇心や活発さ、何かに気を取られる様子などには、身近なペットの行動も取り入れられているという。実際に触れてみると、たしかに主人公の見た目を犬にしただけではなく、「犬を操作している」と思わせる動きへ力が注がれていることが伝わってきた。"
+          }
+        ]
+      },
+      {
+        "eventKey": "e467b925b6753fe8a2bb",
+        "eventKind": "other",
+        "subjectKey": "つなキャン",
+        "subject": {
+          "kind": "game",
+          "key": "つなキャン"
+        },
+        "publishability": "direct",
+        "headline": "「ゆるキャン△」のキャンプゲーム『つなキャン△』、10月22日に“フルリニューアル”でSteamにも進出へ。その名も『ちるキャン△』",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260918-468572/",
+            "publishedAt": "2026-09-18T02:56:07+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260918-468572/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260918-468572-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "10月22日11時に『ゆるキャン△ つなげるみんなのオールインワン!! ちるタイム』へとフルリニューアルされる。\n「ゆるキャン△」のキャンプゲーム『つなキャン△』、10月22日に“フルリニューアル”でSteamにも進出へ。その名も『ちるキャン△』\n『ゆるキャン△ つなげるみんなのオールインワン!!』（通称：つなキャン△）は、TVアニメ「ゆるキャン△」を原作とするゲームだ。各務原なでしこや志摩リンなど、お馴染みのキャラクターたちがフルボイスで登場。そして目的地や参加メンバー、また持っていくキャンプギアや作るキャンプ飯などを選択し、キャンプをおこなう。\nフルリニューアルにおいては、従来の『つなキャン△』の「眺めて楽しむ」魅力を中心に、仕事や勉強をしながら、リンやなでしこたちと一緒に時間を過ごせる「チル × 作業支援」アプリへと生まれ変わるという。\nまた、選択したBGMに、焚き火・雨・川・虫・風・海といった環境音を重ねられる機能も用意される。なお、『つなキャン△』にて集めたギアやコスチューム、料理などはそのまま引き継がれ、引き続き利用可能だ。\nフルリニューアルのスケジュールとしては、まず本日9月18日にゲーム内通貨「ゆるコイン（金）」の販売が終了し、10月21日11時をもって『つなキャン△』としてのサービスは終了。そして10月22日11時に『ちるキャン△』へとアップデートされる。なお、未使用のゆるコイン（金）の払い戻しが実施予定で、こちらの詳細は後日案内される。\n【大切なお知らせ】 『つなキャン△』は10月21日にサービスを終了し、翌22日、“チル×作業支援”アプリ『ちるキャン△』へ生まれ変わります。 これまで集めた資産は、そのまま引き継ぎ🏕️ Steam買い切り版のウィッシュリスト受付中！ ▶ https://t.co/nPqF8dvGiC #ちるキャン △ #ゆるキャン △ pic.twitter.com/4H1rBpRAo8\nデベロッパーのenishは9月18日、キャンプゲーム『 ゆるキャン△ つなげるみんなのオールインワン!! 』について、10月22日11時に『ゆるキャン△ つなげるみんなのオールインワン!! ちるタイム』へとフルリニューアルすると発表した。本作は、iOS/Android/PC（DMM GAMES）向けに基本無料（一部アイテム課金あり）にて配信中。\nまたこれにあわせて、本作のPC（Steam）版を同日10月22日に配信開始することも発表。買い切り版として、早期アクセス配信されるとのこと。"
+          }
+        ]
+      },
+      {
+        "eventKey": "9e4262a63f3f25a613ba",
+        "eventKind": "other",
+        "subjectKey": "emberward",
+        "subject": {
+          "kind": "game",
+          "key": "emberward"
+        },
+        "publishability": "direct",
+        "headline": "「圧倒的に好評」ローグライトタワーディフェンス『Emberward』、アプデとともに正式リリース。ポータルまみれ新エリアや「マグマ射出」新タワーなどどっさり実装",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/emberward-20260918-468562/",
+            "publishedAt": "2026-09-18T02:51:27+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/emberward-20260918-468562/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/emberward-20260918-468562-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Refic Gamesは9月18日、『Emberward』を正式リリースした。正式リリースにあたっては、新エリア「Void Depths」や新たなタワーなどが追加されている。\n「圧倒的に好評」ローグライトタワーディフェンス『Emberward』、アプデとともに正式リリース。ポータルまみれ新エリアや「マグマ射出」新タワーなどどっさり実装\nデベロッパーのRefic Gamesは9月18日、『 Emberward 』を正式リリースした。対応プラットフォームはPC（Steam）で、ゲーム内は日本語表示に対応している。\n『Emberward』は、ブロックを組み合わせた迷路作りと防衛戦を融合したローグライト・タワーディフェンスゲームだ。プレイヤーは監視役となり、「命の炎」を守ることになる。敵の進路を自ら組み替えながら防衛網を築き、押し寄せるモンスターを迎え撃つのだ。\n『Emberward』は早期アクセス段階から好評を博しており、Steamユーザーレビューは本稿執筆時点で約3800件中96％が好評とする「圧倒的に好評」ステータスを獲得している。本作は、ブロックを組み合わせて敵の進行ルートそのものを作り変える迷路構築と、多彩なタワーを配置するタワーディフェンスを組み合わせたゲームプレイが持ち味だ。限られた形状のブロックをどう並べて敵を遠回りさせるか、そのうえでどこにどのタワーを置くかを考える必要があり、迷路作りと防衛設備の配置が密接に結びついている。こうした独自のシステムが支持を集めるなか、約2年3か月にわたってアップデートが重ねられ、今回正式リリースを迎えた。\n『Emberward』はPC（ Steam ）向けに配信中。リリース記念セールとして10月2日までは定価から15％オフとなる税込1955円で購入できる。デモ版も配信中だ。\n本作では、バトル開始前にL字型や直線型などのブロックをフィールドへ配置し、敵の侵攻ルートを組み替えて迷路を作る。限られたブロックを組み合わせてモンスターを遠回りさせつつ、周囲にはゴールドを消費してタワーを建設し迎撃。タワーにはサイズや属性、攻撃方法などそれぞれ異なる特徴があり、サイコロの出目がダメージになる「サイコロタワー」や、敵を追いかけて攻撃する「ドローンタワー」なども存在する。地形と手札にあわせて敵の進路を引き延ばし、タワーが攻撃しやすい防衛網を組み立てていく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "eb513c269acb40f8df0d",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Astartes II, the Most Anticipated Warhammer 40,000 Animation Ever, Has a New Trailer and Confirmation of Key Details",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/astartes-ii-the-most-anticipated-warhammer-40000-animation-ever-has-a-new-trailer-and-confirmation-of-key-details",
+            "publishedAt": "2026-09-18T19:24:47.003Z",
+            "canonicalUrl": "https://www.ign.com/articles/astartes-ii-the-most-anticipated-warhammer-40000-animation-ever-has-a-new-trailer-and-confirmation-of-key-details",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/18/astartes-ii-1789759410501.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Games Workshop has released a new trailer for Astartes II, the most anticipated Warhammer 40,000 animation ever.\nAstartes II, the Most Anticipated Warhammer 40,000 Animation Ever, Has a New Trailer and Confirmation of Key Details\nFor the uninitiated, the original Astartes was created by superfan Syama Pedersen, who was subsequently brought into the fold to make the official sequel. Astartes is widely accepted as the greatest Warhammer 40,000 animation ever made, official or unofficial, with only Amazon’s excellent Space Marine 2 animation for the Secret Level anthology series competing with it in quality terms. Indeed, Astartes was so good that it inspired Saber Interactive’s hugely successful Space Marine 2 in terms of the look and feel of the Space Marines themselves.\nDuring Games Workshop’s ‘Big Autumn Preview’ event, fans were treated to a new look at Astartes II, which confirms the appearance of Deathwatch and Terminators. As the company notes in a post on Warhammer Community , fans of Space Hulk will no doubt find a lot familiar here.\nASTARTES 2 teaser Coming December We get to follow a Deathwatch unit investigating a Space Hulk! pic.twitter.com/DgveN5yz6K\nIndeed, the Space Hulk vibes come through loud and clear. We see Space Marines stomp about a dark, shadowy interior which you just know will house horrible, nightmarish things in the shadows. But the first-person shot of a corridor lit only by spotlights is the clearest sign that the much-loved tabletop game, Space Hulk, was an influence.\nAlso in the post, Games Workshop confirmed that Astartes II will be “significantly longer” than its predecessor, which is music to fan ears. Understandably as a single-person fan project, Astartes is on the short side.\n“We knew already that this was likely to feature Deathwatch and Terminators, from the unsubtle hints dropped at the end of the LAST trailer, and now we see them, they look like they mean business,” Games Workshop said. “The imposing line of storm bolter barrels and the crackle of a power fist, combined with the ominous surroundings, are certainly giving off some strong Space Hulk vibes."
+          }
+        ]
+      },
+      {
+        "eventKey": "07e851a96a454ced9cf4",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Call of Duty Maker Activision Says the Video Game Cheat Market Generates $8.5 Billion a Year",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/call-of-duty-maker-activision-says-the-video-game-cheat-market-generates-85-billion-a-year",
+            "publishedAt": "2026-09-18T15:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/call-of-duty-maker-activision-says-the-video-game-cheat-market-generates-85-billion-a-year",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/18/ss-6b8f4040a1e923f036e04d9eb21ecb0f866be57e-1920x1080-1789741799815.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Ahead of Call of Duty: Modern Warfare 4’s release, Activision has spoken about the “multi-billion-dollar market” behind video game cheats.\nCall of Duty Maker Activision Says the Video Game Cheat Market Generates $8.5 Billion a Year\nCheating is a fact of life in pretty much all online games, but Call of Duty has a reputation for it, exacerbated by the free-to-download battle royale, Warzone. Activision, like other video game companies, faces an uphill battle against cheaters and those who make and profit from them, and generative AI has made that battle even more complex.\nNow, to hammer home the point about how big a deal video game cheating is, Activision&#x27;s Team Ricochet has posted a blog that breaks down the business behind it.\n“Cheat sellers have built a sprawling, multi-billion-dollar marketplace of resellers, subscription services, cheat reskins, illicit accounts, spoofing tools, and organized distribution networks,” Activision said, pointing to recent analysis that suggests cheat subscriptions across just 15 games generates roughly $3.5 billion annually. Activision estimates that when you include adjacent industries such as account sales, boosting, spoofing, and other services, the broader cheating economy generates about $8.5 billion each year.\nYou might have seen Activision post bodycam footage of a Call of Duty cheat maker being served a cease and desist order — that’s part of the legal action the company takes here. But it’s also using “technical detection” to try to clamp down on cheat makers.\nRICOCHET Anti-Cheat doesn&#x27;t end when your match does. Cheat makers operate around the world. So do we. We’re taking the fight directly to cheat sellers. Last weekend during the Closed Beta, we went to Ohio to takedown Elocarry. That’s not an isolated case... pic.twitter.com/IP69qlGgDD\nActivision said it’s “disrupted” more than 375 reseller operations, issued more than 80 cease-and-desist demands, and helped shut down 31 primary cheat vendors. “Cheat sellers often use marketing tactics and social posts to make their operations look stable, even when they are under significant pressure,” Activision said. “We’ve seen cheat developers use social platforms to explain months of downtime with excuses like ‘the flu,’ ‘surgery,’ or a ‘car accident’ rather than acknowledge their products were detected and no longer reliable. Those messages are part of the playbook they use to reassure customers while our systems continue disrupting their networks.”"
+          }
+        ]
+      },
+      {
+        "eventKey": "41d224d2e2c93e524b59",
+        "eventKind": "other",
+        "subjectKey": "control-resonant",
+        "subject": {
+          "kind": "game",
+          "key": "control-resonant"
+        },
+        "publishability": "direct",
+        "headline": "Control Resonant Is Almost a Picture Perfect PC Port",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/control-resonant-is-almost-a-picture-perfect-pc-port",
+            "publishedAt": "2026-09-18T13:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/control-resonant-is-almost-a-picture-perfect-pc-port",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/10/controlthumb-1789054804916.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Control Resonant is nearly a picture perfect PC port, with gorgeous visuals and stellar performance on almost every PC I&#x27;ve tested it on.\nControl Resonant Is Almost a Picture Perfect PC Port\nWhen the Nvidia GeForce RTX 2080 Ti first came out in 2018, I was skeptical of ray tracing and DLSS. The first few games that used the tech, like Battlefield 1 and Shadow of the Tomb Raider , had fairly lackluster ray tracing implementations that didn&#x27;t look great and were just a way to nuke performance without getting much out of it. It wasn’t until Control came out in the summer of 2019 that it really started to click for me.\nThere was just something about the lighting solution for that game that made it look better than pretty much anything else out at the time, even if it wasn’t going for total realism. It’s no surprise then, that Control Resonant follows in the original game’s footsteps, and might just be one of the most beautiful games of the year because of it. But even with the incredible things Remedy was able to do with the visuals, Control Resonant is still one of the best optimized PC games of the year so far, and even runs reasonably well on the Xbox Ally X.\nControl Resonant, though, dials back on some of the ultra-realism of Alan Wake 2, and is able to scale much better to less powerful hardware. While the game definitely rewards high-end PCs with a stunning implementation of path tracing that really accentuates the game’s art style, it’s somehow even more impressive how good the game looks on a handheld.\nControl Resonant does make the Steam Deck show its age a bit, though. Even with the handheld preset, set to 720p and FSR set to balanced, Valve&#x27;s 4-and-a-half-year-old handheld struggles to stay above 25 fps. You can absolutely play the game like that if you want, but I wouldn&#x27;t really recommend it.\nI installed an RTX 4070 Ti Super and set the game to 1440p with the medium preset with ray tracing at medium, along with DLSS set to balanced. At those settings, Control Resonant averaged 111 fps, with a 1% low of 81 fps – far above Remedy&#x27;s quoted 60 fps for those settings. Granted, I did test with an RTX 4070 Ti Super, which is around 10-15% faster than the recommended 4070 Ti. But even if you lopped off 15% of the frames there, it would still average 94 fps, which is better than Remedy&#x27;s official system requirements suggest.\nWith frame generation enabled, the RTX 4070 Ti&#x27;s frame rate jumps to 118 fps, although the pre-frame-gen number drops down to 60. Still, that is more than enough for Control Resonant to feel responsive, while also delivering an incredibly smooth frame rate for a high-refresh gaming monitor . Usually, turning on frame gen would come with more latency than having it off, but for some reason, Remedy doesn&#x27;t include the option to turn on Nvidia reflex indepently from frame interpolation, so you actually end up with less latency with it enabled.\nWith how good the lighting is in Control Resonant, I probably would have come away happy if the game ran a lot worse than it does. The fact that it scales so well while looking as good as it does makes it one of the best PC ports of the year so far. If you have a halfway decent gaming PC lying around and you&#x27;re planning on playing Resonant anyways, I&#x27;d recommend picking it up on Steam in a heartbeat.\nNow this is what I call optimization.\nRemedy’s last game was certainly a technical masterpiece as well. Alan Wake 2 is still one of the most beautiful games I’ve ever seen, and there are parts of that game that look like I’m playing through a movie, especially on higher graphics settings. But at the same time, it’s not a game that’s known for running on less powerful PCs."
+          }
+        ]
+      },
+      {
+        "eventKey": "12b8315f3cabae27549d",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "EA Sports FC 27 Review So Far",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/ea-sports-fc-27-review-so-far",
+            "publishedAt": "2026-09-19T00:45:24.784Z",
+            "canonicalUrl": "https://www.ign.com/articles/ea-sports-fc-27-review-so-far",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/19/ea-fc-27-1789778341891.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "EA Sports stands on shaky ground with a new open-world hub, but the realistic, intuitive Tactics system shows promise.\nI find myself in a weird place for my in-progress review of EA Sports FC 27. On one hand, worthwhile strategic elements have finally been added that reflect real-world tactics in a concise, intuitive way. On the other hand, the promised improvements to behavior and pathing of computer-controlled players on the field still ring hollow, carrying over many of the same issues the series has had for over a decade. Couple this with the dreaded introduction of open-world elements via The Grounds, and the result is yet another instance of positive steps forward but negative steps backward.\nEver since NBA 2K14 introduced MyPark, which eventually evolved into The Neighborhood in NBA 2K18 and The City in NBA 2K21, I figured it was only a matter of time before EA brought a similar open world full of activities to its sports franchises. While The Grounds isn&#x27;t without merit, it often feels like EA is trying to solve a problem that didn&#x27;t really exist.\nMy first impression is that The Grounds doesn’t need to be an open-world environment to deliver what the playerbase wants out of a more communal online mode. I don’t need to run through a visually saturated, low-resolution city populated by lifeless NPCs just to find a game mode to start up when simple menus devoted to the same function can do the same thing in a more efficient manner. Sure, it works well as an active lobby for matchmaking and makes it easier to find other players and move between activities, but between the framerate drops and unnatural character animations, nothing immersed me in the hub in EA Sports FC 27 enough to justify its existence.\nWhen it comes to gameplay, EA Sports FC 27&#x27;s expanded Tactics system is easily the best addition, wonderfully complementing the playstyles and roles introduced over the past few years. The new strategy system gives much more control over how teams behave in different phases of play, going beyond basic formations and instructions by explaining the purpose, strengths, and weaknesses of different tactical approaches. This becomes particularly useful when building around individual player attributes. As a Manchester United fan, I found that a deeper defensive approach worked especially well for Noussair Mazraoui, whose patient style lets him maintain his position and disrupt attacks without constantly stepping out of shape, while a short-passing buildup gives him chances to use his technical ability without abandoning that defensive structure.\nRead the full EA Sports FC 26 review .\nThat same flexibility can be useful defensively, particularly when protecting a lead. If an opponent repeatedly targets his side of the pitch, giving Šeško more defensive responsibility lets him drop back and support the right back, providing another way to protect that flank without abandoning the attacking structure. What makes the system particularly valuable is that it teaches the strategy behind soccer formations without overwhelming players with unnecessary information. EA Sports FC 27 does a good job explaining why different shapes work, which players suit them, and how to adjust them against different opponents, making the tactical aspect for the sport approachable while still leaving experienced players plenty of room to experiment.\nCrossing and corner kicks have also improved noticeably, with both systems producing more convincing positioning battles and giving the player greater control over what happens inside the box. I scored several successful headers with Harry Maguire from corners during my time with the game, which stood out because I could count on one hand the number of corner routines and headed goals I had scored in previous EA Sports FC entries.\nThe issues above are only compounded by the myriad of unskippable cutscenes and NBA 2K15-level voice acting that make up The Grounds. The irony is that I was initially e"
+          }
+        ]
+      },
+      {
+        "eventKey": "56d57926bd4a8da41c48",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Get Final Fantasy VII Remake Intergrade Switch 2 Edition for Under $9 by Following This 1 Easy Step",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/final-fantasy-7-remake-intergrade-for-switch-2-deal",
+            "publishedAt": "2026-09-18T17:15:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/final-fantasy-7-remake-intergrade-for-switch-2-deal",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/17/tifa-1789673498112.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "We&#x27;re getting close to wrapping up this trilogy.\nGet Final Fantasy VII Remake Intergrade Switch 2 Edition for Under $9 by Following This 1 Easy Step\nIf there&#x27;s any game you should get from the under-$10 bargain bin, this would unquestionably be a truly worthy pickup. From now until September 30, Nintendo eShop is offering a digital copy of Final Fantasy VII Remake Intergrade Switch 2 edition for $9.99. That&#x27;s already a stellar deal since it&#x27;s currently selling for $39.99 everywhere else. But there&#x27;s a way to get it for an even better price. Head on over to Amazon and pick up a $10 Nintendo eShop digital gift card for just $8.98. Use that gift card on this purchase and you&#x27;re effectively paying $8.98.\nFinal Fantasy VII Remake was the first installment of the completely overhauled FFVII trilogy. It originally launched on PlayStation 4 back in 2020. The \"Intergrade\" edition was released in 2021 for the PlayStation 5 console, with enhanced 4K graphics, higher 60fps frame rate, faster loading times, and most importantly, new DLC content starring FFVII fan favorite Yuffie. Not until January of this year did the Intergrade edition port over to the Nintendo Switch 2 console. In his Final Fantasy VII Remake Intergrade Switch 2 re-review , he noted that the Switch 2 handles the game quite well.\nThis sale is the perfect opportunity to starting catching up on the FFVII trilogy. Earlier this year Sony announced the final chapter - Final Fantasy VII Revelation - with a launch date in April of 2027. This time around, Switch 2 gamers won&#x27;t have to wait because the Switch 2 launch will coincide with all the other platforms . Revelation will close the loop on Cloud&#x27;s story and will culminate in clashes with the gargantuan Weapons and the final battle with Sephiroth himself."
+          }
+        ]
+      },
+      {
+        "eventKey": "de53f93a93d60a347643",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "IGN 30 Anniversary Bundle Is Live: Get 7 PC Games for $15",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/ign-30-anniversary-bundle-is-live-get-7-pc-games-for-15",
+            "publishedAt": "2026-09-18T18:49:08.511Z",
+            "canonicalUrl": "https://www.ign.com/articles/ign-30-anniversary-bundle-is-live-get-7-pc-games-for-15",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/18/screenshot-2026-09-18-at-2-31-01-pm-1789756316978.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "IGN is 30, and to celebrate, we&#x27;ve teamed up with Humble to offer a bundle of 7 excellent PC games for just $15.\nIGN 30 Anniversary Bundle Is Live: Get 7 PC Games for $15\nDid you know that this very website is now 30 years old? Look at the logo at the top of this page if you don&#x27;t believe me. To celebrate, the IGN 30 Anniversary Bundle is now live, which getes you seven Steam PC games for just $15 on Humble. The games are all worth checking out, and genre-wise there’s a little something for everyone. There’s an MMO, a Souls-like shooter, a survival game, and more. Let’s dive in.\nRoguelite fans can enjoy BlazBlue Entropy Effect, while survival types can try to live to swim another day in Subnautica, which our reviewer gave a 9.1/10 back in the decimal-loving days of 2018. Thronebreaker: The Witcher Tales got a 9.4/10 review that same year, with our critic calling it, “one of the best-written RPGs I’ve played in years.”\nAll told, this bundle gets you $214 worth of PC games for just $15. Or you can buy in at a lower tier for less. Any way you slice it, it’s a terrific deal, especially if you haven’t played any (or even some) of the games included.\nThe bundle will be available until October 9, so you have a few weeks to ponder the deal.\nChris Reed is a senior commerce editor and deals expert for IGN. He also runs IGN&#x27;s LEGO coverage and maintains the upcoming release dates articles for video games , LEGO sets , and 4K Blu-rays . You can follow him on Bluesky .\nRemnant 2, Elder Scrolls Online: Elsweyr, and more.\nIt’s hard to say which game is the headliner here, as a number of them could take that role. The game with the most content has to be the MMO The Elder Scrolls Online - Elsweyr. It includes the base game, plus the Elsweyr, Morrowind, and Summerset chapters. The Elsweyr expansion specifically introduced the Necromancer class as well as dragon hunts, which are pretty exciting. That’s hundreds of hours’ worth of first-person MMO action (and it even runs great on Steam Deck, where I’ve been playing it).\nAlso included in the collection is Remnant II, an excellent Soulslike game with guns and sprinkling of looter-shooter action baked into it. We gave it a 9/10 in our review a few years back."
+          }
+        ]
+      },
+      {
+        "eventKey": "6f116ada78499295ff70",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Marvel's Wolverine Has 'Sold Well,' Early Data Suggests, but Don't Expect Spider-Man Numbers",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/marvels-wolverine-has-sold-well-early-data-suggests-but-dont-expect-spider-man-numbers",
+            "publishedAt": "2026-09-18T15:22:44.111Z",
+            "canonicalUrl": "https://www.ign.com/articles/marvels-wolverine-has-sold-well-early-data-suggests-but-dont-expect-spider-man-numbers",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/13/wolverine-again-1786621307864.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Sony has yet to announce an official sales figure for Marvel’s Wolverine, but one analyst has said early data suggests it&#x27;s sold 1.9 million copies since going on sale on September 15, generating around $130 million in revenue.\nMarvel&#x27;s Wolverine Has &#x27;Sold Well,&#x27; Early Data Suggests, but Don&#x27;t Expect Spider-Man Numbers\nSony has yet to announce an official sales figure for Marvel’s Wolverine , but one analyst has said early data suggests it&#x27;s sold 1.9 million copies since going on sale on September 15, generating around $130 million in revenue.\nThrough all this, it’s important to note that Sony has yet to make any official sales announcement for Marvel’s Wolverine. It has made sales announcements for PlayStation Studios games in the past. For example, Sucker Punch’s Ghost of Yotei went on sale on October 2, 2025 and sold 3.3 million units as of November 2 (at the 32 day mark), according to Sony’s official figures.\nBack in October 23, Sony announced that Insomniac&#x27;s PlayStation 5 exclusive Spider-Man 2 sold more than 2.5 million copies in 24 hours , which meant the open-world superhero game overtook Santa Monica Studio’s God of War Ragnarok at the top of the PlayStation day-one launch sales chart. At the time, it was the fastest-selling PlayStation Studios game in history (Helldivers 2 now holds top spot).\nAssuming Alinea Analytics is in the right ballpark, Marvel’s Wolverine is tracking behind Spider-Man 2. But it has already passed the lifetime PS5 copies sold and revenues of Hideo Kojima’s Death Stranding 2, which hit the headlines when Sony ditched Kojima’s Physint. Indeed, according to Elliot, Marvel’s Wolverine is after just a few days on sale the top-performing new PlayStation Studios game released on PS5 so far this year, ahead of MLB The Show, Bungie’s Marathon, Housemarque’s Saros, and fighting game Marvel Tōkon.\nThe big question is how well Wolverine continues to sell. Wolverine is currently sitting on a 77 Metascore , with IGN’s Marvel’s Wolverine review returning a 6/10. We said: “Marvel&#x27;s Wolverine&#x27;s slick and satisfying combat wears thin well before its conclusion, so much so that even its strong character work can&#x27;t quite save it from being anything more than okay.”\n“So yes, Wolverine has sold well, but its commercial long tail is limited by its mixed media and streamer reception,” Elliott said. “Unlike Spider-Man, which reviewed insanely well and has stayed evergreen for years, this one’s tail will be shorter and lumpier, but still there.”\nExpect a bump when the MCU kicks into gear this December with the release of Avengers: Doomsday, which features the X-Men (but does it feature Hugh Jackman’s Wolverine?). Wolverine might also benefit from the expanded PS5 install base that will inevitably kick in with the release of GTA 6 in November. And Wolverine is sure to prove a popular choice under the Christmas tree.\nRhys Elliott, head of market analysis at Alinea Analytics, took to social media to say an estimated 22.9% of that revenue came from the sale of physical copies of the game — remember, Sony plans to cease production of PlayStation discs from 2028."
+          }
+        ]
+      },
+      {
+        "eventKey": "e96ce1b83f4ee0958a5e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Sugar Lies launches in late 2026 for PC, in spring 2027 for Switch",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/sugar-lies-launches-in-late-2026-for-pc-in-spring-2027-for-switch",
+            "publishedAt": "2026-09-18T03:50:02+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/sugar-lies-launches-in-late-2026-for-pc-in-spring-2027-for-switch",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Sugar-Lies-Date_09-17-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Romance visual novel Sugar Lies will launch for PC via Steam in late 2026 for 2,860 yen, followed by Switch in spring 2027, developer Kogado Studio announced. It will support English, Japanese, Tra…\nSugar Lies launches in late 2026 for PC, in spring 2027 for Switch\nRomance visual novel Sugar Lies will launch for PC via Steam in late 2026 for 2,860 yen, followed by Switch in spring 2027, developer Kogado Studio announced. It will support English, Japanese, Traditional Chinese, and Simplified Chinese language options. A physical edition will be available for Switch in Japan for 4,000 yen.\nA young man who hates lies, and a girl who lies like she breathes.\n&#8220;It makes me sick. This world is full of nothing but lies.&#8221;\nAkito Nagatsuki is a young man who detests lies.\nWatch a new trailer below, featuring the opening theme song &#8220;Truth or Lies&#8221; composed by Raito with vocals by voice actors Ikumi Hasegawa and Hikaru Iida.\nHere is an overview of the game, via its Steam page :\nA short visual novel featuring a boy-meets-girl summer story."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 50958,
+      "estimatedInputTokens": 12740,
+      "activeTrackingItems": 0,
+      "candidateItems": 16,
+      "includedItems": 16,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
