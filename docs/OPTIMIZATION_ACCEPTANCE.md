@@ -1,6 +1,6 @@
 # 优化收尾与维护记录（2026-09-19）
 
-本次范围是发布可靠性与有界补充队列。已合并生产基线 69ba3b4（9 月 19 日日报、用户译名、日历修复）；不改 UI、历史内容或每日两次编辑频率。部署结果在本次 PR 与 Actions 中记录。
+本次范围是发布可靠性与有界补充队列。已合并生产基线 69ba3b4（9 月 19 日日报、用户译名、日历修复）；不改 UI、历史内容或每日两次编辑频率。发布审查与部署证据集中记录在 [PR #133](https://github.com/fallw1nd/daily-game-brief/pull/133) 及其 Actions；维护时先核对 PR 的最终合并和部署状态。
 
 ## 已完成修改
 
@@ -13,11 +13,11 @@
 
 ## 验证
 
-- 功能提交 c273742；最终 npm run check：83 个测试文件、419 项测试通过；40 期归档和英文校验通过，40/40 英文可用，生产构建成功。
+- 最终功能提交 e699781；最终 npm run check：83 个测试文件、419 项测试通过；40 期归档和英文校验通过，40/40 英文可用，生产构建成功。
 - 同游戏不同事实、人工反馈重放、超长标题、构建失败状态、补充队列与预算边界有回归覆盖。
 - editorial-feedback-conflict-smoke：注入三次 push 冲突后保留 pending；恢复成功，六个并发文件及已有账本记录全部保留。
-- editorial-bundle-smoke：使用临时 bare remote 与真实 publisher/check，覆盖正常双包、重复执行、第二包失败、main/state 确认失败、跨期拒绝。最终结果以下方发布验收补记为准。
-- 本地日志位于 artifacts/closeout-final-check.log、closeout-feedback-smoke.log、closeout-bundle-smoke.log（不提交生成日志）。此前 9 月 13 日验收只适用于旧提交 96b2827，不能代替本轮验证。
+- editorial-bundle-smoke：使用临时 bare remote 与真实 publisher/check，覆盖正常双包、重复执行、第二包失败、main/state 确认失败、跨期拒绝。完整演练通过（重复发布不改数据、同一期人工反馈保留、第二包修复、确认恢复和跨期拒绝）。演练随后发现确认恢复缺少反馈时间，e699781 改为保留原校验时间并持久化；其针对性复验结果记录在 PR #133。
+- 本地日志位于 artifacts/closeout-final-check.log、closeout-feedback-smoke.log、closeout-bundle-smoke.log、closeout-ack-final-smoke.log（不提交生成日志）。此前 9 月 13 日验收只适用于旧提交 96b2827，不能代替本轮验证。
 
 ## 恢复步骤
 
