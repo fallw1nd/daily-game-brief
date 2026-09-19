@@ -94,13 +94,17 @@ async function reconcileAlreadyPublished(submission, state, submissionSha) {
     && state.value.packet?.blobSha === submission.packetBlobSha
     && state.value.editorial?.submissionSha === submissionSha;
   if (!committedRecord && !currentDigestMatches) return null;
+  // With a missing publication ack, validation time is a conservative lower
+  // bound. Never timestamp old feedback with recovery time.
+  const feedbackAt = committedRecord?.at
+    || (state.value.publication?.status === "committed" ? state.value.publication.updatedAt : state.value.editorial?.updatedAt);
+  if (!Number.isFinite(Date.parse(feedbackAt || ""))) throw new Error("cannot replay feedback without a durable decision timestamp");
   let repairedMainSha = null;
   if (state.value.publication?.status !== "committed" && currentDigestMatches) {
     const mainSha = (await command("git", ["rev-parse", "HEAD"])).stdout.trim();
     repairedMainSha = mainSha;
     const publicationAt = state.value.transitions?.find(item => item.event === "publication-committed" && item.decisionDigest === editorialDecisionDigest(submission.editorial))?.at
-      || state.value.publication.updatedAt
-      || new Date().toISOString();
+      || feedbackAt;
     await updateState("publication-committed", [
       `--main-sha=${mainSha}`,
       "--source=editorial",
@@ -119,7 +123,7 @@ async function reconcileAlreadyPublished(submission, state, submissionSha) {
     status: "already-exists",
     feedbackEligible: true,
     mainSha: committedRecord?.mainSha || state.value.publication?.mainSha || repairedMainSha,
-    feedbackAt: committedRecord?.at || state.value.publication?.updatedAt || null,
+    feedbackAt,
     decisionIdentity: editorialDecisionDigest(submission.editorial),
   };
 }

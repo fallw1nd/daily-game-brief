@@ -417,6 +417,9 @@ async function executeAckRecovery() {
     if (!partialResult.changed || partialResult.results[0]?.mainSha == null || afterFailureState.editorial.status !== "valid" || afterFailureState.publication.status !== "pending" || !manifestAfterFailure.editions.some(item => item.id === editionId)) {
       throw new Error("main commit/state acknowledgement failure did not leave valid open state");
     }
+    const manualLedgerPath = join(scenario.root, "automation/ledger/events.json");
+    await writeJson(manualLedgerPath, { schemaVersion: 2, retentionDays: 45, events: { "daily-fact": { lastDecisionEdition: editionId, lastDecisionAt: new Date(Date.now() + 60000).toISOString(), lastDecisionIdentity: "manual-after-commit", lastDecision: "exclude" } } });
+    await commitStateFixture(scenario, "test(automation): preserve manual feedback after missing ack");
     const changedPlan = structuredClone(originalPlan);
     changedPlan.submissions[0].editorial.decisions[0].summary = "替换稿，不应借用旧 valid。";
     delete changedPlan.serializedChars;
@@ -427,6 +430,9 @@ async function executeAckRecovery() {
     const rerun = await runBundle(scenario);
     if (!rerun.ok) throw new Error(`ack recovery rerun failed: ${rerun.error}`);
     const result = await readJson(scenario.resultPath);
+    const recoveredState = await readJson(scenario.statePath);
+    if (!recoveredState.transitions.some(item => item.event === "publication-committed" && item.at === result.results[0]?.feedbackAt)) throw new Error("recovered decision timestamp was not persisted");
+    if (!result.results[0]?.feedbackAt || (await readJson(manualLedgerPath)).events["daily-fact"]?.lastDecision !== "exclude") throw new Error("missing-ack recovery overwrote newer manual feedback");
     return {
       firstRunFailure: failed.error,
       partialResult: { changed: partialResult.changed, committedItem: partialResult.results[0]?.index ?? null, mainSha: partialResult.results[0]?.mainSha || null },
@@ -462,6 +468,9 @@ async function executeCrossEditionReject() {
   }
 }
 
+if (process.env.EDITORIAL_BUNDLE_SMOKE_CASE === "ack-recovery") {
+  console.log(JSON.stringify({ ackRecovery: await executeAckRecovery() }, null, 2));
+} else {
 const output = {
   editionId,
   success: await executeSuccess(),
@@ -471,3 +480,5 @@ const output = {
   crossEdition: await executeCrossEditionReject(),
 };
 console.log(JSON.stringify(output, null, 2));
+
+}
