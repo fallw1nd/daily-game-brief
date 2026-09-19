@@ -47,7 +47,7 @@ if (evidence.window.period === "daily") {
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   calendarDiscovery = boundCalendarReport(report);
   console.log("Calendar coverage: " + JSON.stringify(report.coverage));
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarDiscovery.candidates.length} candidate rows in packet; ${calendarDiscovery.omittedCandidates} omitted by limits. Discovery requires primary-source verification.\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + "\n\n" + Object.entries(report.platformCoverage || {}).map(([platform, item]) => `- ${platform}: ${item.selectedCandidates}/${item.discoveredCandidates} leads selected, ${item.primaryCandidates} primary-source leads, ${item.status}`).join("\n") + `\n\n${calendarDiscovery.candidates.length} candidate leads in packet; omitted=${calendarDiscovery.omittedCandidates} (cap=${calendarDiscovery.omissionStats?.candidateCap || 0}, packetBudget=${calendarDiscovery.omissionStats?.packetBudget || 0}). Discovery requires primary-source verification.\n`);
 }
 const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length : 0;
 let showcaseReport = { events: [], announcements: [], coverage: [] };
@@ -111,7 +111,7 @@ const instructions = [
   "archiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。",
   "早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。",
   "upcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。",
-  "upcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。"
+  "upcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；同标题同日期可能已合并多个平台/sourceRefs，采用前必须逐项打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。dateConflict 不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；platformCoverage 的 needs_fallback/needs_primary_confirmation、coverage 的 failed/empty_or_changed、以及 omissionStats 中 candidateCap/packetBudget>0 都要针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。"
 ].join("\n");
 const packet = {
   schemaVersion: 3,
