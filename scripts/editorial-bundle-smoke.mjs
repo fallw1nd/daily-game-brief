@@ -9,7 +9,9 @@ import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
 
 const run = promisify(execFile);
 const sourceRoot = resolve(".");
-const editionId = "2026-09-17-daily";
+const baselineManifest = JSON.parse(await readFile(join(sourceRoot, "public/data/manifest.json"), "utf8"));
+const editionDate = new Date(Date.parse(`${baselineManifest.latest.slice(0, 10)}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+const editionId = `${editionDate}-daily`;
 const window = expectedEditorialWindow(editionId);
 const source = {
   sourceIndex: 0,
@@ -26,7 +28,7 @@ function packetFor(eventKey, scope = null) {
   return {
     schemaVersion: 3,
     mode: "chatgpt-handoff",
-    finalizedAt: "2026-09-17T04:00:00.000Z",
+    finalizedAt: `${editionDate}T04:00:00.000Z`,
     coverageThrough: window.windowEnd,
     outputSchema: {},
     ...(scope ? { continuation: { scope, preservePublished: true } } : {}),
@@ -45,7 +47,7 @@ function packetFor(eventKey, scope = null) {
       }],
       ...(scope === "showcase" ? {
         showcases: {
-          events: [{ id: "direct", kind: "nintendo-direct", date: "2026-09-17", sources: [] }],
+          events: [{ id: "direct", kind: "nintendo-direct", date: editionDate, sources: [] }],
           announcements: [{ id: eventKey, showcaseId: "direct", factUnits: [{ id: `${eventKey}-fact` }] }],
         },
       } : {}),
@@ -77,7 +79,7 @@ function editorialFor(eventKey, packetBlobSha, scope = null) {
       tracking: false,
       verification: "已打开发行方一手来源。",
       reason: "一手来源确认。",
-      beijingTime: "2026-09-17 11:00",
+      beijingTime: `${editionDate} 09:00`,
       timeNote: "只确认日期。",
       platforms: ["PC"],
       region: "全球",
@@ -87,7 +89,7 @@ function editorialFor(eventKey, packetBlobSha, scope = null) {
       ...(scope === "showcase" ? { coveredFactIds: [`${eventKey}-fact`] } : {}),
       sharedFactFrame: {
         subjectTitleKey: "bundle-game",
-        dates: ["2026-09-17"],
+        dates: [editionDate],
         times: [],
         numbers: [eventKey],
         platforms: ["PC"],
@@ -161,7 +163,7 @@ async function createScenario(label, continuationScope = "news") {
   const newsPacketSha = gitBlobSha(newsPacketText);
   const normalEditorial = editorialFor("daily-fact", normalPacketSha);
   const newsEditorial = editorialFor(continuationEventKey, newsPacketSha, continuationScope);
-  const stateAt = "2026-09-17T04:30:00.000Z";
+  const stateAt = `${editionDate}T04:30:00.000Z`;
   let state = createEditionState(editionId, stateAt);
   state = applyEditionStateEvent(state, "packet-ready", { packetBlobSha: normalPacketSha, at: stateAt });
   const queue = {
@@ -275,7 +277,9 @@ async function executeSuccess() {
     const manualLedger = await readJson(manualLedgerPath);
     manualLedger.events["daily-fact"] = {
       ...manualLedger.events["daily-fact"],
-      lastDecisionEdition: "2026-09-14-daily",
+      lastDecisionEdition: editionId,
+      lastDecisionAt: new Date(Date.now() + 60000).toISOString(),
+      lastDecisionIdentity: "manual-revision",
       lastDecision: "exclude",
       lastDecisionReason: "后续人工决定，bundle replay 不得覆盖。",
     };
@@ -285,6 +289,7 @@ async function executeSuccess() {
     if (!rerun.ok) throw new Error(`complete bundle rerun failed: ${rerun.error}`);
     const rerunPublication = await readJson(scenario.resultPath);
     const finalLedger = await readJson(manualLedgerPath);
+    if (finalLedger.events["daily-fact"]?.lastDecision !== "exclude" || rerunPublication.changed || !rerunPublication.results.every(item => item.status === "already-exists")) throw new Error("replay changed publication or replaced later manual feedback");
     const state = await readJson(scenario.statePath);
     const queue = await readJson(join(scenario.root, "automation/batches", editionId, "queue.json"));
     const manifest = await readJson(join(scenario.root, "public/data/manifest.json"));
@@ -300,7 +305,7 @@ async function executeSuccess() {
       },
       feedback: {
         ledgerExists: await readFile(manualLedgerPath, "utf8").then(() => true).catch(() => false),
-        laterManualDecisionPreserved: finalLedger.events["daily-fact"]?.lastDecisionEdition === "2026-09-14-daily" && finalLedger.events["daily-fact"]?.lastDecision === "exclude",
+        laterManualDecisionPreserved: finalLedger.events["daily-fact"]?.lastDecisionEdition === editionId && finalLedger.events["daily-fact"]?.lastDecision === "exclude",
       },
       durableState: { editorial: state.editorial.status, publication: state.publication.status, revisionRequest: state.revisionRequest?.status || null },
       queue: { batch: queue.batches[0].name, status: queue.batches[0].status },
@@ -368,12 +373,12 @@ async function executePackageTwoRetry() {
     staleState = applyEditionStateEvent(staleState, "editorial-submitted", {
       packetBlobSha: scenario.newsPacketSha,
       submissionSha: oldSubmissionSha,
-      at: "2026-09-17T05:00:00.000Z",
+      at: `${editionDate}T05:00:00.000Z`,
     });
     staleState = applyEditionStateEvent(staleState, "editorial-valid", {
       packetBlobSha: scenario.newsPacketSha,
       submissionSha: oldSubmissionSha,
-      at: "2026-09-17T05:01:00.000Z",
+      at: `${editionDate}T05:01:00.000Z`,
     });
     await writeJson(scenario.statePath, staleState);
     await commitStateFixture(scenario, "test(automation): seed stale valid bundle decision");
