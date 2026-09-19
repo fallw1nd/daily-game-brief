@@ -38,6 +38,8 @@ For Daily, `windowEnd` and `plannedAt` are intentionally different. `windowEnd=1
 
 Neither English generation, locale repair, media enrichment, retry logic, nor the noon deployment gate may alter these windows or issue sequencing.
 
+Release-calendar discovery remains a bounded pre-editorial aid. Its source-specific health ledger is stored on `automation/state` separately from news source health, and may affect candidate ordering but never waive the minimum PC / PlayStation / Xbox / Nintendo checks or the primary-evidence requirement. Candidate-cap omissions and packet-budget omissions are reported separately; neither authorizes publication from snippets alone.
+
 ## English Overlay contract
 
 Simplified Chinese Canonical data remains the sole factual authority. A valid English edition is a presentation Overlay stored at:

@@ -34,10 +34,10 @@ flowchart LR
 | Steam日期排序列表 | 最多4页 | 补充非热门新作；分页达到上限仍属部分覆盖 |
 | Nintendo美国商店Coming Soon | 服务器内嵌产品数据、NSUID、平台、日期 | 捕获Switch与Switch 2；不代表日本/中国地区全量 |
 | Xbox Wire Next Week on Xbox | 官方周报内明确的游戏链接和发售日 | 捕获Xbox新作与移植；周报不覆盖整15天 |
-| PlayStation Blog RSS | 近21天内相关公告链接 | 提交待阅读公告，绝不把文章标题当游戏名或发文日当发售日 |
+| PlayStation Blog RSS | 近21天内相关公告；标题含明确“launches/releases/arrives/out + 月日”时生成日期线索 | 只把官方标题中的明确日期结构化为 discovery lead；发文日绝不替代发售日，入库前仍须打开官方详情核验 |
 | GamesRadar跨平台月历 | 月份/年份标题下的明确日期游戏行 | 独立查漏线索；媒体日期不能直接当官方确认 |
 
-来源配置位于config/release-calendar-sources.json。优先核验登记过的作品名、多个来源共同出现的作品，以及基线中没有的记录。按来源家族轮流分配候选位置，避免PC大量条目占满队列。不会凭关键词杜撰“知名度”或未经公开数据支持的愿望单数量。
+来源配置位于config/release-calendar-sources.json。发现层先按“同作品+同日期”合并跨商店/跨平台重复线索，保留全部平台与 sourceRefs；不同日期仍分开并标记冲突。排序优先登记作品、多来源交叉命中、不在 Canonical baseline 的新项目、一手来源与健康来源。候选 cap 前先为 PC / PlayStation / Xbox / Nintendo 各保留最多8条最低发现位，再按来源家族轮流填充，避免单一 PC 列表或综合月历挤占其他平台。不会凭关键词杜撰“知名度”或未经公开数据支持的愿望单数量。
 
 ## 采用之前必须核实的字段
 
@@ -52,16 +52,25 @@ flowchart LR
 - HTTP成功不等于抓取成功，解析0项标记empty_or_changed；有列表也始终标记partial，不能宣称已查全。
 - 日期严格过滤，不把月/季度/TBA推测成某一天。保留跨年窗口、产品ID、平台与来源。
 - 抓取最多并发2个来源，单请求12秒、响应3.5MB上限；Steam最多4页，其余每源1页。来源失败不阻塞新闻生成；后续页失败时保留已成功获取的页。
-- 完整发现报告写入artifacts/release-calendar-discovery.json并上传既有Actions artifact；GitHub步骤摘要展示来源状态和数量。packet最多100条候选，再按24,000字符上限收缩并记录omittedCandidates。完整报告与packet的计数可能不同。
-- 输入预算提前计入日历资料，沿用既有正文候选预算规则，不增加模型总输入上限；若有截断，编辑必须对重点作品和薄弱平台补查，不能假装处理了被截断的记录。
+- 完整发现报告写入artifacts/release-calendar-discovery.json并上传既有Actions artifact；GitHub步骤摘要展示来源状态、四平台候选与一手线索数量。packet最多100条候选，再按24,000字符上限收缩；omissionStats分别记录candidateCap与packetBudget，不能把两种漏损混成一个不可解释的总数。
+- 日历自己的来源健康度持久化到automation/state的automation/health/release-calendar.json。连续失败/空解析与近期可用率会参与候选排序，但不会跳过任何已配置平台源；四平台最低候选保障优先于健康度降权，避免“全局成功率高”掩盖单个平台失联。
+- 输入预算提前计入日历资料，沿用既有正文候选预算规则，不增加模型总输入上限；packet候选改为紧凑 sourceRefs 表示，不再为每个候选重复 family/priority/review 等纯机器排序字段。若仍有截断，编辑必须对重点作品和薄弱平台补查，不能假装处理了被截断的记录。
 
 发现层不直接写入public/data，不自动增加official事实，不自动发布候选。最终仍由既有编辑、可信publisher、双语、媒体与发布检查完成。
+
+## 2026-09-19 生产审计基线
+
+审计取2026-09-13至09-19七个自然Daily的已保存Actions artifact与Canonical archive，不依赖实时网络。正式upcoming数量依次为6 / 6 / 5 / 5 / 7 / 10 / 13。完整发现层候选分别为100 / 100 / 100 / 100 / 100 / 82 / 100；candidate cap造成的omitted分别为80 / 11 / 16 / 18 / 12 / 0 / 101。旧packet在24,000字符限制下实际只送入45 / 45 / 44 / 43 / 42 / 44 / 43条，因此最终旧版omitted上升到135 / 66 / 72 / 75 / 70 / 38 / 158。
+
+固定artifact回放显示，旧100条候选中每期约有13–19条“同作品+同日期”的重复平台/来源 lead。仅做该事实层合并并采用紧凑packet表示时，七期可容纳约68–83条候选，而不是42–45条；这说明主要packet漏损来自重复表示和字符预算，而不是必须无限提高联网请求或模型输入上限。该回放只能证明传递机制改善，不等于新增条目已经在自然生产期次被正式采用。
+
+PlayStation是最明显的平台发现缺口：七期PlayStation Blog解析的in-window结构化记录均为0，但reviewLinks持续为1–6条，证明HTTP成功不代表可用日历发现。新逻辑只对官方Blog标题中明确出现完整月日且带launch/release/arrive/out语义的文章生成结构化lead；其他文章继续保持review-only。最终入Canonical仍要求打开官方详情并确认身份、日期、平台、地区与releaseType。
 
 ## 运行与验收
 
 `npm run calendar:discover -- --date=2026-09-08` 可独立试运行。日期是期次的北京日期，输出窗口为9月9日至23日。
 
-2026-09-08实测：Steam热门榜26条窗口内记录，日期列表4页40条，Nintendo7条，Xbox19条，跨平台月历24条；PlayStation提供3篇待阅读公告。跨页/来源归并与上限处理后输出100条候选记录，12条未纳入。不同平台版本不等于独立游戏数，以上不是已完成一手核验的发布数量。来源内容会随时间变化。
+2026-09-08原始实测：Steam热门榜26条窗口内记录，日期列表4页40条，Nintendo7条，Xbox19条，跨平台月历24条；PlayStation提供3篇待阅读公告。该数据保留作历史基线；当前实现已经改为title+date合并、四平台最低候选保障、PS明确日期标题lead、独立日历source health与分层omission telemetry。不同平台版本不等于独立游戏数，以上都不是已完成一手核验的发布数量。来源内容会随时间变化。
 
 自动测试覆盖日期边界/跨年、模糊日期、平台身份、重复项、冲突日期、媒体线索分类、来源宕机、页面结构变化、体积和输入预算、真实packet构建断网，以及封面失败占位。
 

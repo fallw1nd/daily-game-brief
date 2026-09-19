@@ -637,3 +637,14 @@
 - **2026-09-19 reviewed scope:** Synced production 69ba3b4; Sep16 formal repair acaf72d already exists. Initial Canonical + next news only; later continuations remain single inbox. The old four-slot/day simulation is not a release guarantee. Shared archive-title validation and build-failure acknowledgement passed npm run check (83 files / 419 tests / 40 bilingual archives); feedback conflict recovery preserved all six concurrent files. Full-source completeness and measured cost remain open; release evidence is recorded in docs/OPTIMIZATION_ACCEPTANCE.md and the PR.
 
 - **2026-09-19 closeout:** PR #133 已合并 main（b7fbcdc），Verify 35439433649 成功；2026-09-16 正式稿已由 trusted publisher 以 acaf72d 修复并完成 media/Pages 35197448570；共享 archiveTitle 校验、build failure acknowledgement 与 bundle recovery 均已进入生产。该条自身 Close when 全部满足；发布会完整性、自然吞吐、成本等继续由各自维护项追踪。
+
+
+## MNT-20260919-01 — 15日发售日历候选重复、PS解析弱与omission不可解释
+
+- **Priority / status:** P2 / in_progress.
+- **Area:** release calendar discovery / ranking / source health / input cost.
+- **Evidence:** 2026-09-13至09-19七个自然Daily的已保存Actions artifact显示，完整发现候选为100 / 100 / 100 / 100 / 100 / 82 / 100，candidate-cap omitted为80 / 11 / 16 / 18 / 12 / 0 / 101；进入编辑packet的候选仅45 / 45 / 44 / 43 / 42 / 44 / 43，最终omitted扩大到135 / 66 / 72 / 75 / 70 / 38 / 158。同期旧候选中每期约13–19条是同作品同日期的重复平台/来源lead。PlayStation Blog七期均为HTTP/解析成功但0条in-window结构化记录，同时持续产生1–6条reviewLinks；现有新闻source-health账本也不能代表Steam/Nintendo/Xbox/GamesRadar日历parser健康。
+- **Bounded resolution:** 不新增外部源或Scheduled Task，不提高100条full-report cap或120k模型输入预算。按title+date合并重复lead并保留平台/sourceRefs；为PC/PlayStation/Xbox/Nintendo各保留最多8条最低候选位；PlayStation官方Blog仅在标题含明确launch/release/arrive/out与完整月日时生成结构化lead，发文日绝不代替发售日；持久化独立release-calendar source health并作为有界排序信号；将omission拆分candidateCap/packetBudget并压缩packet字段。
+- **Offline replay:** 仅使用上述七期固定artifact做表示层回放，合并重复lead并压缩packet后可容纳约68–83条候选，而旧packet为42–45条。该结果证明候选传递预算利用率改善，不证明自然期次正式采用率或全球平台覆盖已经提高。
+- **Risk:** title+date合并可能把同名同日但实际不同SKU/地区事项聚合成一个lead，因此保留全部sourceRefs/platform/region信息且最终仍要求逐一打开官方详情；平台最低配额可能让低价值lead进入候选池，因此只保留8条上限并继续按knownTitle/crossSource/new-baseline/primary/health排序。
+- **Close criteria:** PR完整check与Pages通过；至少一个后续自然Daily落盘release-calendar health、四平台platformCoverage与分层omission telemetry；若PS出现明确日期Blog标题则能形成lead且仍经官方详情核验，若没有则不得虚构成功；比较自然期次candidate/packet omitted与Canonical新增/patch结果后再判断recall改善。
