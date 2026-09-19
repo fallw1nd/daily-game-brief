@@ -12,7 +12,7 @@ export function releaseDate(raw, referenceDate) {
   const exact = value.match(/^(\d{4}-\d{2}-\d{2})(?:T|$)/);
   if (exact) iso = exact[1];
   else {
-    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(20\d{2}))?\b/i);
+    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(20\d{2}))?\b/i);
     if (!match) return null;
     const month = months.indexOf(match[1].slice(0, 3).toLowerCase()) + 1;
     let year = Number(match[3] || referenceDate.slice(0, 4));
