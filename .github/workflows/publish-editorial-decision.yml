@@ -339,7 +339,7 @@ jobs:
         if: steps.publication.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && steps.submission.outputs.mode == 'publish')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yml --ref main
+        run: gh workflow run deploy.yml --ref main -f edition_id=${{ steps.submission.outputs.edition }}
 
       - name: Trigger edition-specific media workflow
         if: steps.submission.outputs.mode == 'publish' && (steps.publication.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
@@ -381,6 +381,11 @@ jobs:
             echo "Failed to update automation/state after three attempts"
             exit 1
           fi
+
+      - name: Activate one oldest pending continuation
+        if: steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'success'
+        shell: bash
+        run: bash scripts/update-showcase-queue-branch.sh --no-refresh-sources
 
       - name: Retry a validated failed publication once
         if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success' && steps.submission.outputs.mode == 'publish'
