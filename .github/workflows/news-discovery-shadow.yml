@@ -152,6 +152,7 @@ jobs:
           git fetch origin automation/state:refs/remotes/origin/automation/state || true
           git show origin/automation/state:automation/ledger/events.json > artifacts/event-ledger-previous.json || true
           git show origin/automation/state:automation/health/sources.json > artifacts/source-health-previous.json || true
+          git show origin/automation/state:automation/health/release-calendar.json > artifacts/release-calendar-health-previous.json || true
           git show origin/automation/state:automation/ledger/title-lookups.json > artifacts/title-lookup-cache.json || echo '{"schemaVersion":1,"records":{},"pending":[]}' > artifacts/title-lookup-cache.json
 
       - name: Update persistent source health
@@ -198,6 +199,7 @@ jobs:
             artifacts/showcase-evidence.json
             artifacts/editorial-batches/
             artifacts/release-calendar-discovery.json
+            artifacts/release-calendar-health.json
             artifacts/event-ledger.json
             artifacts/editorial-packet.json
           if-no-files-found: error
@@ -240,6 +242,7 @@ jobs:
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
           cp artifacts/source-health.json "$health"
+          cp artifacts/release-calendar-health.json "$RUNNER_TEMP/release-calendar-health.json"
           cp artifacts/title-lookup-cache.json "$RUNNER_TEMP/title-lookups.json"
           cp -R artifacts/editorial-batches "$RUNNER_TEMP/editorial-batches"
           edition_id="${{ steps.edition.outputs.edition }}"
@@ -254,13 +257,14 @@ jobs:
             cp "$packet" "$state_dir/automation/packets/latest-$period.json"
             cp "$ledger" "$state_dir/automation/ledger/events.json"
             cp "$health" "$state_dir/automation/health/sources.json"
+            cp "$RUNNER_TEMP/release-calendar-health.json" "$state_dir/automation/health/release-calendar.json"
             cp "$RUNNER_TEMP/title-lookups.json" "$state_dir/automation/ledger/title-lookups.json"
             mkdir -p "$state_dir/automation/batches/$edition_id"
             cp "$RUNNER_TEMP/editorial-batches/"*.json "$state_dir/automation/batches/$edition_id/"
             node scripts/record-edition-state.mjs --state-root="$state_dir" --edition="$edition_id" --event=packet-ready --packet="$packet" --run-id="${{ github.run_id }}"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
-            git -C "$state_dir" add automation/packets automation/batches automation/ledger/events.json automation/ledger/title-lookups.json automation/health/sources.json "automation/status/$edition_id.json"
+            git -C "$state_dir" add automation/packets automation/batches automation/ledger/events.json automation/ledger/title-lookups.json automation/health/sources.json automation/health/release-calendar.json "automation/status/$edition_id.json"
             if git -C "$state_dir" diff --cached --quiet; then success=true; else
               git -C "$state_dir" commit -m "chore(automation): persist $edition_id packet acknowledgement"
               if git -C "$state_dir" push origin HEAD:automation/state; then success=true; fi
