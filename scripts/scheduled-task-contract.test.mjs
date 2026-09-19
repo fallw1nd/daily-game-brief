@@ -50,10 +50,10 @@ describe("Daily scheduled-task orchestration contract", () => {
     expect(contract).toContain("no acknowledged `packet.status:\"ready\"` for that exact edition");
     expect(contract).toContain("`automation/wake/<edition-id>.json`");
     expect(contract).toContain("`packet_missing_at_handoff`");
-    expect(contract).toContain("After the wake commit succeeds, you may use the remainder of this same invocation for at most one continuation that was already acknowledged ready before this wake");
+    expect(contract).toContain("After committing it, this invocation may handle one continuation that was already ready beforehand");
     expect(contract).toContain("never wait for or poll Actions inside the wake invocation");
-    expect(contract).toContain("After step 4 proves current liveness is either already healthy or has just been signaled");
-    expect(contract).toContain("Do not wait for the just-created wake to become ready");
+    expect(contract).toContain("Once current liveness is healthy or signaled");
+    expect(contract).toContain("Never wait for the new wake");
     expect(contract).toContain("New Canonical work and liveness always outrank both");
     expect(contract).toContain("For `packet.continuation.scope` `news` or `showcase`");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
