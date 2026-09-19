@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { applyEditorialFeedback } from "./lib/event-ledger.mjs";
+import { editorialDecisionDigest } from "./lib/locale-digest.mjs";
 
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
 const DECISION_PATH = resolve(process.env.EDITORIAL_DECISION_PATH || "artifacts/editorial-decisions.json");
@@ -19,6 +20,7 @@ if (packet?.editorialInput?.window?.id !== editorial.editionId) {
 }
 const updated = applyEditorialFeedback(ledger, editorial, packet, {
   decidedAt: process.env.EDITORIAL_DECIDED_AT || new Date().toISOString(),
+  decisionIdentity: process.env.EDITORIAL_DECISION_IDENTITY || editorialDecisionDigest(editorial),
 });
 await mkdir(dirname(LEDGER_PATH), { recursive: true });
 await writeFile(LEDGER_PATH, JSON.stringify(updated, null, 2) + "\n");

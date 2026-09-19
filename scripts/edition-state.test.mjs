@@ -54,6 +54,13 @@ function submittedStateFor(targetEditionId) {
   });
 }
 
+function validStateFor(targetEditionId) {
+  return applyEditionStateEvent(submittedStateFor(targetEditionId), "editorial-valid", {
+    packetBlobSha: packetSha,
+    submissionSha,
+  });
+}
+
 function invalidStateFor(targetEditionId) {
   return applyEditionStateEvent(submittedStateFor(targetEditionId), "editorial-invalid", {
     packetBlobSha: packetSha,
@@ -202,6 +209,22 @@ describe("durable per-edition state machine", () => {
     expect(applyEditionStateEvent(published, "publication-committed", { mainSha, source: "editorial" })).toEqual(published);
   });
 
+  it("records the exact decision identity on a committed publication transition", () => {
+    const published = applyEditionStateEvent(validState(), "publication-committed", {
+      mainSha,
+      source: "editorial",
+      packetBlobSha: packetSha,
+      submissionSha,
+      decisionDigest: "4".repeat(64),
+    });
+    expect(published.transitions.at(-1)).toMatchObject({
+      event: "publication-committed",
+      packetBlobSha: packetSha,
+      submissionSha,
+      decisionDigest: "4".repeat(64),
+    });
+  });
+
   it("records publication failures and retry ownership", () => {
     const failed = applyEditionStateEvent(validState(), "publication-failed", { error: "push race" });
     expect(failed.publication).toMatchObject({ status: "failed", error: "push race" });
@@ -288,6 +311,69 @@ describe("oldest-due edition compensation", () => {
     };
     const result = resolveDueEdition({ period: "am", now, manifest, states, purpose: "editorial" });
     expect(result).toMatchObject({ needed: true, window: { id: "2026-08-30-am" }, editorialMode: "new-decision" });
+  });
+
+  it("prioritizes unpublished Canonical work before old continuations and showcase supplements", () => {
+    let continuation = validStateFor("2026-08-28-am");
+    continuation = applyEditionStateEvent(continuation, "publication-committed", { mainSha, source: "editorial" });
+    continuation = applyEditionStateEvent(continuation, "continuation-opened", {
+      reason: "editorial_continuation",
+      batchName: "news-1.json",
+      batchScope: "news",
+      eventKeys: ["news-1"],
+    });
+    continuation = applyEditionStateEvent(continuation, "packet-ready", { packetBlobSha: "4".repeat(40) });
+
+    let showcase = validStateFor("2026-08-30-am");
+    showcase = applyEditionStateEvent(showcase, "publication-committed", { mainSha, source: "editorial" });
+    showcase = applyEditionStateEvent(showcase, "supplement-opened", { reason: "showcase_completion", announcementIds: ["show-1"] });
+    showcase = applyEditionStateEvent(showcase, "packet-ready", { packetBlobSha: "5".repeat(40) });
+
+    const normal = readyStateFor("2026-08-29-am");
+    const states = {
+      "2026-08-28-am": continuation,
+      "2026-08-29-am": normal,
+      "2026-08-30-am": showcase,
+    };
+    const result = resolveDueEdition({ period: "am", now: new Date("2026-08-30T04:00:00.000Z"), manifest, states, purpose: "editorial" });
+    expect(result).toMatchObject({ needed: true, window: { id: "2026-08-29-am" }, editorialMode: "new-decision" });
+
+    const continuationOnly = resolveDueEdition({
+      period: "am",
+      now: new Date("2026-08-30T04:00:00.000Z"),
+      manifest,
+      states: { "2026-08-28-am": continuation, "2026-08-30-am": showcase },
+      purpose: "editorial",
+    });
+    expect(continuationOnly).toMatchObject({ needed: true, window: { id: "2026-08-28-am" }, editorialMode: "editorial-continuation" });
+  });
+
+  it("wakes the current Daily before consuming an old continuation when its packet is missing", () => {
+    let continuation = validStateFor("2026-09-10-daily");
+    continuation = applyEditionStateEvent(continuation, "publication-committed", { mainSha, source: "editorial" });
+    continuation = applyEditionStateEvent(continuation, "continuation-opened", {
+      reason: "editorial_continuation",
+      batchName: "news-old.json",
+      batchScope: "news",
+      eventKeys: ["news-old"],
+    });
+    continuation = applyEditionStateEvent(continuation, "packet-ready", { packetBlobSha: "4".repeat(40) });
+    const manifest = {
+      editions: [{ id: "2026-09-11-daily", date: "2026-09-11", period: "daily", issueNumber: 40 }],
+    };
+    const result = resolveDueEdition({
+      period: "daily",
+      now: new Date("2026-09-12T03:00:00.000Z"),
+      manifest,
+      states: { "2026-09-10-daily": continuation },
+      purpose: "editorial",
+    });
+    expect(result).toMatchObject({
+      needed: false,
+      livenessWake: true,
+      editorialMode: "liveness-wake",
+      window: { id: "2026-09-12-daily" },
+    });
   });
 });
   it("requires the timeout acknowledgement before degraded publication", () => {

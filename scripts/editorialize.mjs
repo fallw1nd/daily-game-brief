@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.mjs";
 import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calendar-discovery.mjs";
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
+import { gitBlobSha } from "./lib/edition-state.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
@@ -100,6 +101,7 @@ const instructions = [
   "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。",
   "输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。",
   "从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。",
+  "若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。",
   "lane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。",
   "official 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。",
   "每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。",
@@ -121,8 +123,9 @@ const packet = {
   outputSchema: editorialSchema,
   editorialInput,
 };
+const packetText = JSON.stringify(packet, null, 2) + "\n";
 await mkdir(dirname(PACKET_PATH), { recursive: true });
-await writeFile(PACKET_PATH, JSON.stringify(packet, null, 2) + "\n");
+await writeFile(PACKET_PATH, packetText);
 const batchDirectory = resolve(dirname(PACKET_PATH), "editorial-batches");
 await mkdir(batchDirectory, { recursive: true });
 await writeFile(resolve(batchDirectory, "showcase-evidence.json"), JSON.stringify(showcaseReport, null, 2) + "\n");
@@ -147,5 +150,32 @@ for (const [index, input] of continuationInputs.entries()) {
   queue.batches.push({ name, scope: continuation.continuation.scope, status: "pending", eventKeys: input.packages.map(item => item.eventKey) });
 }
 await writeFile(resolve(batchDirectory, "queue.json"), JSON.stringify(queue, null, 2) + "\n");
+// Preserve the durable queue's fairness order in the handoff hint. GitHub
+// remains authoritative and re-resolves this candidate after any queue change.
+const nextBatch = queue.batches.find(batch => batch.status !== "completed");
+const secondBatch = nextBatch?.scope === "news" ? nextBatch : null;
+const bundlePlan = {
+  schemaVersion: 1,
+  editionId: editorialInput.window.id,
+  generatedAt,
+  source: "trusted-editorial-packet-builder",
+  submissions: [
+    {
+      index: 0,
+      scope: "canonical",
+      batchName: null,
+      packetBlobSha: gitBlobSha(packetText),
+      eventKeys: editorialInput.packages.map(item => item.eventKey),
+    },
+    ...(secondBatch ? [{
+      index: 1,
+      scope: secondBatch.scope,
+      batchName: secondBatch.name,
+      packetBlobSha: gitBlobSha(await readFile(resolve(batchDirectory, secondBatch.name), "utf8")),
+      eventKeys: secondBatch.eventKeys,
+    }] : []),
+  ],
+};
+await writeFile(resolve(batchDirectory, "bundle-plan.json"), JSON.stringify(bundlePlan, null, 2) + "\n");
 console.log(`Editorial packet: ${editorialInput.packages.length} packages; title hints=${titleHints.length}; estimated reading=${editorialInput.budget.estimatedInputTokens} tokens`);
 console.log(`Packet: ${PACKET_PATH}`);

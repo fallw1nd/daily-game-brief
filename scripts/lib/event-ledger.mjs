@@ -76,6 +76,7 @@ function totals(events) {
 
 export function applyEditorialFeedback(ledger, editorial, packet, options = {}) {
   const decidedAt = options.decidedAt || new Date().toISOString();
+  const decisionIdentity = options.decisionIdentity || null;
   const editionId = editorial.editionId;
   const events = structuredClone(ledger?.events || {});
   const packages = new Map((packet?.editorialInput?.packages || []).map((item) => [item.eventKey, item]));
@@ -85,6 +86,13 @@ export function applyEditorialFeedback(ledger, editorial, packet, options = {}) 
   for (const decision of editorial.decisions || []) {
     const prior = events[decision.eventKey] || {};
     if (prior.lastDecisionEdition && prior.lastDecisionEdition > editionId) continue;
+    if (prior.lastDecisionEdition === editionId) {
+      const priorAt = Date.parse(prior.lastDecisionAt || "");
+      const currentAt = Date.parse(decidedAt);
+      if ((decisionIdentity && prior.lastDecisionIdentity === decisionIdentity) ||
+        (!decisionIdentity && Number.isFinite(priorAt) && Number.isFinite(currentAt) && currentAt <= priorAt) ||
+        (Number.isFinite(priorAt) && Number.isFinite(currentAt) && currentAt < priorAt)) continue;
+    }
     applied = true;
     const reminder = trackingItems.get(decision.eventKey);
     const packetItem = packages.get(decision.eventKey);
@@ -145,6 +153,7 @@ export function applyEditorialFeedback(ledger, editorial, packet, options = {}) 
       lastDecisionReason: decision.reason,
       lastDecisionEdition: editionId,
       lastDecisionAt: decidedAt,
+      ...(decisionIdentity ? { lastDecisionIdentity: decisionIdentity } : {}),
       decisionHistory,
       ...(tracking ? { tracking } : {}),
     };

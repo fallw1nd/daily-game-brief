@@ -536,6 +536,9 @@
 - **Bounded resolution:** 公告身份对账、地区来源状态、独立简讯、持久有界批次及串行受限补齐；程序保护已有人工内容与原窗口。外部编辑任务只有每日两次调用，尚需实际唤醒/恢复验证，不能仅凭持久队列宣称及时补齐。
 - **Close when:** 日美欧独立清单中全部实质事实对应正文或简讯，真实Direct和State of Play隔离演练通过；失败与预算不足恢复、并发人工修订通过；本期部署与后续自然期次均有证据。实现细节和剩余项见docs/SHOWCASE_RECOVERY.md。
 
+- **2026-09-13 local bundle closeout:** 功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 在隔离 bare remote 通过有界 same-edition bundle、serial publish、partial/retry、stale-valid revalidation、main/state split-brain ack recovery、cross-edition rejection 和 feedback conflict/recovery 演练；queue fairness 的有限模拟保持 news 可消费且 showcase 最迟顺延一日。未修改 public data、固定 cron 或实际 Scheduled Task。
+- **2026-09-13 residual:** 以上是代码/隔离证据，不是 live workflow、Pages/media deployment、自然两次调用或发布会独立全量 checklist 验收；真实 provider 成本、title-hint 采用和后续自然期次仍未满足 Close when，条目保持 `in_progress`。
+
 ## MNT-20260910-02 — 译名候选未持久积累且来源独立性不足
 
 - **Discovered:** 2026-09-10
@@ -582,6 +585,8 @@
 - **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.
 - **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
 
+- **2026-09-13 local optimization closeout:** 在功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 上加入同 edition bundle 的 identity/state/feedback 事务、显式 partial result、queue fairness 与 24 个文件的回归/演练覆盖；验收记录见 `docs/OPTIMIZATION_ACCEPTANCE.md`。本地完整检查通过后仍不改变本条 status：没有 live workflow/deploy、实际 scheduler 配置、provider cost 或自然运行证据，文档精简和字符边界不等于费用下降。
+
 ## MNT-20260912-02 — 历史降级稿正式修订被跳过且重新抓取丢失旧证据
 
 - **Priority / status:** P1 / resolved.
@@ -591,3 +596,14 @@
 
 - **Verified 2026-09-12:** [PR #126](https://github.com/fallw1nd/daily-game-brief/pull/126) merged as `1b7b350`; 389 tests, 33 archives, locale checks and build passed. Real isolated publication preserved all 7 original entry IDs, 6 calendar items, issue/window, latest.json and other archives; both languages passed validation.
 - **Production:** [Pinned evidence 34686744599](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686744599) restored original acknowledged blob `a7f9035`; [trusted publication 34686797086](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686797086) published `eddc154`; [Pages 34686853796](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686853796) and [media 34686854912](https://github.com/fallw1nd/daily-game-brief/actions/runs/34686854912) succeeded. Live Chinese/English NO.032 returned HTTP 200 with 7 formal entries and no fallback headlines; latest remains NO.033. Broader showcase coverage work remains separately open.
+
+## MNT-20260917-01 — bundle handoff/recovery hardening and overlong archive-title validation
+
+- **Priority / status:** P1 / in_progress.
+- **Evidence:** The Sep16 publication run [35051724442](https://github.com/fallw1nd/daily-game-brief/actions/runs/35051724442) validated the editorial submission but `npm run validate:data` rejected its 41-character `archiveTitle` (`日报｜《Wo Long 2: Wings of Ember》定档2027年3月4日`). Submission validation only checked the period prefix, leaving durable editorial state `valid` while publication remained pending; the observed deployment was `c971636` / run `35072647135`, so this is recorded as a state/publication split rather than a successful release.
+- **Bounded resolution in this candidate:** Reuse the shared 8–40 Unicode-character archive-title rule during editorial submission validation so the workflow records `editorial-invalid` before publication and leaves a targeted, repairable packet. Same-edition news continuation reuse now requires a confirmed same fact (shared fact digest plus event identity or exact copy), while independent facts omit `existingEntryId`. Bundle feedback carries the durable publication timestamp and decision identity, protecting later same-edition manual decisions and making replay idempotent.
+- **Recovery scope:** The trusted handoff writes a real `bundle-plan.json` beside packet batches and persists it with `automation/state`; Initial Canonical plus next-news plans are rechecked; absent/stale plans and later continuations use single inbox, without a claim of automatic plan regeneration. Queue order remains the fairness authority, showcase start/replay is covered, and the SLA watchdog scans due queues across editions with one bounded refresh/activation instead of filtering only the current day. Older editorial branches must use the existing single-inbox publisher path until the bundle workflow is present on both trusted `main` and the target editorial branch.
+- **Measured evidence:** `git ls-remote origin refs/heads/main` was `c9716360aa1d36beb97f531f9d1b82567ccec8b4` before this candidate's follow-up merge. On automation/state `4d92f091f4f081e5e0f0b0882b902bb736c266fe`, the real 2026-09-15 packet measured raw JSON 177,272 chars, compact JSON 128,376, `editorialInput.budget.usedInputChars=117,897` / `maxInputChars=120,000`, 17 packages and 94 tracking items; it is valid under the provider-input budget despite the larger transport envelope. Four older queues (Sep11/13/14/15) were read without mutation and contained 7/13/5/13 pending news event identities; no plan file was required for the read-only compatibility path.
+- **Close when:** Astra accepts the candidate, it is merged without altering the fixed-window/publication contract, Sep16 is repaired through the trusted publisher, and live Actions/Pages confirm no recurrence. Showcase full-source completeness, natural two-pass scheduling, provider cost, title-hint adoption and cross-platform calendar coverage remain separate open criteria; this entry does not claim those validations.
+
+- **2026-09-19 reviewed scope:** Synced production 69ba3b4; Sep16 formal repair acaf72d already exists. Initial Canonical + next news only; later continuations remain single inbox. The old four-slot/day simulation is not a release guarantee. Shared archive-title validation and build-failure acknowledgement passed npm run check (83 files / 419 tests / 40 bilingual archives); feedback conflict recovery preserved all six concurrent files. Full-source completeness and measured cost remain open; release evidence is recorded in docs/OPTIMIZATION_ACCEPTANCE.md and the PR.

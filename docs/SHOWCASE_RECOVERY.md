@@ -1,6 +1,6 @@
 # 发布会补齐
 
-仅当持久状态的 `revisionRequest` 为 open、reason 为 `showcase_completion`，且已确认 packet 标记 `continuation.scope:showcase`、`preservePublished:true`，才消费已发布期次的自动补齐任务。普通人工修订仍使用既有授权入口。
+仅当持久状态的 `revisionRequest` 为 open、reason 为 `showcase_completion`，且已确认 packet 标记 `continuation.scope:showcase`、`preservePublished:true`，才消费已发布期次的自动补齐任务。普通人工修订仍使用既有授权入口。新闻分包使用独立的 `editorial_continuation` reason、`continuation.scope:news` 和精确 event-key 白名单，不能借用本补齐授权。
 
 新一期的正常编辑与缺包唤醒优先；自动发布会补齐不参与“最旧未发布日报”的选择，避免旧期队列占用新一期的交接机会。两次现有调用共享这一顺序。
 
@@ -9,7 +9,7 @@
 - 已存在的同一事实填写 `existingEntryId`，但不能只凭游戏名或来源 URL 合并。不同事实新增简讯；地区独有平台、日期差异保留。
 - 保留已有正文、人工修订、期标题、头条和发售日历。补齐提交不携带日历变更；英文仅补新条目，已有英文由程序保留。
 - 未核验内容继续 needs_review。地区材料不全、清单有缺口或来源仅为 Highlights 时不宣称收录完整。
-- GitHub 在已有状态分支事务中串行激活后续包；推送冲突须读取最新状态重新计算。编辑任务不直接操作状态队列。
+- GitHub 在已有状态分支事务中串行激活后续包；没有已消费的 news 续接轮次时先激活 news，激活一个 news 后下一轮保留 showcase（没有待处理 showcase 才继续 news），每次事务仍最多激活一个包；推送冲突须读取最新状态重新计算。编辑任务不直接操作状态队列。
 - 2026-09-11 用户确认继续每天两次编辑调用。30/120/360 分钟是重试到期条件，由下一次既有运行消费，不承诺在该分钟立即完成。旧期补齐只更新目标归档及索引，不把首页回退到旧期。
 
 ## 实现验收状态（2026-09-11）

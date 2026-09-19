@@ -2,14 +2,22 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
-import { advanceShowcaseQueue } from "./lib/showcase-queue.mjs";
+import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
 import { showcaseRetryDue } from "./lib/showcase.mjs";
 import { mergeShowcaseReports, refreshedShowcaseBatches } from "./lib/showcase-refresh.mjs";
 
 const root = resolve(process.argv.find(arg => arg.startsWith("--state-root="))?.slice(13) || ".");
+const requestedEdition = process.argv.find(arg => arg.startsWith("--edition="))?.slice("--edition=".length) || "";
+const maxActivations = Number(process.argv.find(arg => arg.startsWith("--max-activations="))?.slice("--max-activations=".length) || 1);
+if (!Number.isInteger(maxActivations) || maxActivations < 1) throw new Error("max activations must be a positive integer");
 const manifest = JSON.parse(await readFile("public/data/manifest.json", "utf8"));
 let refreshed = false;
-for (const edition of manifest.editions) {
+let activations = 0;
+const editions = requestedEdition
+  ? manifest.editions.filter(edition => edition.id === requestedEdition)
+  : [...manifest.editions].sort((a, b) => (b.issueNumber || 0) - (a.issueNumber || 0) || b.id.localeCompare(a.id));
+for (const edition of editions) {
+  if (activations >= maxActivations) break;
   const canonical = JSON.parse(await readFile(resolve("public/data", edition.path), "utf8"));
   const queuePath = resolve(root, `automation/batches/${canonical.id}/queue.json`);
   let queue;
@@ -56,15 +64,16 @@ for (const edition of manifest.editions) {
       }
     }
   }
-  const packets = Object.fromEntries(await Promise.all(queue.batches.filter(batch => batch.scope === "showcase" && batch.status !== "completed").map(async batch => {
+  const packets = Object.fromEntries(await Promise.all(queue.batches.filter(batch => batch.status !== "completed").map(async batch => {
     if (!/^[\w-]+\.json$/.test(batch.name)) throw new Error("invalid batch filename");
     return [batch.name, await readFile(resolve(root, `automation/batches/${canonical.id}/${batch.name}`), "utf8")];
   })));
-  const result = advanceShowcaseQueue({ queue, state, canonical, packets });
+  const result = advanceEditorialQueue({ queue, state, canonical, packets });
   await writeFile(queuePath, JSON.stringify(result.queue, null, 2) + "\n");
   if (result.packet) {
+    activations += 1;
     await writeFile(resolve(root, `automation/packets/${canonical.id}.json`), result.packet);
     await writeFile(statePath, JSON.stringify(result.state, null, 2) + "\n");
   }
-  console.log(JSON.stringify({ editionId: canonical.id, remaining: result.queue.remainingAnnouncements, activated: Boolean(result.packet) }));
+  console.log(JSON.stringify({ editionId: canonical.id, remaining: result.queue.remainingAnnouncements, activated: Boolean(result.packet), batch: result.batch?.name || null, scope: result.batch?.scope || null }));
 }

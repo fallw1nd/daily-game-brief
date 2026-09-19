@@ -129,4 +129,32 @@ describe("persistent event ledger", () => {
     expect(closed.events["event-1"].decisionHistory).toHaveLength(1);
     expect(closed.events["event-1"].decisionHistory[0].decision).toBe("exclude");
   });
+
+  it("preserves a later same-edition manual decision when a bundle is replayed", () => {
+    const base = updateLedger({
+      generatedAt: "2026-08-26T02:00:00.000Z",
+      window: { id: "2026-08-26-am" },
+      candidates: [candidate],
+    });
+    const packet = { editorialInput: { packages: [{ eventKey: "event-1", sources: [] }] } };
+    const bundleDecision = {
+      editionId: "2026-08-26-am",
+      decisions: [{ eventKey: "event-1", decision: "exclude", reason: "bundle", sourceIndexes: [], additionalSources: [] }],
+    };
+    const bundled = applyEditorialFeedback(base, bundleDecision, packet, {
+      decidedAt: "2026-08-26T02:15:00.000Z",
+      decisionIdentity: "bundle-identity",
+    });
+    const manual = applyEditorialFeedback(bundled, {
+      ...bundleDecision,
+      decisions: [{ ...bundleDecision.decisions[0], decision: "include", reason: "manual" }],
+    }, packet, { decidedAt: "2026-08-26T02:30:00.000Z", decisionIdentity: "manual-identity" });
+    const replay = applyEditorialFeedback(manual, bundleDecision, packet, {
+      decidedAt: "2026-08-26T02:15:00.000Z",
+      decisionIdentity: "bundle-identity",
+    });
+    expect(replay).toEqual(manual);
+    expect(replay.events["event-1"].lastDecision).toBe("include");
+    expect(replay.events["event-1"].lastDecisionIdentity).toBe("manual-identity");
+  });
 });

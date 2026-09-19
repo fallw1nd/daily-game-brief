@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEdition } from "./lib/edition-publisher.mjs";
+import { projectionDigest } from "./lib/locale-digest.mjs";
 
 const editionId = "2026-08-31-daily";
 const manifest = {
@@ -72,6 +73,8 @@ function decision(eventKey, titleKey, titleEn, headline) {
 const currentLatest = {
   id: editionId,
   issueNumber: 21,
+  archiveTitle: "日报｜人工保留的期标题",
+  leadEntryId: `${editionId}-news-0`,
   entries: [
     {
       id: `${editionId}-news-0`,
@@ -179,6 +182,33 @@ describe("authorized same-edition revision overlay", () => {
     expect(result.edition.archiveTitle).toBe(latest.archiveTitle);
     expect(result.edition.leadEntryId).toBe(latest.leadEntryId);
     expect(result.edition.upcoming).toEqual(latest.upcoming);
+  });
+
+  it("rejects a news continuation existingEntryId when the same subject has a different fact", () => {
+    const scoped = structuredClone(packet);
+    scoped.continuation = { scope: "news", preservePublished: true };
+    scoped.editorialInput.packages = [scoped.editorialInput.packages[0]];
+    const latest = structuredClone(currentLatest);
+    const priorFrame = structuredClone(editorial.decisions[0].sharedFactFrame);
+    latest.entries[0].sharedFactFrameDigest = projectionDigest(priorFrame);
+    latest.entries[0].headline = editorial.decisions[0].headline;
+    latest.entries[0].summary = editorial.decisions[0].summary;
+    const changedDecision = {
+      ...editorial.decisions[0],
+      existingEntryId: latest.entries[0].id,
+      headline: "《Halloween: The Game》宣布移植版本",
+      summary: "发行方宣布了另一项移植事实。",
+      sharedFactFrame: priorFrame,
+    };
+    const draft = { ...editorial, leadEventKey: changedDecision.eventKey, decisions: [changedDecision] };
+    expect(() => buildEdition({ packet: scoped, editorial: draft, latest, manifest, allowSameEditionRevision: true }))
+      .toThrow("existingEntryId must identify the confirmed same fact");
+
+    const independent = { ...draft, decisions: [{ ...changedDecision, existingEntryId: undefined }] };
+    const result = buildEdition({ packet: scoped, editorial: independent, latest, manifest, allowSameEditionRevision: true });
+    expect(result.status).toBe("revised");
+    expect(result.edition.entries).toHaveLength(3);
+    expect(result.edition.entries.at(-1).id).not.toBe(latest.entries[0].id);
   });
 
   it("replaces matching titles in place, preserves omitted canonical stories/media, and appends new entries", () => {

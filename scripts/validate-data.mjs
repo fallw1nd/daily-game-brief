@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { windowForEditionId } from "./lib/edition-window.mjs";
 import { verifiedWindowTimeError } from "./lib/time-window.mjs";
 import { validateShowcaseData } from "./lib/showcase-data-validation.mjs";
+import { hasValidArchiveTitle } from "./lib/archive-title.mjs";
 
 const dataRoot = resolve("public/data");
 const errors = [];
@@ -65,18 +66,6 @@ function trackLocalMedia(asset, context) {
   if (/^media\/briefs\/\d{4}\/\d{2}\/[^/]+\/.+\.(avif|jpe?g|png|webp)$/i.test(asset?.url ?? "")) {
     mediaFiles.set(asset.url, context);
   }
-}
-
-function hasValidArchiveTitle(title, period) {
-  const prefixes = { am: "早报｜", pm: "晚报｜", daily: "日报｜" };
-  const prefix = prefixes[period];
-  return Boolean(
-    prefix &&
-    typeof title === "string" &&
-    title.trim().startsWith(prefix) &&
-    [...title.trim()].length >= 8 &&
-    [...title.trim()].length <= 40
-  );
 }
 
 async function readJson(path) {

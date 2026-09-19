@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
-import { buildEdition } from "./lib/edition-publisher.mjs";
+import { buildEdition, editorialDecisionDigest } from "./lib/edition-publisher.mjs";
 import { validateEditorialOutput } from "./lib/editorial-contract.mjs";
 import {
   buildEnglishOverlay,
@@ -25,6 +25,7 @@ const LOCALE_REPAIR_DRAFT_PATH = process.env.LOCALE_REPAIR_DRAFT_PATH
 const RESULT_PATH = resolve(process.env.PUBLICATION_RESULT_PATH || "artifacts/publication-result.json");
 const PUBLICATION_MODE = process.env.PUBLICATION_MODE || "publish";
 const SAME_EDITION_REVISION_REASON = "user_authorized_same_edition_revision";
+const EDITORIAL_CONTINUATION_REASON = "editorial_continuation";
 if (!new Set(["publish", "locale-repair"]).has(PUBLICATION_MODE)) {
   throw new Error(`Unsupported PUBLICATION_MODE: ${PUBLICATION_MODE}`);
 }
@@ -93,14 +94,24 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`,
     ]);
     const state = JSON.parse(stdout);
+    const packetEventKeys = new Set(packet?.editorialInput?.packages?.map(item => item.eventKey) || []);
+    const continuationKeys = new Set(state.revisionRequest?.eventKeys || []);
+    const newsContinuation = state.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON &&
+      packet?.continuation?.scope === "news" &&
+      packet?.continuation?.preservePublished === true &&
+      state.revisionRequest.batchScope === "news" &&
+      packetEventKeys.size > 0 &&
+      packetEventKeys.size === continuationKeys.size &&
+      [...packetEventKeys].every(key => continuationKeys.has(key)) &&
+      packet.editorialInput.packages.every(item => !item.showcaseRefs?.length);
+    const showcaseContinuation = state.revisionRequest?.reason === "showcase_completion" &&
+      packet?.continuation?.scope === "showcase" &&
+      packet?.continuation?.preservePublished === true &&
+      packet.editorialInput.packages.length > 0 &&
+      packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)));
     return state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
-      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || (
-        state.revisionRequest?.reason === "showcase_completion" &&
-        packet.continuation?.scope === "showcase" && packet.continuation?.preservePublished === true &&
-        packet.editorialInput.packages.length > 0 &&
-        packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)))
-      )) &&
+      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
@@ -193,8 +204,30 @@ if (PUBLICATION_MODE === "locale-repair") {
 }
 
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
-const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
+const continuationPacket = ["news", "showcase"].includes(packet.continuation?.scope);
+if (continuationPacket && !allowSameEditionRevision) {
+  throw new Error("editorial continuation requires a matching durable state authorization");
+}
+const noOpNewsContinuation = packet.continuation?.scope === "news" &&
+  packet.continuation?.preservePublished === true &&
+  !editorial.decisions.some(item => item.decision === "include");
+if (noOpNewsContinuation) {
+  const existingOverlay = await readOptionalJson(resolve("public/data", localeArchivePath(editorial.editionId)));
+  await writePublicationResult({
+    editionId: editorial.editionId,
+    status: "continuation-noop",
+    publicationMode: "publish",
+    decisionDigest: editorialDecisionDigest(editorial),
+    canonicalStatus: "unchanged",
+    localeStatus: existingOverlay ? "available" : "unavailable",
+    localeReasonCode: existingOverlay ? null : "retained-existing-state",
+    feedbackEligible: true,
+  });
+  console.log(`${editorial.editionId}: news continuation reviewed with no included facts; Canonical publication unchanged.`);
+  process.exit(0);
+}
+const now = process.env.BRIEF_NOW ? new Date(process.env.BRIEF_NOW) : new Date();
 let publisherLatest = latest;
 const historicalRevision = allowSameEditionRevision && editorial.editionId !== latest.id;
 if (historicalRevision) {

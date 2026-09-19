@@ -216,10 +216,12 @@ jobs:
             locale_status="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).localeStatus || 'unresolved'")"
             locale_reason="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).localeReasonCode || ''")"
             publication_status="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).status || 'unresolved'")"
+            decision_digest="$(node -p "JSON.parse(require('fs').readFileSync('artifacts/publication-result.json','utf8')).decisionDigest || ''")"
             echo "feedback_eligible=$feedback_eligible" >> "$GITHUB_OUTPUT"
             echo "locale_status=$locale_status" >> "$GITHUB_OUTPUT"
             echo "locale_reason=$locale_reason" >> "$GITHUB_OUTPUT"
             echo "publication_status=$publication_status" >> "$GITHUB_OUTPUT"
+            echo "decision_digest=$decision_digest" >> "$GITHUB_OUTPUT"
           }
 
           for attempt in 1 2 3; do
@@ -264,6 +266,9 @@ jobs:
           bash scripts/update-edition-state-branch.sh \
             "${{ steps.submission.outputs.edition }}" publication-committed \
             --main-sha="${{ steps.publication.outputs.commit }}" \
+            --packet-blob-sha="${{ steps.submission.outputs.packet_blob_sha }}" \
+            --submission-sha="${{ steps.submission.outputs.submission_sha }}" \
+            --decision-digest="${{ steps.publication.outputs.decision_digest }}" \
             --source=editorial
           bash scripts/update-edition-state-branch.sh \
             "${{ steps.submission.outputs.edition }}" locale-status \
@@ -280,12 +285,12 @@ jobs:
             --reason=locale-repaired
 
       - name: Record publication failure state
-        if: failure() && steps.validation.outcome == 'success' && steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'failure'
+        if: failure() && steps.validation.outcome == 'success' && steps.submission.outputs.mode == 'publish' && (steps.build.outcome == 'failure' || steps.publication.outcome == 'failure')
         shell: bash
         run: |
           bash scripts/update-edition-state-branch.sh \
             "${{ steps.submission.outputs.edition }}" publication-failed \
-            --error="trusted publisher failed after validation"
+            --error="trusted publisher failed after validation (build=${{ steps.build.outcome }}, publication=${{ steps.publication.outcome }}); inspect this run before retrying"
 
       - name: Record degraded English incident
         if: steps.publication.outputs.locale_status == 'unavailable'
@@ -355,7 +360,7 @@ jobs:
             git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
             git worktree add --detach "$state_dir" origin/automation/state
             EVENT_LEDGER_PATH="$state_dir/automation/ledger/events.json" node scripts/apply-editorial-feedback.mjs
-            node scripts/advance-showcase-queue.mjs --state-root="$state_dir"
+            node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --edition="${{ steps.submission.outputs.edition }}" --max-activations=1
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
             git -C "$state_dir" add automation/ledger/events.json

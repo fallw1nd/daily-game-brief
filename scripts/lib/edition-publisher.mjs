@@ -1,4 +1,5 @@
 import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
+import { hasValidArchiveTitle } from "./archive-title.mjs";
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
@@ -151,6 +152,18 @@ function entryMedia(previous, imageSeed, nextRecord) {
   };
 }
 
+function normalizeFactText(value) {
+  return String(value || "").normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function confirmedSameFact(entry, decision) {
+  const digest = decision?.sharedFactFrame ? projectionDigest(decision.sharedFactFrame) : null;
+  if (!digest || !entry?.sharedFactFrameDigest || entry.sharedFactFrameDigest !== digest) return false;
+  if (entry.eventKey) return entry.eventKey === decision.eventKey;
+  return normalizeFactText(entry.headline) === normalizeFactText(decision.headline)
+    && normalizeFactText(entry.summary) === normalizeFactText(decision.summary);
+}
+
 function sectionCounters(entries, windowId) {
   const counters = new Map();
   for (const entry of entries || []) {
@@ -178,6 +191,9 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     latest.id === window.id &&
     latest.issueNumber === existingManifestItem.issueNumber
   );
+  if (authorizedLatestRevision && latest.sourceReport?.editorialDecisionDigest === decisionDigest) {
+    return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
+  }
   if (existingManifestItem && !degradedEdition && !authorizedLatestRevision) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
@@ -186,6 +202,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
   const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
+  const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
   const previousIds = new Set(previousEntries.map((entry) => entry.id));
   const counters = sectionCounters(previousEntries, window.id);
   const entryByEvent = new Map();
@@ -211,10 +228,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const previous = authorizedLatestRevision
       ? packetItem?.showcaseRefs?.length
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
-        : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
+        : isNewsContinuation
+          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key && confirmedSameFact(entry, decision)) : null
+          : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
       : null;
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
-      throw new Error(`included ${decision.eventKey}: existingEntryId must identify the confirmed subject in this edition`);
+      const identity = isNewsContinuation ? "confirmed same fact" : "confirmed subject";
+      throw new Error(`included ${decision.eventKey}: existingEntryId must identify the ${identity} in this edition; omit it to create an independent entry`);
     }
     const index = counters.get(decision.section) || 0;
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;
@@ -253,6 +273,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     if (prior) {
       // Several regional records can point to the same already published fact.
       // Only append evidence associations here; ordinary duplicate edits still fail.
+      if (isNewsContinuation) throw new Error("multiple news continuation decisions target the same entry; merge the fact into one decision");
       if (packet.continuation?.preservePublished !== true || !previousIds.has(entry.id)) throw new Error("multiple decisions overwrite the same entry; merge announcement evidence into one decision");
       revisedById.set(entry.id, { ...prior, showcaseRefs: mergeShowcaseRefs([...(prior.showcaseRefs || []), ...(entry.showcaseRefs || [])]) });
     } else revisedById.set(entry.id, entry);
@@ -289,6 +310,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
     ? latest.archiveTitle
     : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
+  if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error("normalized archiveTitle must contain 8–40 characters with the matching period prefix");
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")

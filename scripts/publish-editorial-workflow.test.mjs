@@ -5,11 +5,18 @@ const workflow = await readFile(".github/workflows/publish-editorial-decision.ym
 const stateUpdateScript = await readFile("scripts/update-edition-state-branch.sh", "utf8");
 
 describe("trusted bilingual publication workflow", () => {
+  it("records build failures after valid editorial submission for recovery", () => {
+    const step = workflow.split("- name: Record publication failure state")[1].split("- name:")[0];
+    expect(step).toContain("steps.build.outcome == 'failure' || steps.publication.outcome == 'failure'");
+    expect(step).toContain("publication-failed");
+  });
   it("keeps one trusted publisher and exposes publish plus locale-repair modes", () => {
     expect(workflow).toContain("publication_mode:");
     expect(workflow).toContain("- publish");
     expect(workflow).toContain("- locale-repair");
     expect(workflow).toContain('PUBLICATION_MODE: ${{ steps.submission.outputs.mode }}');
+    expect(workflow).toContain("decision_digest=");
+    expect(workflow).toContain('--decision-digest="${{ steps.publication.outputs.decision_digest }}"');
     expect(workflow).not.toContain("english-publisher");
   });
 
