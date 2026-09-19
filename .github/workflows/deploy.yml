@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      edition_id:
+        description: Optional exact edition whose deployment state should be acknowledged
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -83,12 +88,12 @@ jobs:
         uses: actions/deploy-pages@v5
 
       - name: Acknowledge deployment outcome
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.edition_id != ''
         shell: bash
         run: |
-          edition="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('public/data/latest.json','utf8')); process.stdout.write(data.editionId || data.id || '')")"
-          if [ -z "$edition" ]; then
-            echo "Unable to resolve deployed edition from public/data/latest.json"
+          edition="${{ inputs.edition_id }}"
+          if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily)$ ]]; then
+            echo "Invalid deployment acknowledgement edition: $edition"
             exit 1
           fi
           if [ "${{ steps.deployment.outcome }}" = "success" ]; then
