@@ -1,0 +1,1198 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-20T02:24:11.046Z",
+  "finalizedAt": "2026-09-20T02:24:11.046Z",
+  "coverageThrough": "2026-09-20 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-20-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-20 12:00",
+      "windowStart": "2026-09-19 10:10",
+      "windowEnd": "2026-09-20 10:10"
+    },
+    "adjacentEdition": "2026-09-19-daily",
+    "packages": [
+      {
+        "eventKey": "6f05d8b5676a4a4651bc",
+        "eventKind": "announcement",
+        "subjectKey": "コロプラのイベントは9月21日から9月20日に前倒しで実施 4gamerブースの最新スケジュールを",
+        "subject": {
+          "kind": "game",
+          "key": "コロプラのイベントは9月21日から9月20日に前倒しで実施 4gamerブースの最新スケジュールを"
+        },
+        "publishability": "direct",
+        "headline": "コロプラのイベントは9月21日から9月20日に前倒しで実施。4Gamerブースの最新スケジュールを発表［TGS2026］",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/991/G999110/20260919068/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/991/G999110/20260919068/",
+            "imageUrl": "https://www.4gamer.net/games/991/G999110/20260919068/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本日（2026年9月19日），CESAから発表があったとおり，台風25号の接近に伴い，東京ゲームショウ2026の最終日にあたる9月21日の開催中止が決定した。本決定により，4Gamerブースで同日に…\nコロプラのイベントは9月21日から9月20日に前倒しで実施。4Gamerブースの最新スケジュールを発表［TGS2026］\n東京ゲームショウ2026，台風25号の接近に伴い，最終日9月21日の開催中止を発表\nコンピュータエンターテインメント協会（CESA）は，現在開催中の東京ゲームショウ2026の最終日となる 9月21日の開催中止を発表 した。台風25号の接近に伴い，最新の気象情報，交通機関への影響，会場の安全確保を踏まえ，協議した結果の判断とのことだ。\n「クイズアクションRPG ウィズジェネレーション」の最新情報を実機プレイで紹介。開発プロデューサーがTGS 2026の4Gamerブースに登壇\n4Gamerは，東京ゲームショウ2026（以下，TGS 2026）の4Gamerブースにて，コロプラの新作スマートフォン向けタイトル 「クイズアクションRPG ウィズジェネレーション」 の ステージイベントを，2026年9月21日13：45〜14：15に開催 する。"
+          }
+        ]
+      },
+      {
+        "eventKey": "0c593dab82ce1e924799",
+        "eventKind": "announcement",
+        "subjectKey": "東京ゲームショウ2026 台風25号の接近に伴い 最終日9月21日の開催中止を",
+        "subject": {
+          "kind": "game",
+          "key": "東京ゲームショウ2026 台風25号の接近に伴い 最終日9月21日の開催中止を"
+        },
+        "publishability": "direct",
+        "headline": "東京ゲームショウ2026，台風25号の接近に伴い，最終日9月21日の開催中止を発表",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/991/G999110/20260919042/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/991/G999110/20260919042/",
+            "imageUrl": "https://www.4gamer.net/games/991/G999110/20260919042/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "コンピュータエンターテインメント協会（CESA）は，現在開催中の東京ゲームショウ2026の最終日となる9月21日の開催中止を発表した。台風25号の接近に伴い，最新の気象情報，交通機関への影響，会場の…\n東京ゲームショウ2026，台風25号の接近に伴い，最終日9月21日の開催中止を発表\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\n［プレイレポ］「CONTROL Resonant」の舞台はマンハッタンへ。物語のスケールもバトルアクションも前作から大きく変貌を遂げた超常世界を堪能しよう"
+          }
+        ]
+      },
+      {
+        "eventKey": "3c95a4e1801bbf4e3a9f",
+        "eventKind": "launch",
+        "subjectKey": "procedure zero",
+        "subject": {
+          "kind": "game",
+          "key": "procedure zero"
+        },
+        "publishability": "direct",
+        "headline": "記録上存在しない囚人として，施設が隠す秘密を探れ。ステルスホラー「PROCEDURE ZERO」，デモ版を配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/038/G103815/20260919066/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/038/G103815/20260919066/",
+            "imageUrl": "https://www.4gamer.net/games/038/G103815/20260919066/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "DELANIVO GAMESは2026年9月15日，開発中の新作タイトル「PROCEDURE ZERO」のデモ版を配信開始した。本作は，一人称視点のステルスアクションとサイコロジカルホラーを融合させ…\n記録上存在しない囚人として，施設が隠す秘密を探れ。ステルスホラー「PROCEDURE ZERO」，デモ版を配信開始\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」\n男色ディーノのゲイムヒヒョー ゼロ：第907回「次の新作が心配になるくらい好き」\n［プレイレポ］「CONTROL Resonant」の舞台はマンハッタンへ。物語のスケールもバトルアクションも前作から大きく変貌を遂げた超常世界を堪能しよう"
+          }
+        ]
+      },
+      {
+        "eventKey": "b4d8137b60dc194196b5",
+        "eventKind": "announcement",
+        "subjectKey": "バットマン",
+        "subject": {
+          "kind": "game",
+          "key": "バットマン"
+        },
+        "publishability": "direct",
+        "headline": "「バットマン」と「仮面ライダーゼロワン」のコラボレーションプロジェクトが発表！両者が共演するオリジナルコミックや、バンダイによる商品展開も決定",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/2609194a",
+            "publishedAt": "2026-09-19T11:11:32+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/2609194a",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/HSkj5LrbwAA4Rta-675x1024.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "両者が登場するオリジナルコミックの制作や、バンダイによる商品展開も決定。プロジェクトの詳細については今後順次発表される\n「バットマン」と「仮面ライダーゼロワン」のコラボレーションプロジェクトが発表！両者が共演するオリジナルコミックや、バンダイによる商品展開も決定\nDC公式は9月19日、毎年9月の第3土曜日に祝われる「バットマンの日」を記念して、 「バットマン」 と 「仮面ライダーゼロワン」 のコラボレーションプロジェクトを発表した。\n伝説は、ここから始まる― ◥◣◥◣ ◢◤◢◤⁰ バットマン⁰ ×⁰ 仮面ライダーゼロワン⁰◢◤◢◤ ◥◣◥◣ バットマンの日を記念して、⁰日米を代表するヒーローによる⁰コラボレーションプロジェクトを発表‼ 両ヒーローが共演する… pic.twitter.com/exPgF7VMFs\nプロジェクトでは両ヒーローが共演するオリジナルコミックの制作をはじめ、バンダイによる商品展開も決定している。プロジェクトの詳細については今後順次発表されるとのこと。\nXの引用 では「社長ヒーローつながりか！」「予想外のコラボすぎる」「キービジュアルがめっちゃかっこいい」など、本コラボプロジェクトへの期待や喜びの声が多く寄せられている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "0cd42d7eba844ce00a8d",
+        "eventKind": "announcement",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "「三國志」シリーズ、プレイヤーが一番好きな武将は「趙雲」。「あなたのNo.1 三國志」総選挙の結果が発表され、No.1武将・タイトル・ゲーム内要素が選出",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/2609193m",
+            "publishedAt": "2026-09-19T07:39:09+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/2609193m",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/6f8e0c43cc1117ee8e0e36a814b342a0-1024x576.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "日本・アジア別の投票で趙雲は1位の人気を両取り。2位「張遼」、3位「諸葛亮」。No.1作品は『三國志14』、君主プレイは武将プレイより人気という結果に\n「三國志」シリーズ、プレイヤーが一番好きな武将は「趙雲」。「あなたのNo.1 三國志」総選挙の結果が発表され、No.1武将・タイトル・ゲーム内要素が選出\n9月19日、東京ゲームショウ2026にて実施された 「三國志」シリーズ40周年スペシャルステージ にて、 「あなたのNo.1 三國志」 投票企画の結果が発表された。\nシリーズタイトル、ゲーム内要素、武将といった事項に対し、投票で人気ランキングを決めようというものだ。投票は日本とアジア別で実施された。\n“「三國志」シリーズで好きな武将は？”という設問に対して、日本・アジアともに1位が趙雲という結果に。以降、日本では2位・張遼、3位・諸葛亮。アジアでは2位・諸葛亮、3位・関羽という結果となった。\n好きなシリーズ作品は日本では『三國志14』、アジアでは『三國志11』が1位に。好きな要素は日本・アジアともに「君主プレイ」が1位で、「武将プレイ」を上回ることとなった。\n「三國志」シリーズは、1985年12月に第1作がPC向けに発売された歴史シミュレーションゲーム。2025年12月に40周年を迎えており、コーエーテクモゲームスは記念特設サイトの開設や記念ムービーの公開を行ってきた。\nシリーズ最新作は、2026年1月29日に発売された『三國志8 REMAKE with パワーアップキット』。2024年10月発売の『三國志8 REMAKE』にさまざまな要素を追加したパワーアップキット版で、40周年記念作品として位置づけられている。武将の成長がプレイごとに変化する「宝珠」、勢力の膠着状態を動かす「転機」、仮想シナリオの追加などが盛り込まれた。対応プラットフォームはPS5、PS4、Nintendo Switch、PC（Steam）だ。\n関連記事 シブサワ・コウ氏、「『三國志15』は必ず作ります」と意気込み語る。TGS2026の「三國志」シリーズ40周年ステージにて"
+          }
+        ]
+      },
+      {
+        "eventKey": "227f4df9373d4b89afbf",
+        "eventKind": "other",
+        "subjectKey": "東京ゲームショウ2026",
+        "subject": {
+          "kind": "game",
+          "key": "東京ゲームショウ2026"
+        },
+        "publishability": "direct",
+        "headline": "「東京ゲームショウ2026」9月20日のスケジュール変更・大手出展社の動向まとめ【随時更新】",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/2609193x",
+            "publishedAt": "2026-09-19T10:39:44+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/2609193x",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/13057-151-8514f8908158bb4feb4181b5b62f7177-2667x1500-2.webp",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "記事執筆時点でコーエーテクモゲームスやZETA DIVISIONが20日のスケジュール変更を発表。そのほか、多くの出展社が中止のアナウンスを行っている\n「東京ゲームショウ2026」9月20日のスケジュール変更・大手出展社の動向まとめ【随時更新】\n9月19日、 「東京ゲームショウ2026」 の最終日として予定されていた「9月21日」が、台風25号の影響により開催中止となることが発表された。\n台風25号の接近に伴い、「東京ゲームショウ2026」9月21日（月・祝）の開催中止が発表されました。 これに伴い、プレイステーション®ブースで予定していた9月21日（月・祝）の試遊や配信イベントなども中止いたします。… https://t.co/pjKas9qNRu pic.twitter.com/FCJpzgVrok\n9月21日（月・祝）の「東京ゲームショウ2026」最終日は、台風25号の接近に伴い開催中止が決定いたしました。これに伴い、セガ／アトラスブースにて予定しておりました21日の各種イベントおよびステージも中止となります。⁰なお、『STRANGER THAN… https://t.co/sbTSILrvnM\n9月21日（月・祝）の「東京ゲームショウ2026」最終日は、台風25号の接近に伴い開催中止が決定いたしました。 詳細は「東京ゲームショウ2026」公式サイトにてご確認ください。 https://t.co/gmvT7k20Pu\n【「東京ゲームショウ2026」 9月21日（月・祝）出展中止のお知らせ】 平素よりバンダイナムコエンターテインメントのタイトルをご愛顧いただき、誠にありがとうございます。 この度、台風25号の影響により、 主催者より2026年9月21日（月・祝）の東京ゲームショウ2026の開催中止が発表されました。… https://t.co/jfIJQFj0wa\n【「東京ゲームショウ2026」9月21日（月・祝）出展中止のお知らせ】… https://t.co/7h1HqjNtGj\n台風25号の日本列島への接近に伴う「東京ゲームショウ2026」の開催について、東京ゲームショウ事務局より、下記の通り発表がございましたのでお知らせいたします。 9月20日（日）予定通り開催 9月21日（月・祝）開催中止…\nそれにあわせて、各出展社が9月21日の出展内容の中止やスケジュール変更をアナウンスしている。本稿では前日の 「9月20日」 に影響を与えるスケジュール変更や、大手出展社の出展について発表されている情報をまとめ、随時更新していく。\n■変更 9/20 10:30〜11:15 『真・三國無双２ with 猛将伝 Remastered』ステージ ※「9/21 11:40〜12:25」の予定から変更\n■中止 『カリアのアトリエ ～夜の王国と追憶の道標～』ステージ 『進撃の巨人３』ステージ"
+          }
+        ]
+      },
+      {
+        "eventKey": "277ef1f345e503a2fa92",
+        "eventKind": "company",
+        "subjectKey": "japanese devs aren t facing the same",
+        "subject": {
+          "kind": "entity",
+          "key": "japanese devs aren t facing the same"
+        },
+        "publishability": "direct",
+        "headline": "Japanese devs aren't facing the same layoff crisis because their executives are paid an order of magnitude less, 'they didn’t get swept up in the live-service trend,' and their teams are smaller, says industry expert",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/gaming-industry/japanese-devs-arent-facing-the-same-layoff-crisis-because-their-executives-are-paid-an-order-of-magnitude-less-they-didnt-get-swept-up-in-the-live-service-trend-and-their-teams-are-smaller-says-industry-expert/",
+            "publishedAt": "2026-09-19T18:13:42Z",
+            "canonicalUrl": "https://www.pcgamer.com/gaming-industry/japanese-devs-arent-facing-the-same-layoff-crisis-because-their-executives-are-paid-an-order-of-magnitude-less-they-didnt-get-swept-up-in-the-live-service-trend-and-their-teams-are-smaller-says-industry-expert/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/P7BwmjdsUjLLhs6hvztbka-1280-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "It's hard to argue against those takeaways.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nFrom the creators of Edge: A free weekly videogame industry newsletter, featuring in-depth news, expert analysis and exclusive interviews\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-20T10:23:35+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "df3eb6fe31735685de78",
+        "eventKind": "other",
+        "subjectKey": "モンスターハンターワイルズ アセンダンス",
+        "subject": {
+          "kind": "game",
+          "key": "モンスターハンターワイルズ アセンダンス"
+        },
+        "publishability": "direct",
+        "headline": "『モンスターハンターワイルズ：アセンダンス』にてフルフルしれっとお披露目で大盛り上がり。“超伸び伸び首だけ乱入”のサプライズ登場",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260919-468830/",
+            "publishedAt": "2026-09-19T05:17:49+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260919-468830/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260919-468830-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "最も会場が盛り上がったのは新要素ではなく、愛されるモンスター「フルフル」の登場であった。\n『モンスターハンターワイルズ：アセンダンス』にてフルフルしれっとお披露目で大盛り上がり。“超伸び伸び首だけ乱入”のサプライズ登場\nカプコンは「東京ゲームショウ 2026」に出展中だ。公式YouTubeチャンネルでは、ステージライブが配信されている。『モンスターハンターワイルズ：アセンダンス』（以下、アセンダンス）ステージでは、本作のディレクターを務める平岡拓朗氏が操作。新モンスターアラケータの狩猟がお披露目されたが、会場が盛り上がったのはそちらよりも愛されるモンスター「フルフル」の登場であった。\n『アセンダンス』は超大型拡張コンテンツと銘打たれており、本編から続くさらなるストーリーが描かれるという。上空に浮かぶ大地が新たな舞台となり、新フィールドも追加。より歯ごたえのある新たなクエストランクとして「マスターランク」が実装され、新しいモンスターのほか、存在だけで天災級の影響を与える古龍が襲い来るそうだ。クシャルダオラとラオシャンロン、そして雷雲を操る新たな古龍グンドラージャなどが登場することが明かされている。\nフルフルは、『モンスターハンター』シリーズに登場する飛竜種のモンスターである。寒くて暗い環境を好むため、寒冷地の洞窟にて目にすることが多い。また暗い所で生活したためか、全体が白く、目が退化して大きな口だけがある顔も大きな特徴だ。体内には発電器官をもっており、攻撃の際には口などから電気を放つ。前作『モンスターハンターライズ』には登場していたものの、これまで『モンスターハンターワイルズ』には登場してこなかった。\n『 モンスターハンターワイルズ 』はPC（ Steam ）/ PS5 / XBOX Series X|S 向けに発売中。Nintendo Switch 2版が12月4日に発売される。そして大型DLC『アセンダンス』は2027年に発売予定だ。\n『モンスターハンターワイルズ：アセンダンス』では&ldquo;『ワイルズ』の反省点&rdquo;を徹底的に見直し、「もっと面白くなるところ」を伸ばす。全武器種ぶんブーストブレイサー実装の苦労など、開発陣に訊いた\n『モンスターハンターワイルズ：アセンダンス』にてフルフルしれっとお披露目で大盛り上がり。&ldquo;超伸び伸び首だけ乱入&rdquo;のサプライズ登場\nそんな本作では新要素「ブーストブレイサー」が導入。ブーストブレイサーを起動することで「ブースト状態」となり、一定時間ハンターのアクション性能が強化されたり新たな派生が使用可能になる。ブースト状態には、強力な攻撃を放つ新アクション「ブースト発動アクション」を放つことなどで移行できるという。全14種の武器種の紹介動画も公開されてきた（ 関連記事 ）。"
+          }
+        ]
+      },
+      {
+        "eventKey": "61d0a09fed56783c2107",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "『鳴潮』大型アプデ「Ver3.7」は9月30日配信へ。ついに“物語振り返り機能”実装、写真撮影も強化され、新天地での物語は最終章を迎える",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260919-468890/",
+            "publishedAt": "2026-09-19T13:53:12+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260919-468890/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260919-468890-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "KURO GAMESは9月19日、『鳴潮』の大型アップデートVer3.7「鏡に鎖す妄世、心で照らす紅塵」を9月30日に配信することを発表した。\n『鳴潮』大型アプデ「Ver3.7」は9月30日配信へ。ついに“物語振り返り機能”実装、写真撮影も強化され、新天地での物語は最終章を迎える\nKURO GAMESは9月19日、『 鳴潮 』の大型アップデートVer3.7「鏡に鎖す妄世、心で照らす紅塵」を9月30日に配信することを発表した。本日20時より放送された「『鳴潮』Ver3.7予告特別通信」では、大型アップデートの内容を紹介。本アップデートではメインストーリーの続きが描かれるほか、イベントの実施や\n大型アップデートVer3.7は「玄方最終章」として、「潮汐任務」の第4章第4幕が配信。新たな新エリア「夢枢天羅」を旅の舞台に、漂泊者がこれまで謎に包まれていた玄方地界の歳主の心月狐へといよいよ近づいていく。諦天鑑と呼ばれる組織の夢州エリア責任者である鎖暝も現れる中、漂泊者は鎖暝と共に心月狐を見つけるために玄方城の制御中枢である神居へと足を踏み入れる。\nVer3.7の新エリア「夢枢天羅」は神居の内部であり、心月狐が制御する空間だ。そこには夢州の自然環境が集約されており、壮観な景色と共に街並みも存在する空間となっているようだ。さらに、夢枢天羅の深層エリアである「心域」では、炎のように熱いエリアや凍えるほどに寒いエリアなども待ち受けているという。不安定な状態にある心域は新たなコンテンツ「心の井戸」で探索するエリアとなるようで、さまざまなギミックを解決することで徐々に安定していく。安定することで報酬がもらえるほか、夢枢天羅でのバトルが楽になるシステムが用意されているそうだ。\nさらに、Ver3.7では新たな任務「奇譚任務」が追加される。奇譚任務ではストーリー全体に演出が追加されて、フルボイスで描かれるコンテンツとなるという。Ver3.7で追加される「璇心、月の如く世の情を寄す」では、漂泊者は遥か過去へと戻り、璇情という少女と出会う。そして、漂泊者は彼女の頼みに応じて「感情の匣」の修理を手助けすることになるという。\nそして、Ver3.7ではふたりの新たな共鳴者が実装される。ひとりは歳主である「心」だ。彼女は共鳴スキルを使用することでキツネの姿に変化するほか、共鳴解放を使用することで歳主の姿へと変化。歳主の姿になると玄方の建築物を顕現させる、歳主らしい力を駆使した攻撃を操るキャラクターとなっている。\nさらに、アップデートのたびにおこなわれているシステム改善がVer3.7でも実施される。まずは、潮汐任務の振り返り機能「軌跡の回顧」だ。次回のアップデートの時点で、Ver1.1からVer1.3までの範囲の振り返りが可能で、あのシーンをもう一度見たいという人や最初の方のストーリーの詳細を忘れてしまったという人にとって待望の機能だ。なお、後のストーリーに関しても順次追加予定であるそうだ。また、Ver1.2の「月追祭」のようなコンテンツも本機能で体験できるそうで、隠しアチーブメントの取得も可能だという。最近『鳴潮』を始めたばかりという人にも嬉しい機能だろう。\n『鳴潮』は基本プレイ無料のオープンワールドアクションRPGだ。開発を手がけるのはKURO GAMES。本作にてプレイヤーは長い眠りから目覚めた「漂泊者」となって、世界各地を旅しながら仲間たちと「悲鳴」と呼ばれる災いを乗り越えていく。ゲームプレイでは、回避やパリィを用いたテンポの速い戦闘が繰り広げられる。本作は2024年5月にiOS/Android/PC（Epic Gamesストア）向けにリリースされ、現在はPS5/XBOX Series X|S/PC（Steam/Mac App Store）でも配信中だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7e909b8a4b13dff2fea0",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "As Fans Flood the World of Warcraft: Forever Beta, Dev Says It's Putting Up 'The Craziest Numbers I've Seen in 17 Years Working at Blizzard'",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/as-fans-flood-the-world-of-warcraft-forever-beta-dev-says-its-putting-up-the-craziest-numbers-ive-seen-in-17-years-working-at-blizzard",
+            "publishedAt": "2026-09-19T08:19:37.018Z",
+            "canonicalUrl": "https://www.ign.com/articles/as-fans-flood-the-world-of-warcraft-forever-beta-dev-says-its-putting-up-the-craziest-numbers-ive-seen-in-17-years-working-at-blizzard",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/19/forever-1789805930640.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "World of Warcraft: Forever looks like it could be a smash hit after the launch of the beta was overrun with eager fans, surprising even Blizzard itself.\nAs Fans Flood the World of Warcraft: Forever Beta, Dev Says It&#x27;s Putting Up &#x27;The Craziest Numbers I&#x27;ve Seen in 17 Years Working at Blizzard&#x27;\nBlizzard’s ended last weekend’s BlizzCon 2026 Opening Ceremony with the announcement of World of Warcraft: Forever , a “Classic Plus” MMO developed by the World of Warcraft Classic team, and set during the first year of World of Warcraft.\nWhile Forever doesn’t launch until November 4, the beta was made available this week, and it was flooded by players. Those who did manage to get in faced disconnects. And then actually playing the game was tough due to extreme lag with looting and accepting quests. Hardly ideal.\nWorld of Warcraft Classic developer Josh Greenfield took to X / Twitter to provide some insight into the popularity of the beta.\n“Man, it was hard to sleep last night, I was so excited,” Greenfield said. “Beta has been... crazy. The craziest numbers I&#x27;ve seen in 17 years working at Blizzard and almost eight years on classic.\nThat suggests significant interest in Forever, beyond even the launch of Classic itself. As a grizzled veteran of World of Warcraft’s early years, I remember well the brutal login queues most players would face when the groundbreaking MMO launched late 2004 and early 2005. Forever is rekindling those memories for me.\nSo, what’s going on with those queues? World of Warcraft senior game producer Tom Ellis took to X / Twitter to offer an explanation that acts as a fascinating insight into what goes on with the launch of an MMO. The upshot is this is a beta, and usually World of Warcraft betas don’t see this sort of interest."
+          }
+        ]
+      },
+      {
+        "eventKey": "33fd3dbbd241e1b3beb4",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Insomniac Says Marvel's Wolverine Uses No Generative AI After Fans Spot Strange Signs in-Game",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/insomniac-says-marvels-wolverine-uses-no-generative-ai-after-fans-spot-strange-signs-in-game",
+            "publishedAt": "2026-09-19T17:02:08.690Z",
+            "canonicalUrl": "https://www.ign.com/articles/insomniac-says-marvels-wolverine-uses-no-generative-ai-after-fans-spot-strange-signs-in-game",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/08/wolverinethumb-1788880705929.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Insomniac Games has stepped in to confirm Marvel&#x27;s Wolverine contains no generative AI after a few bizarre in-game signs raised eyebrows on social media.\nInsomniac Says Marvel&#x27;s Wolverine Uses No Generative AI After Fans Spot Strange Signs in-Game\nAt least as it&#x27;s presented here, the bathroom signs certainly seem odd. With fear surrounding AI at an all-time high , fans latched onto the clip, concerned that Insomniac had used the controversial technology to help build Marvel&#x27;s Wolverine.\nThe glitchy bathroom signs then, of course, found their way over to X/Twitter, where user Rock Solid shared images from the video. Fans again swarmed out of fear, but Insomniac has since said its Wolverine game doesn&#x27;t feature a drop of genAI.\nThe developer&#x27;s director of community and marketing, James Stevenson, replied to the X post in question to clear the air. He said \"a UV map bug\" is behind the strange bathroom signs, promising that Insomniac is currently working on a fix that should address any similar instances of glitchy visuals. For those who still had question marks above their heads, Stevenson was more direct: \"There are no AI-generated assets in Marvel&#x27;s Wolverine.\"\nNo. This is a UV map bug and we have a fix coming. There are no AI generated assets in Marvel’s Wolverine.\nWhen Insomniac will deploy the fix remains unclear, but those worried the bathroom image may be a sign the developer used genAI for its new PS5 game can at least rest easy. It&#x27;s the conclusion to yet another speed bump for the Wolverine game just days following its September 15 launch.\nThe first and, perhaps, most visible controversy arrived in the form of Logan&#x27;s Scent Trails, which fans online had not-so-lovingly dubbed \"fart gas.\" Thankfully, a small fix for that arrived just yesterday, with Insomniac promising to investigate a toggle option for the tracking feature as post-launch work continues. While one issue is stamped out, others are still finding reasons to be upset with the game&#x27;s linear story .\nThe hubbub surrounding the new PlayStation 5 exclusive&#x27;s latest controversial moment kicked off when TikToker SmoothMango shared a video of their findings online (via Kotaku ). Their minute-long clip focused on not one but two different bathroom signs that featured melted-together figures that look not unlike the kind of AI-generated assets audiences have attempted to train themselves to watch for .\n\"Folks, that looks AI-generated,\" SmoothMango said. \"I am trying to think of a way to describe this that is not AI generation because there&#x27;s no way it&#x27;s a bathroom for mutants. That looks supremely suss.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "09ed480596e21e7af283",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Marvel's Wolverine Developer Nerfs Scent Trails and Audio Sense Indicators After 'Fart Gas' Backlash",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/marvels-wolverine-developer-nerfs-scent-trails-and-audio-sense-indicators-after-fart-gas-backlash",
+            "publishedAt": "2026-09-19T07:23:42.499Z",
+            "canonicalUrl": "https://www.ign.com/articles/marvels-wolverine-developer-nerfs-scent-trails-and-audio-sense-indicators-after-fart-gas-backlash",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/06/02/wolverine-main-1780437427510.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Insomniac has released an update for Marvel’s Wolverine that nerfs the “fart gas” that had become such a talking point even before the game’s release.\nMarvel&#x27;s Wolverine Developer Nerfs Scent Trails and Audio Sense Indicators After &#x27;Fart Gas&#x27; Backlash\nThe debate around this was rekindled following the publication of Marvel’s Wolverine reviews earlier this month, with The Washington Post journalist Gene Park calling the scent trail “fart gas” because of the way it appears behind characters Logan follows.\nJean Grey’s fart gas trail is NOT part of the navigation assist option. i turned it on and there’s another green line that tells you where to go. mission waypoint (yellow marker) is on as well and THAT can be turned off. 2nd pic i turn off the options and the gas stays. it seems… https://t.co/XSBsGa6Xj0 pic.twitter.com/cKs9uTPSG0\nThere was some confusion online about the ability to turn this feature off via accessibility options. Insomniac’s official list of accessibility options for Wolverine includes a “Chase Assist,” which lets you toggle reduced movement speed for targets during chase sequences, but it does not turn off the trail. Other navigation toggles do not turn off the scent trail either.\nAhead of Wolverine’s release, Insomniac’s director of community and marketing, James Stevenson, took to social media to explain that Logan&#x27;s scent trail is baked into the way the mutant&#x27;s powers work.\n“The scent trail isn’t always on,” he clarified. “It represents Logan’s canon mutant super senses and elite tracking ability. It only is there when he’s tracking a specific scent / sound (a person, whisky, or another clue scent) - story/mission moments or when he catches whiff of a collectible.”\nReferencing previous discourse about Final Fantasy’s yellow paint guides , some have said Logan&#x27;s scent trails remove any potential skill required for chase sequences and any joy of discovery in exploration."
+          }
+        ]
+      },
+      {
+        "eventKey": "edc31b019d84bd27af5a",
+        "eventKind": "other",
+        "subjectKey": "the-blood-of-dawnwalker",
+        "subject": {
+          "kind": "game",
+          "key": "the-blood-of-dawnwalker"
+        },
+        "publishability": "direct",
+        "headline": "The Blood of Dawnwalker Modders Aren’t Missing the Point – They Just Love the Game",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/the-blood-of-dawnwalker-modders-arent-missing-the-point-they-just-love-the-game",
+            "publishedAt": "2026-09-19T14:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/the-blood-of-dawnwalker-modders-arent-missing-the-point-they-just-love-the-game",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/18/dawnwalker-brencis-blogroll-1789733324205.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Modders are extending The Blood of Dawnwalker&#x27;s 30-day time limit to allow more time to complete every questline. But while this goes against the developer&#x27;s vision, it shouldn&#x27;t be seen as vandalism.\nThe Blood of Dawnwalker Modders Aren’t Missing the Point – They Just Love the Game\nIf even the developers don’t consider the timer vital to the series, why should we?\nI’ve spent the weeks since The Blood of Dawnwalker’s release nodding at headlines about how the time-pressured quest to rescue lead character Coen’s family – which is on a controversial 30-day timer – is the heart of the design, and that anyone looking to extend that clock with a mod wouldn’t be having the intended experience .\nBut, after reading that the developers themselves aren’t so bothered about the timer that they’d definitely want to add it in again – that a Dawnwalker sequel could strip out this mechanic and still inexorably be a Dawnwalker game – I’ve interrogated my own assumptions. I wonder if we’ve been giving anyone who’d roll back a couple of 0s on the odometer too hard a ride. Is the example of the “irresponsible modder”, someone incapable of understanding that developer intent should supersede any possible alteration, a fantasy?\nThe threat of a ticking clock is one of the first things you learn in screen writing classes: that a scene is more tense if there’s an outside force driving it forward, that a conversation which would otherwise just be two people in a room is twice as interesting if one of them really needs to get out of there. In a movie it&#x27;s contrivance; obviously the timer can’t end until it’s dramatically interesting. A game, meanwhile, has to account for your character learning they’re about to explode and then just doing their idle animation for their remaining twenty minutes of life. The idea of a long-tail timer achieves the same aim as the movie version, though. Every decision matters if you can only make so many of them, and everything has more weight if there’s a cost.\nIt’s unlikely that Dawnwalker’s modders, or any modders who’d take the time limit out of any game, are unaware of this. I’m cynical about trends, I’m not cynical about individual people. I can imagine someone who has reckoned with this decision has thought about why these systems are implemented, but eventually accepts their “vandalism” of the art as a small price to pay to overcome problems inherent to this scale of game design.\nMany games don’t benefit from a second playthrough. I’ve been playing games almost daily for over thirty years. I’m more than aware of how much gristle and sinew there is among the meat. I’ve chosen not to go back to a lot of things that I’ve loved in the past because I haven’t wanted to do the same stuff over and over. For every great bit of combat design in the best open world games, for every narrative twist and turn, there’s a lot of looking around in cupboards for bullets or pissing around in menus trying on new shoelaces that give you an extra 3% poison damage. Dawnwalker is no different; the equipment variety that will help in the quest to defeat the story’s vampiric villain, Brencis, is as incremental in scale as any other game. I’m fine doing this sort of stuff the first go through, but when I’ve absorbed the majority of the experience, it’s a challenge to get myself to care again.\nIf there’s, say, enough unique stuff in Dawnwalker for a player to only see 70 or 80% of everything in a playthrough, maybe just enough to miss a chunk if you were busy making other choices, but not enough to have a radically different experience the second time around, then playing it twice would just be pushing through a lot of the same things you’ve already done. Micro changes in context, but macro similarities in activity. If someone wants to see everything in there and they still want the goodie gumdrops school prefect ending, they’re being more generous to their own time and patience than they’re limiting their appreciation of a"
+          }
+        ]
+      },
+      {
+        "eventKey": "d1d0dfb9dc40c9674bbb",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "The Last of Us Director Apologizes to God of War Laufey Devs After Calling Recent AAA Games 'Boring'",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/the-last-of-us-director-apologizes-to-god-of-war-laufey-devs-after-calling-recent-aaa-games-boring",
+            "publishedAt": "2026-09-19T19:08:59.466Z",
+            "canonicalUrl": "https://www.ign.com/articles/the-last-of-us-director-apologizes-to-god-of-war-laufey-devs-after-calling-recent-aaa-games-boring",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/06/02/gowmeetthecastthumb-1780442012331.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The Last of Us game director Bruce Straley has apologized to the God of War Laufey team after his comments about modern AAA games brought \"uninvited and unnecessary negative attention.\"\nThe Last of Us Director Apologizes to God of War Laufey Devs After Calling Recent AAA Games &#x27;Boring&#x27;\n\"My fear is that our player base is getting tired of playing the same verbs for the last 20 years.\"\nThe comments in question surfaced as part of a recently published piece by Edge magazine and saw the former Naughty Dog developer tackling the state of AAA gaming and game development. Straley initially said with a laugh that he thinks \"the verbs and experiences we&#x27;re delivering in the triple-A space are… I wanna say boring,\" before bringing God of War Laufey into the equation.\n\"God of War Laufey, I look at that game, and every pixel is mindblowing,\" he said to Edge. \"The amount of work and skill that&#x27;s gone into every single frame… I&#x27;ve made those kinds of games, and I&#x27;m still blown away. But when I actually look at what you&#x27;re doing in the game? I&#x27;m not excited. And that&#x27;s nothing against the God of War team. Just, across the board in triple-A, it feels like there’s no opportunity to inject fresh, innovative ideas.\"\nThe Last of Us has certainly had its influence on the state of big-budget games, so it was no surprise to see social media light up with reactions to Straley&#x27;s thoughts. The former Naughty Dog lead then followed up the commotion with a thread of posts on X/Twitter , taking the opportunity to elaborate on his perspective on where the industry is at and where it&#x27;s heading.\n\"I want to apologize to the Laufey team for dragging you all into this uninvited and unnecessary negative attention,\" he said. \"I was trying to illustrate an industry concern and my mistake of naming your game is being used out of context and for clickbait. You don’t need this. I’m sorry.\n\"A journo asked me about the state of our industry. I mentioned a few concerns. One being the lack of innovation & risks taken in the AAA space. Though this isn’t the team’s fault! My fear is that our player base is getting tired of playing the same verbs for the last 20 years."
+          }
+        ]
+      },
+      {
+        "eventKey": "9d62814b87a60854f809",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "We Ranked The 10 Best Eevee Pokémon Cards of All Time",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/best-eevee-pokemon-tcg-cards",
+            "publishedAt": "2026-09-19T17:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/best-eevee-pokemon-tcg-cards",
+            "imageUrl": "https://assets1.ignimgs.com/2018/10/15/p002-1539586785238.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "We&#x27;ve ranked the 10 best Eevee Pokémon cards of all time, from priceless Japanese trophy promos to iconic vintage classics and modern chase cards.\nWe Ranked The 10 Best Eevee Pokémon Cards of All Time\nStraight from an Eevee superfan.\nIf you know one thing about me, it’s that I love Eevee.\nBetween a shelf overflowing with a collection of over 100 Eevee plushies and my ongoing quest to complete an ultimate Eevee Master Set binder (collecting every single variant, promo, and English card ever printed for our favorite fluffball), this Pokémon is my number one.\nSo with the 30th Celebration expansion release and Eeveelution chase cards dominating the market, what better time to settle this once and for all: which is the best Eevee card of all time? And I mean Eevee - pure, unevolved, Normal-type Eevee.\nNo disrespect to the Eeveelutions, but if we let them on this list, we all know Moonbreon would shoot to number one quicker than we can shuffle a deck.\nBefore we jump in, for those after 30th Celebration boosters, our best suggestion right now is to request an invite from Amazon for the ETB at least , priced much more reasonably compared to other retailers. Invites will be sent out soon!\n10. Eevee — Pokémon TCG: 30th Celebration 2-Pack Blister Promo"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 38231,
+      "estimatedInputTokens": 9558,
+      "activeTrackingItems": 0,
+      "candidateItems": 16,
+      "includedItems": 16,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
