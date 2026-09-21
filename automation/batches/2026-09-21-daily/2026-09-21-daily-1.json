@@ -1,0 +1,1377 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-21T02:20:25.230Z",
+  "finalizedAt": "2026-09-21T02:20:25.230Z",
+  "coverageThrough": "2026-09-21 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-21-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-21 12:00",
+      "windowStart": "2026-09-20 10:10",
+      "windowEnd": "2026-09-21 10:10"
+    },
+    "adjacentEdition": "2026-09-20-daily",
+    "packages": [
+      {
+        "eventKey": "dc6413a557ae4ae5afec",
+        "eventKind": "dlc",
+        "subjectKey": "cairn free",
+        "subject": {
+          "kind": "game",
+          "key": "cairn free"
+        },
+        "publishability": "direct",
+        "headline": "Cairn free DLC &#8216;On the Trail: Deep Water&#8217; launches October 29",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/cairn-free-dlc-on-the-trail-deep-water-launches-october-29",
+            "publishedAt": "2026-09-20T16:45:04+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/cairn-free-dlc-on-the-trail-deep-water-launches-october-29",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Cairn-DLC_09-20-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Survival climbing adventure game Cairn&#8217;s free downloadable content &#8220;On the Trail: Deep Water&#8221; will launch on October 29, developer The Game Bakers announced.\nCairn free DLC &#8216;On the Trail: Deep Water&#8217; launches October 29\nSurvival climbing adventure game Cairn &#8216;s free downloadable content &#8220;On the Trail: Deep Water&#8221; will launch on October 29, developer The Game Bakers announced.\n&#8220;On the Trail: Deep Water&#8221; is the first of a series of free downloadable content bringing Cairn climbers with new climbing locations and fresh challenges as they follow the trail of a legendary climber. The downloadable content brings three new climbing areas, and introduces water soloing: players can now climb over water, without the consequences of plummeting to their death! Marco won&#8217;t be cheering from the sideline anymore, players can now climb with him or Aava.\nCairn is available now for PlayStation 5 and PC via Steam , Epic Games Store , and GOG . A Switch 2 version is due out in early 2027.\nHere is an overview of the downloadable content, via The Game Bakers:"
+          }
+        ]
+      },
+      {
+        "eventKey": "79606733b9cfc9405c81",
+        "eventKind": "announcement",
+        "subjectKey": "dream club zero r",
+        "subject": {
+          "kind": "game",
+          "key": "dream club zero r"
+        },
+        "publishability": "direct",
+        "headline": "Dream Club Zero R+ announced for console",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/dream-club-zero-r-announced-for-console",
+            "publishedAt": "2026-09-20T03:18:02+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/dream-club-zero-r-announced-for-console",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Dream-Club-Zero-R-Plus-Ann_09-19-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "D3 Publisher has announced Dream Club Zero R+, a new port of the romance simulation game Dream Club Zero for console. It will launch in 2027 in Japan. Release platforms were not announced.\nDream Club Zero R+ announced for console\nD3 Publisher has announced Dream Club Zero R+ , a new port of the romance simulation game Dream Club Zero for console. It will launch in 2027 in Japan. Release platforms were not announced.\nDream Club Zero first launched for Xbox 360 on January 27, 2011 in Japan, followed by PS Vita as Dream Club Zero Portable on November 17, 2011, and PlayStation 3 as Dream Club Zero Special Edipyon! on January 17, 2013.\nThe new port will feature three new host girls designed by Haruyuki Morisawa, who handled character designs for previous Dream Club games.\nFurther information will be announced at a later date."
+          }
+        ]
+      },
+      {
+        "eventKey": "eb74ec6d1c357ee02165",
+        "eventKind": "update",
+        "subjectKey": "honkai star rail version 4 6",
+        "subject": {
+          "kind": "game",
+          "key": "honkai star rail version 4 6"
+        },
+        "publishability": "direct",
+        "headline": "Honkai: Star Rail version 4.6 update &#8216;Dance With the Beast Before Moonrise&#8217; launches September 28",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/honkai-star-rail-version-4-6-update-dance-with-the-beast-before-moonrise-launches-september-28",
+            "publishedAt": "2026-09-20T14:15:20+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/honkai-star-rail-version-4-6-update-dance-with-the-beast-before-moonrise-launches-september-28",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Honkai-Star-Rail_2026_09-20-26_032.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The version 4.6 update for Honkai: Star Rail, dubbed &#8220;Dance With the Beast Before Moonrise,&#8221; will launch on September 28, developer miHoYo announced.\nHonkai: Star Rail version 4.6 update &#8216;Dance With the Beast Before Moonrise&#8217; launches September 28\nThe version 4.6 update for Honkai: Star Rail , dubbed &#8220;Dance With the Beast Before Moonrise,&#8221; will launch on September 28, developer miHoYo announced.\nFollowing the conclusion of the previous story, Nihilux officially revealed her identity as Aha, the Aeon of Elation. Now, alongside the Trailblazer and with Pearl&#8217;s assistance, they will head to the Life Sciences Institute deep within Astropolis to uncover the truth behind the scheme to &#8220;weaponize the husk.&#8221;\nServing as the source of all imagenae in Astropolis, the Life Sciences Institute was built under the leadership of Madam Yabuli, head of the IPC&#8217;s Technology Department. Now, Yabuli is pushing forward a dangerous plan to &#8220;weaponize the husk,&#8221; at the cost of every life in Planarcadia, and is even suspected of harboring ties with a mysterious faction that worships the Voracity in Astropolis. To protect the peace of Planarcadia, Pearl plans to use the recovery of Leviathan Essence as a cover to dispatch Kuchiba and Ashveil on a coordinated investigation deep into the Life Sciences Institute, teaming up with the Trailblazer and Nihilux to crush this conspiracy once and for all.\nIn this update, Pearl, a 5-star Ice character following the Path of Elation, will officially become a playable character. The CEO of Planarcadia has always been known for her raw computational power and rational decision-making. When the critical threat of the Voracity struck, she decisively arranged for Planarcadia&#8217;s residents to evacuate on the Astral Express, while she herself stayed behind to oversee the encanvasing ritual. In this story, Pearl and the Trailblazer will witness together how &#8220;Preservation&#8221; and &#8220;Art&#8221; ultimately merge into a single theme. Outside the story, Pearl&#8217;s understanding of art is equally reflected in combat. During combat, Pearl can consume her &#8220;Certified Banger&#8221; to offset a portion of DMG for all ally characters. At the same time, Pearl can enter the &#8220;Deep Learning&#8221; state to learn the combat data of a designated teammate and gain a corresponding Enhanced ATK. If this teammate is an Elation character, Pearl&#8217;s Enhanced ATK will deal additional Elation DMG to enemies. If the entire team consists of Elation characters, this teammate will also gain an extra turn, while receiving a massive amount of Punchline and &#8220;Certified Banger.&#8221;\nThroughout Version 4.6, the drop rates for the limited 5-star character Pearl and the limited 5-star Light Cone &#8220;Colors for Tomorrow&#8221; will both be boosted. The limited 5-star character Evanescia will also receive a rerun in the first half of the version. Then, in the second half, the limited 5-star character Mortenax Blade will be getting a rerun, continuing to provide indispensable help for your trailblazing expedition.\nAs for the version&#8217;s events, the brand-new &#8220;Love, Ghosts &#038; Robots&#8221; event is coming soon. The Trailblazer will help the resurrected Skott run a mechatron workshop, assembling and selling mechatrons to gradually build the workshop into a project with a five-star rating. Meanwhile, the massive combat reality show event, &#8220;Interastral Peace Gala: One Take,&#8221; will also kick off. On top of that, the brand-new &#8220;Astral Imagea&#8221; gameplay will officially debut. Trailblazers can obtain multiple Astral Imageas to tag along on their adventures, and co-op with friends to take on the &#8220;Astral Slammers Squad!&#8221; challenge. Furthermore, Hyacine&#8217;s new outfit &#8220;Warm Cotton Skies&#8221; and Evanescia&#8217;s new outfit &#8220;Lunar Blossoming&#8221; will hit the Outfit Show Window together. Yo"
+          }
+        ]
+      },
+      {
+        "eventKey": "66feda1bcfa03ad6c3fb",
+        "eventKind": "announcement",
+        "subjectKey": "industrial noir occult turn based rpg wane",
+        "subject": {
+          "kind": "game",
+          "key": "industrial noir occult turn based rpg wane"
+        },
+        "publishability": "direct",
+        "headline": "Industrial noir occult turn-based RPG WANE announced for PC",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/industrial-noir-occult-turn-based-rpg-wane-announced-for-pc",
+            "publishedAt": "2026-09-20T16:35:18+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/industrial-noir-occult-turn-based-rpg-wane-announced-for-pc",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/WANE_2026_09-20-26_006.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher Shoreline Games and developer Metis Creative have announced WANE, an industrial noir occult turn-based RPG. It will be available for PC via Steam. A release date was not announced.\nIndustrial noir occult turn-based RPG WANE announced for PC\nPublisher Shoreline Games and developer Metis Creative have announced WANE , an industrial noir occult turn-based RPG. It will be available for PC via Steam . A release date was not announced.\n&#8220;Metis Creative has the kind of imagination that makes you want to pay attention to whatever they&#8217;re working on next,&#8221; said Shoreline Games CEO Keith Kawamura in a press release. &#8220;Having already had the chance to work with the team once before, we knew firsthand just how thoughtful and inventive they are. WANE is a fantastic example of that creativity, and from the moment we saw what the team was creating, we knew we wanted to help bring it to players. We&#8217;re thrilled to be partnering with Metis again and finally begin sharing WANE with the world.&#8221;\nMetis Creative CEO Sarp Duyar added, &#8220;Metis Creative has found success in our ability to produce high-quality, original visuals that match a deep and engaging narrative across several award-winning tabletop games. Our vision with WANE is to continue that tradition across a totally new medium for us and push the boundaries of our creativity.&#8221;\nIn WANE , players take on the role of Declan Wayne, a fading archaeologist whose fractured memories have transformed his cerebral realm of Ravelle into a shifting labyrinth of trauma, obsession, and regret. Players recruit adventurers, build a three-person party, and descend through three distinct biomes in grid-based tactical combat shaped by attrition, random encounters, and boss battles.\nBetween expeditions, players return to an antiquarian shop to appraise and sell relics, upgrade facilities, and fund the next run. As the roguelike cycle continues, new synergies, shortcuts, and permanent buffs open up while the story unfolds through repeated journeys deeper into Ravelle.\nHere is an overview of the game, via Shoreline Games:"
+          }
+        ]
+      },
+      {
+        "eventKey": "cec73cc2d837989c395f",
+        "eventKind": "announcement",
+        "subjectKey": "junji ito inspired cozy paranormal cleaning game dust till dawn",
+        "subject": {
+          "kind": "game",
+          "key": "junji ito inspired cozy paranormal cleaning game dust till dawn"
+        },
+        "publishability": "direct",
+        "headline": "Junji Ito-inspired cozy paranormal cleaning game Dust till Dawn announced for PC",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/junji-ito-inspired-cozy-paranormal-cleaning-game-dust-till-dawn-announced-for-pc",
+            "publishedAt": "2026-09-20T16:43:27+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/junji-ito-inspired-cozy-paranormal-cleaning-game-dust-till-dawn-announced-for-pc",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Dust-tll-Dawn-Announced_09-20-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Mac n Cheese Games has announced Dust till Dawn, a cozy paranormal cleaning game set in a rural Japanese village. It will be available for PC via Steam. A release date was not announced.\nJunji Ito-inspired cozy paranormal cleaning game Dust till Dawn announced for PC\nMac n Cheese Games has announced Dust till Dawn , a cozy paranormal cleaning game set in a rural Japanese village. It will be available for PC via Steam . A release date was not announced.\nHere is an overview of the game, via Mac n Cheese Games:\nDust till Dawn is a cozy paranormal cleaning game set in a fictional rural Japanese village where a mysterious dust has begun appearing across homes, businesses, and community spaces.\nDust till Dawn combines the meditative satisfaction of cleaning games with the creeping unease and surreal imagery of Japanese horror manga.\nPlayers step into the role of a maid taking cleaning jobs throughout the village. Sweep, wipe, wash, and carefully restore each location, bringing calm and order back one space at a time.\nSettle into the satisfying rhythm of putting things back in order. Sweep away dust, wipe surfaces, clean rooms, and restore everything from family homes and shops to public buildings and other corners of the village.\nThe dust shouldn&#8217;t be here. Neither should the objects that seem to move, the rooms that refuse to stay in order, or the traces of something passing through after you&#8217;ve finished cleaning."
+          }
+        ]
+      },
+      {
+        "eventKey": "461e12131c908d88dfac",
+        "eventKind": "launch",
+        "subjectKey": "stellar blade コンプリートエディション",
+        "subject": {
+          "kind": "game",
+          "key": "stellar blade コンプリートエディション"
+        },
+        "publishability": "direct",
+        "headline": "Switch2「Stellar Blade コンプリートエディション」の体験版が，本日配信開始［TGS2026］",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/035/G103535/20260920026/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/035/G103535/20260920026/",
+            "imageUrl": "https://www.4gamer.net/games/035/G103535/20260920026/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "2026年11月6日に発売予定のSwitch2用ソフト「Stellar Blade コンプリートエディション」の体験版配信が，ニンテンドーeショップにて本日（2026年9月20日）スタートした。また…\nSwitch2「Stellar Blade コンプリートエディション」の体験版が，本日配信開始［TGS2026］\n「Stellar Blade コンプリートエディション」，11月6日発売。「ベヨネッタ」コラボの無料衣装4種や最新トレイラーも公開に\nSHIFT UPは本日，Switch2用ソフト 「Stellar Blade コンプリートエディション」 を 2026年11月6日に発売する と発表し，最新トレイラーを公開した。ゲーム本編に加えてこれまでに配信されたすべてのコンテンツを収録する。また， 「ベヨネッタ」コラボの新衣装4種 も同日からSwitch2版およびPC/PS5版に無料配信される。\n「Stellar Blade」はコンプリートしたあともまだ続く！？ Switch2版出展で来日したキム・ヒョンテ氏にインタビュー［TGS2026］\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日"
+          }
+        ]
+      },
+      {
+        "eventKey": "0b35ad3c4cbcc2a89881",
+        "eventKind": "launch",
+        "subjectKey": "loftia",
+        "subject": {
+          "kind": "game",
+          "key": "loftia"
+        },
+        "publishability": "direct",
+        "headline": "戦闘も競争もないライフシムMMO「Loftia」の早期アクセス版が11月3日に配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/973/G097300/20260918057/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/973/G097300/20260918057/",
+            "imageUrl": "https://www.4gamer.net/games/973/G097300/20260918057/SS/003.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Qloud Gamesは本日（2026年9月21日），「Loftia」の早期アクセス版を2026年11月3日に配信すると発表した。本作は，空に浮かぶ島々でもう1つの人生を送るMMOで，戦闘や競争の要…\n戦闘も競争もないライフシムMMO「Loftia」の早期アクセス版が11月3日に配信開始\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      },
+      {
+        "eventKey": "1652b2b0a608ef70603b",
+        "eventKind": "release-date",
+        "subjectKey": "neon abyss 2 has a new final boss a",
+        "subject": {
+          "kind": "game",
+          "key": "neon abyss 2 has a new final boss a"
+        },
+        "publishability": "direct",
+        "headline": "Neon Abyss 2 has a new final boss, a release date, and at least 1 massive fish worth many, many points",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/action/neon-abyss-2-has-a-new-final-boss-a-release-date-and-at-least-1-massive-fish-worth-many-many-points/",
+            "publishedAt": "2026-09-20T16:23:40Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/action/neon-abyss-2-has-a-new-final-boss-a-release-date-and-at-least-1-massive-fish-worth-many-many-points/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/Qowm9adoYKCWCkuFWnnGSf-1920-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "I like all of these things.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nYour newsletter sign-up was successful\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "718bed710a76b7a7033c",
+        "eventKind": "release-date",
+        "subjectKey": "virtue and a sledgehammer announces october 27",
+        "subject": {
+          "kind": "game",
+          "key": "virtue and a sledgehammer announces october 27"
+        },
+        "publishability": "direct",
+        "headline": "Virtue and a Sledgehammer announces October 27 release date with another banger of a trailer",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/action/virtue-and-a-sledgehammer-announces-october-27-release-date-with-another-banger-of-a-trailer/",
+            "publishedAt": "2026-09-20T16:49:13Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/action/virtue-and-a-sledgehammer-announces-october-27-release-date-with-another-banger-of-a-trailer/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/mXputmZUsAiQXZ4uULVJjY-2560-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Do androids dream of electric construction tools?\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nKeep up to date with the most important stories and the best deals, as picked by the PC Gamer team.\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nYour membership journey starts here."
+          }
+        ]
+      },
+      {
+        "eventKey": "e0a18352cf75ff156f48",
+        "eventKind": "launch",
+        "subjectKey": "女神異聞録ペルソナ",
+        "subject": {
+          "kind": "game",
+          "key": "女神異聞録ペルソナ"
+        },
+        "publishability": "direct",
+        "headline": "『女神異聞録ペルソナ』オリジナルサウンドトラックが9月21日0時から配信開始。メインビジュアルはPS版パッケージを彷彿とさせるデザインに",
+        "tier": "B",
+        "score": 102,
+        "timeRelation": "unknown",
+        "readiness": "two-media-no-primary",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/88745",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/88745",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/88745/thumbnail_XtCS.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "シリーズ1作目『女神異聞録 ペルソナ』のオリジナル・サウンドトラックが各種音楽配信サービスで配信される。\n『女神異聞録ペルソナ』オリジナルサウンドトラックが9月21日0時から配信開始。メインビジュアルはPS版パッケージを彷彿とさせるデザインに\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年09月21日10時〜2026年09月21日11時\nゼルダの伝説 時のオカリナ -Switch2 【パッケージ版早期購入特典】オリジナルアートカードセット/オリジナルステッカー 同梱\n基本無料のオープンワールドRPG『アニモ』配信中！かわいい生き物アニモたちと冒険に出かけよう。"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/2609203q",
+            "publishedAt": "2026-09-20T11:45:44+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/2609203q",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/4139d275656950851280c6b0912652a9-1024x582.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本日で発売30周年を迎えた『ペルソナ』シリーズの第1作。聖エルミン学園の高校生たちの物語を彩った楽曲を楽しめる\n『女神異聞録ペルソナ』のサウンドトラックが9月21日0時から配信開始！『ペルソナ4 リバイバル』のオリジナルサウンドトラックは2月18日に発売へ\nアトラスは9月20日、 「女神異聞録ペルソナ オリジナル・サウンドトラック」 を9月21日0時（日本時間）より各種音楽配信サービスで配信すると発表した。本情報は、同日に配信された「ペルソナ30周年」スペシャル生放送にて公開されている。\n『女神異聞録ペルソナ』は、1996年9月20日にPS向けに発売されたRPG。『ペルソナ』シリーズの第1作にあたり、今回の発表当日に発売30周年を迎えた。\n『女神異聞録ペルソナ』オリジナルサウンドトラックの デジタル配信が決定！ 9月21日（祝・月）0時より 各種音楽配信サービスで配信開始だ！ シリーズの原点を彩った名曲の数々、 ぜひ楽しんでくれよな🎶 #p30th pic.twitter.com/Hg5lEni0j7\n本作では、聖エルミン学園に通う高校生たちが、不思議な力「ペルソナ」に目覚め、異変に立ち向かっていく物語が展開される。今回のサウンドトラック配信では、シリーズの原点となる作品の楽曲を楽しめるようになる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-21T10:19:48+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "ba1d572130e538834ec6",
+        "eventKind": "other",
+        "subjectKey": "私のリアルは充実しすぎている",
+        "subject": {
+          "kind": "game",
+          "key": "私のリアルは充実しすぎている"
+        },
+        "publishability": "direct",
+        "headline": "「乙女ゲーム脳の主人公」の学園ラブコメ、『私のリアルは充実しすぎている』を今こそ遊んでみよう。題材はキャッチーだが描写は丁寧で深みもある",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/special-column/20260920-468962/",
+            "publishedAt": "2026-09-20T04:53:42+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/special-column/20260920-468962/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260920-468962-image1.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『私のリアルは充実しすぎている』は、主人公の二面性をフックとしただけの作品ではなく、「本当の自分とは何なのか」という題材からキャラクターを丁寧に描いている作品だ。\n「乙女ゲーム脳の主人公」の学園ラブコメ、『私のリアルは充実しすぎている』を今こそ遊んでみよう。題材はキャッチーだが描写は丁寧で深みもある\n連載第9回となる本稿では、サークル「TetraScope」が手がける乙女ゲーム『私のリアルは充実しすぎている』を紹介。もとは2014年にフリー同人ゲームとしてリリースされた作品で、2022年にはフルボイス化&ヴィジュアルファンブックの内容を追加したSteam版やスマートフォン版が展開。2024年にはNintendo Switch向けに移植されるなど、長きに渡り愛されてきたタイトルだ。\nまた本作における「本当の自分」というテーマは、恋愛だけに限定されたものではない。希美は周囲から見れば充実した高校生活を送り、友人にも恵まれ、学校では頼られる存在として振る舞っているが、「何も悩みもないリア充」として描かれているわけではない。むしろ周囲から見れば恵まれているからこそ、自分の悩みを人に話すことが難しくなるという感覚が、彼女の人物像にリアリティを与えている。そういった意味では、「私のリアルは充実しすぎている」というタイトルも、単に主人公がモテモテだから自虐で付けられたタイトルではないのだろう。\n『私のリアルは充実しすぎている』は、乙女ゲームを遊ぶ主人公をプレイヤーが操作するという構造を入口にしながら、他人から見える自分と自分だけが知っている自分の違い、好きなものを好きでいることを軽快なラブコメディのなかに落とし込んでいる。「自分が周囲からどう見られているのか」「本当の自分とは何なのか」という身近な題材からキャラクターを掘り下げながら、乙女ゲームというジャンルへの愛も感じる作品だ。\n『私のリアルは充実しすぎている』は、PC（ Steam / Windows ）/ Nintendo Switch / iOS / Android 向けに配信中。\nSteamでは日々数多くのゲームがリリースされている一方で、個人や少人数チームによる国産タイトルには大作の話題に隠れながらも、独創的なアイデアや強いこだわりを持つ作品が少なくない。本連載「見逃してない？ 国産Steamタイトル発掘録」では、同人・インディーゲームを中心に、国産Steamタイトルを毎回1本ずつピックアップして魅力を伝えていきたい。\n公式では「顔良し、頭良し、性格良し。完全無欠のリア充女子が送るドタバタラブコメディ！（たぶん）」とされており、物語の主人公は高校2年生の姉崎希美。キャッチコピーどおり容姿端麗・成績も優秀で、性格も申し分なく、学校では生徒会副会長を務めるという、まさに周囲から見れば「完璧な人間」だ。だが彼女には誰にも知られていない一面があり、希美は乙女ゲームが大好きなオタクとして、学校で見せている姿からは想像しにくい趣味を持っている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "41cbb1ade7e2dd7da419",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Final Fantasy 7 Revelation Will 'Easily Take Over 100 Hours' for Completionists to Beat, Director Teases",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/final-fantasy-7-revelation-will-easily-take-over-100-hours-for-completionists-to-beat-director-teases",
+            "publishedAt": "2026-09-20T20:52:01.323Z",
+            "canonicalUrl": "https://www.ign.com/articles/final-fantasy-7-revelation-will-easily-take-over-100-hours-for-completionists-to-beat-director-teases",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/20/final-fantasy-7-revelation-sephiroth-beat-1789937430860.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Final Fantasy 7 Revelation director Naoki Hamaguchi teased that completionist playthroughs for the remake trilogy&#x27;s conclusion could \"easily take over a hundred hours\" to beat.\nFinal Fantasy 7 Revelation Will &#x27;Easily Take Over 100 Hours&#x27; for Completionists to Beat, Director Teases\nThe developer helping lead the charge on Cloud and the rest of the party&#x27;s final assault against Sephiroth opened up about the size of the final chapter during an interview with GameSpot . We already suspected there would be a lot to do when Final Fantasy 7 Revelation launches for PC and consoles next year, but it sounds like those looking to see all Square Enix has to offer will be especially busy.\n\"In a standard playthrough from beginning to end, if I were to review and check every single asset and element in the game, it’ll easily take over a hundred hours,\" Hamaguchi said of his own playthroughs. \"Obviously, I can&#x27;t do that in each and every single playthrough. As the director, I don’t have enough time for that, so sometimes I would just skip combat and focus on checking the main story.\"\nThat&#x27;s a lot of Final Fantasy 7 Revelation playtime. The two previous entries in the trilogy – Remake and Rebirth – proved to be large games in their own right, but the 2027 RPG finale will no doubt up the ante yet again . As Cloud, Tifa, Barret, Vincent Valentine, and the rest of the crew try to finish the fight against Sephiroth, players will use a giant airship known as the Highwind to travel.\n\"I will try to do these playthroughs as much time as time allows,\" he said. \"Yesterday, during a separate round of interviews, when there was downtime, I actually did bring a PS5 controller, so I checked the latest version of the build. Even on business trips, if there’s even a small amount of time that I have available, I’ll try to check the latest version of the game to see if there are any issues.\"\nIt&#x27;s important to remember that not everyone will sink the same amount of time into Final Fantasy 7 Revelation. Some will no doubt turn over every pixel on the planet, while others will surely beeline their way through the story.\nHow long some of these different playthroughs will take is unclear, and with months to go until launch, Hamaguchi&#x27;s 100-hour estimate could always change. Either way, the team is anticipating a hefty download, with the director recently telling VGC that the game could eat around 200GB of storage .\nNaoki Hamaguchi says he&#x27;s already reached the credits 46 times."
+          }
+        ]
+      },
+      {
+        "eventKey": "883f8fe1c24a57ca9494",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Hideo Kojima Reveals What Happened With Sony in Exclusive First Interview Since PlayStation Ditched Physint",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/hideo-kojima-reveals-what-happened-with-sony-in-exclusive-first-interview-since-playstation-ditched-physint",
+            "publishedAt": "2026-09-20T11:00:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/hideo-kojima-reveals-what-happened-with-sony-in-exclusive-first-interview-since-playstation-ditched-physint",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/14/kojima-1789384796872.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Hideo Kojima reveals what happened with Sony in his first interview since PlayStation ditched Physint.\nHideo Kojima Reveals What Happened With Sony in Exclusive First Interview Since PlayStation Ditched Physint\nIn June, Sony asked Hideo Kojima to attend a Zoom call. At the time, he was busy working on Xbox game OD and PlayStation game Physint , the latter a spiritual successor to the video game series that made him one of the most celebrated developers on the planet: Metal Gear Solid.\nFor the meeting, he brought along Kojima Productions president Shinji Hirano and head of talent development Aki Saito. Kojima tells IGN in his first interview since last week’s dramatic news that he was so stunned by what Sony told him that his mind went blank. PlayStation was pulling out of the Physint project, and funding for it would end. And that was that.\nKojima initially kept the news from his staff at Kojima Productions as he worried over the future of his company. Would he have to let developers from the Physint team go? Would they leave anyway, given what had happened? What would the bank, whose loans helped Kojima Productions staff up after the release of Death Stranding, think? And what about all the actors he’d already scanned for Physint? Was this a P.T. situation all over again?\nAs we know, Kojima convinced Microsoft and new Xbox boss Asha Sharma to pick up Physint in one of the most dramatic console switches in history. Now the previous PlayStation exclusive may not release on PlayStation at all.\nIn our interview, Kojima tells IGN Japan’s Daniel Robson how he feared Kojima Productions might collapse as a result of Sony&#x27;s decision, and details his game-saving pitch to Xbox, which was quick to snap Physint up.\nIt’s important to note that the interview was conducted before Bloomberg’s report that Sony ditched Physint due to missed deadlines, budget concerns, and Death Stranding’s alleged commercial failings . Kojima Productions provided a statement to IGN, which appears at the end of this interview, following a request for comment. In it, Kojima Productions insists the studio is \"in a healthy, profitable state, development for Physint continues to move forward with Xbox, and our relationship with PlayStation remains strong.​\"\nHideo Kojima: We are an independent company, so no funding is behind us as a corporation. We sign contracts according to projects, and that&#x27;s how we survive one by one as an indie. So I need to find a new project before the previous project ends, and that&#x27;s how we stay alive. That&#x27;s our background situation.\n\"I didn&#x27;t want to do the same thing we did for P.T.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "aa98ba13998fff9a8ef2",
+        "eventKind": "launch",
+        "subjectKey": "ステラーブレイド",
+        "subject": {
+          "kind": "game",
+          "key": "ステラーブレイド"
+        },
+        "publishability": "direct",
+        "headline": "『ステラーブレイド』の『ベヨネッタ』コラボ衣装の最後の1着は、キム・ヒョンテ氏の手によるオリジナルデザイン“ブラックトレス”。Switch2無料体験版は本日（9/20）配信開始【TGS2026】",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/88662",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/88662",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/88662/thumbnail_lnOC.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "東京ゲームショウ2026（TGS2026）のセガ/アトラスブースのステージイベントとして“『Stellar Blade』地上帰還ステージ”が実施。『ベヨネッタ』のコラボ衣装として、未公開だった4着目の衣装が『ステラーブレイド』のディレクターであるキム・ヒョンテ氏オリジナルデザインによる“ブラックドレス”であることが明らかにされた。\n『ステラーブレイド』の『ベヨネッタ』コラボ衣装の最後の1着は、キム・ヒョンテ氏の手によるオリジナルデザイン“ブラックトレス”。Switch2無料体験版は本日（9/20）配信開始【TGS2026】\n2026年11月6日に発売予定のNintendo Switch 2向けのソフト『ステラーブレイド コンプリートエディション』。『ベヨネッタ』のコラボ衣装が収録されることを記念し、プラチナゲームズの稲葉氏とSHIFT UPのキム・ヒョンテ氏の対談が実現。コラボ衣装のスクリーンショットも公開。\n“Nintendo Direct 2026.6.9”（ニンテンドーダイレクト）”にて、SHIFT UPが開発を手掛けるNintendo Switch 2用アクションゲーム『Stellar Blade コンプリートエディション』が2026年11月6日に発売されることが明らかにされた。\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年09月21日10時〜2026年09月21日11時"
+          }
+        ]
+      },
+      {
+        "eventKey": "28829d438c8b318d92bf",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "東京ゲームショウ2026、総来場者数は25万7642人。台風25号の影響で5日目は中止、4日間開催に【TGS2026】",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/88715",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/88715",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/88715/thumbnail_SbgN.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "東京ゲームショウ2026（TGS2026）の総来場者数は25万7642人。台風25号の影響で5日目が中止となり4日間開催に。過去最多の53の国・地域から1138の企業・団体が出展した。\n東京ゲームショウ2026、総来場者数は25万7642人。台風25号の影響で5日目は中止、4日間開催に【TGS2026】\n東京ゲームショウ2027（TGS2027）は2027年9月16日～20日の5日間開催を予定。リアル会場は幕張メッセ。TGS2026は台風25号の影響で最終日が中止となり、4日間開催となった。\n『メルブラ：トワイルミナ』グランドシナリオモードは約20時間の大ボリューム。奈須きのこ氏の物語をビジュアルノベル級の演出で描く【TGS2026】\n復活の『天地創造』試遊レビュー。今風のアクセスのよさで、スーパーファミコンっぽさを楽しむ。遠い記憶を呼び戻すほど印象的な哀愁サウンドと不思議なビジュアルにも注目【TGS2026】\n【TGS2026】『ロマサガ3』リメイク試遊レビュー。迷子のゴン救出＆グゥエイン戦にシリーズ初心者が挑戦。遊びやすさと戦略性を体感【ロマンシング サガ3 デスティニーユナイテッド】\n『モンハンワイルズ：アセンダンス』インタビュー。メインモンスターは「まだ公開していない」。リリース時点でやり応えのあるエンドコンテンツを用意【TGS2026】\n千葉県・幕張メッセで開催された東京ゲームショウ2025（TGS2025）、会期4日間のリアル会場総来場者数が発表された。\n千葉県・幕張メッセで開催された東京ゲームショウ2024（TGS2024）、会期4日間のリアル会場総来場者数が発表。4日間の総来場者数は27万4739人で、歴代2位の結果となった（会期中に配信した公式番組の総視聴者数やTOKYO GAME SHOW Digital World 2024のオンライン来場者数等は後日発表）。\n本記事はアフィリエイトプログラムによる収益を得ている場合があります"
+          }
+        ]
+      },
+      {
+        "eventKey": "d5b9e5dc8ebbf231440e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Castlevania: Belmont&#8217;s Curse demo launches October 1",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/castlevania-belmonts-curse-demo-launches-october-1",
+            "publishedAt": "2026-09-20T06:35:22+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/castlevania-belmonts-curse-demo-launches-october-1",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Castlevania-Demo_09-20-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher Konami and developers Evil Empire and Motion Twin will release a demo for Castlevania: Belmont&#8217;s Curse on October 1, the companies announced. Save data from thedemo can be transferr…\nCastlevania: Belmont&#8217;s Curse demo launches October 1\nPublisher Konami and developers Evil Empire and Motion Twin will release a demo for Castlevania: Belmont&#8217;s Curse on October 1, the companies announced . Save data from thedemo can be transferred to the full game when it launches.\nTrevor Belmont, the hero who defeated Dracula, ventures into the burning streets with his daughter, Rose Belmont. Armed with the legendary holy whip, the Vampire Killer, they hunt down the beasts bleeding from the looming castle.\nCastlevania: Belmont&#8217;s Curse is due out for PlayStation 5 , Xbox Series , Switch , and PC via Steam and Microsoft Store on October 15.\nOctober 8 @ 12:00 pm - 12:45 pm EDT\nOctober 12 @ 2:00 pm - 3:00 pm EDT\nHere is a brief overview of the game, via Konami:\nMedieval Paris, where the tolling bells herald the end.\n1499. Paris is engulfed in flames as monstrous creatures suddenly emerge from the shadows."
+          }
+        ]
+      },
+      {
+        "eventKey": "3baaf2f0f526699941cb",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Dynasty Warriors 3: Complete Edition Remastered demo launches September 24",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/dynasty-warriors-3-complete-edition-remastered-demo-launches-september-24",
+            "publishedAt": "2026-09-20T03:30:07+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/dynasty-warriors-3-complete-edition-remastered-demo-launches-september-24",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/DW3-Demo_09-19-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher Koei Tecmo and developer Omega Force will release a demo for tactical action game remake Dynasty Warriors 3: Complete Edition Remastered on September 24, the companies announced.\nDynasty Warriors 3: Complete Edition Remastered demo launches September 24\nDynasty Warriors 3: Complete Edition Remastered is due out for PlayStation 5 , Xbox Series , Switch 2 , and PC via Steam on October 1.\nSeptember 29 @ 1:00 pm - 2:00 pm EDT\nAdditionally, the companies confirmed that a free update that adds online two-player play, previously only available via local split-screen, is planned for release by January 2027."
+          }
+        ]
+      },
+      {
+        "eventKey": "0e4a17e57acc2e1f1f49",
+        "eventKind": "other",
+        "subjectKey": "日本ゲーム大賞2026",
+        "subject": {
+          "kind": "game",
+          "key": "日本ゲーム大賞2026"
+        },
+        "publishability": "direct",
+        "headline": "「日本ゲーム大賞2026」フューチャー部門の受賞作品が決定。「ファイナルファンタジーVII リベレーション」「ペルソナ4 リバイバル」など10作品が選出［TGS2026］",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/969/G096901/20260920034/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/969/G096901/20260920034/",
+            "imageUrl": "https://www.4gamer.net/games/969/G096901/20260920034/SS/002.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "コンピュータエンターテインメント協会（CESA）は2026年9月20日，「日本ゲーム大賞2026」フューチャー部門の受賞10作品を発表した。「ファイナルファンタジーVII リベレーション」や「ペルソ…\n「日本ゲーム大賞2026」フューチャー部門の受賞作品が決定。「ファイナルファンタジーVII リベレーション」「ペルソナ4 リバイバル」など10作品が選出［TGS2026］\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 45421,
+      "estimatedInputTokens": 10716,
+      "activeTrackingItems": 0,
+      "candidateItems": 19,
+      "includedItems": 19,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Woman Simulator",
+        "subjectKey": "Woman Simulator",
+        "titleKey": "woman-simulator",
+        "titleZhCn": "家庭主妇模拟器",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2025/woman-simulator/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "家庭主妇模拟器_家庭主妇模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "家庭主妇模拟器_家庭主妇模拟器下载_中文_攻略_视频_评价_游民星空 Gamersky.com 家庭主妇模拟器 Woman Simulator 分享 QQ 微博 微信 综合 资讯 攻略 下载 查看全部20 截图 壁纸 原画 设定图 其他 视频 1/2 在游戏中，你将扮演一名家庭主妇，亲身体验所有家务。专制的丈夫会盯着你，并因工作质量不佳而惩罚你。你需要做饭、洗碗、洗衣、熨烫并晾干内衣和袜子、用吸尘器打扫并拖地、刷洗马桶和窗户。此外，你还要注意自己的精神状态和丈夫的情绪。打扫后泡个澡放松，讨好你的爱人以获得新的手提包，因为你可以把它卖掉并逃向自由的生活。 PC 即将发售Steam愿望单榜#43 发布时间 2026-09-22 PC 2"
+          },
+          {
+            "label": "www.ali213.net",
+            "url": "https://www.ali213.net/news/html/2026-7/1021049.html",
+            "hostname": "www.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "洗碗,做饭,安抚老公情绪 争议作品通过Steam审查复活_游侠网 Ali213.net",
+            "excerpt": "辈子&rdquo;&ldquo;为什么开发者讨厌女性&rdquo;等;支持者则认为游戏本质是一款恶搞生存类&ldquo;逃脱游戏&rdquo;，主角最终目标是逃离控制，因题材敏感就全面封杀未免上纲上线。目前该作仍在持续引发讨论。 0 分享至 扫描关注游侠网 微信扫描，关注游侠网 相关资讯 感受压力爆大的生活！《家庭主妇模拟器》上架Steam Woman Simulator Woman Simulator 上市时间：2025-11-11 游戏平台：PC 游戏类型：休闲益智PUZ 制作公司： Sebasa Games 游戏语言：中文 发行公司： Sebasa Games 新闻 攻略 下载 补丁 系列 视频 0 .0 虾说 购买 进入专题"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Fading Echo",
+        "subjectKey": "Fading Echo",
+        "titleKey": "fading-echo",
+        "titleZhCn": "断曲余音",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2025/fading-echo/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "断曲余音_断曲余音下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "断曲余音_断曲余音下载_中文_攻略_视频_评价_游民星空 Gamersky.com 断曲余音 Fading Echo 分享 QQ 微博 微信 综合 资讯 攻略 下载 专区 社区 查看全部38 截图 壁纸 原画 设定图 其他 视频 1/2 进入快节奏的沙漠朋克动作冒险游戏，释放水的力量，驾驭诸多元素，触发连锁反应。在瞬息万变的超现实中滑行穿梭，用创意撬动这个充满回应的世界。扮演一位年轻的传奇人物，探索她的过去，守护她的未来。 PC PS5 Switch2 XSX 发布时间 2026-07-21 PC 2026-07-21 PS5 未知 Switch2 2026-09-17 XSX 未知 游戏时长 未知 游戏类型 冒险游戏 动作游戏 角"
+          },
+          {
+            "label": "www.3dmgame.com",
+            "url": "https://www.3dmgame.com/games/fadingecho/resource/",
+            "hostname": "www.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "断曲余音下载_断曲余音补丁,修改器,mod,汉化下载_3DM游戏网",
+            "excerpt": "断曲余音下载_断曲余音补丁,修改器,mod,汉化下载_3DM游戏网 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 新闻 攻略 资源 图片 游戏下载 《断曲余音》游戏库 下载 补丁下载 全部 断曲余音 Fading Echo 发售：2026年7月21日 语言：英文 | 多国 类型：角色扮演 开发：Emeteria 平台：PC 8.0 已有 59 人评分 您还未评分！ 《断曲余音》是一款以创意为战斗核心、节奏感极强的元素动作冒险RPG。化身为年轻传奇“壹”，从悖论污染体的魔爪中拯救这片正走向毁灭的荒漠之地。你可以自由操纵水元素，触发连锁反应，并穿梭于超现实的世界之中。请与个性迥异的伙伴们并肩作战，共同守"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
