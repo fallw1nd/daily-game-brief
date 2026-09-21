@@ -75,10 +75,30 @@ jobs:
             process.stdout.write(wake.reason);
           ')"
           if [ "$wake_reason" = "user_authorized_same_edition_revision" ]; then
-            bash scripts/update-edition-state-branch.sh \
-              "$edition" revision-opened \
-              --reason=user_authorized_same_edition_revision \
-              --actor=user-authorized-acceptance
+            git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+            already_open="$(EDITION_ID="$edition" node -e '
+              const { execFileSync } = require("node:child_process");
+              const edition = process.env.EDITION_ID;
+              try {
+                const raw = execFileSync("git", ["show", `origin/automation/state:automation/status/${edition}.json`], { encoding: "utf8" });
+                const state = JSON.parse(raw);
+                const open = state.revisionRequest?.status === "open"
+                  && state.revisionRequest.reason === "user_authorized_same_edition_revision"
+                  && state.editorial?.status === "pending"
+                  && ["pending", "ready"].includes(state.packet?.status);
+                process.stdout.write(open ? "true" : "false");
+              } catch {
+                process.stdout.write("false");
+              }
+            ')"
+            if [ "$already_open" = "true" ]; then
+              echo "Authorized historical revision is already open for $edition; resuming it."
+            else
+              bash scripts/update-edition-state-branch.sh \
+                "$edition" revision-opened \
+                --reason=user_authorized_same_edition_revision \
+                --actor=user-authorized-acceptance
+            fi
           fi
 
       - name: Select immutable due edition
@@ -116,6 +136,15 @@ jobs:
                 if (state.editionId !== process.env.EDITION_ID || state.revisionRequest?.status !== "open" || state.revisionRequest?.reason !== "user_authorized_same_edition_revision" || state.editorial?.status !== "pending" || !packetRefreshable) throw new Error(`durable revision authorization is not refreshable for ${process.env.EDITION_ID}`);
               '
               echo "revision_authorized=true" >> "$GITHUB_OUTPUT"
+              pinned_sha="$(node scripts/restore-revision-packet.mjs "$state_path" "$RUNNER_TEMP/daily-wake.json" "$RUNNER_TEMP/pinned-packet.json")"
+              if [ -n "$pinned_sha" ]; then
+                bash scripts/update-edition-state-branch.sh "$edition" packet-ready --packet="$RUNNER_TEMP/pinned-packet.json" --run-id="$GITHUB_RUN_ID"
+                echo "edition=$edition" >> "$GITHUB_OUTPUT"
+                echo "period=$period" >> "$GITHUB_OUTPUT"
+                echo "needed=false" >> "$GITHUB_OUTPUT"
+                git worktree remove --force "$state_dir"
+                exit 0
+              fi
             fi
             node scripts/resolve-packet-dispatch.mjs --period="$period" --edition="$edition" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
