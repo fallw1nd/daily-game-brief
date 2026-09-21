@@ -6,6 +6,13 @@ event="${2:?state event is required}"
 shift 2
 main_root="$(pwd)"
 success=false
+packet_path=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --packet=*) packet_path="${arg#--packet=}" ;;
+  esac
+done
 
 for attempt in 1 2 3; do
   state_dir="${RUNNER_TEMP:?RUNNER_TEMP is required}/edition-state-${GITHUB_RUN_ID:-local}-$attempt"
@@ -30,9 +37,21 @@ for attempt in 1 2 3; do
     --event="$event" \
     --run-id="${GITHUB_RUN_ID:-local}" \
     "$@"
+
+  # A pinned historical revision packet normally reuses an existing Git blob.
+  # If the authorized wake repaired only subject identity, persist those
+  # derived bytes so the new packet SHA is fetchable by the trusted publisher.
+  if [ "$event" = "packet-ready" ] && [ -n "$packet_path" ]; then
+    mkdir -p "$state_dir/automation/packets"
+    cp "$packet_path" "$state_dir/automation/packets/$edition.json"
+  fi
+
   git -C "$state_dir" config user.name "daily-game-brief[bot]"
   git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
   git -C "$state_dir" add "automation/status/$edition.json"
+  if [ "$event" = "packet-ready" ] && [ -n "$packet_path" ]; then
+    git -C "$state_dir" add "automation/packets/$edition.json"
+  fi
   if git -C "$state_dir" diff --cached --quiet; then
     success=true
     git worktree remove --force "$state_dir"
