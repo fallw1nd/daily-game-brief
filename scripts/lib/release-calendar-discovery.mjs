@@ -1,4 +1,5 @@
 import { JSDOM, VirtualConsole } from "jsdom";
+import { aggregateCalendarLeads, dedupeCalendarObservations } from "./release-calendar-identity.mjs";
 
 const DAY = 86400000;
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -53,7 +54,7 @@ export function parseReleaseSource(html, source, editionDate) {
       const data = JSON.parse(doc.querySelector("#__NEXT_DATA__")?.textContent || "null");
       const walk = (v) => {
         if (!v || typeof v !== "object") return;
-        if (v.name && v.releaseDate && v.urlKey && v.nsuid) add(v.name, releaseDate(v.releaseDate, editionDate), `https://www.nintendo.com/us/store/products/${v.urlKey}/`, [v.platform?.label || "Nintendo Switch"], { productId: `nintendo:${v.nsuid}` });
+        if (v.name && v.releaseDate && v.urlKey && v.nsuid) add(v.name, releaseDate(v.releaseDate, editionDate), `https://www.nintendo.com/us/store/products/${v.urlKey}/`, [clean(v.platform?.label) || "unknown"], { productId: `nintendo:${v.nsuid}`, platformFamily: "Nintendo" });
         for (const x of Object.values(v)) walk(x);
       };
       walk(data);
@@ -96,7 +97,7 @@ export function parseReleaseSource(html, source, editionDate) {
       }
     }
   } finally { document.window.close(); }
-  const unique = [...new Map(records.map(r => [`${r.productId || titleIdentity(r.title)}|${r.platforms.join(",")}|${r.date}`, r])).values()];
+  const unique = dedupeCalendarObservations(records);
   return { records: unique, reviewLinks: reviewLinks.slice(0, 8) };
 }
 
@@ -116,8 +117,6 @@ export async function fetchReleaseSource(source, config, fetcher = fetch) {
 
 export async function collectReleaseCalendar({ config, editionDate, baseline = [], titleRegistry = {}, fetcher = fetch, now = new Date() }) {
   const window = releaseWindow(editionDate);
-  const known = new Set(Object.entries(titleRegistry.translations || {}).flatMap(([key, v]) => [key, v.titleZhCn, ...(v.titleEnAliases || [])]).filter(Boolean).map(titleIdentity));
-  const baselineNames = new Set(baseline.flatMap(v => [v.title?.title_en, v.title?.title_zh_cn]).filter(Boolean).map(titleIdentity));
   const results = [];
   // Two requests at a time, fixed source count; an outage is diagnostic, never a news publication blocker.
   for (let i = 0; i < config.sources.length; i += 2) {
@@ -142,24 +141,13 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
     results.push(...batch);
   }
   const all = results.flatMap(r => r.records);
-  const groups = new Map();
-  for (const record of all) {
-    const key = `${record.productId || titleIdentity(record.title)}|${record.platforms.join(",")}|${record.region}`;
-    const previous = groups.get(key);
-    if (previous) {
-      previous.sources = [...new Set([...previous.sources, record.sourceId])];
-      previous.dates = [...new Set([...previous.dates, record.date])];
-      previous.priority = Math.max(previous.priority, record.priority);
-    } else groups.set(key, { ...record, sources: [record.sourceId], dates: [record.date], knownTitle: known.has(titleIdentity(record.title)), inBaseline: baselineNames.has(titleIdentity(record.title)) });
-  }
-  const crossSource = new Map();
-  for (const r of all) { const key = titleIdentity(r.title); const families = crossSource.get(key) || new Set(); families.add(r.family); crossSource.set(key, families); }
-  const ranked = [...groups.values()].sort((a, b) => (Number(b.knownTitle) * 4 + Number(crossSource.get(titleIdentity(b.title)).size > 1) * 3 + b.priority + Number(!b.inBaseline)) - (Number(a.knownTitle) * 4 + Number(crossSource.get(titleIdentity(a.title)).size > 1) * 3 + a.priority + Number(!a.inBaseline)) || a.date.localeCompare(b.date));
+  const grouped = aggregateCalendarLeads(all, { baseline, titleRegistry });
+  const ranked = grouped.sort((a, b) => (Number(b.knownTitle) * 4 + Number(b.crossSource) * 3 + b.priority + Number(!b.inBaseline)) - (Number(a.knownTitle) * 4 + Number(a.crossSource) * 3 + a.priority + Number(!a.inBaseline)) || (a.date || "9999-99-99").localeCompare(b.date || "9999-99-99") || a.title.localeCompare(b.title));
   // Allocate across families before filling by priority so PC volume cannot evict console leads.
   const selected = []; const buckets = [...new Set(ranked.map(r => r.family))].map(family => ranked.filter(r => r.family === family));
   while (selected.length < config.maxCandidates && buckets.some(b => b.length)) for (const bucket of buckets) if (bucket.length && selected.length < config.maxCandidates) selected.push(bucket.shift());
   const coverage = results.map(r => ({ sourceId: r.source.id, url: r.source.url, platform: r.source.platform, status: r.status, pages: r.pages || 0, parsedCount: r.parsedCount, inWindow: r.records.length, reviewLinks: r.reviewLinks.length, ...(r.error ? { error: r.error } : {}) }));
-  return { editionDate, window, fetchedAt: now.toISOString(), coverage, candidates: selected.map(r => ({ ...r, crossSource: crossSource.get(titleIdentity(r.title)).size > 1, review: "open_primary_source_before_publication" })), reviewLinks: results.flatMap(r => r.reviewLinks), omittedCandidates: ranked.length - selected.length, coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.", requiredChecks: ["Open primary pages for missing known titles and cross-source leads first.", "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.", "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.", "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."] };
+  return { editionDate, window, fetchedAt: now.toISOString(), coverage, candidates: selected.map(r => ({ ...r, review: "open_primary_source_before_publication" })), reviewLinks: results.flatMap(r => r.reviewLinks), omittedCandidates: ranked.length - selected.length, coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.", requiredChecks: ["Open primary pages for missing known titles and cross-source leads first.", "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.", "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.", "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."] };
 }
 
 export function boundCalendarReport(report, maxChars = 24000) {
