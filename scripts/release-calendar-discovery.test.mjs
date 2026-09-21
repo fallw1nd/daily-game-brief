@@ -45,15 +45,17 @@ describe("release discovery", () => {
     expect(report.coverage.map(r => r.status)).toEqual(["partial", "failed"]);
     expect(report.candidates[0].review).toBe("open_primary_source_before_publication");
   });
-  it("preserves conflicting dates and reserves console coverage when the PC list grows", async () => {
-    const config = settings([source("steam"), source("calendar", { platform: "multiplatform" })]); config.maxCandidates = 2;
+  it("preserves conflicting dates when a multi-date group has no scalar date hint", async () => {
+    const config = settings([source("steam"), source("calendar", { platform: "multiplatform" })]); config.maxCandidates = 3;
     const report = await collectReleaseCalendar({ config, editionDate: "2026-09-08", fetcher: async url => new Response(url.endsWith("steam") ? row(1, "Game", "Sep 9, 2026") + row(1, "Game", "Sep 10, 2026") + row(2, "PC only", "Sep 11, 2026") : '<h3>2026</h3><ul><li>Console (PS5) – September 12</li></ul>') });
-    expect(report.candidates.map(r => r.family)).toEqual(["steam", "calendar"]);
-    expect(report.candidates[0].dates).toEqual(["2026-09-09", "2026-09-10"]);
-    expect(report.omittedCandidates).toBe(1);
+    expect(report.candidates.map(r => r.family)).toEqual(["steam", "calendar", "steam"]);
+    const conflicting = report.candidates.find(r => r.title === "Game");
+    expect(conflicting.dates).toEqual(["2026-09-09", "2026-09-10"]);
+    expect(conflicting.date).toBeNull();
+    expect(report.omittedCandidates).toBe(0);
     const bounded = boundCalendarReport(report, JSON.stringify(report).length - 1);
-    expect(bounded.candidates).toHaveLength(1);
-    expect(bounded.omittedCandidates).toBe(2);
+    expect(bounded.candidates).toHaveLength(2);
+    expect(bounded.omittedCandidates).toBe(1);
   });
   it("reports parser drift and rejects oversized responses", async () => {
     const report = await collectReleaseCalendar({ config: settings([source("steam")]), editionDate: "2026-09-08", fetcher: async () => new Response("<h1>Challenge</h1>") });

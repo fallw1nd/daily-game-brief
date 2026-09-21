@@ -166,16 +166,16 @@ function makeGroup(rows, meta, productConflictIds = []) {
       scopes.set(key, datesForScope);
     }
   }
-  const unknownScope = observations.some((observation) => observation.platforms.includes("unknown") || observation.region === "unknown" || observation.releaseType === "unknown");
+  const unknownScope = observations.some((observation) => observation.platforms.length === 0 || observation.platforms.includes("unknown") || observation.region === "unknown" || observation.releaseType === "unknown");
   const scopedDateConflict = [...scopes.entries()].some(([scopeKey, scopeDates]) => scopeDates.size > 1 && JSON.parse(scopeKey).every((value) => value !== "unknown"));
   const dateConflictUncertain = !scopedDateConflict && unknownScope && dates.length > 1;
   const group = {
     // Legacy fields remain available to packet consumers.
     title: first.title,
-    // A same-scope conflict keeps the earliest date only as a deterministic
-    // discovery sort hint; dateConflict/status and dates remain authoritative
-    // for review, so this is never a verified date.
-    date: dates.length === 1 || scopedDateConflict || dateConflictUncertain ? dates[0] : null,
+    // Multiple observed dates never become a scalar date. dateConflict/status
+    // and dates remain authoritative for review, while discovery sorting can
+    // use a separate hint in a later batch without falsifying this field.
+    date: dates.length === 1 ? dates[0] : null,
     url: first.url,
     announcementUrl: first.announcementUrl,
     platforms,
@@ -232,7 +232,19 @@ export function aggregateCalendarLeads(records = [], { baseline = [], titleRegis
   const baselineSet = baselineNames(baseline);
   const normalized = records.filter(Boolean).map((record) => normalizeObservation(record, aliases, knownNames, baselineSet)).filter(Boolean);
   const deduped = new Map();
-  for (const row of normalized) deduped.set(observationKey(row.obs), row);
+  for (const row of normalized) {
+    const key = observationKey(row.obs);
+    const existing = deduped.get(key);
+    if (!existing) {
+      deduped.set(key, row);
+      continue;
+    }
+    // Flags are evidence carried by the observation, not part of its
+    // substantive identity. Keep the first row's stable payload while
+    // retaining positive historical flags from every duplicate.
+    existing.known ||= row.known;
+    existing.baseline ||= row.baseline;
+  }
 
   const byBase = new Map();
   for (const row of deduped.values()) {
@@ -258,12 +270,10 @@ export function aggregateCalendarLeads(records = [], { baseline = [], titleRegis
       .map(([namespace]) => namespace);
 
     if (!conflictingNamespaces.length) {
-      // One product per store is safe to merge across stores. Unknown product
-      // observations remain separate so they are never assigned by inference.
-      const knownRows = rows.filter((row) => row.obs.productId);
-      const unknownRows = rows.filter((row) => !row.obs.productId);
-      if (knownRows.length) groups.push(makeGroup(knownRows, { ...meta, base, identityKey: base }, []));
-      if (unknownRows.length) groups.push(makeGroup(unknownRows, { ...meta, base: `${base}|product:unknown`, identityKey: `${base}|product:unknown` }, []));
+      // With no same-store product collision, all observations describe one
+      // research task. An unscoped observation is retained in that task and
+      // is never assigned to the known product by inference.
+      groups.push(makeGroup(rows, { ...meta, base, identityKey: base }, []));
       continue;
     }
 
@@ -298,7 +308,16 @@ export function dedupeCalendarObservations(records = []) {
     const row = normalizeObservation(record, new Map(), new Set(), new Set());
     if (!row) continue;
     const normalized = row.obs;
-    if (!seen.has(observationKey(normalized))) seen.set(observationKey(normalized), record);
+    const key = observationKey(normalized);
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, { ...record });
+      continue;
+    }
+    // Preserve first-seen ordering/payload while OR-ing historical flags
+    // carried by later duplicate records.
+    if (record.knownTitle) existing.knownTitle = true;
+    if (record.inBaseline) existing.inBaseline = true;
   }
   return [...seen.values()];
 }
