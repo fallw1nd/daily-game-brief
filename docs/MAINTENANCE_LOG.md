@@ -643,7 +643,7 @@
 - **Discovered:** 2026-09-22
 - **Priority / status:** P1 / in_progress.
 - **Evidence:** 2026-09-22 Daily continuation 中，多条已打开的 IGN、Gematsu、AUTOMATON、4Gamer 等注册媒体报道被 packet 统一标为 `needs-more-evidence`；同一实现还把单一官方一手标为 `needs-independent-report`。这与现行 Canonical contract 不一致：`official` 本来只要求一手来源，`media_report` 也从未要求两家媒体。实际编辑因此把一批主体和事实均清楚的内容错误送入 `needs_review`。另有来源在 RSS/列表阶段已经用精确 `publishedAt` 判定为 `timeRelation:"window"`，但打开正文后若模板不暴露时间，`build-evidence` 会丢弃该 listing timestamp，使边界日候选再次被迫待核。
-- **Bounded resolution:** readiness 改为描述证据组成而不是发布结论：`primary-plus-independent`、`primary-only`、`two-media-no-primary`、`single-media`、`discovery-only`、`no-opened-evidence`。单一注册 media 在主体、窗口和核心事实清楚时允许以 `media_report` 发布；明确转述可识别官方公告/采访/发言时允许 `media_relay_official`；只有 `multi_source_verified` 继续要求两家独立可靠来源。可信未确认内容仍可按 `rumors + unconfirmed + tracking` 发布。仅主体身份未解、事实冲突、固定窗口无法证明、动态聚合数据缺少必要快照等实质阻塞使用 `needs_review`。证据构建优先正文 metadata/可见时间，在正文缺失时保留同一来源 listing/RSS 的原始发布时间作为窗口证据。
+- **Bounded resolution:** readiness 改为描述证据组成而不是发布结论：`primary-plus-independent`、`primary-only`、`two-media-no-primary`、`single-media`、`discovery-only`、`no-opened-evidence`。单一注册 media 在主体、窗口和核心事实清楚时允许以 `media_report` 发布；明确转述可识别官方公告/采访/发言时允许 `media_relay_official`；只有 `multi_source_verified` 继续要求两家独立可靠来源。可信未确认内容仍可按 `rumors + unconfirmed + tracking` 发布。仅主体身份未解、事实冲突、固定窗口无法证明、动态聚合数据缺少必要快照等实质阻塞使用 `needs_review`。证据构建优先正文 metadata/可见时间，在正文缺失时保留同一来源 RSS/feed 的原始发布时间作为窗口证据。
 - **Safety boundaries retained:** 不改变 Daily 固定窗口、`requires_subject_identity`、`official` 一手要求、`multi_source_verified` 独立性要求、传闻不确定性标记、动态聚合数据快照要求或 trusted publisher 校验。没有修改历史 archive。
 - **Close when:** 新 readiness/时间回退回归通过，完整 `npm run check` 通过并合并 main；Pages 成功；至少一个后续自然 Daily packet 证明可信单一媒体不再仅因来源数量进入 `needs_review`，同时固定窗口和主体 gate 无回退。
 
