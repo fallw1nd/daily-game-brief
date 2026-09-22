@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
+import { classifyEvidenceReadiness, resolveEvidencePublishedAt } from "./lib/evidence-readiness.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
 import { extractExplicitOfficialLinks } from "./lib/primary-resolver.mjs";
 import { sourceVisiblePublishedAt } from "./lib/source-visible-time.mjs";
@@ -165,7 +166,11 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
         publisherKey,
         observedPrimaryIndependenceKeys,
         pageTitle: meta.pageTitle,
-        publishedAt: meta.publishedAt || sourceVisiblePublishedAt(html, source),
+        publishedAt: resolveEvidencePublishedAt({
+          metadataPublishedAt: meta.publishedAt,
+          visiblePublishedAt: sourceVisiblePublishedAt(html, source),
+          listingPublishedAt: appearance.publishedAt,
+        }),
         imageUrl: meta.imageUrl,
         canonicalUrl: meta.canonicalUrl,
         ...languageMetadata(source, meta, text),
@@ -177,9 +182,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
     }
   });
   const opened = sources.filter((source) => source.status === "opened");
-  const hasPrimary = opened.some((source) => source.kind === "primary");
-  const independentReliable = new Set(opened.filter((source) => source.kind !== "discovery").map((source) => source.independenceKey));
-  const readiness = hasPrimary && independentReliable.size >= 2 ? "primary-plus-independent" : hasPrimary ? "needs-independent-report" : independentReliable.size >= 2 ? "two-media-no-primary" : "needs-more-evidence";
+  const readiness = classifyEvidenceReadiness(opened);
   const primaryCandidates = [];
   const seenPrimary = new Set();
   for (const item of opened.flatMap((source) => source.primaryCandidates || [])) {
@@ -228,9 +231,11 @@ const output = {
     ...candidateBudget.telemetry,
     packages: packages.length,
     primaryPlusIndependent: packages.filter((item) => item.readiness === "primary-plus-independent").length,
-    needsIndependentReport: packages.filter((item) => item.readiness === "needs-independent-report").length,
+    primaryOnly: packages.filter((item) => item.readiness === "primary-only").length,
     twoMediaNoPrimary: packages.filter((item) => item.readiness === "two-media-no-primary").length,
-    needsMoreEvidence: packages.filter((item) => item.readiness === "needs-more-evidence").length,
+    singleMedia: packages.filter((item) => item.readiness === "single-media").length,
+    discoveryOnly: packages.filter((item) => item.readiness === "discovery-only").length,
+    noOpenedEvidence: packages.filter((item) => item.readiness === "no-opened-evidence").length,
     explicitPrimaryCandidates: packages.reduce((sum, item) => sum + item.primaryResolution.candidates.length, 0),
     observedPrimaryOrigins: new Set(packages.flatMap((item) => item.provenanceObservation.observedPrimaryIndependenceKeys)).size,
     limitedPages: packages.flatMap((item) => item.sources).filter((item) => item.status === "limited").length,
@@ -241,5 +246,5 @@ const output = {
 
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(output, null, 2) + "\n");
-console.log(`Evidence packages: ${output.totals.packages}; ready=${output.totals.primaryPlusIndependent}; explicit primary links=${output.totals.explicitPrimaryCandidates}; observed primary origins=${output.totals.observedPrimaryOrigins}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
+console.log(`Evidence packages: ${output.totals.packages}; primary+independent=${output.totals.primaryPlusIndependent}; primary-only=${output.totals.primaryOnly}; two-media=${output.totals.twoMediaNoPrimary}; single-media=${output.totals.singleMedia}; discovery-only=${output.totals.discoveryOnly}; explicit primary links=${output.totals.explicitPrimaryCandidates}; observed primary origins=${output.totals.observedPrimaryOrigins}; limited pages=${output.totals.limitedPages}; omitted=${output.totals.omittedByCandidateLimit}`);
 console.log(`Report: ${OUTPUT_PATH}`);
