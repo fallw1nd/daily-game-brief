@@ -1,162 +1,91 @@
-# Programmatic Brief Automation
+# Production Automation Architecture
 
-GitHub Actions prepares bounded evidence and deterministic state. The existing ChatGPT tasks perform the evidence-bounded editorial decision and submit a structured bilingual handoff; trusted code on `main` remains the only production publisher.
+Daily is the active production cadence. GitHub Actions is the durable orchestrator and only trusted publisher; the single enabled ChatGPT task performs bounded editorial decisions from immutable packets.
 
-## Reliability boundary
+## Current timeline
 
-Code owns deterministic work:
+| Beijing time | Owner | Action |
+| --- | --- | --- |
+| 10:10 | GitHub | Close the Daily evidence window and build the final packet. |
+| 10:20 | ChatGPT | Primary editorial invocation. |
+| 11:00 | GitHub | SLA preflight / packet recovery check. |
+| 11:10 | GitHub | Scheduled media recovery. |
+| 11:20 | ChatGPT | Second editorial invocation for current/recovery/continuation work. |
+| 11:40 | GitHub | Degraded publication fallback deadline. |
+| 12:00 | Pages | Planned Daily release gate. |
 
-- fixed Beijing windows and expected edition IDs;
-- incremental source-list/RSS discovery;
-- URL normalization, candidate deduplication, and adjacent-edition comparison;
-- source/time/media/schema validation;
-- media download, conversion, and caching;
-- Canonical entry identity, issue numbering, digest calculation, English Overlay validation, and explicit locale availability state;
-- atomic Git publication, deployment checks, retries, locale repair, and SLA incidents.
+GitHub cron is a liveness signal, not an identity source. Exact edition/window identity comes from the shared edition-window helpers and durable state.
 
-The existing ChatGPT scheduled tasks own only evidence-bounded editorial work:
+## Ownership
 
-- candidate prioritization after deterministic scoring;
-- concise Simplified Chinese headline, summary, verification, and time-note drafting;
-- a language-neutral `sharedFactFrame` for every included event;
-- natural English presentation copy from the same selected evidence and shared fact boundary when it can be completed safely;
-- structured `fact_status`, `time_status`, and `tracking` suggestions;
-- careful wording for rumors, disputes, interviews, and legal reports.
+GitHub owns deterministic work: source collection, scoring, evidence extraction, fixed windows, state transitions, issue/entry identity, schema validation, English/media availability, atomic publication, deployment, retries, and incidents.
 
-The model must never calculate issue numbers, final entry IDs, `factsDigest`, `canonicalCopyDigest`, or `localeDigest`; mutate manifests directly; download media; invent facts for English; or decide that a failed deployment succeeded. English is a presentation layer: an incomplete or invalid English draft must not suppress an otherwise valid Simplified Chinese Canonical edition.
+ChatGPT owns editorial judgment inside a finalized packet: include/exclude/review decisions, concise Chinese copy, `sharedFactFrame`, English presentation when safe, fact/time/tracking choices, and uncertainty wording. It never calculates issue numbers or digests, writes Canonical data directly, edits `automation/state`, or declares deployment success.
 
-## Components
+## Packet and evidence flow
 
-### Validation and SLA
+1. `config/news-sources.json` defines curated discovery sources.
+2. `scripts/collect-news.mjs` creates normalized A/B/C candidates for the fixed Daily window.
+3. `scripts/build-evidence.mjs` opens only shortlisted pages and produces bounded evidence packages. Readiness describes evidence composition, not publication eligibility. Article metadata/visible time is preferred; a trusted RSS/feed timestamp may be retained when the article template omits time.
+4. `scripts/editorialize.mjs` builds packet v3 / editorial input v2 after cutoff. Provider-facing input is capped at 120,000 characters per packet. Title hints and the release-calendar discovery stay fact-bounded.
+5. The packet and its Git blob SHA are acknowledged on `automation/state`. Mutable latest pointers are convenience views only.
 
-- `scripts/validate-data.mjs` enforces fixed windows, enums, primary-source requirements, source independence for `multi_source_verified`, tracking for unconfirmed entries, the next-15-day range, detailed audits, and byte-identical latest/archive data.
-- `scripts/validate-editorial-packet.mjs` rejects stale or malformed finalized packets before either ChatGPT or the SLA watchdog treats them as usable. It checks packet/input schema versions, mode, exact edition/period/planned time/window, `coverageThrough`, and post-cutoff finalization.
-- `scripts/validate-locales.mjs` and the English Overlay validator enforce stable Canonical identities, fact digests, copy digests, locale digests, complete English presentation fields, and explicit unavailable states without making English a Canonical fact gate.
-- Media proposals preserve the validated branch and audit artifact when repository settings block PR creation. The workflow creates a visible fallback incident instead of misreporting the failure as an enrichment error.
-- `Brief publication SLA watchdog` checks each expected edition after its deadline and opens or updates an incident when the archive or deployed manifest is missing.
+## Durable state
 
-### Final-window discovery
+Each edition has `automation/status/<edition-id>.json` with independent lanes for packet, editorial, publication, deployment, English, and media.
 
-`Final editorial packet` starts at the fixed production evidence cutoff and captures the complete edition window. Legacy AM/PM use 10:10/17:00 Asia/Shanghai; the precutover-compatible Daily contract uses a 10:10 cutoff with 12:00 public `plannedAt`. Packet start time is never the ChatGPT task invocation time.
+- packet: `pending → ready | failed`
+- editorial: `pending → submitted → valid | invalid`, or GitHub-owned `timed_out`
+- publication: `pending → committed | failed`
+- deployment: `pending → deployed | failed`
+- English/media: independent `pending | available | partial | unavailable`
 
-1. `config/news-sources.json` is the curated source registry.
-2. `scripts/collect-news.mjs` reads RSS and list pages without opening article bodies.
-3. Candidates are normalized, scored, compared with the adjacent edition, and split into A/B/C review levels.
-4. `scripts/build-evidence.mjs` records declared/detected source-language metadata together with the bounded evidence text; language metadata guides presentation only and never upgrades factual authority.
-5. The artifact records every limited source so coverage failures remain visible.
+`invalid` may be repaired only against the same immutable packet. `submitted`, `valid`, and `timed_out` are not model-editable states.
 
-Artifacts and the persistent state branch measure:
+The persistent 45-day event ledger keeps discovery and editorial fields separate. Active tracking items return to editorial input until explicitly continued or closed.
 
-- official A-level items absent from the corresponding edition;
-- three-source clusters absent from the edition;
-- false-positive A/B candidates;
-- source availability and average candidate volume;
-- candidates found by the shadow collector but not by the ChatGPT task, and vice versa.
+## Liveness, recovery, and fallback
 
-`scripts/audit-news-coverage.mjs` independently compares opened A/B evidence with the expected archive using normalized source URLs, subject keys, and conservative headline overlap. It reports high-confidence and review omissions without mutating an edition.
+If the active task finds the immediate next Daily missing a ready packet after cutoff, it may write the exact `packet_missing_at_handoff` wake file. The wake only asks GitHub to build/acknowledge the packet; it is not recovery state.
 
-### Evidence extraction and ledger
+The SLA watchdog restores the acknowledged packet first. If it is missing/stale/invalid, GitHub rebuilds collection → ledger → evidence → packet and acknowledges the replacement before further action. At the degraded deadline, fallback publication admits only conservative A-level facts supported by an opened primary source or two independent opened reliable sources. It never invents translations, rumors, or analysis.
 
-`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, source-language metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. Article metadata/visible time remains preferred, but the trusted discovery RSS/feed timestamp is retained as a fallback so a source appearance already classified inside the fixed window does not lose its usable time evidence merely because the article template hides the timestamp. Readiness names evidence composition rather than a publication verdict: `primary-plus-independent`, `primary-only`, `two-media-no-primary`, `single-media`, `discovery-only`, or `no-opened-evidence`. A single curated media source may publish as a bounded `media_report`; two independent reliable sources are required only when claiming `multi_source_verified`. No model call receives an unbounded page or the complete archive history.
+## Continuations and revisions
 
-### ChatGPT editorial handoff
+A published edition may receive queue-authorized same-edition continuations without changing its issue/window.
 
-`scripts/editorialize.mjs` builds a compact, finalized editorial packet for the existing **10:20/11:20 Asia/Shanghai Daily ChatGPT invocations**. Each edition is capped at 120,000 evidence characters (roughly 30,000 reading tokens), carries the active `contractVersion: 2` decision schema, records coverage through the fixed cutoff, and is persisted on `automation/state`. The former AM task now handles both Daily invocations; the former PM task is disabled.
+- `editorial_continuation`: bounded news packet with exact event-key scope and `preservePublished:true`.
+- `showcase_completion`: bounded showcase/fact supplement; see `docs/SHOWCASE_RECOVERY.md`.
+- user-authorized same-edition revision: explicit wake/revision authorization tied to the existing edition and packet rules.
 
-The ten-minute separation is intentional: GitHub closes the AM/PM evidence windows and starts `Final editorial packet` at 10:10/17:00, then the ChatGPT editorial handoff starts at 10:20/17:10. For Daily, GitHub closes evidence at 10:10, the ChatGPT handoff remains 10:20, and public `plannedAt` is 12:00. This buffer gives packet generation normal queue/runtime headroom and must never admit post-cutoff facts.
+An initial trusted bundle may contain the Daily packet plus one next-news continuation. GitHub re-resolves all packet/event identities before serial publication. Later continuations use the single inbox. Partial/replayed publication is idempotent and does not reopen already committed facts.
 
-Each due edition has one durable record at `automation/status/<edition-id>.json`. It records the fixed identity and window, the finalized packet's Git blob SHA, editorial submission/validation acknowledgement, publication commit, deployment result, and independent English/media availability. All writers update this record through bounded compare-and-retry pushes to `automation/state`; mutable `latest-am.json` / `latest-pm.json` / `latest-daily.json` pointers are convenience views, never identity authorities. A persisted `automation/batches/<edition-id>/queue.json` may contain bounded continuation packets; the queue activates at most one packet in a state transaction and records its exact batch scope/event identities before the editorial task can consume it.
+Same-edition revision overlays preserve previously published entries, stable matching entry IDs, existing verified media, tracking, and the current release-calendar baseline unless an explicit supported change removes/updates them.
 
-A delayed ChatGPT invocation selects the oldest already-due state for its period whose packet is acknowledged, publication is not committed, and editorial state is `pending` or `invalid`. `pending` starts a new decision. `invalid` is a bounded repair: the task reads durable `validationErrors` and the prior `submissionSha`, then corrects that decision for the same edition against the same acknowledged packet blob. A trusted `editorial_continuation` packet is a pre-cutoff, same-edition news batch with exact event-key identity and `preservePublished:true`; it uses a distinct queue-owned state reason and cannot use the showcase authorization. It never rediscovers events, swaps packets, skips backlog, or advances to a later window. `submitted` and `valid` are already owned by the GitHub publication lane; `timed_out` is owned by the GitHub SLA lane, so none of those states are eligible for ChatGPT editing.
+## Canonical, English, media, and deployment
 
-When a trusted Daily handoff exposes a second same-edition packet, `scripts/editorialize.mjs` writes a pre-confirmed `bundle-plan.json` beside the packet batches; the packet workflow copies that plan into `automation/batches/<edition-id>/bundle-plan.json` on `automation/state`. The task reads that plan before drafting and may commit one `automation/bundle-inbox/<edition-id>.json` containing at most two ordered submissions: the normal Daily packet first, then a GitHub-resolved news continuation when one is available. The plan is only a candidate handoff; GitHub still resolves the request against durable state and queue data, fixes each packet's Git blob SHA, scope, batch filename, event keys, and queue snapshot, then publishes the submissions serially. An absent/stale plan or a later continuation uses the single-inbox path. The initial plan is not regenerated as the queue advances; prepare rechecks submitted identities after editing and cannot supply missing pre-edit evidence. The same-edition bundle is same-edition only: each packet's existing `editorialInput.budget.usedInputChars` must remain within the 120,000-character provider-facing input budget and the bundle within 240,000; the serialized packet/editorial transport envelope has separate 240,000-per-packet and 480,000-per-bundle safety limits. These are safety/input limits, not a provider token or cost measurement. Before every packet GitHub re-reads state, activates only the trusted queue candidate, and stops on failure so an unprocessed packet remains pending. The result records each committed package and its feedback status; if the three-attempt state feedback transaction remains pending, the explicit bundle `workflow_dispatch` with the exact edition ID reruns the same bundle against the latest state, preserving later ledger decisions. A retry may acknowledge an already committed first packet idempotently and repair only the active later packet; it never reopens a completed publication or accepts an editor-selected blob/event identity. Branches created before this workflow was installed must use the existing single `automation/inbox/<edition-id>.json` publisher path; bundle submission is allowed only when the workflow is present on both trusted `main` and the target editorial branch, so an old branch cannot commit a bundle with no trigger.
+Simplified Chinese Canonical lives in `public/data/archive/`, `latest.json`, and `manifest.json`. English is a fact-bound Overlay under `public/data/locales/en/`; it can degrade independently without blocking valid Chinese Canonical. Media is likewise nonblocking and may be enriched later with verified assets.
 
-The ChatGPT task reads the state first, restores a ready packet by its acknowledged blob SHA, copies that SHA to top-level `packetBlobSha`, and submits only the editorial decision. It never polls Actions, creates workflow files, performs collection recovery, writes `automation/state`, or publishes Canonical data. Missing/invalid packet recovery and degraded publication have one owner: GitHub Actions. A matching packet is usable only when it passes the same finalized-packet checks as `scripts/validate-editorial-packet.mjs`. After that preflight, the task reads current `main` manifest/latest and the referenced archive. A normal Canonical edition is authoritative even when `automation/state` lags: the task verifies it and stops before drafting or committing. Only a missing Canonical, an existing `[自动事实清单]`, or a durable `editorial_continuation` packet can proceed; the latter preserves the existing edition and remains a same-edition, same-issue continuation.
+The publisher validates the submission against the acknowledged packet, rebuilds from current `main` on concurrent advances, runs `npm run check`, commits atomically, and dispatches exact-edition Pages/media work. Pages holds a staged Daily until `plannedAt`.
 
-Daily adds one narrow liveness signal without changing recovery ownership. If the 10:20 Daily task has no eligible ready state after formal cutover, it may read current `main`, derive only the immediate successor of the latest published healthy AM or Daily edition, require that candidate Canonical to be absent, and commit one exact `automation/wake/<edition-id>.json` on `automation/editorial/<edition-id>`. The payload is fixed to schema v1, `period:"daily"`, and `reason:"packet_missing_at_handoff"`. The task then stops; it does not inspect or poll Actions. `.github/workflows/news-discovery-shadow.yml` accepts that push only from `automation/editorial/*-daily`, revalidates the branch edition and wake payload, and runs `resolve-packet-dispatch.mjs` with exact `period + edition`. The resolver rejects mismatched or too-early targets. Thus the wake is merely a second scheduler signal; GitHub still performs all collection, packet acknowledgement, SLA recovery, degraded publication, deployment, and incidents.
+## Compatibility
 
-After packet persistence, `Final editorial packet` waits until the fixed 11:00/17:50 publication SLA and dispatches `Brief publication SLA watchdog` with the exact edition. Daily packet runs, including those started by the bounded wake signal, use the 11:00 SLA. The cron remains a redundant wake-up, while `scripts/resolve-due-edition.mjs` always selects the oldest unpublished due window. Thus a delayed or skipped GitHub schedule cannot silently advance past backlog, and a Daily wake-triggered packet does not depend on the delayed schedule to reach SLA verification.
+Historical AM/PM archives and manual `am|pm|daily` workflow inputs remain supported for explicit historical recovery/revision. They are not the current production cadence. The one-time first-Daily bridge window is encoded in shared window helpers and remains immutable historical compatibility, not an operational rule.
 
-For every included decision, `sharedFactFrame` is the language-neutral boundary for subject title key, dates, times, numbers, platforms, people/entities, versions, and proper terms. Simplified Chinese Canonical copy and `locales.en` must stay inside this frame. English is independently edited rather than sentence-by-sentence translated; official English terminology is preferred when opened English evidence provides it. When complete English copy cannot be produced safely, the task omits `locales.en` instead of weakening or changing the Canonical decision.
+## Operations
 
-### Canonical data and English Overlay
-
-The Simplified Chinese edition under `public/data/archive/YYYY/MM/<edition-id>.json`, plus `latest.json` and `manifest.json`, remains the sole fact authority. English is stored separately under `public/data/locales/en/archive/YYYY/MM/<edition-id>.json` as a presentation Overlay that references Canonical identities and contains no independent fact-status, time-status, tracking, source URL, platform, date, issue, or ordering authority.
-
-The trusted publisher binds the editorial `eventKey` handoff to final Canonical `entryId` values after the edition is built. It then computes:
-
-- `factsDigest` from the stable Canonical fact projection;
-- `canonicalCopyDigest` from Simplified Chinese presentation copy;
-- `localeDigest` from the English Overlay presentation payload.
-
-A stale `factsDigest` makes the English Overlay unavailable. A changed Simplified Chinese copy digest is observable but does not by itself imply factual staleness. `public/data/locales/en/index.json` is generated state describing which Canonical editions have a valid English Overlay and which are explicitly unavailable.
-
-### Idempotent publisher
-
-`scripts/publish-editorial-decision.mjs` validates the structured Canonical decision against the packet, builds the archive, preserves continuous issue numbers, updates latest/manifest/search index, and exits without Canonical mutation when a normal edition already exists. If the SLA fallback published an `[自动事实清单]`, the normal task may revise that same edition and issue number. Media failures degrade to explicit unavailable states; fact-verification failures exclude the story.
-
-Only after packet preflight and the current-`main` Canonical idempotency check may the ChatGPT task create `automation/editorial/<edition-id>` and write `automation/inbox/<edition-id>.json`; it stops after the commit succeeds. The Daily missing-packet wake path may create that same edition-scoped branch earlier, but a wake commit contains only `automation/wake/<edition-id>.json` and never an editorial inbox decision. `.github/workflows/publish-editorial-decision.yml` runs trusted publisher code from `main`, restores the exact finalized packet from `automation/state`, validates all edition identities and cutoff coverage, performs the complete check, and publishes the result.
-
-Normal publication has three observable locale outcomes:
-
-- **bilingual** — Canonical publication and a valid English Overlay are committed together;
-- **Chinese-first degraded** — Canonical publication succeeds while English is recorded as machine-readable unavailable because the English draft is missing or invalid;
-- **locale repair** — a later trusted `locale-repair` run may add/replace only English Overlay/availability state. The workflow guards hashes of the Canonical archive, `latest.json`, and `manifest.json` so repair cannot silently mutate factual data.
-
-Publication is concurrency-safe against other `main` writers. If a push is rejected because `main` advanced after the edition was built, the workflow resets to the current `origin/main`, rebuilds the same committed editorial decision, reruns the full repository check, and retries up to three times. This preserves concurrent media changes instead of rebasing a stale generated `latest.json` over them. If a validated publication workflow still fails, the original push-triggered run queues at most one `workflow_dispatch` retry for the same committed decision. The retry path is semantically idempotent: an edition that already reached `main` is detected as `already-exists`, keeps its issue number, and can still re-dispatch Pages/media and finish ledger feedback.
-
-After a changed edition reaches `main`, the publisher dispatches `deploy.yml` and `media-enrichment.yml` with the exact edition ID. A workflow-dispatch retry also re-dispatches these downstream workflows even when the content commit already exists, covering the case where the original run failed after the `main` push but before downstream dispatch. Deployment verification and incidents remain GitHub responsibilities.
-
-After the edition dispatches, the publisher writes every structured decision back to the persistent 45-day ledger on `automation/state`. Discovery fields and editorial fields remain separate so a later collection cannot erase an editorial result. Records distinguish included, excluded, actively tracked, and closed tracking states, keep a bounded decision history, and use edition identity to prevent an older rerun from replacing newer judgment. A formal revision replaces the degraded decision for the same edition.
-
-Active tracking records are mandatory editorial input. When fresh opened evidence exists, the event is prioritized in the normal package list; otherwise a compact `trackingQueue` reminder carries its last decision, reason, source URLs, and dates. The ChatGPT task must explicitly continue or close every reminder. Tracking reminders count against the same 120,000-character budget and fail visibly rather than disappearing when the budget cannot contain them.
-
-The 11:00/17:50 SLA watchdog first restores the matching packet blob acknowledged by `automation/status/<edition-id>.json` and validates the complete finalized-packet contract, not only the edition ID. If the packet is missing, stale, malformed, or pre-cutoff while the edition is unhealthy, the watchdog reruns collection, ledger update, evidence extraction, and packet construction in its own Node environment. A recovered packet and its acknowledgement are committed with the same bounded compare-and-retry rule; publication does not proceed from an unacknowledged recovery packet.
-
-The watchdog then uses `scripts/build-degraded-decision.mjs` only when an edition is missing. It admits only windowed A-level events with an opened primary source or two independent opened sources, preserves source-language facts, and does not invent translations, rumors, or analysis. Its `main` publication uses the same rebuild-on-current-main retry principle for up to three attempts. If the repository already contains the edition but Pages is still unhealthy, the watchdog re-dispatches Pages rather than treating the absence of a new data diff as sufficient recovery. If collection fails or no event meets the threshold, it opens an incident instead of fabricating an edition.
-
-### Observation and refinement
-
-During precutover, keep the existing **10:20/17:10 ChatGPT tasks** enabled and unchanged. Treat 10:10/17:00 as legacy evidence cutoffs and packet-start times, not ChatGPT invocation times. After formal Daily cutover, keep only the converted 10:20 Daily editorial task enabled, use the bounded wake signal solely when its exact acknowledged packet is missing, and validate both normal packet availability and wake/SLA liveness in production acceptance. Review real outputs for omission audits, source health, degraded fallbacks, locale outcomes, media outcomes, and SLA behavior before tightening or widening timing again.
-
-## Operational states
-
-Every due edition has independently observable lanes:
-
-- packet: `pending → ready | failed`;
-- editorial: `pending → submitted → valid | invalid`, with `invalid → submitted` for same-packet repair, or GitHub-owned `timed_out`;
-- publication: `pending → committed | failed`;
-- deployment: `pending → deployed | failed`;
-- English and media: independent `pending`, `available`, `partial`, or `unavailable` states.
-
-The normal publisher may commit only an exact `valid` submission bound to the acknowledged packet blob. The degraded publisher may commit only under the GitHub-owned timeout/recovery path. Invalid submissions retain machine-readable `validationErrors` and the rejected `submissionSha`; a correction replaces only the submission SHA while preserving edition and packet identity. `submitted`, `valid`, and `timed_out` cannot be reopened by a new ChatGPT submission.
-
-An already published edition may have one queue-owned `editorial_continuation` cycle at a time. Its packet must be `continuation.scope:"news"`, preserve published content, and carry the exact durable batch event keys; a continuation with no included facts may close as an unchanged review after every item receives a decision. `showcase_completion` remains a separate scoped reason for announcement/fact supplements.
-
-`degraded` — publishable Canonical facts completed; optional media, English presentation, or a noncritical source failed.
-
-`failed` — archive missing, Canonical source contract invalid, commit rejected, or deployment not visible; an incident is opened and the fixed window is retained for recovery.
-
-Silent disappearance is never a valid state.
-
-## Commands
+Primary commands:
 
 ```bash
-npm run news:collect:am
-npm run news:collect:pm
-npm run news:ledger
-npm run news:ledger-feedback
+npm run news:collect:daily
 npm run news:evidence
 npm run news:packet
-node scripts/validate-editorial-packet.mjs --edition=YYYY-MM-DD-am --period=am
-npm run brief:publish-decision
 npm run brief:validate-submission
-npm run brief:degraded-decision
-npm run brief:sla:am
-npm run brief:sla:pm
+npm run brief:publish-decision
+npm run brief:sla:daily
 npm run validate:data
 npm run validate:locales
 npm run check
 ```
 
-The discovery and SLA scripts use only Node.js built-ins. They can run before `npm ci` when diagnosing a dependency outage.
+Historical AM/PM command variants remain for recovery tooling only.

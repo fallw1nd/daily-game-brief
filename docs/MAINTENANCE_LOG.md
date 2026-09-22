@@ -606,12 +606,12 @@
 
 - **Priority / status:** P2 / in_progress.
 - **Evidence:** 工作区根 AGENTS 仍强制 gpt-taste，生产已使用 ReadingApp；媒体补充提示仍要求追加早晚任务；编辑契约对发布会和英文修复顺序存在冲突；每次 push 全量检查会重复验证纯日志更新。
-- **Resolution:** 按官方 Astra guidance 和 Eric Provencher 实践建议精简入口、按需读资料、复用有效校验，修正旧文档和路由，保留生产安全边界。详见 docs/ASTRA_INSTRUCTION_REVIEW.md。
+- **Resolution:** 按官方 Astra guidance 和 Eric Provencher 实践建议精简入口、按需读资料、复用有效校验，修正旧文档和路由，保留生产安全边界。当时的详细审查已由 PR #125 与本条验证记录留档；一次性审查文档后续已从生产文档目录移除。
 - **Close criteria:** 契约回归和完整检查通过，生产分支更新；后续自然编辑任务验证选择顺序与完整提交，记录实际调用成本后再关闭。文档缩短不等于已证明费用下降。
 - **Verification:** `npm run check` passed: 78 test files / 386 tests, 33 archives, locale validation, typecheck and production build. No public data or scheduler configuration changed; natural-run and cost evidence remain pending.
 - **Publication:** [PR #125](https://github.com/fallw1nd/daily-game-brief/pull/125) merged to main as `8a74760`; [Verify 34682716468](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682716468) and [Verify 34682704339](https://github.com/fallw1nd/daily-game-brief/actions/runs/34682704339) passed. This evidence-only follow-up reuses those checks; status remains in_progress pending the stated natural-run criteria.
 
-- **2026-09-13 local optimization closeout:** 在功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 上加入同 edition bundle 的 identity/state/feedback 事务、显式 partial result、queue fairness 与 24 个文件的回归/演练覆盖；验收记录见 `docs/OPTIMIZATION_ACCEPTANCE.md`。本地完整检查通过后仍不改变本条 status：没有 live workflow/deploy、实际 scheduler 配置、provider cost 或自然运行证据，文档精简和字符边界不等于费用下降。
+- **2026-09-13 local optimization closeout:** 在功能 head `96b28273cf539456a24022417eabe6a2fffe36c0` 上加入同 edition bundle 的 identity/state/feedback 事务、显式 partial result、queue fairness 与 24 个文件的回归/演练覆盖；当时的验收细节保留在 PR #133、对应 Actions 与本维护日志中；一次性验收文档后续已从生产文档目录移除。本地完整检查通过后仍不改变本条 status：没有 live workflow/deploy、实际 scheduler 配置、provider cost 或自然运行证据，文档精简和字符边界不等于费用下降。
 
 - **2026-09-19 closeout:** 实际调度器已独立回读：唯一启用长期任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 为 Asia/Shanghai 精确10:20与11:20，旧 PM 任务禁用；2026-09-13至19多期自然提交验证当前选择顺序与完整提交可工作。功能/调度验收已满足，唯一剩余关闭条件是“实际调用成本/usage”测量；当前 Automations 接口不暴露每次 Scheduled Task token/费用，因此不能伪造成本下降结论，继续 in_progress 仅等待可获得的真实 usage 证据。
 
@@ -634,7 +634,7 @@
 - **Measured evidence:** `git ls-remote origin refs/heads/main` was `c9716360aa1d36beb97f531f9d1b82567ccec8b4` before this candidate's follow-up merge. On automation/state `4d92f091f4f081e5e0f0b0882b902bb736c266fe`, the real 2026-09-15 packet measured raw JSON 177,272 chars, compact JSON 128,376, `editorialInput.budget.usedInputChars=117,897` / `maxInputChars=120,000`, 17 packages and 94 tracking items; it is valid under the provider-input budget despite the larger transport envelope. Four older queues (Sep11/13/14/15) were read without mutation and contained 7/13/5/13 pending news event identities; no plan file was required for the read-only compatibility path.
 - **Close when:** Astra accepts the candidate, it is merged without altering the fixed-window/publication contract, Sep16 is repaired through the trusted publisher, and live Actions/Pages confirm no recurrence. Showcase full-source completeness, natural two-pass scheduling, provider cost, title-hint adoption and cross-platform calendar coverage remain separate open criteria; this entry does not claim those validations.
 
-- **2026-09-19 reviewed scope:** Synced production 69ba3b4; Sep16 formal repair acaf72d already exists. Initial Canonical + next news only; later continuations remain single inbox. The old four-slot/day simulation is not a release guarantee. Shared archive-title validation and build-failure acknowledgement passed npm run check (83 files / 419 tests / 40 bilingual archives); feedback conflict recovery preserved all six concurrent files. Full-source completeness and measured cost remain open; release evidence is recorded in docs/OPTIMIZATION_ACCEPTANCE.md and the PR.
+- **2026-09-19 reviewed scope:** Synced production 69ba3b4; Sep16 formal repair acaf72d already exists. Initial Canonical + next news only; later continuations remain single inbox. The old four-slot/day simulation is not a release guarantee. Shared archive-title validation and build-failure acknowledgement passed npm run check (83 files / 419 tests / 40 bilingual archives); feedback conflict recovery preserved all six concurrent files. Full-source completeness and measured cost remain open; release evidence is retained in PR #133, its Actions runs, and this maintenance ledger.
 
 - **2026-09-19 closeout:** PR #133 已合并 main（b7fbcdc），Verify 35439433649 成功；2026-09-16 正式稿已由 trusted publisher 以 acaf72d 修复并完成 media/Pages 35197448570；共享 archiveTitle 校验、build failure acknowledgement 与 bundle recovery 均已进入生产。该条自身 Close when 全部满足；发布会完整性、自然吞吐、成本等继续由各自维护项追踪。
 
@@ -646,4 +646,13 @@
 - **Bounded resolution:** readiness 改为描述证据组成而不是发布结论：`primary-plus-independent`、`primary-only`、`two-media-no-primary`、`single-media`、`discovery-only`、`no-opened-evidence`。单一注册 media 在主体、窗口和核心事实清楚时允许以 `media_report` 发布；明确转述可识别官方公告/采访/发言时允许 `media_relay_official`；只有 `multi_source_verified` 继续要求两家独立可靠来源。可信未确认内容仍可按 `rumors + unconfirmed + tracking` 发布。仅主体身份未解、事实冲突、固定窗口无法证明、动态聚合数据缺少必要快照等实质阻塞使用 `needs_review`。证据构建优先正文 metadata/可见时间，在正文缺失时保留同一来源 RSS/feed 的原始发布时间作为窗口证据。
 - **Safety boundaries retained:** 不改变 Daily 固定窗口、`requires_subject_identity`、`official` 一手要求、`multi_source_verified` 独立性要求、传闻不确定性标记、动态聚合数据快照要求或 trusted publisher 校验。没有修改历史 archive。
 - **Close when:** 新 readiness/时间回退回归通过，完整 `npm run check` 通过并合并 main；Pages 成功；至少一个后续自然 Daily packet 证明可信单一媒体不再仅因来源数量进入 `needs_review`，同时固定窗口和主体 gate 无回退。
+
+## MNT-20260922-02 — 生产文档与实际 Daily 运行状态长期漂移
+
+- **Discovered:** 2026-09-22
+- **Priority / status:** P1 / in_progress.
+- **Evidence:** 实际调度器只有一个启用的“游戏圈每日简报”，Asia/Shanghai 每日 10:20/11:20；仓库却仍同时保留 precutover、两个 Scheduled Tasks、10:20/17:10、旧媒体恢复、迁移 rollback 与一次性 Astra/System/Optimization 验收文档。README 还把一次性 SYSTEM_REVIEW 当成入口。核心规则在 AGENTS、SCHEDULED_TASK_PROMPT、AUTOMATION_ARCHITECTURE、DATA_PIPELINE 与多份历史文档重复，增加模型上下文和维护漂移风险。
+- **Bounded resolution:** 将生产文档收敛到当前 Daily 架构；README 明确现行入口；AGENTS 只保留仓库级边界；Scheduled Task prompt 只保留编排契约；AUTOMATION_ARCHITECTURE/Data Pipeline 分别成为状态/职责和数据/证据权威；媒体、日历、发布会各自只保留当前专项规则。删除已完成的 Daily migration、Astra/System review、Optimization plan/acceptance、旧 media addendum 与重复 revision note；保留历史事实于本维护日志和 PR/Actions。AM/PM 代码与 workflow_dispatch 入口只在仍承担历史恢复/修订兼容时保留，不作为当前 cadence。
+- **Test cleanup:** 将 `daily-edition-precutover.test.mjs` 改为生产语义命名，并收紧 Scheduled Task 文本测试为关键边界而非逐句复制文档；重复 revision-note 文档测试随已合并规则一并移除。
+- **Close when:** 完整 `npm run check` 通过，PR 合并 main，Pages 成功；实际启用 Scheduled Task prompt 同步为精简 bootstrap 且保持原 10:20/11:20 schedule 与 enabled 状态不变。
 

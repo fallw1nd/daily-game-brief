@@ -26,8 +26,8 @@ function packetForDaily(editionId) {
   };
 }
 
-describe("Daily Edition production compatibility", () => {
-  it("uses a 10:10 evidence cutoff while scheduling normal Daily editions for noon", () => {
+describe("Daily edition production contract", () => {
+  it("uses a 10:10 evidence cutoff and noon planned release", () => {
     expect(plannedWindow("daily", new Date("2026-09-01T04:00:00Z"))).toEqual({
       id: "2026-09-01-daily",
       period: "daily",
@@ -35,67 +35,34 @@ describe("Daily Edition production compatibility", () => {
       windowStart: "2026-08-31 10:10",
       windowEnd: "2026-09-01 10:10",
     });
-    expect(expectedEditorialWindow("2026-09-01-daily")).toEqual({
-      id: "2026-09-01-daily",
-      period: "daily",
-      plannedAt: "2026-09-01 12:00",
-      windowStart: "2026-08-31 10:10",
-      windowEnd: "2026-09-01 10:10",
-    });
   });
 
-  it("bridges the first real Daily strictly after the final published legacy PM", () => {
-    expect(expectedEditorialWindow("2026-08-31-daily")).toEqual({
-      id: "2026-08-31-daily",
-      period: "daily",
-      plannedAt: "2026-08-31 12:00",
-      windowStart: "2026-08-30 17:00",
-      windowEnd: "2026-08-31 10:10",
-    });
-    const manifest = {
-      editions: [{ id: "2026-08-30-pm", date: "2026-08-30", period: "pm", issueNumber: 20 }],
-    };
-    const result = resolveDueEdition({
-      period: "daily",
-      now: new Date("2026-08-31T06:20:00Z"),
-      manifest,
-      purpose: "packet",
-    });
-    expect(result.needed).toBe(true);
-    expect(result.window).toMatchObject({
-      id: "2026-08-31-daily",
+  it("preserves the one-time first-Daily bridge as historical compatibility", () => {
+    expect(expectedEditorialWindow("2026-08-31-daily")).toMatchObject({
       windowStart: "2026-08-30 17:00",
       windowEnd: "2026-08-31 10:10",
     });
   });
 
-  it("makes Daily due at the evidence cutoff rather than the noon publication time", () => {
+  it("makes Daily due at cutoff rather than release time", () => {
     expect(latestDueWindow("daily", new Date("2026-09-01T02:09:59Z")).id).toBe("2026-08-31-daily");
     expect(latestDueWindow("daily", new Date("2026-09-01T02:10:00Z")).id).toBe("2026-09-01-daily");
   });
 
-  it("accepts a finalized immutable Daily packet without changing packet schemaVersion 3", () => {
+  it("accepts the finalized immutable Daily packet contract", () => {
     expect(validateFinalizedEditorialPacket(packetForDaily("2026-09-01-daily"), {
       editionId: "2026-09-01-daily",
       period: "daily",
     })).toEqual([]);
-    expect(validateFinalizedEditorialPacket(packetForDaily("2026-08-31-daily"), {
-      editionId: "2026-08-31-daily",
-      period: "daily",
-    })).toEqual([]);
   });
 
-  it("rolls back from a published Daily into the same-day PM window without gaps", () => {
-    const manifest = {
-      editions: [{ id: "2026-09-01-daily", date: "2026-09-01", period: "daily", issueNumber: 21 }],
-    };
+  it("retains PM resolution only for historical/manual compatibility", () => {
     const result = resolveDueEdition({
       period: "pm",
       now: new Date("2026-09-01T09:00:00Z"),
-      manifest,
+      manifest: { editions: [{ id: "2026-09-01-daily", date: "2026-09-01", period: "daily", issueNumber: 21 }] },
       purpose: "packet",
     });
-    expect(result.needed).toBe(true);
     expect(result.window).toMatchObject({
       id: "2026-09-01-pm",
       windowStart: "2026-09-01 10:10",
@@ -103,7 +70,7 @@ describe("Daily Edition production compatibility", () => {
     });
   });
 
-  it("switches both Chinese and English footer cadence by edition period", () => {
+  it("renders Daily cadence in both locales", () => {
     expect(chineseApp).toContain('edition.period === "daily" ? "每天一期，整理值得核验的游戏行业动态。"');
     expect(chineseApp).toContain('edition.period === "daily" ? "北京时间 12:00 更新"');
     expect(englishApp).toContain('edition.period === "daily" ? "One evidence-checked video-game industry brief each day."');

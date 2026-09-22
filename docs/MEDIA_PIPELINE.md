@@ -1,65 +1,63 @@
 # Media Pipeline
 
-The media pipeline enriches an edition after Canonical publication, opens listed source pages, validates the image response, converts accepted assets to JPEG, and publishes the validated data and files directly to `main`. It then dispatches the normal Pages deployment.
+Media enrichment runs after Canonical publication and is nonblocking. It opens traceable source pages, verifies subject/image identity, normalizes accepted assets, updates the same edition, and dispatches Pages when data changes.
 
-Daily is active. Publication triggers exact-edition media enrichment; Pages holds release until `plannedAt=12:00`. Current editorial and recovery times are defined in `docs/SCHEDULED_TASK_PROMPT.md` and the workflows, not legacy AM/PM migration notes.
+Current recovery schedule is 11:10 `Asia/Shanghai`; exact-edition enrichment is also dispatched immediately after Canonical publication. Production timing belongs in `docs/SCHEDULED_TASK_PROMPT.md`, not historical migration notes.
 
-Store verified WebP/JPEG assets preferably below 500 KB in `public/media/briefs/YYYY/MM/<edition-id>/`. New v2 media requires meaningful Chinese alt, credit, HTTPS sourceUrl, kind and the verified aspect when supplied; otherwise use image_status/cover_status=unavailable with a specific reason.
+## Required state
 
-## Cover priority
+New v2 news/calendar items need either:
 
-For multi-platform games, use the first verified source available in this order:
+- verified media with meaningful Chinese `alt`, `credit`, HTTPS `sourceUrl`, `kind`, and verified `aspect` when relevant; or
+- explicit `image_status` / `cover_status: "unavailable"` with a specific reason.
 
-1. PlayStation Store (prefer Hong Kong and Simplified Chinese) product art.
-2. Nintendo eShop Japan or another traceable Nintendo product page.
-3. Microsoft/Xbox Store, Steam, publisher stores, and media rooms.
-4. The user-supplied discovery sites for edition identification.
-5. DeepSeek-assisted open-web source discovery when the listed chain produces no usable result.
+Store repository assets under `public/media/briefs/YYYY/MM/<edition-id>/`; prefer JPEG/WebP below 500 KB. News art is normalized to 16:9. Covers preserve their source orientation.
 
-Storefront URLs belong in config/media-catalog.json for reuse or in an upcoming item's mediaSources. Query parameters may be removed only on known PlayStation, Nintendo, and Microsoft image CDNs. Keep the original product page as sourceUrl.
+## Source order
 
-Source order is a reliability preference, not an eligibility gate or a shape requirement. Accept square, portrait, or landscape covers and preserve the source orientation. Official storefront banners, publisher key art, official screenshots, and Steam header art are valid covers when they clearly depict the same title.
+### Covers
 
-If official storefronts and publisher pages yield no usable asset, a reputable media report, reliable retailer, or recognized game database may supply same-title artwork when the exact source page is opened, the game/edition match is checked, and the rights holder can be credited. Prefer downloading these assets into the repository instead of hotlinking the third-party host. Credit the actual developer, publisher, or rights holder—not merely the page host.
+Prefer the first verified same-title source available:
 
-Search results must use the original image URL and source page, never a search-engine thumbnail. Fan art, unrelated images, watermarked composites, and images without an accessible source page remain prohibited. Cover credit remains in JSON but is not rendered as a visible caption.
+1. PlayStation Store, preferably Hong Kong/Simplified Chinese when appropriate;
+2. Nintendo eShop / official Nintendo product page;
+3. Microsoft/Xbox Store, Steam, publisher store/media room;
+4. reliable retailer/media/game database only when the exact source page is opened and subject/edition identity is clear;
+5. bounded web-search discovery as a last resort when configured.
 
-The repository script can use DeepSeek's Responses API `web_search` only after all listed sources fail, when `DEEPSEEK_API_KEY` is present. DeepSeek is used only to discover candidate **source pages**; it never supplies a trusted image directly. The script opens each returned HTTPS page itself, requires an exact subject term copied from the edition title/headline to be confirmed in the page metadata, extracts that page's `og:image`/Twitter image, and then applies the normal HTTPS, size, dimension, format, and local-normalization checks. If the secret is absent or search fails, the pipeline safely continues without this last-resort layer.
+The order is a reliability preference, not a shape requirement. Square, portrait, and landscape art are all valid when identity/provenance is verified.
 
-MobyGames, LaunchBox Games Database, Glitchwave, Gavas, and Refuge are not automatic image sources. MobyGames requires its licensed API plan and attribution; Gavas prohibits unapproved reproduction and image hotlinking; the remaining sites lack a confirmed machine-readable reuse permission or block automation. They may help a human identify an edition, but the final asset must resolve to an approved original source.
+### Editorial images
 
-## Editorial fallback ladder
+Stop at the first valid match:
 
-The goal is to avoid empty story art whenever a clearly related, traceable image exists. Relevance is to the **subject of the story**, not only the exact event page. Stop after the first verified match in this order:
+1. image from the exact official or selected reliable report page;
+2. thumbnail from the exact primary official YouTube upload;
+3. same-person verified photo for person-led stories;
+4. official same-game key art, cover, screenshot, or platform/publisher artwork;
+5. bounded web-search discovery of source pages;
+6. explicit unavailable reason.
 
-1. The exact official source page's image, or the exact reliable secondary report page's image when that report is already one of the story's evidence sources. Secondary-source images may be accepted automatically only from the article page attached to that same story; they are not a license to pull arbitrary third-party imagery.
-2. The thumbnail of the exact primary official YouTube upload.
-3. For a person-led story such as an interview, podcast, developer comment, or designer profile: another clearly identified, traceable photo of that same person from an official page or reliable media source. The photo does not need to come from the current interview.
-4. For a game-led story: official key art, game cover/store art, official screenshot, or other publisher/platform artwork for that same game. A game cover is an acceptable fallback for a news item about that game's update, release, test, interview, delay, or other new development.
-5. DeepSeek-assisted open-web source discovery for the same story subject when the listed sources produce no usable asset. Person-led stories search for the named person first; game-led stories search for the game and allow cover/key art/screenshot source pages. DeepSeek returns only candidate page URLs. The repository then opens and validates those pages itself before accepting any image.
-6. Only then record a specific unavailable reason.
+Fallback art may depict the confirmed subject rather than the exact event, but never a merely similar person/game, unrelated stock, fan art, watermarked composite, or search thumbnail.
 
-A fallback image is not required to depict the exact event, but it must depict the correct subject. Do not use a merely similar developer, another game in the series without an explicit relationship, generic convention photography, logos presented as editorial art, or an image whose identity cannot be verified. Prefer a relevant fallback over `unavailable`, but prefer `unavailable` over a plausible-looking mismatch.
+## Search-assisted discovery
 
-An exact official-upload thumbnail is not a search-result thumbnail. The source must be the opened primary video URL, the script must derive the video ID, and the image response must pass type, size, and dimension checks. The downloader tries `maxresdefault`, `hq720`, `sddefault`, then `hqdefault` and saves the first valid result locally. Do not use another channel's reupload.
+When configured, DeepSeek/web search is discovery only. It returns candidate **source pages**; repository code still opens each HTTPS page, confirms the story subject, extracts the page image, and applies normal response/type/size/dimension checks. Search output never becomes trusted media by itself.
+
+MobyGames, LaunchBox, Glitchwave, Gavas, Refuge, and similar databases may help identify an edition but are not automatically approved asset origins. Final media still needs an opened, traceable source with acceptable reuse/provenance.
 
 ## Automatic checks
 
-Run npm run media:audit for a read-only report or npm run media:enrich for the latest edition. The tool:
+`npm run media:audit` is read-only; `npm run media:enrich` applies to the selected/latest edition.
 
-- accepts HTTPS only and rejects local/private network targets;
-- limits HTML to 3 MB and images to 15 MB;
-- requires at least 320×320 pixels;
-- crops editorial images to 16:9;
-- preserves cover orientation as square, portrait, or landscape;
-- encodes JPEG at no more than 500 KB;
-- writes to public/media/briefs/YYYY/MM/<edition-id>/;
+The tool:
+
+- accepts HTTPS only and rejects local/private targets;
+- limits HTML/image response sizes;
+- requires usable dimensions;
+- crops news art to 16:9;
+- preserves cover orientation;
+- normalizes accepted assets into the repository when possible;
 - records a specific unavailable reason instead of forcing a mismatch.
 
-The editorial publisher dispatches the workflow for the exact edition immediately after Canonical publication. Legacy scheduled runs at 11:10 and 18:00 Asia/Shanghai are idempotent recovery checks and remain unchanged during precutover. After formal Daily cutover, 11:10 becomes the single scheduled Daily media recovery point and the legacy 18:00 recovery is removed/disabled. Exact-edition enrichment remains event-driven and should normally finish before the 12:00 release gate; the scheduled recovery does not replace or delay it. A media update reaches `main` only after source, image, schema, test, type, data, and build checks succeed.
-
-Media remains a nonblocking lane. The noon release cannot fabricate or force an image merely to meet the clock: any unresolved record must carry the explicit unavailable reason required by the Canonical contract. Verified media found later may revise only the media state/assets of that same edition and trigger a later Pages update.
-
-## DeepSeek search configuration
-
-Create a repository-level GitHub Actions secret named `DEEPSEEK_API_KEY`. The media workflow exposes it only to the enrichment step, which calls `https://api.deepseek.com/responses` with `deepseek-v4-flash` and forces the server-side `web_search` tool. No key means no paid web-search fallback; all free listed-source fallbacks still run normally. Because this is the last fallback layer, API calls occur only for records still missing verified media after the deterministic source chain has been exhausted.
+A media failure must not block a valid Canonical edition or alter facts. Verified media found later may revise only media state/assets for that same edition.

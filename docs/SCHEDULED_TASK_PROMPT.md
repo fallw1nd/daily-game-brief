@@ -1,28 +1,30 @@
 # Scheduled Task Editorial Contract
 
-Production uses one active long-lived ChatGPT editorial task with two exact Daily invocations at 10:20 and 11:20, `Asia/Shanghai`; the former PM task is disabled. Evidence closes at 10:10, fallback is due at 11:40, and public release is planned for 12:00. First Daily `2026-08-31-daily` uses `(2026-08-30 17:00, 2026-08-31 10:10]`; later editions use `(previous day 10:10, current day 10:10]`.
+Production has one enabled ChatGPT editorial task, invoked at 10:20 and 11:20 `Asia/Shanghai`. Daily evidence closes at 10:10, GitHub degraded fallback is due at 11:40, and public release is planned for 12:00. The task edits; GitHub owns collection recovery, validation, publication, deployment, state, and incidents.
 
-Priority is new Canonical work, current Daily liveness wake, trusted `editorial_continuation`, ready `showcase_completion`, then one English repair.
+Priority: new Canonical work → current Daily liveness wake → oldest ready `editorial_continuation` → ready `showcase_completion` → one English repair.
 
-## 1. Canonical and liveness
-1. First select the oldest already-due Daily edition with `packet.status:"ready"`, uncommitted publication, editorial `pending`/`invalid`, and no `editorial_continuation` or `showcase_completion` request. `pending` starts a decision; `invalid` repairs one for the same packet using durable `validationErrors` and `submissionSha`. `submitted`/`valid` belong to GitHub's publication lane and `timed_out` to its degraded fallback lane; never select or re-edit them. Never skip Canonical backlog or derive its identity from runner time.
-2. read `automation/status/<edition-id>.json`, then read the packet by its Git blob SHA. Copy it unchanged to `packetBlobSha`. Require packet v3, `mode:"chatgpt-handoff"`, editorial input v2, edition/period/plannedAt/window, cutoff coverage, and post-cutoff finalization.
-3. Use `main` `AGENTS.md` and manifest/latest; load registry only when needed. `main` is authoritative; absent Canonical, `[自动事实清单]`, or trusted continuation proceeds.
-4. If no Canonical work exists, derive the immediate next missing Daily from current `main`. After 10:10, if that exact edition lacks acknowledged `packet.status:"ready"`, commit schema-v1 `automation/wake/<edition-id>.json` with `packet_missing_at_handoff` on its editorial branch. Do not wait or poll for the wake. After committing it, this invocation may handle one continuation that was already ready beforehand; otherwise stop. Never wake ready/in-flight/published work.
-5. Once current liveness is healthy or signaled, consume the oldest already-ready `editorial_continuation`, then `showcase_completion`. Never wait for the new wake. Canonical and current liveness outrank both. For Canonical, `automation/batches/<edition-id>/bundle-plan.json` may expose up to two same-edition packets: Daily then next news. Require matching state/queue and workflow on both trusted `main` and the target editorial branch; otherwise use the existing single `automation/inbox/<edition-id>.json` publisher path. Later continuations use single inbox. Commit `automation/bundle-inbox/<edition-id>.json` only then; preserve each resolved packet SHA, queue batch/event keys and per-packet limits. GitHub rechecks; unprocessed packets remain pending on failure. Never choose a Git blob or event identity yourself.
+## 1. Resolve exact work
 
-## 2. Canonical submission
-- Headlines and archive titles must name their game, company or person.
-- Return one `include`/`exclude`/`needs_review` per packet item; add nothing outside the packet. Follow `AGENTS.md`: one media source may support `media_report`; two independent sources only for `multi_source_verified`; `needs_review` requires a blocker, not one-source coverage. `official` needs primary evidence; Never invent a `requires_subject_identity` subject.
-- For `packet.continuation.scope` `news` or `showcase`, use scoped packages/facts, preserve edition, no calendar changes, and unchanged packet SHA/identities. News cannot add `showcaseRefs` or other-batch facts; `existingEntryId` needs a confirmed same fact, never title/URL alone. Showcase follows `docs/SHOWCASE_RECOVERY.md`; partial/Highlights never complete.
-- Daily uses `upcomingMode:"inherit_and_patch"`. Do not copy `editorialInput.upcomingBaseline.items` or replace the calendar with empty data. Publisher carries the newest verified Canonical calendar forward and expires entries outside the strict future-15-day window.
-- `editorialInput.upcomingBaseline.refreshRange` permits calendar-only research across the future-15-day window. Use `upcomingDiscovery` leads, open official pages, and check platforms plus date/platform/region gaps. Record limits; discovery failure never changes news or deletes entries. Submit changed items with HTTPS sources.
-- Follow live `AGENTS.md` for Chinese names, mainland terminology, sources, time boundaries, copy, and uncertainty. Narrow naming lookups cannot change facts. Every include needs a complete language-neutral `sharedFactFrame`; do not invent issue numbers, final IDs, or digests.
-- Check includes against the immutable packet when drafting; before committing, resolve validation errors. `sharedFactFrame.subjectTitleKey` and `sharedFactFrame.platforms` must exactly match the Canonical title/platform decision; source/time/fact status stays evidence-bounded. durable `validationErrors` name a field; repair that field without changing unrelated decisions or adding evidence.
-- Attempt complete `locales.en` by default. English is nonblocking, but omission is exceptional; match Canonical order and facts. `locales.en.upcoming` covers submitted patches; inherited items need not repeat. If unsafe, omit `locales.en`.
-- Commit one `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`, or the ordered bundle above when explicitly planned. After it succeeds, do not poll Actions and stop.
+1. Select the oldest due Daily with acknowledged `packet.status:"ready"`, uncommitted publication, editorial `pending` or `invalid`, and no active continuation/showcase request. `pending` starts a decision; `invalid` repairs the same packet using durable `validationErrors` and `submissionSha`. Never edit `submitted`, `valid`, or `timed_out`.
+2. Read `automation/status/<edition-id>.json`, then the packet by its exact Git blob SHA. Copy that SHA unchanged to `packetBlobSha`. Require packet v3, `mode:"chatgpt-handoff"`, editorial input v2, matching edition/window, cutoff coverage, and post-cutoff finalization.
+3. Read current `main` `AGENTS.md` plus only the focused docs/data needed for this edition. Current Canonical is authoritative even if durable state lags.
+4. If no Canonical work exists after 10:10 and the immediate next Daily lacks an acknowledged ready packet, commit only `automation/wake/<edition-id>.json` with `reason:"packet_missing_at_handoff"` on its editorial branch. Do not wait or poll. That invocation may still consume one continuation that was already ready before the wake.
+5. For continuation/showcase work, use only the queue-authorized packet/blob/event identities. A trusted initial bundle may contain at most the Daily packet plus one next-news packet; otherwise use the single-inbox path. Never choose packet or event identity yourself.
 
-## 3. One English repair
-Choose the oldest published Daily from `2026-08-31-daily` whose English is unavailable for `editorial-overlay-missing` or `editorial-overlay-invalid`. Final Canonical `entryId`/order are authoritative; cover each once using accepted evidence, without rediscovery or fact changes. Commit only schema-v1 `locale:"en"` to `automation/locale-inbox/<edition-id>.json` on `automation/locale/en/<edition-id>`. Trusted publisher hash-guards archive/latest/manifest and changes only English Overlay/state. Then stop.
+## 2. Decide within the packet
 
-Do not inspect Actions or poll Actions; create/delete workflows, edit state, publish Canonical directly, advance editions, or change long-lived tasks. GitHub owns recovery, validation, publication, deployment, state and incidents. A single Canonical or locale failure must never mutate the active Daily task.
+- Return one `include`/`exclude`/`needs_review` per packet item; add nothing outside the packet.
+- Follow `AGENTS.md` evidence thresholds. `official` needs primary evidence; two independent reliable sources are required only for `multi_source_verified`; `needs_review` requires a material blocker. Never invent a `requires_subject_identity` subject.
+- Continuations preserve the edition, existing published content, issue/window, and scoped identities. News continuations cannot add calendar/showcase facts. Showcase completion follows `docs/SHOWCASE_RECOVERY.md`.
+- Daily uses `upcomingMode:"inherit_and_patch"`. Calendar-only research is limited to `upcomingBaseline.refreshRange`; discovery failure cannot delete existing entries or alter news decisions.
+- Every include needs a complete `sharedFactFrame`. Names, dates, numbers, platforms, people/entities, versions, and proper terms must come from selected evidence. Do not calculate issue numbers, final IDs, or digests.
+- Attempt complete `locales.en` from the same fact frame. English is nonblocking; omit it if safe complete copy is not possible.
+
+Commit `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id>`, or the trusted ordered bundle when explicitly authorized. After the commit succeeds, stop.
+
+## 3. English repair
+
+If no higher-priority work exists, repair one oldest published Daily whose English is unavailable for an editorial overlay reason. Final Canonical IDs/order are authoritative. Commit only the locale repair to `automation/locale/en/<edition-id>`; do not rediscover or change facts.
+
+Do not poll Actions; create/delete workflows; edit `automation/state`; publish Canonical directly; advance editions; or mutate any Scheduled Task. A single failure must never change the task schedule or enable/disable state.
