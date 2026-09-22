@@ -650,9 +650,10 @@
 ## MNT-20260922-02 — 生产文档与实际 Daily 运行状态长期漂移
 
 - **Discovered:** 2026-09-22
-- **Priority / status:** P1 / in_progress.
+- **Priority / status:** P1 / resolved.
 - **Evidence:** 实际调度器只有一个启用的“游戏圈每日简报”，Asia/Shanghai 每日 10:20/11:20；仓库却仍同时保留 precutover、两个 Scheduled Tasks、10:20/17:10、旧媒体恢复、迁移 rollback 与一次性 Astra/System/Optimization 验收文档。README 还把一次性 SYSTEM_REVIEW 当成入口。核心规则在 AGENTS、SCHEDULED_TASK_PROMPT、AUTOMATION_ARCHITECTURE、DATA_PIPELINE 与多份历史文档重复，增加模型上下文和维护漂移风险。
 - **Bounded resolution:** 将生产文档收敛到当前 Daily 架构；README 明确现行入口；AGENTS 只保留仓库级边界；Scheduled Task prompt 只保留编排契约；AUTOMATION_ARCHITECTURE/Data Pipeline 分别成为状态/职责和数据/证据权威；媒体、日历、发布会各自只保留当前专项规则。删除已完成的 Daily migration、Astra/System review、Optimization plan/acceptance、旧 media addendum 与重复 revision note；保留历史事实于本维护日志和 PR/Actions。AM/PM 代码与 workflow_dispatch 入口只在仍承担历史恢复/修订兼容时保留，不作为当前 cadence。
 - **Test cleanup:** 将 `daily-edition-precutover.test.mjs` 改为生产语义命名，并收紧 Scheduled Task 文本测试为关键边界而非逐句复制文档；重复 revision-note 文档测试随已合并规则一并移除。
 - **Close when:** 完整 `npm run check` 通过，PR 合并 main，Pages 成功；实际启用 Scheduled Task prompt 同步为精简 bootstrap 且保持原 10:20/11:20 schedule 与 enabled 状态不变。
+- **2026-09-22 closeout:** PR #161 合并为 `ae4fc34`。Verify [35756273011](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756273011) 通过：83 个测试文件 / 418 项测试、43 期 Canonical 校验、英文基础设施校验和生产构建全部成功；合并后 Pages [35756425578](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756425578) 成功。实际启用任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 已改为精简 bootstrap，仍为 `enabled=true`，Asia/Shanghai 10:20/11:20 两次调用；旧 PM 与一次性历史任务继续保持 disabled。关闭条件全部满足。
 
