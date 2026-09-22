@@ -1,0 +1,82 @@
+name: One-shot historical title translation audit
+
+on:
+  push:
+    branches:
+      - chore/title-translation-audit-2026-09-22
+    paths:
+      - .github/workflows/title-translation-audit-one-shot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v7
+        with:
+          ref: chore/title-translation-audit-2026-09-22
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare exhaustive title audit
+        run: node scripts/title-translation-audit-one-shot.mjs prepare
+
+      - name: Search and verify every unresolved game title
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          NEWS_EVIDENCE_PATH: artifacts/title-translation-audit-evidence.json
+          TITLE_CACHE_PATH: artifacts/title-translation-audit-cache.json
+          TITLE_HINTS_PATH: artifacts/title-translation-audit-hints.json
+          TITLE_HINT_LIMIT: "20"
+          TITLE_MAX_RUN_TOKENS: "30000"
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 12); do
+            echo "title-audit pass $i"
+            node scripts/build-title-hints.mjs
+            queued=$(node -e "const r=require('./artifacts/title-translation-audit-hints.json'); process.stdout.write(String(r.queuedSubjects||0))")
+            status=$(node -e "const r=require('./artifacts/title-translation-audit-hints.json'); process.stdout.write(String(r.providerStatus||''))")
+            echo "queued=$queued provider=$status"
+            if [ "$status" = "unavailable" ] && [ "$queued" != "0" ]; then
+              echo "Title search provider became unavailable before exhaustive audit completed." >&2
+              exit 1
+            fi
+            if [ "$queued" = "0" ]; then
+              break
+            fi
+            if [ "$i" = "12" ]; then
+              echo "Exhaustive audit exceeded 12 bounded passes." >&2
+              exit 1
+            fi
+          done
+
+      - name: Apply verified names and Chinese-game localization
+        run: node scripts/title-translation-audit-one-shot.mjs apply
+
+      - name: Validate final repository state
+        run: npm run check
+
+      - name: Remove one-shot machinery and commit result
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm scripts/title-translation-audit-one-shot.mjs
+          rm .github/workflows/title-translation-audit-one-shot.yml
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(titles): backfill verified Chinese names"
+          git push origin HEAD:chore/title-translation-audit-2026-09-22
