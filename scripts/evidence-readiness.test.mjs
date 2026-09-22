@@ -29,7 +29,7 @@ describe("evidence readiness", () => {
 });
 
 describe("evidence publication time fallback", () => {
-  it("preserves the discovery-list timestamp when the opened article has no timestamp", () => {
+  it("preserves the RSS/feed timestamp when the opened article has no timestamp", () => {
     expect(resolveEvidencePublishedAt({
       listingPublishedAt: "2026-09-21T03:15:00.000Z",
     })).toBe("2026-09-21T03:15:00.000Z");
