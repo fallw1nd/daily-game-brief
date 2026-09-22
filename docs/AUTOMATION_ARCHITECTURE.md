@@ -57,7 +57,7 @@ Artifacts and the persistent state branch measure:
 
 ### Evidence extraction and ledger
 
-`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, source-language metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. No model call receives an unbounded page or the complete archive history.
+`scripts/build-evidence.mjs` opens only shortlisted A/B pages, extracts publication time, traceable media metadata, source-language metadata, and relevant passages, and creates compact evidence packages. Each package is bounded to three source pages and 4,000 evidence characters per source. Article metadata/visible time remains preferred, but the trusted discovery listing/RSS timestamp is retained as a fallback so a source appearance already classified inside the fixed window does not lose its usable time evidence merely because the article template hides the timestamp. Readiness names evidence composition rather than a publication verdict: `primary-plus-independent`, `primary-only`, `two-media-no-primary`, `single-media`, `discovery-only`, or `no-opened-evidence`. A single curated media source may publish as a bounded `media_report`; two independent reliable sources are required only when claiming `multi_source_verified`. No model call receives an unbounded page or the complete archive history.
 
 ### ChatGPT editorial handoff
 
