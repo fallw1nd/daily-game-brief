@@ -4,26 +4,24 @@ Vite/React/TypeScript game-news site. Production is `main`; UI is in `src/`, dat
 
 ## Working and verification
 
-Complete authorized work through verification. Decide routine details independently; clarify only material scope or risk. Load skills for the relevant workflow, not keyword matches; explicit user choices and project requirements override generic recipes.
+Complete authorized work through verification. Decide routine details independently; clarify only material scope or risk. Use `package.json` commands and run affected checks during development. Before publishing code, data, workflow, or machine-consumed editorial changes, run `npm run check` on the final implementation. Documentation-only follow-ups may reuse passing evidence when no executable contract changed.
 
-Use `package.json` for commands. Run affected checks during development. Before publishing changes to code, data, workflows or machine-consumed editorial instructions, run `npm run check` once on the final implementation. Reuse passing results when only explanatory documentation changes; rerun affected checks for subsequent functional changes or failures. Do not add tests that merely restate the implementation. Keep existing CI and production validation intact.
-
-Use Conventional Commits; PRs include relevant validation and schema/archive impact. Update the matching `docs/MAINTENANCE_LOG.md` entry for persistent reliability, quality or cost problems; retain history, evidence and closure criteria. Do not turn routine edits into new rules or maintenance work.
-
-Prefer existing types, keys, transactions and tests. Add a new hash, frozen contract, baseline or gate only for a demonstrated failure those mechanisms cannot address; preserve existing safeguards. Formal gates belong at publication, security or cross-system boundaries.
+Use Conventional Commits. Update `docs/MAINTENANCE_LOG.md` only for persistent reliability, quality, or cost problems; it is a historical ledger, not a production contract. Prefer existing types, keys, transactions, and gates. Add new frozen contracts or publication gates only for demonstrated failures.
 
 ## Editorial boundaries
 
-- Production uses Daily editions: `Asia/Shanghai`, `(previous day 10:10, current day 10:10]`, planned publication 12:00. Preserve packet identity, fixed windows, continuous issue numbers and historical archives. Historical title corrections require explicit user authorization; use the established revision flow.
-- News facts must stay within the acknowledged evidence packet. `official` requires an opened primary source. One opened curated media source may publish as `media_report` when subject, window and core facts are clear; a curated media source explicitly relaying an identifiable official announcement/interview/statement may publish as `media_relay_official`. Two independent sources are required only when claiming `multi_source_verified`. `needs_review` is for material blockers such as unresolved identity, contradictory evidence, an unprovable fixed-window boundary, or mutable aggregate data without the required snapshot—not merely because only one reliable media source is open. Rumors retain their distinct status and uncertainty. Calendar research and terminology lookups have only the exceptions defined in the editorial contract.
-- User-specified names take priority. Otherwise use verified mainland Simplified Chinese terminology when available; accepted community names are `common_translation`. Never machine-translate game names or invent identities. Reuse the title registry and verified hints before searching; terminology research cannot add event facts.
-- Headlines name their confirmed subject. Archive and manifest share a distinctive period-prefixed `archiveTitle` and valid `leadEntryId`.
-- Each new story/calendar item needs verified media or a specific unavailable reason. Keep meaningful Chinese alt, credit, HTTPS source page and kind; no unrelated art. News is 16:9; covers retain their verified ratio and hide visible credit captions. Source preference and file conventions: `docs/MEDIA_PIPELINE.md`.
+- Production cadence is Daily: `Asia/Shanghai`, `(previous day 10:10, current day 10:10]`, planned release 12:00. Preserve packet identity, fixed windows, issue numbers, and historical archives. Historical revisions require explicit user authorization and the established revision flow.
+- Facts stay inside the acknowledged packet. `official` requires opened primary evidence. One opened curated media source may support `media_report` when subject, window, and core facts are clear; an explicit media relay of an identifiable official announcement/interview/statement may use `media_relay_official`. Only `multi_source_verified` requires two independent reliable sources. `needs_review` is for material blockers, not merely one-source coverage. Rumors remain explicitly uncertain and tracked.
+- User-specified names take priority. Otherwise reuse `config/title-translations.json`, verified title hints, and official mainland Simplified Chinese terminology. Never machine-translate game names or invent identities. Naming/terminology lookups cannot add event facts.
+- Headlines name their confirmed game, company, or person. Archive and manifest share the period-prefixed `archiveTitle` and valid `leadEntryId`.
+- Every story/calendar item needs verified media or an explicit unavailable reason. Media provenance and file rules live in `docs/MEDIA_PIPELINE.md`.
 
 ## Read when relevant
 
-- Scheduled editing/publication: `docs/SCHEDULED_TASK_PROMPT.md`; pipeline/state changes: `docs/DATA_PIPELINE.md` and `docs/AUTOMATION_ARCHITECTURE.md`.
-- Showcase supplementation: `docs/SHOWCASE_RECOVERY.md`; release-calendar discovery: `docs/RELEASE_CALENDAR.md`.
-- UI: `docs/VISUAL_GUIDELINES.md` and the relevant section of `docs/READING_SAMPLE.md`. The accepted ReadingApp is the default reference; use Phosphor icons. Preserve keyboard access, reduced motion, AA contrast and usable 390px layouts. Do not use the Windows browser sandbox for visual QA; provide a focused manual checklist for affected layouts/themes, wrapping, focus and content.
+- Editorial scheduling/publication: `docs/SCHEDULED_TASK_PROMPT.md`.
+- State, recovery, and publisher behavior: `docs/AUTOMATION_ARCHITECTURE.md`.
+- Canonical/evidence/naming/data: `docs/DATA_PIPELINE.md`.
+- Showcase, calendar, media, source discovery: the matching focused document under `docs/`.
+- UI: `docs/VISUAL_GUIDELINES.md` and the relevant section of `docs/READING_SAMPLE.md`. The accepted ReadingApp is the default reference; use Phosphor icons, preserve keyboard access, reduced motion, AA contrast, and usable 390px layouts.
 
-These are task-specific references, not a mandatory reading list for every edit. Historical design/migration notes and bundled example skills do not override current production guidance.
+Do not treat migration plans, incident notes, or maintenance history as live instructions.
