@@ -1,0 +1,1334 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-22T02:20:22.032Z",
+  "finalizedAt": "2026-09-22T02:20:22.032Z",
+  "coverageThrough": "2026-09-22 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。未核验事实继续needs_review，不因热度或预算排除。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\nofficial 要求已打开一手来源；multi_source_verified 要求两家独立可靠来源，A级也不豁免时间/来源要求。未确认内容仅进 rumors，tracking=true，标题摘要保留不确定性。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-22-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-22 12:00",
+      "windowStart": "2026-09-21 10:10",
+      "windowEnd": "2026-09-22 10:10"
+    },
+    "adjacentEdition": "2026-09-21-daily",
+    "packages": [
+      {
+        "eventKey": "f250c43341cd7874a97d",
+        "eventKind": "company",
+        "subjectKey": "rockstar games new modding",
+        "subject": {
+          "kind": "entity",
+          "key": "rockstar games new modding"
+        },
+        "publishability": "direct",
+        "headline": "Rockstar Games' New Modding Policy Crushes Influencers' Dreams for Monetized GTA 6 RP Servers",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/rockstar-games-new-modding-policy-crushes-influencers-dreams-for-monetized-gta-6-rp-servers",
+            "publishedAt": "2026-09-21T18:43:44.291Z",
+            "canonicalUrl": "https://www.ign.com/articles/rockstar-games-new-modding-policy-crushes-influencers-dreams-for-monetized-gta-6-rp-servers",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/17/gta-6-soundtrack-1789662158949.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Rockstar Games has outlined its policy for modding ahead of Grand Theft Auto 6&#x27;s release, and it may crush the dreams of some would-be entrepreneurs.\nRockstar Games&#x27; New Modding Policy Crushes Influencers&#x27; Dreams for Monetized GTA 6 RP Servers\nRockstar Games has a somewhat contentious history with the modding community, but the developer has lightened up in recent years following the absurd success of GTA 5&#x27;s RP community. Rockstar even acquired the developer of the FiveM modding platform and partnered with the biggest RP server, nopixel, to develop a new iteration . Now, it seems like Rockstar is trying to make it clear where it stands with modding ahead of GTA 6&#x27;s release, so there&#x27;s less room for controversy when modding inevitably begins.\nThe rules are clearly outlined on Rockstar&#x27;s website and include some obvious examples, such as no use of others&#x27; IP, pornography, bullying, or endorsements of violent extremism. Additionally, modders can not make Rockstar&#x27;s games available on platforms they&#x27;ve never been released on, and they can&#x27;t add characters, maps, or assets from other games to different titles, either.\nThere is one section of the policy that seems to specifically address some things that influencers have been planning for some time: Rockstar explicitly forbids unauthorized commercialization of mods in its games.\nFor instance, influencers like Adin Ross have spent the last couple of years making claims that he&#x27;d create a GTA 6 server where players could essentially live inside of it and earn real money. Ross even went as far as saying players could quit their jobs in real life and live off the money made in his GTA 6 server. Unless Rockstar signs off on it, though, that won&#x27;t be possible. Rockstar&#x27;s policy notes that players can not exchange real money in mods via crypto or traditional currencies. Players also can&#x27;t use real money for gambling within modded content, and mod owners can not promote any kind of third-party sponsored content.\nUltimately, it sounds like the servers that Ross and other influencers have been imagining will not be possible. As folks have probably anticipated, GTA 6 will not be a Second Life experience to make real money. It&#x27;s still very much a video game, and one over which Rockstar plans to have close supervision. There&#x27;s a lot of room for the game to get corrupted if influencers could radically commercialize their servers, so it&#x27;s probably best that Rockstar is policing this.\nWe won&#x27;t see any mods for GTA 6 for a while, as the game isn&#x27;t releasing on PC on November 19. However, there have been a variety of teases from Rockstar&#x27;s parent company, Take-Two Interactive, that GTA 6 will eventually make its way to PC . How long will that take? We have no idea. It seems hard to imagine it being any later than a year, given the increased popularity of PC gaming since Rockstar&#x27;s last major release and the high demand for this game, though."
+          }
+        ]
+      },
+      {
+        "eventKey": "a4e28da5a9cf3744696c",
+        "eventKind": "update",
+        "subjectKey": "the blood of dawnwalker",
+        "subject": {
+          "kind": "game",
+          "key": "the blood of dawnwalker"
+        },
+        "publishability": "direct",
+        "headline": "The Blood of Dawnwalker Update to Add Easier Difficulty Setting for Players Who Don't Want Combat",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/the-blood-of-dawnwalker-update-to-add-easier-difficulty-setting-for-players-who-dont-want-combat",
+            "publishedAt": "2026-09-21T23:53:45.474Z",
+            "canonicalUrl": "https://www.ign.com/articles/the-blood-of-dawnwalker-update-to-add-easier-difficulty-setting-for-players-who-dont-want-combat",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/21/blood-of-dawnwalker-combat-1790034499854.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The first major The Blood of Dawnwalker update will introduce an easier difficulty option for \"people who don&#x27;t want to experience combat\" when it launches in October.\nThe Blood of Dawnwalker Update to Add Easier Difficulty Setting for Players Who Don&#x27;t Want Combat\nThe first big patch is due out in October.\nDeveloper Rebel Wolves&#x27; game director, Konrad Tomaszkiewicz, teased the changes coming to the team&#x27;s breakout vampire RPG during a new interview with Eurogamer . Amongst a batch of combat tweaks and other gameplay changes, one of the highlights for the early October The Blood of Dawnwalker update includes reworked difficulty options for players who don&#x27;t want to spill too much blood during the story.\nWhen the update launches, players will see the new easier difficulty option replace the current easiest mode, called Story Mode, and adopt its name. The version of the mode currently in the game will seemingly be bumped up a peg and given a new name. The Blood of Dawnwalker currently has four difficulty modes – Story, Fair, Challenging, and Duelist – with next month&#x27;s addition set to bring the total to five.\n\"We will introduce an additional difficulty level, but an easier one, because many people are asking for a more easy difficulty,\" Tomaszkiewicz said. \"The Story mode which we have right now will be a different difficulty — we will call it Demanding or something like this — and we will add a new Story mode which will be even easier for people who don&#x27;t want to experience the combat, they just want to learn the story and go through the game without this gameplay challenge.\"\nHow exactly The Blood of Dawnwalker will tackle an easier difficulty mode is unclear. The game director&#x27;s comment suggests it will cater to those who want to skip combat altogether, though how this will be achieved is unclear. There&#x27;s no release date for the update just yet, but with its launch set for early October, we won&#x27;t have to wait too long.\nRebel Wolves is also looking into improving gameplay performance, especially for PC users, as well as a fluid option for players to escape fights if they bite off more than they can chew. Other items on the docket include targeting and the camera. Tomaszkiewicz referenced desires from players to tweak how targeting works for Coen and how the upcoming patch will address that."
+          }
+        ]
+      },
+      {
+        "eventKey": "d56ec34a382128c99805",
+        "eventKind": "announcement",
+        "subjectKey": "hodka",
+        "subject": {
+          "kind": "game",
+          "key": "hodka"
+        },
+        "publishability": "direct",
+        "headline": "オープンワールド荒野運転旅ゲーム『HODKA』発表。おんぼろバンで孤独なガラクタ漁り、夜になると“巨大な何か”に襲われる",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260921-469113/",
+            "publishedAt": "2026-09-21T05:05:15+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260921-469113/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260921-469113-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Skystone Gamesは9月21日、ボロボロのバンで旅するオープンワールド探索アドベンチャーゲーム『HODKA』を発表した。\nオープンワールド荒野運転旅ゲーム『HODKA』発表。おんぼろバンで孤独なガラクタ漁り、夜になると“巨大な何か”に襲われる\nパブリッシャーのSkystone Gamesは9月21日、Flazmが手がけるアドベンチャーゲーム 『 HODKA 』 を発表した。対応プラットフォームはPC（Steam）で、ストアページの記載によればゲーム内は日本語表示に対応予定。リリースは2027年の予定となっている。\n『HODKA』は、広大なタイガ地帯をボロボロのバンで旅するオープンワールド探索アドベンチャーゲームである。プレイヤーは失踪した叔父の足取りを掴むため、かなり年季の入ったバンを運転してタイガを冒険することになる。広大なタイガは地図にも記載がなく、住人はよそ者にそっけない態度である。しかも夜になると霧が濃くなり、得体のしれない脅威も迫ってくる。比較的安全な明るい時間に金属探知機を使って地中に埋もれたがらくたを漁り、掘り出したものを売ったり、パーツを作成したりしながら、行動範囲を広げていくのだ。\n『HODKA』は、PC（ Steam ）向けに2027年リリース予定だ。\n本作のゲームプレイは基本的にバンの運転が中心となる。フィールドのあちこちにはがらくたを掘り出せるポイントがあり、金属探知や採掘はミニゲームのようなかたちでおこなわれる。各種アイテムは四角いグリッド状になっており、バンのスペースが許す限り搭載することが可能だ。ただし、金属探知や採掘をすると時間も経過していくため注意が必要だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "ab69a861ebdc3da0434a",
+        "eventKind": "announcement",
+        "subjectKey": "potato please",
+        "subject": {
+          "kind": "game",
+          "key": "potato please"
+        },
+        "publishability": "direct",
+        "headline": "ひたすらジャガイモの皮をむく物理演算ゲーム『Potato Please』発表。お国のために芋まみれ、不穏労働シム",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260921-469096/",
+            "publishedAt": "2026-09-21T03:39:02+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260921-469096/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260921-469096-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Golden Horn Studiosは9月20日、ジャガイモの皮をむき続けるゲーム『Potato Please』を発表した。\nひたすらジャガイモの皮をむく物理演算ゲーム『Potato Please』発表。お国のために芋まみれ、不穏労働シム\nデベロッパーのGolden Horn Studiosは9月20日、『 Potato Please 』を発表した。対応プラットフォームはPC（Steam）。ストアページによると、ゲーム内は日本語表示に対応予定だ。\n『Potato Please』は、大量のジャガイモの皮をむき続ける一人称視点のシミュレーションゲームだ。プレイヤーに託された使命は、軍隊の腹を満たすこと。山のように積まれたジャガイモをひたすら処理し、兵士たちの食料を用意するのだ。\n本作の開発を手がけるのは、2025年設立のインディーデベロッパーGolden Horn Studiosだ。同デベロッパーは現在『Dr.Clone』も開発中。同作では、ポータルから訪れる客の依頼に応えながら、機械や発明品を増やし、ガレージから地下へと作業場を拡張していく。2月にはデモ版が配信され、その後も新たな生産機械やクラフトシステム、エリア、ミニゲームなどの開発が進められている。そして新作となる『Potato Please』では、発明ではなくジャガイモの処理を題材に、作業場を少しずつ効率化していくゲームプレイが描かれる。山積みのジャガイモを処理した先に何が待っているのか。気になる方はウィッシュリストに登録して続報を待つとよいだろう。\n『Potato Please』はPC（ Steam ）向けに配信予定。\n仕事はまず、ジャガイモをひとつずつ手作業でむくところから始まる。ジャガイモを手に取り、ナイフやピーラーを使って表面の皮を削り、きれいになったら水の中へ投入。また、物理演算も取り入れられているようで、皮は好きな位置から削ることができ、ジャガイモを回しながら少しずつむいていく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "d3cc3f92a75f2779a459",
+        "eventKind": "delay",
+        "subjectKey": "blighted",
+        "subject": {
+          "kind": "game",
+          "key": "blighted"
+        },
+        "publishability": "direct",
+        "headline": "Blighted delayed to 2027",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/blighted-delayed-to-2027",
+            "publishedAt": "2026-09-21T14:14:12+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/blighted-delayed-to-2027",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Blighted-Delay_09-21-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "DrinkBox Studios has delayed Metroidvania action RPG Blighted from its previously planned fall 2026 release wind to 2027. It will be available for Switch 2 and PC via Steam.\nDrinkBox Studios has delayed Metroidvania action RPG Blighted from its previously planned fall 2026 release wind to 2027. It will be available for Switch 2 and PC via Steam .\nDrinkBox Studios will share more news on Blighted in 2027, with another developer update coming this winter.\n&#8220;The team has been working hard (and growing!) but we feel we still need a bit more time to polish and tune the game before launch,&#8221; said DrinkBox Studios&#8217; Josh Davis in a developer blog . &#8220;With this in mind, we’ve decided to shift our release to 2027. We appreciate your patience, and while we will have more news in the new year, we have one more really cool dev update before 2026 wraps that we think you&#8217;ll want to keep an eye out for.&#8221;\nThe game also also teased new looks at its level design as part of the developer blog, showcasing the Watcher&#8217;s Peak hub and more.\nSeptember 29 @ 1:00 pm - 2:00 pm EDT"
+          }
+        ]
+      },
+      {
+        "eventKey": "5b16cd37cabed22af501",
+        "eventKind": "launch",
+        "subjectKey": "legacy of kain defiance remastered physical editions",
+        "subject": {
+          "kind": "game",
+          "key": "legacy of kain defiance remastered physical editions"
+        },
+        "publishability": "direct",
+        "headline": "Legacy of Kain: Defiance Remastered physical editions launch November 13",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/legacy-of-kain-defiance-remastered-physical-editions-launch-november-13",
+            "publishedAt": "2026-09-21T16:47:28+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/legacy-of-kain-defiance-remastered-physical-editions-launch-november-13",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/LoK-Defiance_09-21-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Crystal Dynamics and co-developer PlayEveryWhere, and distributor PLAION, will release new physical editions of Legacy of Kain: Defiance Remastered for PlayStation 5, Xbox Series / Xbox One, and Sw…\nLegacy of Kain: Defiance Remastered physical editions launch November 13\nCrystal Dynamics and co-developer PlayEveryWhere, and distributor PLAION , will release new physical editions of Legacy of Kain: Defiance Remastered for PlayStation 5 , Xbox Series / Xbox One , and Switch on November 13, the companies announced. The Switch version is a code in a box.\nThe physical editions are as follows:\nLegacy of Kain: Defiance Remastered is available now digitally for PlayStation 5, Xbox Series, Switch 2, PlayStation 4, Xbox One, Switch, and PC via Steam , Epic Games Store , and GOG .\nSeptember 29 @ 1:00 pm - 2:00 pm EDT"
+          }
+        ]
+      },
+      {
+        "eventKey": "a8e0362d7fb533d38f66",
+        "eventKind": "launch",
+        "subjectKey": "fortblox 荒野を駆ける移動要塞",
+        "subject": {
+          "kind": "game",
+          "key": "fortblox 荒野を駆ける移動要塞"
+        },
+        "publishability": "direct",
+        "headline": "ブロックや武器，キャラクターを自由に組み合わせて自分だけの移動要塞を作る「FORTBLOX：荒野を駆ける移動要塞」，スマホ向けに配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/044/G104463/20260921033/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/044/G104463/20260921033/",
+            "imageUrl": "https://www.4gamer.net/games/044/G104463/20260921033/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "HYPERRISEは本日，スマホゲーム「FORTBLOX：荒野を駆ける移動要塞」の配信をApp StoreとGoogle Playで開始した。サービス形態は基本プレイ無料＋アイテム課金。本作は，さま…\nブロックや武器，キャラクターを自由に組み合わせて自分だけの移動要塞を作る「FORTBLOX：荒野を駆ける移動要塞」，スマホ向けに配信開始\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      },
+      {
+        "eventKey": "898a07910e93531c04df",
+        "eventKind": "launch",
+        "subjectKey": "the hollowing",
+        "subject": {
+          "kind": "game",
+          "key": "the hollowing"
+        },
+        "publishability": "direct",
+        "headline": "不気味な雰囲気が漂う巨大構造物内をメンテナンスのために飛び回る。ホラーフライトシム「The Hollowing」のデモ版が配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/044/G104443/20260921012/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/044/G104443/20260921012/",
+            "imageUrl": "https://www.4gamer.net/games/044/G104443/20260921012/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Future Friends Gamesは本日（2026年9月21日），Rubeki Gamesが開発中の新作タイトル「The Hollowing」のデモ版を，Steamで配信開始した。本作は，巨大…\n不気味な雰囲気が漂う巨大構造物内をメンテナンスのために飛び回る。ホラーフライトシム「The Hollowing」のデモ版が配信開始\n剣戟アクション「鬼武者 Way of the Sword」も快適動作。LenovoのノートPC「Legion Pro 5 Gen 10」は頼もしいゲーマーの相棒だ【PR】\n地球防衛軍6.2 INVADERS FROM ANOTHER WORLD\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      },
+      {
+        "eventKey": "d5ecab8d1d35ebe4bd45",
+        "eventKind": "launch",
+        "subjectKey": "dressmaker",
+        "subject": {
+          "kind": "game",
+          "key": "dressmaker"
+        },
+        "publishability": "direct",
+        "headline": "好きな素材を選び，デザインを決めてドレス作り。完成までの工程が楽しめるSLG「Dressmaker」，Steamで配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/015/G101519/20260921051/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/015/G101519/20260921051/",
+            "imageUrl": "https://www.4gamer.net/games/015/G101519/20260921051/SS/004.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Cozy Livesは本日，PC/Mac用ソフト「Dressmaker」の配信をSteamで開始した。本作は，ドレス作りのあらゆる工程を楽しめるシミュレーションゲームだ。型紙の配置や裁断から縫製まで…\n好きな素材を選び，デザインを決めてドレス作り。完成までの工程が楽しめるSLG「Dressmaker」，Steamで配信開始\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      },
+      {
+        "eventKey": "f43f76985332f70b696d",
+        "eventKind": "launch",
+        "subjectKey": "core keeper",
+        "subject": {
+          "kind": "game",
+          "key": "core keeper"
+        },
+        "publishability": "direct",
+        "headline": "畜産動物に乗ったり連れ回したりできるアイテムが登場。「Core Keeper」，大型無料アップデート“地下のライダー”を配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/621/G062117/20260921032/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.4gamer.net/games/621/G062117/20260921032/",
+            "imageUrl": "https://www.4gamer.net/games/621/G062117/20260921032/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Fireshine Gamesは本日（2026年9月21日），Pugstormが開発した採掘サンドボックスアドベンチャー「Core Keeper」の大型無料アップデート，「地下のライダー（Rider…\n畜産動物に乗ったり連れ回したりできるアイテムが登場。「Core Keeper」，大型無料アップデート“地下のライダー”を配信開始\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に\nリメイクシリーズ2作目「FINAL FANTASY VII REBIRTH」が1973円！ 映画化も果たした「８番出口」は329円！「今週のすべり込みセール情報」"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-22T10:19:50+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "39c5b98c0caff81d0db3",
+        "eventKind": "release-date",
+        "subjectKey": "genshin 7 1 countdown",
+        "subject": {
+          "kind": "game",
+          "key": "genshin 7 1 countdown"
+        },
+        "publishability": "direct",
+        "headline": "Genshin 7.1 Countdown (Release Date & Time)",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/genshin-impact-7-1-release-date-time-maintenance-countdown-vesna-vodyanitsa-banner/",
+            "publishedAt": "2026-09-22T00:14:02Z",
+            "canonicalUrl": "https://gamerant.com/genshin-impact-7-1-release-date-time-maintenance-countdown-vesna-vodyanitsa-banner/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/09/genshin-impact-7-1-release-date-time-update-maintenance-countdown-vesna-vodyanitsa-banner-genshin-7-1-release-date-vesna.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Both Vesna and Vodyanitsa will light up Phase 1 of Genshin Impact 7.1, instead of being separated in the two halves of the version.\nGenshin Impact 7.1 Release Date (Vesna & Vodyanitsa Banner)\nGenshin Impact 7.1 is coming out on September 22, 2026, at 11:00 PM ET (UTC-4) . Unlike most versions with two characters, version 7.1 will have both of them released in the first phase. So you only have three weeks to get both characters if you want them.\nGenshin Impact redeem codes commonly come with Primogems rewards that aid in players’ gacha experience.\nVesna & Vodyanitsa Banner Release Date In Genshin Impact 7.1\nVesna (Anemo-Sword) and Vodyanitsa (Hydro-Catalyst) will be featured together in Phase 1 of Genshin Impact 7.1. Additionally, these characters will also get a rate-up, making them easier to get:\nGenshin Impact 7.1 Maintenance Ends & Start Time\nIf you calculate a typical five-hour maintenance time, here's when Genshin 7.1 maintenance starts and ends:\nGenshin 7.1 Maintenance Starts\nVesna & Vodyanitsa Banner Release Date: September 22, 2026 – October 13, 2026 (Phase 1)"
+          }
+        ]
+      },
+      {
+        "eventKey": "1ba15d00e25d00496571",
+        "eventKind": "release-date",
+        "subjectKey": "persona fans get first look at kotone shiomi s abilities and",
+        "subject": {
+          "kind": "game",
+          "key": "persona fans get first look at kotone shiomi s abilities and"
+        },
+        "publishability": "direct",
+        "headline": "Persona Fans Get First Look At Kotone Shiomi's Abilities and Release Date",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/persona-5-phantom-x-kotone-shiomi-femc-release-date-abilities/",
+            "publishedAt": "2026-09-21T22:30:13Z",
+            "canonicalUrl": "https://gamerant.com/persona-5-phantom-x-kotone-shiomi-femc-release-date-abilities/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/09/persona-5-phantom-x-kotone-shomi-pink.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Persona 3 Portable protagonist Kotone Shiomi is returning, and the series gives a first look at her abilities and release date.\nPersona Fans Get First Look At Kotone Shiomi's Abilities and Release Date\nPersona 3 Portable protagonist Kotone Shiomi is coming to Persona 5: The Phantom X , and the game has detailed her kit and shared her release date. Fans of the neglected Persona FeMC will soon be able to revisit the character in Persona 5: The Phantom X with full voice acting, a new story, and all with a brand-new high-definition 3D model.\nUnfortunately for fans, Atlus opted to skip Kotone Shiomi in Persona 3 Reload , the recent remake of the game. Though Kotone wasn't part of the original version of the game that came out for the PlayStation 2, she was added as an alternate protagonist for the player to choose from when Persona 3 Portable launched in 2009. Thankfully, that version of the game has been ported to modern consoles, and now she's joining another game's cast.\nPersona 4 Revival is showing off a brand-new Social Link coming to the game, featuring crossover content with the Persona 4 anime.\nPersona 5: The Phantom X Details Kotone Shiomi's Addition to the Cast\nKotone Shiomi is joining the cast of Persona 5: The Phantom X beginning on September 24. All versions of the game will release a sync patch that will add her character in honor of the franchise's 30th anniversary. Her banner will last until November 12 at 1:59 AM UTC. During a livestream, the team detailed her new look, kit, and gave some glimpses into her new side story. Persona 5: The Phantom X protagonist Wonder will encounter her after going through a mysterious door in Paulownia Mall, which will temporarily cause him to lose his memory of Tartarus. Kotone will come to his rescue there, and can join the protagonist's party permanently if drawn from a limited banner.\nKotone Shiomi is classified as a Strategist, a class that focuses on buffing the team, and will have the Fire element. Her abilities will allow her to buff party members' attack, pierce rate, and final damage. Her assist skill, Go For Broke, puts her in a Fortune state, which extends the effect of her Powerful Bond buff and allows her to activate another party member's Highlight immediately, even if the gauge isn't full. She also has a unique ability in which the party gains a 1% final damage amplification buff for every Strategist in the party, even if Kotone herself isn't actively in the party. Both Persona 3 protagonists, Kotone and Makoto, will also be usable in the same party.\nFans of the Persona series have had a lot to enjoy in 2026, as the entire franchise has been holding celebrations for its anniversary. A number of Persona tie-ins have been hosted at various retailers and restaurants, a Netflix Persona adaptation has been announced, and more details of Persona 4 Revival have been revealed. Persona will also cross over with Cardfight Vanguard , with full decks for Persona 3 , 4 , and 5 , and the remaining series entries' protagonists featured on individual cards."
+          }
+        ]
+      },
+      {
+        "eventKey": "a1d6f921b9220d1315e5",
+        "eventKind": "other",
+        "subjectKey": "魔王城前店の宿泊名簿",
+        "subject": {
+          "kind": "game",
+          "key": "魔王城前店の宿泊名簿"
+        },
+        "publishability": "direct",
+        "headline": "“RPGっぽい宿屋の記録”推理ゲーム『魔王城前店の宿泊名簿』無料公開。断片情報から謎に迫る『オブラディン』風ゲーム",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260921-469163/",
+            "publishedAt": "2026-09-21T08:16:26+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260921-469163/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260921-469163-header2.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "個人ゲーム開発者の作っちゃうおじさん氏は9月20日、無料ブラウザ推理ゲーム『魔王城前店の宿泊名簿』を公開した。\n“RPGっぽい宿屋の記録”推理ゲーム『魔王城前店の宿泊名簿』無料公開。断片情報から謎に迫る『オブラディン』風ゲーム\n個人ゲーム開発者の作っちゃうおじさん氏は9月20日、無料ブラウザ推理ゲーム『 魔王城前店の宿泊名簿 』を公開した。PC/スマートフォンのWebブラウザから、ダウンロード不要でプレイ可能だ。\n『魔王城前店の宿泊名簿』は、魔王討伐へ向かった冒険者たちの記録を読み解き、過去の宿泊名簿を復元していく推理ゲームだ。公式説明では「オブラディンライク」と標榜されており、断片的な情報を突き合わせて人物や出来事を特定するという、『Return of the Obra Dinn』に似た作風になっている。プレイヤーは冒険者たちの「思考盗聴記録」を手がかりに、誰がいつ、どの宿のどの部屋に泊まっていたのかを突き止めていく。\n『魔王城前店の宿泊名簿』は、『Return of the Obra Dinn』『ギルド探求団へようこそ！』『デスゲームの報告書』などから影響を受けて制作されたという。同氏は9月17日、同月19日から20日にかけて実施されるゲーム制作企画に向けて、「魔王城付近の宿泊名簿から、勇者が失踪した理由を解き明かす」オブラディンライクを制作すると予告。その後9月20日に、本作を公開した。公開後には『ギルド探求団へようこそ！』の開発者であるパルソニック氏も好評を寄せるなど、さっそくじわじわと 話題になっている 。\n『魔王城前店の宿泊名簿』は PC/スマートフォン 向けに無料公開中。Webブラウザからダウンロード不要でプレイできる。\n&ldquo;RPGっぽい宿屋の記録&rdquo;推理ゲーム『魔王城前店の宿泊名簿』無料公開。断片情報から謎に迫る『オブラディン』風ゲーム\n物語のきっかけとなるのは、学校から出された「町の歴史を調べる」という宿題だ。主人公は家族が営む宿屋について調べることになり、倉庫に残された大量の古い資料を発見。まずは主人公が暮らす「谷風亭」の、100年前の宿泊名簿を完成させることになる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "a791dbfb951fa17a2284",
+        "eventKind": "other",
+        "subjectKey": "マインクラフト",
+        "subject": {
+          "kind": "game",
+          "key": "マインクラフト"
+        },
+        "publishability": "direct",
+        "headline": "「マインクラフト ライブ」放送決定、9月27日2時から。『マインクラフト』の“次の章”が見られそう",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260922-469245/",
+            "publishedAt": "2026-09-21T22:10:36+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260922-469245/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469245-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Mojang Studiosは9月22日、「Minecraft LIVE（マインクラフト ライブ）」を日本時間9月27日午前2時から放送すると発表した。\n「マインクラフト ライブ」放送決定、9月27日2時から。『マインクラフト』の“次の章”が見られそう\nMojang Studiosは9月22日、「 Minecraft LIVE（マインクラフト ライブ） 」を日本時間9月27日午前2時から放送すると発表した。\n「マインクラフト ライブ」は『マインクラフト』の最新情報をお披露目する毎年恒例のライブイベント。毎年春と秋に計2回開催されるのが通例だが、今年は5月にも「TwitchCon」の会場からの生放送も実施。そこでは「カオス・キューブド」の配信日や、映画「マインクラフト／ザ・ムービー」の続編のタイトル、そして先日配信されたゲームドロップ「ウィルダネス・バウンド」から「まだらな森」のお披露目などがおこなわれた（ 関連記事 ）。\nそして今年3回目となる2026年秋のマインクラフトライブの放送が決定した。数日後の9月30日に、スピンオフとなるアクションRPG『Minecraft Dungeons II（マインクラフト ダンジョンズ 2）』の発売も控えているタイミングでの放送となる。告知映像では「The next chapter for Minecraft（マインクラフトの次の章）」というフレーズも用いられており、どのような内容となるのか期待が高まる。\n最新AI「GPT-6 Astra」が『マインクラフト』でクリーパーの襲撃に遭い&ldquo;トラウマ化&rdquo;。ビビりまくってジャガイモ栽培しかできなくなる"
+          }
+        ]
+      },
+      {
+        "eventKey": "10dfaece8d8b2c1422d5",
+        "eventKind": "other",
+        "subjectKey": "call of duty",
+        "subject": {
+          "kind": "game",
+          "key": "call of duty"
+        },
+        "publishability": "direct",
+        "headline": "『Call of Duty』のチート対策は「使う側も潰し、売る側も潰す」二正面作戦に。“年間推計5500億円規模の巨大チート市場”を、根元から叩く",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260921-469217/",
+            "publishedAt": "2026-09-21T11:28:53+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260921-469217/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260921-469217-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Activisionは9月18日、同社のチート対策チーム「TeamRICOCHET」にまつわる情報を公開。巨大な“チート経済圏”そのものを攻撃する方針を明らかにした。\n『Call of Duty』のチート対策は「使う側も潰し、売る側も潰す」二正面作戦に。“年間推計5500億円規模の巨大チート市場”を、根元から叩く\n『Call of Duty』シリーズなどを手がけるActivisionは9月18日、同社のチート対策チーム「TeamRICOCHET」にまつわる情報を 公開 。TeamRICOCHETは、チート利用者のアカウント停止だけではなく、販売業者にも圧力も強めることによって、不正行為全体では推計で85億ドルにもおよぶという“チート経済圏”そのものを攻撃する方針を明らかにした。\nActivisionは、『Call of Duty』シリーズに向けてアンチチートシステム「RICOCHET Anti-Cheat」（以下、RICOCHET）を展開している。近年のPC版のシリーズ作品ではカーネルレベルドライバーも用いながら、不正行為の検出やアカウント停止措置などをおこなっている。またTeam RICOCHETでは、RICOCHETの開発・運用のほか、チート業者への法的措置など包括的なチート対策をおこなっている。RICOCHETは、今年10月23日発売予定の『Call of Duty: Modern Warfare 4』にも実装予定で、先行ベータテストでは新しいチート検知システムも導入されたという（ 関連記事 ）。\n今回は、『Call of Duty』シリーズでチート対策を続けるTeam RICOCHETによって、チート産業ビジネスの一端と、そうした状況を踏まえた対策が明かされたかたちだ。Team RICOCHETは、不正アカウントの停止だけではなく、チート業者への法的措置も積極的におこなっており、先月にはチート開発業者へ活動停止命令書を受け渡す“家宅訪問動画”を公開していた（ 関連記事 ）。\nFPSをはじめとする対戦ゲームにおいて、チート対策は長年にわたる課題のひとつであり、その対応をめぐってゲーム会社に不満の矛先が向けられることも少なくない。今回の発信には、シリーズ最新作『Call of Duty: Modern Warfare 4』の発売を控え、同作におけるチート対策や安全性をあらためてアピールする狙いがありそうだ。またこれまでゲーム会社が対策を講じる一方で、チート開発者がその対策をかいくぐろうとする、“いたちごっこ”は続いてきた。技術的なチートの検知・対策だけでなく、その流通や収益構造構造にも目を向けて対策を講じているというActivisionの取り組みが実を結ぶのかは注目されるところだ。\n『 Call of Duty: Modern Warfare 4 』はPC（ Steam / Microsoft Store / Battle.net ）/ Xbox Series X|S / PS5 / Nintendo Switch 2 向けに、10月23日発売予定だ。\nそんなTeam RICOCHETは自身の公式ブログで9月18日、同社がおこなっているチート行為への対応と、チート産業の現状について報告した。まずIntorqaの調査を紹介し、巨大産業と化しつつあるチート業者の背景を解説している。"
+          }
+        ]
+      },
+      {
+        "eventKey": "cb03461258aede80ac93",
+        "eventKind": "other",
+        "subjectKey": "melty blood twi lumina",
+        "subject": {
+          "kind": "game",
+          "key": "melty blood twi lumina"
+        },
+        "publishability": "direct",
+        "headline": "『MELTY BLOOD: TWI-LUMINA』試遊&#038;メディアセッションまとめ。簡易操作モードは連打コンボが強い、アーマー付き突進中段のシステム技「ガントレット」など新情報いろいろ",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/melblo-20260921-469140/",
+            "publishedAt": "2026-09-21T06:18:16+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/melblo-20260921-469140/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本稿では、試遊で体験できた新システムについてのプレイレポと、メディアセッションで明かされた新モード「グランドシナリオモード」の詳細についてお届けする。\n『MELTY BLOOD: TWI-LUMINA』試遊&メディアセッションまとめ。簡易操作モードは連打コンボが強い、アーマー付き突進中段のシステム技「ガントレット」など新情報いろいろ\n『MELTY BLOOD: TWI-LUMINA』（以下、『TWI-LUMINA』）は、TYPE-MOONによるノベルゲーム『月姫』のキャラクターが登場するスピンオフ格闘ゲーム『MELTY BLOOD』シリーズの最新作。2021年に発売された『月姫』のリメイク作品『月姫 -A piece of blue glass moon-』をベースにした『MELTY BLOOD: TYPE LUMINA』の後継作となる作品だ。来年4月の発売を控える本作だが、9月17日から20日にかけて開催された東京ゲームショウ2026にて、先行試遊とメディアセッションが実施された。本稿では、試遊で体験できた新システムについてのプレイレポと、メディアセッションで明かされた新モード「グランドシナリオモード」の詳細についてお届けする。\n「Actモード」は『TWI-LUMINA』から実装される新しい操作モード。従来の操作モードは「Duelモード」と呼称されて区別されており、Actモードはワンボタン必殺技やダッシュ、連打コンボなどが使用可能ないわゆる簡易操作モードとなっている。まずワンボタン必殺技だが、これは方向入力+必殺技ボタンでコマンド技が出せるというオーソドックスなもの。波動拳コマンドの必殺技はニュートラル+必殺技ボタン、昇竜拳コマンドの必殺技は前入れ+必殺技ボタン、といった塩梅だ。\n次に、試遊とは別に設けられたメディアセッションにて公開された、『TWI-LUMINA』の目玉でもある新モード「グランドシナリオモード」についても解説しよう。こちらはいわゆるストーリーモードにあたるモードで、奈須きのこ氏書き下ろしのシナリオが用意されている。全体的に『月姫 -A piece of blue glass moon-』を彷彿とさせるUIで、画面全体を使ってテキストを読んでいくビジュアルノベルのようなパートと、キャラクターの立ち絵に画面下部のメッセージウィンドウが合わさったアドベンチャーパートの2つで構成されている。\nそして何より注目なのは、そのボリューム。このグランドシナリオモードは、プレイ時間換算にして20時間ほどのシナリオが用意されているとのこと。格闘ゲームの付属モードとしては異例の分量であることがお分かりいただけるだろう。もはやおまけではなく、『TWI-LUMINA』は対戦格闘ゲームとノベルゲームが一体となった作品と言っても過言ではないレベルだ。\n芹沢氏： おっしゃる通りかなり新しい試みではあって、制作の労力という点でもかなりのものを注ぎ込んでいます。『MELTY BLOOD』シリーズは長く続いているシリーズということもあってベースとなるゲームの作りがしっかりとしていますし、我々も経験があって格闘ゲームとしてはちゃんと毎回面白いものを作れる自信がある。でも、それだけでは結局既存のファンや格闘ゲームのファンしか遊んでくれません。TYPE-MOONブランドの大きな魅力のひとつでもある「奈須きのこさんによるシナリオ」を最大限活用して、新しい層のファンを取り込みたい。そしてそういったプレイヤーたちに、格闘ゲームの魅力を伝えたい。そういった理由で、このグランドシナリオモードに力を入れることを決めました。\n芹沢氏： あくまで『月姫』とその派生作品としての『MELTY BLOOD』のシナリオモードという立ち位置なので、コラボキャラなどは基本的には絡んでこないです。\n『MELTY BLOOD: TWI-LUMINA』はPS4/PS5/Xbox One/Nintendo Switch/Nintendo Switch 2/PC（Steam）向けに、2027年4月22日発売予定。\nまずは試遊のプレイレポからお届けしよう。今回の試遊で体験できた要素のうち、おそらくもっとも重要なのはシステム面での大きな変更点である「Actモード」と「ルミナゲージ」である。"
+          }
+        ]
+      },
+      {
+        "eventKey": "2f54cba9ad15aeae7dfe",
+        "eventKind": "other",
+        "subjectKey": "starcraft",
+        "subject": {
+          "kind": "game",
+          "key": "starcraft"
+        },
+        "publishability": "direct",
+        "headline": "Blizzard Says StarCraft 'Won't Be Exclusive' When It Launches in 2030",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/blizzard-says-starcraft-wont-be-exclusive-when-it-launches-in-2030",
+            "publishedAt": "2026-09-21T20:45:15.744Z",
+            "canonicalUrl": "https://www.ign.com/articles/blizzard-says-starcraft-wont-be-exclusive-when-it-launches-in-2030",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/21/starcraft-exclusive-1790022984188.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Blizzard has confirmed its open-world StarCraft shooter \"won&#x27;t be exclusive\" to Xbox platforms when it launches in 2030.\nBlizzard Says StarCraft &#x27;Won&#x27;t Be Exclusive&#x27; When It Launches in 2030\nBlizzard Entertainment has confirmed its open-world StarCraft shooter \"won&#x27;t be exclusive\" to Xbox platforms when it launches in 2030.\nRepresentatives for the World of Warcraft developer shared the update for the far-off franchise revival in a series of post-BlizzCon 2026 email exchanges with Kotaku . It&#x27;s an update that slightly widens what will be StarCraft&#x27;s list of launch platforms – but where exactly it will be available isn&#x27;t so simple.\nKotaku asked for clarification and was told that Blizzard \"can only say for now that StarCraft won&#x27;t be exclusive.\" The site then asked if the lack of exclusivity meant the game would come to additional consoles, or if it simply meant it would receive a PC release. Representatives for the developer said that, if a story were to call StarCraft an Xbox-exclusive, they would need to issue a correction request.\nA four-year wait means there&#x27;s lots of ground to cover, and knowing so little about what exactly StarCraft is only makes it harder to peer into the future. Blizzard announced the long-rumored video game just a little more than a week ago and only really shared that cinematic trailer at the time. The year 2030 might feel like the distant future, but the release window is still one that the team feels confident about .\nWhen Blizzard announced its new game with the \"Dominion\" cinematic trailer at BlizzCon, it neglected to share how exactly players will be able to play it in 2030. Although previous entries in the RTS series have traditionally been available on PC, the only real platform confirmation we&#x27;ve received thus far came from Xbox UK , which promised that an \"Xbox console\" release was planned."
+          }
+        ]
+      },
+      {
+        "eventKey": "f9aabc9a6bbdc37f9a9a",
+        "eventKind": "other",
+        "subjectKey": "marathon",
+        "subject": {
+          "kind": "game",
+          "key": "marathon"
+        },
+        "publishability": "direct",
+        "headline": "Bungie Bosses Promise to ‘Evolve’ Marathon, Deny Game Will ‘Replace’ Destiny",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bungie-bosses-promise-to-evolve-marathon-deny-game-will-replace-destiny",
+            "publishedAt": "2026-09-21T16:26:14.737Z",
+            "canonicalUrl": "https://www.ign.com/articles/bungie-bosses-promise-to-evolve-marathon-deny-game-will-replace-destiny",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/02/27/marathon-reviewsofar-blogroll-1772235737503.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bungie Studio Head Poria Torkan and Josh Dean, Head of Product and GM of Marathon, revealed plans to “evolve” Marathon as Bungie continues to navigate big internal changes.\nBungie Bosses Promise to ‘Evolve’ Marathon, Deny Game Will ‘Replace’ Destiny\nBungie Studio Head Poria Torkan, alongside the Head of Product and GM of Marathon, Josh Dean, revealed plans to “evolve” Marathon as Bungie continues to navigate big internal changes.\nIn a September 21 video message to fans, Torkan and Dean addressed what’s next for Marathon , saying the game is an “important part” of shaping where Bungie goes next.\n“We’re gonna anchor on what makes Marathon special and evolve it beyond the genre constraints that we’ve placed on it. We’re going to expand Marathon into a deeper survival experience that gives players more ways to take on its dangerous alien world,” Dean continued.\nHe outlined the team&#x27;s goal for Marathon by the end of year one, saying that Bungie hopes to \"preserve what you already love, but find ways to provide players with more agency in how you play, whether in PvE or PvP.\"\nThis news follows Bungie&#x27;s plans to delay Marathon&#x27;s next big update from late September to December. In a blog post published at the same time as Torkan and Dean&#x27;s video message, Bungie reiterated that it \"still [has] a lot planned for [its] October Nightfall Refresh and Symbiosis update in December.\" It also promised that players will get more Marathon news \"later this week\" regarding their vision for the future of the game.\nToday, we’re sharing more about the future of Bungie, including our plans for Destiny, Marathon, and how we’re changing the way we work. Read more on https://t.co/ZkmLWmaQZr : https://t.co/QbDwADGinr pic.twitter.com/F5tcXF0TsN\nMarathon had a rough start since its launch in March; while it received critical acclaim upon release, according to data from SteamsCharts , it currently boasts around 1,390 active players, with a peak of just 2,630 in the last 24 hours. This is merely a small slice of Destiny 2&#x27;s comparatively massive playerbase, and it seems the team at Bungie has taken notice of this, given its renewed efforts to reshape the game.\n\"We’re going to expand it into a deeper survival experience.\"\n\"It didn’t reach as many players as we’d hoped,” Torkan admitted. “But we also know and understand that the game needs to evolve.”"
+          }
+        ]
+      },
+      {
+        "eventKey": "3c25debccc2cd8511daf",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Bungie Says More Destiny Is Coming, Months After Ending Support for Destiny 2",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "needs-more-evidence",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bungie-says-more-destiny-is-coming-months-after-ending-support-for-destiny-2",
+            "publishedAt": "2026-09-21T16:15:31.277Z",
+            "canonicalUrl": "https://www.ign.com/articles/bungie-says-more-destiny-is-coming-months-after-ending-support-for-destiny-2",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/05/25/warframe-and-destiny-1779742030545.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bungie has said it is \"absolutely not done with Destiny\" just months after its controversial decision to end ongoing support for Destiny 2.\nBungie Says More Destiny Is Coming, Months After Ending Support for Destiny 2\nBungie has said it is \"absolutely not done with Destiny\" just months after the controversial decision to end ongoing support for Destiny 2 .\nThe five-minute upload features Bungie studio head Poria Torkan and head of product, GM of Marathon Josh Deane. The two executives start their surprise talk with fans, promising that Sony has not completely abandoned the Destiny brand after months of fans pleading to see them either return to Destiny 2 or eventually create Destiny 3.\n\"We&#x27;re not asking for your trust,\" Torkan said, acknowledging some of Bungie&#x27;s recent struggles. \"We know we have to earn it, and to do that, we need our games to deliver in ways that exceed your expectations of what you&#x27;ve come to love about the games that we make – and that starts with Destiny.\nToday, we’re sharing more about the future of Bungie, including our plans for Destiny, Marathon, and how we’re changing the way we work. Read more on https://t.co/ZkmLWmaQZr : https://t.co/QbDwADGinr pic.twitter.com/F5tcXF0TsN\n\"Bungie wouldn&#x27;t be what it is today without it. It&#x27;s the foundation upon which everything else rests, and we are absolutely not done with Destiny. We have more stories to tell, but we have to do it right and give our teams the time they need to do justice to this amazing universe.\"\nDeane clarified that Bungie&#x27;s goal is to \"return Destiny to its original promise.\" That means going back to \"awe-inspiring mystery, the sense of discovery, and the promise of a community of Guardians rallying together, raging against impossible odds.\"\nIt&#x27;s been a painful few months for the players who stuck by Destiny and Destiny 2 before substantial support came to an end with the Monument of Triumph update in June. Unfortunately, restoring that community and rebuilding trust will take even more time."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 45328,
+      "estimatedInputTokens": 11332,
+      "activeTrackingItems": 0,
+      "candidateItems": 20,
+      "includedItems": 20,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
