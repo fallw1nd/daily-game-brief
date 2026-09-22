@@ -169,7 +169,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
         publishedAt: resolveEvidencePublishedAt({
           metadataPublishedAt: meta.publishedAt,
           visiblePublishedAt: sourceVisiblePublishedAt(html, source),
-          listingPublishedAt: appearance.publishedAt,
+          listingPublishedAt: source?.format === "rss" ? appearance.publishedAt : null,
         }),
         imageUrl: meta.imageUrl,
         canonicalUrl: meta.canonicalUrl,
