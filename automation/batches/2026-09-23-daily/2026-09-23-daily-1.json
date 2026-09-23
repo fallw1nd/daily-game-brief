@@ -1,0 +1,1540 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-23T02:22:23.189Z",
+  "finalizedAt": "2026-09-23T02:22:23.189Z",
+  "coverageThrough": "2026-09-23 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-23-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-23 12:00",
+      "windowStart": "2026-09-22 10:10",
+      "windowEnd": "2026-09-23 10:10"
+    },
+    "adjacentEdition": "2026-09-22-daily",
+    "packages": [
+      {
+        "eventKey": "32171b27fd50dd86ca72",
+        "eventKind": "launch",
+        "subjectKey": "gears-of-war-e-day",
+        "subject": {
+          "kind": "game",
+          "key": "gears-of-war-e-day"
+        },
+        "publishability": "direct",
+        "headline": "Gears of War: E-Day Story Director Laid Off Just a Week Before Early Access Launch",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/gears-of-war-e-day-story-director-laid-off-just-a-week-before-early-access-launch",
+            "publishedAt": "2026-09-23T00:22:16.260Z",
+            "canonicalUrl": "https://www.ign.com/articles/gears-of-war-e-day-story-director-laid-off-just-a-week-before-early-access-launch",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/06/17/gears-thumb-1781708355267.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Gears of War: E-Day&#x27;s story director has been laid off, just one week before the game&#x27;s early access launch.\nGears of War: E-Day Story Director Laid Off Just a Week Before Early Access Launch\nEarlier today, Microsoft continued its ongoing reset of the Xbox brand, resulting in 268 staff members losing their jobs across a number of studios. Many of these employees seemed to be veteran or senior talent, one of the most prominent examples being Juan Vaca, a story director at Gears of War developer The Coalition. Vaca confirmed he was part of the latest round of Xbox layoffs after being with the company for four years.\nThe news comes at a pretty brutal time, as Vaca just publicly celebrated the game going gold last week, and the title will enter early access next week, five days before its global launch. It&#x27;s unclear what Microsoft is planning to do with The Coalition after Gears of War: E-Day&#x27;s launch, but cutting key talent doesn&#x27;t inspire a lot of confidence.\nThis isn&#x27;t the only oddly-timed layoff, either. Halo Studios&#x27; cinematic director Josh Daniels was also laid off , just one day after getting a promotion. Halo Studios&#x27; fate is a lot clearer, however. Activision is taking charge on the future of Halo, while Halo Studios is being gutted. A small team will remain on to support existing Halo games, but a new team is being built under Activision to develop the next mainline game in the franchise.\nGears of War&#x27;s future hasn&#x27;t been outlined much by Microsoft. When E-Day was announced years ago, it was suggested that the team would eventually return to the ongoing storyline that was left hanging at the end of Gears 5 . However, it&#x27;s unclear if that&#x27;s still in the cards with all of the changes happening at Xbox."
+          }
+        ]
+      },
+      {
+        "eventKey": "04b50dedd103eba15e2e",
+        "eventKind": "launch",
+        "subjectKey": "nba star steven adams says gta 6 s",
+        "subject": {
+          "kind": "game",
+          "key": "nba star steven adams says gta 6 s"
+        },
+        "publishability": "direct",
+        "headline": "NBA Star Steven Adams Says GTA 6's Launch Will Lead to a 'League-Wide' Drop in Performance for Athletes and Coaches",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/nba-star-steven-adams-says-gta-6s-launch-will-lead-to-a-league-wide-drop-in-performance-for-athletes-and-coaches",
+            "publishedAt": "2026-09-22T22:36:03.903Z",
+            "canonicalUrl": "https://www.ign.com/articles/nba-star-steven-adams-says-gta-6s-launch-will-lead-to-a-league-wide-drop-in-performance-for-athletes-and-coaches",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/27/mega-1-1787855222702.jpeg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "NBA athlete Steven Adams has warned that fans should expect a \"league-wide\" drop in performance for athletes across all sports in November due to GTA 6&#x27;s release.\nNBA Star Steven Adams Says GTA 6&#x27;s Launch Will Lead to a &#x27;League-Wide&#x27; Drop in Performance for Athletes and Coaches\nSpeaking with media, the Houston Rockets center warned that athletes&#x27; performance will drop in November — not just for the NBA, but also the NFL. He noted that the release of Grand Theft Auto 6 will likely distract players and coaches, but he expects things to improve in December once they&#x27;ve spent enough time with the game.\nSteven Adams has jokes at media day: \"I will say: you guys should anticipate November. The performance of the league, league-wide. GTA is dropping.\" pic.twitter.com/OIBnRbDFeL\n\"You guys should anticipate November. The performance of the league... league-wide. GTA is dropping. Look at the NFL, look at all the leagues, and watch them plummet, mate. Just for the month of November, performance is gonna go down; it should come back up. Most of the boys will get it done; hopefully they finish the game. Coaching as well, by the way. The coaching and scouts are going to be horrendous. Just for November, but it should bounce back in December, hopefully. Should be good.\"\nGiven the fact that GTA 6 is expected to be one of the biggest entertainment releases in history with a massive level of anticipation behind it, it&#x27;s not surprising to hear that even athletes are preparing to grind the hell out of the game. A running joke has made the rounds about NFL quarterback Kyler Murray&#x27;s performance dropping whenever a new Call of Duty game releases, but now that joke appears to be expanding to the vast majority of pro athletes.\nWhether it really does have any kind of effect on performance remains to be seen. These are professionals, of course, and they will still prioritize their careers... But some may not get the same level of rest as they normally would when GTA 6 launches this fall.\nAdams&#x27; comments come at the same time as another NBA-adjacent GTA 6 story . Today, construction was completed on a \"Welcome to Vice City\" sign on the Miami Heat&#x27;s arena in Florida. The sign reportedly cost Rockstar a whopping $975,000 and is expected to remain attached to the arena&#x27;s roof either until the end of the year or the end of the Miami Heat&#x27;s home season. It&#x27;s still unclear if there are any larger marketing deals with GTA 6 and the NBA, such as the debut of a TV spot for the game.\n\"Look at all the leagues, and watch them plummet.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "498413717e4f0733cac4",
+        "eventKind": "announcement",
+        "subjectKey": "pick a boo",
+        "subject": {
+          "kind": "game",
+          "key": "pick a boo"
+        },
+        "publishability": "direct",
+        "headline": "Steamの新たな協力プレイゲーム、“夜逃げ”アクション『PICK A BOO』正式発表。最大6人で家具をまとめて雑すぎ豪快運搬、うろつく怪物からさっさと逃げるか欲張るか",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260922-469313/",
+            "publishedAt": "2026-09-22T04:10:16+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260922-469313/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469313-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Game & Co.は、最大6人プレイ対応のローグライク協力型脱出アクション『PICK A BOO』を正式発表した。\nSteamの新たな協力プレイゲーム、“夜逃げ”アクション『PICK A BOO』正式発表。最大6人で家具をまとめて雑すぎ豪快運搬、うろつく怪物からさっさと逃げるか欲張るか\n株式会社Game & Co.は、株式会社トイジアムが手がける『 PICK A BOO 』を正式発表した。対応プラットフォームはPC（Steam）。\n『PICK A BOO』は、最大6人プレイ対応のローグライク協力型脱出アクションゲームだ。プレイヤーは“夜逃げ”専門のプロ集団の一員として、家具をトラックに積み込んでいく。しかしステージにはモンスターが徘徊しており、見つかる前に脱出しなければならない。\n本作のパブリッシャーを務めるのはGame & Co.。株式会社Brave groupの子会社として、2022年に設立された企業だ。主にeスポーツ関連事業を手がけており、これまでには大手eスポーツチーム「Crazy Raccoon」との共同事業として新作トレーディングカードゲーム『Xross Stars』を企画・運営してきた。本作『PICK A BOO』は同社が手がける初のゲームタイトルとなる。\n『PICK A BOO』はPC（ Steam ）向けに開発中だ。\n本作では家具を運んで集めることで、お金を稼ぐことが可能。また本作では家具を落としたりぶつけたりしても壊れる心配がないため、電磁力でまとめて一気に運ぶことができる。稼いだお金で自分自身の強化パーツを購入することが可能で、たとえばパワー重視の太い腕に換装すれば重たくて持てないものでも運べるようになる。また1人では持てないものは、仲間と協力して運ぶことも可能だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "7c5d45a642df34258469",
+        "eventKind": "release-date",
+        "subjectKey": "wardogs",
+        "subject": {
+          "kind": "game",
+          "key": "wardogs"
+        },
+        "publishability": "direct",
+        "headline": "Wardogs Season 2 Release Date Announced, Will Add Weather Including Rain",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/wardogs-season-2-release-date-announced-will-add-weather-including-rain",
+            "publishedAt": "2026-09-22T18:21:19.115Z",
+            "canonicalUrl": "https://www.ign.com/articles/wardogs-season-2-release-date-announced-will-add-weather-including-rain",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/10/wardogsthumb-1789046591629.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Wardogs Season 2 has a release date, and the new content update will add weather effects, including rain.\nWardogs Season 2 Release Date Announced, Will Add Weather Including Rain\nWardogs Season 2 will arrive on October 15, and although we don&#x27;t know much about it yet, we do know that it will add weather to the game. The first teaser showcases heavy rainfall over a battlefield, suggesting players will have to deal with the elements going forward.\nWhether this will add any changes to the gameplay, such as making it harder to drive or creating visibility issues, remains to be seen. If handled right, it could really shake up the Wardogs experience, especially if weather comes and goes dynamically rather than being enabled in specific matches.\nWARDOGS Season 02 is coming. Stay tuned for more. pic.twitter.com/XTEa3mPGj9\nSeason 2 will also feature a progress wipe, resetting everyone&#x27;s unlocks and ranks back to square one. The aim is to rebalance the scales at the start of each season of Wardogs, preventing players who grind the game endlessly from dominating forever. In theory, without a wipe, it could devalue the entire in-game economy as players will eventually unlock everything and lose the incentive to do anything beyond killing enemies. However, some fans are understandably annoyed that they will have to re-unlock everything just one month after the game&#x27;s early access launch.\nWardogs has become one of the biggest games of the year, selling over two million copies in its first weekend. It&#x27;s unclear where the game is at now sales-wise, but it is continuing to be one of the most played games on Steam . We&#x27;ll have to wait and see what Season 2 brings, but it seems like developer Bulkhead has no plans to slow down on expanding the game with exciting content.\nWardogs is also coming to consoles , but it won&#x27;t be for a while. The team is targeting a 2028 release for the console version of the game, and a big reason for that is so that the team won&#x27;t have to crunch . In a recent interview, Bulkhead CEO Joe Brammer noted that although there is pressure to make a console version, he doesn&#x27;t want to overwork the team."
+          }
+        ]
+      },
+      {
+        "eventKey": "5a9cccdb0b970d106471",
+        "eventKind": "announcement",
+        "subjectKey": "middle earth shadow bundle",
+        "subject": {
+          "kind": "game",
+          "key": "middle earth shadow bundle"
+        },
+        "publishability": "direct",
+        "headline": "Middle-earth: Shadow Bundle announced for Switch 2",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/middle-earth-shadow-bundle-announced-for-switch-2",
+            "publishedAt": "2026-09-22T17:14:44+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/middle-earth-shadow-bundle-announced-for-switch-2",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Middle-earth-Shadow-Bundle-Ann_09-22-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Aspyr has announced Middle-earth: Shadow Bundle for Switch 2, which includes Middle-earth: Shadow of Mordor Game of the Year Edition and Middle-earth: Shadow of War Definitive Edition. It will laun…\nMiddle-earth: Shadow Bundle announced for Switch 2\nAspyr has announced Middle-earth: Shadow Bundle for Switch 2, which includes Middle-earth: Shadow of Mordor Game of the Year Edition and Middle-earth: Shadow of War Definitive Edition . It will launch on September 30. Pre-orders are available now for $34.99, a limited 50 percent discount off its base price of $69.99. Each game will also be available for purchase individually.\nMiddle-earth: Shadow of Mordor Game of the Year Edition and Middle-earth: Shadow of War Definitive Edition previously launched for PlayStation 4, Xbox One, and PC. Middle-earth: Shadow of Mordor is also available for PlayStation 3 and Xbox 360.\nHere is an overview of the bundle, via Aspyr:\nExperience the Award-Winning Middle-earth saga and the Nemesis System on Nintendo Switch 2 .\nMiddle-earth: Shadow of Mordor Game of the Year Edition\nMiddle-earth: Shadow of War Definitive Edition\nIn the sequel to Shadow of Mordor , forge a new Ring of Power, conquer Fortresses in massive battles and dominate Mordor from within – confronting the full power of the Dark Lord Sauron and his Ringwraiths."
+          }
+        ]
+      },
+      {
+        "eventKey": "f886468394e24b538b69",
+        "eventKind": "delay",
+        "subjectKey": "we were almost dead neogeo boss reveals forced redesign behind aes",
+        "subject": {
+          "kind": "game",
+          "key": "we were almost dead neogeo boss reveals forced redesign behind aes"
+        },
+        "publishability": "direct",
+        "headline": "‘We were almost dead’: NeoGeo boss reveals forced redesign behind AES+ delay",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/we-were-almost-dead-neogeo-boss-reveals-forced-redesign-behind-aes-delay/",
+            "publishedAt": "2026-09-22T07:00:04+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/09/IMG_6786-2560x1920.jpeg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Plaion reveals how the AI-driven chip shortage nearly cancelled NeoGeo AES+ entirely…\n‘We were almost dead’: NeoGeo boss reveals forced redesign behind AES+ delay\nPlaion reveals how the AI-driven chip shortage nearly cancelled NeoGeo AES+ entirely\nThe director behind SNK and Plaion’s upcoming NeoGeo AES revival has revealed how the global chip shortage forced it to reengineer the console, leading to the recently confirmed year-long delay and nearly canceling the device entirely.\nNeoGeo AES+ was announced earlier this year, featuring full compatibility with original 1990s NeoGeo cartridges and a suite of quality-of-life improvements. However, months after pre-orders opened, Plaion and SNK recently announced a ten-month delay to September 2027.\nSpeaking to VGC at Tokyo Game Show , Plaion hardware & software director Ben Jones explained the slip came after it failed to procure the memory chips required to manufacture NeoGeo AES+, forcing it to rethink how the console worked.\n“After we announced AES+, we received an overwhelming response and really significant levels of preorders,” Jones said. “So I straight away went into the procurement phase, and advised our partners in the Far East what our requirements were, and it&#8217;s the first time I&#8217;ve ever been refused ordering chips, and I&#8217;ve worked with Plaion for nearly 20 years in this field. I was like, ‘What do you mean you can&#8217;t get these chips? Oh, AI.’”\n“With that in mind, we tasked ourselves to try and see if there was some kind of a workaround with using what&#8217;s called Serial NOR flash, which is basically the same as parallel, but because the NeoGeo only uses parallel flash, you have to do a conversion that lets you use serial flash, which is in easier demand and you can basically get them.”\nPlaion ultimately determined it needed to redesign the cartridge chips with added technology that converted a serial signal into a parallel one. This work, combined with extra testing, is what resulted in NeoGeo AES+’s ten-month delay, Jones said."
+          }
+        ]
+      },
+      {
+        "eventKey": "ce47bcc13c9b928878e9",
+        "eventKind": "announcement",
+        "subjectKey": "shape of dreams",
+        "subject": {
+          "kind": "game",
+          "key": "shape of dreams"
+        },
+        "publishability": "direct",
+        "headline": "［インタビュー］家庭用ゲーム機版も発表された「Shape of Dreams」。少人数チームが直面した外部協業の苦労やゲームデザインの裏側とは",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/872/G087214/20260918075/",
+            "publishedAt": "2026-09-23T00:00:00.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/872/G087214/20260918075/",
+            "imageUrl": "https://www.4gamer.net/games/872/G087214/20260918075/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "PC向けにリリースされ，150万本を超えるセールスを記録しているアクションローグライト「Shape of Dreams」。本作について，Lizard Smoothieの代表であるシム・ウンソプ氏にメ…\n［インタビュー］家庭用ゲーム機版も発表された「Shape of Dreams」。少人数チームが直面した外部協業の苦労やゲームデザインの裏側とは\n「Shape of Dreams」の家庭用ゲーム機版が発売。クロスプレイによる最大4人での協力プレイにも対応\nNEOWIZは9月17日，アクションローグライト 「Shape of Dreams」 の家庭用ゲーム機版を発売した。Nintendo Switch 2やPS5，XBOXに対応し，PCを含めたクロスプレイによる最大4人での協力プレイも可能だ。発売1周年を記念したアップデート「星なき道」も行われ，9人目の旅人や新たな結末が加わった。\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日"
+          }
+        ]
+      },
+      {
+        "eventKey": "9e02a25d77bdef25a69e",
+        "eventKind": "cancel",
+        "subjectKey": "sega wanted to",
+        "subject": {
+          "kind": "game",
+          "key": "sega wanted to"
+        },
+        "publishability": "direct",
+        "headline": "Sega wanted to cancel the entire Sonic series but the first movie saved it, says Sonic Team head Iizuka",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/sega-wanted-to-cancel-the-entire-sonic-series-but-the-first-movie-saved-it-says-sonic-team-head-iizuka/",
+            "publishedAt": "2026-09-22T08:40:07+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2023/10/sonic-superstars-art.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The live-action Sonic film “definitely changed the course of this franchise…\nSega wanted to cancel the entire Sonic series but the first movie saved it, says Sonic Team head Iizuka\nSonic Team head Takashi Iizuka says Sega was planning to end the Sonic series entirely at one point.\nHe then noted that the series has had numerous ups and downs over the years, to the extent that Sega once wanted to draw a line under it and stop making Sonic games altogether.\nIizuka said it was the first live-action Sonic the Hedgehog movie, which was released in 2020 and was a major critical and commercial success, which essentially &#8216;saved&#8217; Sonic and changed Sega&#8217;s plans.\nElsewhere in the interview, Iizuka said that Sega had also planned to kill off the Shadow the Hedgehog character, but his popularity convinced it to change its mind – something that pleased Iizuka personally, because Shadow is his favourite character.\nThe live-action Sonic film &#8220;definitely changed the course of this franchise,&#8221; he says\nIn an interview with One More Game , Iizuka was asked about the history of the series, which turned 35 this year.\n&#8220;It has been 35 years, which means it has been longer than actually my children, so I look upon this franchise like sort of like my own son,&#8221; Iizuka replied."
+          }
+        ]
+      },
+      {
+        "eventKey": "fb177a3a1e19f91ee44a",
+        "eventKind": "launch",
+        "subjectKey": "graveyard keeper 2",
+        "subject": {
+          "kind": "game",
+          "key": "graveyard keeper 2"
+        },
+        "publishability": "direct",
+        "headline": "ゾンビをこき使い墓場を管理・運営するゲーム『Graveyard Keeper 2』が配信開始。“倫理観”を捨てて街の復興に挑もう",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260923z",
+            "publishedAt": "2026-09-22T17:00:25+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260923z",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/Screenshot-2026-09-14-at-12.30.34-PM-2-1024x575.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "遺体から集めた脳や心臓、骨、皮膚を組み合わせてアンデッド軍団を錬成。面倒な作業や生産ラインを自動化し、効率よく利益を叩き出す\nゾンビをこき使い墓場を管理・運営するゲーム『Graveyard Keeper 2』が配信開始。“倫理観”を捨てて街の復興に挑もう\ntinyBuildとLazy Bear Gamesは9月23日、中世の墓地を管理するシミュレーションゲーム 『Graveyard Keeper 2』 の配信を開始した。\n『Graveyard Keeper 2』は、世界累計1000万人以上がプレイした『Graveyard Keeper』の続編。前作のブラックユーモアを引き継ぎ、荒れ果てた中世の墓地を管理・復興させながら、経営やクラフトを進めていく。\n『Graveyard Keeper 2』の対応プラットフォームは、PC（Steam、GOG）、PS5、PS4、Xbox Series X|S、Xbox One、Nintendo Switch、Nintendo Switch 2。価格はSteam版が2800円、PS版が3190円、Xbox版が2900円、Switch版が3800円となっている。\n2026年9月23日— パブリッシャーのtinyBuildおよびデベロッパーのLazy Bear Gamesは、世界累計1,000万人以上のプレイヤーを魅了した大ヒット作の続編となる、不道徳系中世墓地管理シミュレーション『Graveyard Keeper 2』を、本日よりPCおよび各種コンソール向けに配信開始しました。\n前作『Graveyard Keeper』のブラックユーモア溢れる世界観と、中毒性の高い経営・クラフト要素が大幅にパワーアップして帰ってきました！\nタイトル ：Graveyard Keeper 2 ジャンル ：中世墓地管理シミュレーション / クラフトRPG プレイ人数 ：1人 プラットフォーム ：Steam / GOG / PlayStation 5 / PlayStation 4 / Xbox Series X|S / Xbox One / Nintendo Switch / Nintendo Switch 2 発売日 ：2026年9月23日 価格 ：Steam 2800円 / PS 3190円 / Xbox 2900円 / Switch 3800円 (予約購入割引あり) 開発 ：Lazy Bear Games 販売 ：tinyBuild 対応言語 ：日本語 / 英語 / フランス語 / ドイツ語 / ほか計11言語\nLazy Bear Gamesはリトアニアの独立系ゲームスタジオで、破天荒な名作の続編である『Graveyard Keeper 2』と共に帰ってきました！当スタジオは、『Punch Club』、『Swag and Sorcery』、『Bandle Tale: A League of Legends Story』、そしてもちろん『Graveyard Keeper』など、様々なフランチャイズにわたる伝説的なユーモアとアートスタイルで知られています。\nプレイヤーの仕事は、運ばれてくる遺体を埋葬するだけではない。脳や心臓、骨、皮膚などを採取し、パーツを組み合わせて独自のアンデッド軍団を作り出せる。ゾンビたちに農業や素材集め、クラフトなどの作業を任せ、生産を自動化することで、効率よく利益を生み出す“究極のブラック資本主義”を追求できる。\nまた、自らのゾンビ軍団を率いて敵と戦うバトル要素も登場する。アンデッドに占拠された巨大な街を探索し、住民たちの復興を手助けしながら、収益につなげていく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "72ca45dd47bb2eaaded7",
+        "eventKind": "dlc",
+        "subjectKey": "cairn",
+        "subject": {
+          "kind": "game",
+          "key": "cairn"
+        },
+        "publishability": "direct",
+        "headline": "Cairn DLC",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/cairn-dlc/",
+            "publishedAt": "2026-09-22T09:30:00Z",
+            "canonicalUrl": null,
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/wC7vqghgo6FNGEumqGLasR-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The latest Feature,/features,,features, breaking news, comment, reviews and features from the experts at PC Gamer\nPeak peak is back for more. I know there are like 170 games out right now, but I'm carving out some time to play the DLC pack for Cairn coming October 29. If you missed it, Cairn is the best game about climbing (and relationships) ever made, and the free On the Trail: Deep Water update is looking great.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-23T10:21:46+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "ea2b735ec3b0a329fb47",
+        "eventKind": "other",
+        "subjectKey": "アイアンブランブル",
+        "subject": {
+          "kind": "game",
+          "key": "アイアンブランブル"
+        },
+        "publishability": "direct",
+        "headline": "“物理演算”メトロイドヴァニア『アイアンブランブル』体験版が「99％・圧倒的に好評」の大人気。グラップリングフックで巨大機構を舞う、『ラスティッド・モス』開発元による新作",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260922-469299/",
+            "publishedAt": "2026-09-22T03:23:19+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260922-469299/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469299-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "PLAYISMが9月17日に配信開始した、『Iron Bramble / アイアンブランブル』の体験版が好評を博している。\n“物理演算”メトロイドヴァニア『アイアンブランブル』体験版が「99％・圧倒的に好評」の大人気。グラップリングフックで巨大機構を舞う、『ラスティッド・モス』開発元による新作\nPLAYISMが9月17日に配信開始した、『 Iron Bramble / アイアンブランブル 』の体験版が好評を博している。本作の対応プラットフォームはPC（Steam）で、2027年に発売予定。体験版時点で日本語にも対応している。体験版の配信開始から本稿執筆時点のおよそ5日間で、Steamユーザーレビュー533件中99％が好評の「圧倒的に好評」ステータスを獲得しており、製品版への期待感が高まっている。\n本作の舞台は何らかの理由で、人間がいなくなり、「物語」がなくなってしまった世界。「物語を喰らう者」と呼ばれる存在である主人公のライラックは、新たな物語や詩が作られることのない世界に退屈していた。ライラックは、「アイアンブランブル」と呼ばれる謎の建造物の中で、今でも人間が過去の記憶を語り暮らしているという噂を聞く。そこで彼女は、物語を求めてお供の「パック」とともにアイアンブランブルへと挑むことになる。\nアイアンブランブルは、「鉄の茨」を意味するその名の通り、大量の棘で覆われた謎の建造物だ。これを避けるため、ライラックはグラップリングフックを使用したアクションを使いこなして中を探索してゆくことになる。グラップリングフックにはゴムのような伸縮性があり、走ったり、落下の途中でどこかに引っかけたりすることで勢いをつけることで、フックが元に戻ろうとする反動を利用できる。これにより、より高くジャンプしたり、スピードをつけたりといったアクションに発展させることができるのだ。グラップリングフックは敵に引っかけることで戦闘にも活用できる。\n『Iron Bramble / アイアンブランブル』はPC（ Steam ）で2027年発売予定。日本語表示にも対応予定。体験版は9月17日から配信中だ。\n本作はサイバーゴシックの世界観で繰り広げられる、「モメンタムメトロイドヴァニア」を標榜するアクションゲームだ。本作の開発元のひとつであるEmliseは、高評価メトロイドヴァニア『Rusted Moss』を開発したスタジオ。本作でも、『Rusted Moss』の特徴であった伸縮性のあるグラップリングフックを使用した、勢い（モメンタム）を利用してのアクロバティックなアクションは健在。操作には慣れが必要なものの、様々な行動を使い分けることで自由度の高いアクションが可能だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "1a71b9b83d8f0efd7d26",
+        "eventKind": "other",
+        "subjectKey": "50歳超えだけど今からゲーム開発者になれる",
+        "subject": {
+          "kind": "game",
+          "key": "50歳超えだけど今からゲーム開発者になれる"
+        },
+        "publishability": "direct",
+        "headline": "「50歳超えだけど今からゲーム開発者になれる？」との人生相談に、“経験者”が大集結。年配組の熱い回答、あの人気ゲームのディレクターも名乗り出る",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260922-469364/",
+            "publishedAt": "2026-09-22T09:05:34+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260922-469364/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469364-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "年齢を重ねてからでもゲーム開発者になれるのか。そんな人生相談のようなあるユーザーの書き込みが、海外掲示板Redditで注目を集めている。\n「50歳超えだけど今からゲーム開発者になれる？」との人生相談に、“経験者”が大集結。年配組の熱い回答、あの人気ゲームのディレクターも名乗り出る\n今回注目を集めているのはRedditユーザーExcitingSleep氏の「Any 45-50+ year olds who became game developers and found modest success?（45歳から50歳以上の年齢でゲーム開発者になってそれなりに成功した人っている？）」という 書き込み である。同氏は最近になってハイテク業界での仕事をやめることになり、50歳以上という自身の年齢を踏まえると業界への復帰は難しいと考えたという。そこで、早めに終業する仕事をしながら、余暇の時間でゲーム開発をしてみようと思い立ったようだ。そして、もしも同じような経験をした人がいれば実体験やアドバイスを聞きたいという問いに対し、多くの反応が寄せられた。中には有名ゲームのディレクターを務める人物までもが現れている。\nもっとも注目された返信のひとつは「自分のことだ」として経歴を 語る ユーザー-Xaron-氏のものだ。ソフトウェアエンジニアだったという同氏がゲーム開発を始めたのは38歳の時で、10本のスマートフォン向けゲームをリリースしたものの失敗。その後46歳になってからフルタイムでゲーム業界で働き始め、50歳になってようやくゲーム開発で生計を立てられるようになったという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "ed942034f827413c8de0",
+        "eventKind": "other",
+        "subjectKey": "wizardry variants daphne",
+        "subject": {
+          "kind": "game",
+          "key": "wizardry variants daphne"
+        },
+        "publishability": "direct",
+        "headline": "『Wizardry Variants Daphne』のTGSブースで、3面の巨大LEDで表現されたダンジョンを探索。最後の薬草を渡す、渡さないやトラップ濃厚の宝箱を自分で開けるかなどの判断が問われる",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/wizd-20260922-469375/",
+            "publishedAt": "2026-09-22T09:06:15+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/wizd-20260922-469375/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/wizd-20260922-469375-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本稿では、『Wizardry Variants Daphne』のブースで体験できたコンテンツをお伝えしたい。\n『Wizardry Variants Daphne』のTGSブースで、3面の巨大LEDで表現されたダンジョンを探索。最後の薬草を渡す、渡さないやトラップ濃厚の宝箱を自分で開けるかなどの判断が問われる\nドリコムの手がける『Wizardry Variants Daphne』は、基本プレイ無料の3DダンジョンRPGだ。プレイヤーはキャラクターの育成やダンジョンでのアイテム収集などを繰り返して、「奈落」と呼ばれるダンジョンの奥へと進んでいく。2024年10月にサービスが開始された本作は、2026年8月の時点で400万ダウンロードを達成した。\nそんな『Wizardry Variants Daphne』が、東京ゲームショウ2026（以下、TGS2026）に出展された。本稿では、『Wizardry Variants Daphne』のブースで体験できたコンテンツをお伝えしたい。\n『Wizardry Variants Daphne』はTGS2025で初めて出展されたが、昨年はコスプレイヤーのフォトセッションや撮影可能な企画展示がメインコンテンツだった。『Wizardry Variants Daphne』自体が2024年にリリースされているので、試遊コンテンツというよりはファン向けのコンテンツを充実させる狙いがあったものと思われる。\n今年のTGS2026では、本作を知らない人でもその世界観に触れられる体験型のコンテンツが出展された。それは、LED3面で『Wizardry Variants Daphne』に登場するダンジョン「はじまりの奈落」を冒険できるコンテンツだ。サソリ女の討伐依頼を受けた冒険者として、プレイヤーは仲間と一緒にダンジョンへと向かう。LEDは高さ2.5mの大きなもので、3枚のLEDの前に立つとその迫力に圧倒されてしまう。本作は一人称視点で進行するため、プレイヤーキャラクターが一歩進む度に自分もダンジョンの奥へと足を伸ばしていくような気持ちになった。\n道中でいくつかの選択に迫られたものの、仲間たちのがんばりによってなんとかサソリ女の討伐に成功したといった感覚だ。プレイヤーの選んだ内容によって展開が変化し、クエスト成功の可否が変わってくるらしい。今回の試遊ではギルドから依頼達成の認定も得られて、報酬として「ライオンハートシールド」を獲得することができた。プレイ時間は約5分と短い体験だったかもしれないが、LED3面を使用したダンジョン探索は感慨深い。普段プレイしているスマートフォンよりもはるかに大きな画面で、『Wizardry Variants Daphne』の世界観に浸れるコンテンツとして迫力満点だった。\n『Wizardry Variants Daphne』のブースでは、ダンジョン内における拠点となる「ハーケン」を再現したフォトスポットも出展されていた。こちらのフォトスポットには、冒険者たちに扮したコスプレイヤーも登場し、来場者との記念撮影に応じてくれる。筆者がブースにうかがった際にはシェリリーニャとフルートがハーケンにいた。ダンジョン内の拠点というだけあって、そこはかとなく緊張感が伝わってくるようなフォトスポットだった。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6f3b4e4faaa58becb949",
+        "eventKind": "other",
+        "subjectKey": "スター ウォーズ ギャラクティック レーサー",
+        "subject": {
+          "kind": "game",
+          "key": "スター ウォーズ ギャラクティック レーサー"
+        },
+        "publishability": "direct",
+        "headline": "『スター・ウォーズ：ギャラクティック・レーサー』はフォースなし、ジェダイなしの濃厚「スター・ウォーズ」体験。なぜレース？マルチプレイの調整は？実際に遊んで開発者に訊いた",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/20260922-469340/",
+            "publishedAt": "2026-09-22T08:30:29+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/20260922-469340/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469340-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "10月7日発売予定の『スター・ウォーズ：ギャラクティック・レーサー』を試遊し、開発者に直接インタビューする機会に恵まれたのでその内容をお届けする。\n『スター・ウォーズ：ギャラクティック・レーサー』はフォースなし、ジェダイなしの濃厚「スター・ウォーズ」体験。なぜレース？マルチプレイの調整は？実際に遊んで開発者に訊いた\n『スター・ウォーズ：ギャラクティック・レーサー』はFuse Gamesが手掛け、Secret Modeが発売するスペースオペラ「スター・ウォーズ」シリーズの世界を舞台とするレースゲーム。10月7日に発売予定だ。対応プラットフォームはPC（Steam/Epic Gamesストア）/PS5/XBOX Series X|Sで、日本語表示に対応する。\n「スター・ウォーズ」といえばフォースという人も少なくないだろう。しかし『スター・ウォーズ：ギャラクティック・レーサー』にはフォースも予言も登場しない。アウトローたちの過激なレースが描かれる。なのに確実に「スター・ウォーズ」のゲームである不思議な魅力をまとった作品であった。\n弊誌からは「スター・ウォーズ」の知識もレースゲーム経験も人並み……といった筆者と、本作開発陣が携わった『バーンアウト』『ニード・フォー・スピード』シリーズのファンである2名で参加。フォースと銀河を股にかける戦いにフォーカスされがちな「スター・ウォーズ」の世界観のなかで、あえてレースシーンに目を向けた本作に触れた感想と、開発者の生の声をお届けする。なお本稿における本作の説明は、それぞれ試遊版における仕様となるため留意してほしい。\n本作の舞台となるのは、帝国の支配が終わり、スピードへの熱狂が新たな娯楽として広がった銀河系。シングルプレイ向けのキャンペーンでは、大衆のエンターテイメントとして隆盛したレース「ギャラクティック・リーグ」をめぐるオリジナルストーリーが展開される。現在リーグは、悪党ケスター・ブールに牛耳られており、創設者であるダライアス・パックスは支配権を失う危機に立たされている。そこでダライアスは、ブール家に個人的な恨みを抱く一匹狼のレーサーであり、謎多き傭兵でもある「シェード」に協力を依頼。プレイヤーはシェードとしてレースに身を投じることになる。\n筆者がまず驚いたのは、冒頭シーケンスの没入感を高める演出だ。プロローグはいきなりレースのカットシーンから始まる。機体の魅力とレースの空気感を伝える映像の途中でなめらかに操作が可能となり、そのまま一通りの操作を学ぶチュートリアルが開始。本作に登場する基本的な機種が切り替わる流れとなっており、ひとつの機種をある程度操作するとふたたびカットシーンから操作練習へと戻る。ランドスピーダー、スピーダーバイク、スキムスピーダーの3種のマシンの操作感を順番に味わうことができるようになっていた。前述のようなストーリーへの導入が、カットシーンと操作シーンがシームレスに切り替わる没入感の高い体験で提供されるかたちだ。 こうして「ギャラクティック・リーグというレースが盛り上がっているんだな」と理解したところで、主人公シェードのカスタマイズへ。好みに合わせて服装、ヘルメット、音声を選ぶことができる。難易度を選択した後、ふたたびストーリーが進んでいく。\nプロローグに戻ると、シェードを招集したダライアスより突然エキシビションレースに放り込まれ、本作最大の宿敵・ケスターといきなり直接対決することに。レース中の無線や試合後にはケスターにかなり罵られることになり、筆者も「こいつ嫌なやつだな」と、ケスターに恨みを抱くシェードと心がシンクロ。やがてレースが終わり、ダライアスより改めてリーグに参加しろと誘われるという流れだ。\nこのたび弊誌は、東京ゲームショウ2026にあわせて本作を試遊プレイする機会に恵まれた。また、試遊の際には開発元Fuse GamesのCEO兼共同創設者であるMatt Webster氏およびクリエイティブディレクターであるKieran Crimmins氏が同席、説明を受けながらの試遊後にはインタビューも実施した。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6857175958bc508754ce",
+        "eventKind": "other",
+        "subjectKey": "ファイナルファンタジーvii リベレーション",
+        "subject": {
+          "kind": "game",
+          "key": "ファイナルファンタジーvii リベレーション"
+        },
+        "publishability": "direct",
+        "headline": "『ファイナルファンタジーVII リベレーション』TGSバトルプレイ感想。最終作のバトルは、自由で、難しくて、面白い。黒魔道士ティファ躍動、ヴィンセントはちょっと難しい",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/ff7r-20260922-469333/",
+            "publishedAt": "2026-09-22T08:43:28+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/ff7r-20260922-469333/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/ff7r-20260922-469333-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "約30分の試遊を通じて得られたプレイフィールを、本稿でお伝えしたい。\n『ファイナルファンタジーVII リベレーション』TGSバトルプレイ感想。最終作のバトルは、自由で、難しくて、面白い。黒魔道士ティファ躍動、ヴィンセントはちょっと難しい\nスクウェア・エニックスは、『ファイナルファンタジーVII リベレーション』を東京ゲームショウ2026（TGS2026）に試遊出展した。発売日が2027年4月8日に決定した本作は情報公開が加速しているところで、TGS2026では世界初となる一般ユーザー向けの試遊が実施された。\n今回の試遊では、クラウドたちがセフィロスを追いかけて「竜巻の迷宮」と呼ばれる場所を訪れるところだった。原作では竜巻の迷宮をクリアしたあとにメテオの脅威に世界がさらされることになるので、『ファイナルファンタジーVII リベレーション』のストーリーにおいて重要なシーンのひとつといえるだろう。タイミング的にはシドが新規バトルメンバーになってパーティーを明るく盛り上げてくれるものの、竜巻の迷宮は落雷がしばしば発生するなど不穏な場所だ。\nファイナルファンタジーVII リベレーション 』は、PC（ Steam / Epic Gamesストア / XBOX on PC ）/ Nintendo Switch 2 / PS5 /XBOX Series X|S 向けに2027年4月8日に発売予定。「ファイナルファンタジーVII リメイクシリーズ」 三部作セットになったトリロジーエディションは購入後すぐに1作目と2作目をプレイ可能 だ。三部作セットは『ファイナルファンタジーVII リベレーション』発売前ならば、1万1330円（税込）のお買い得価格で購入できる。なお、 弊誌ではオープンワールドの探索を中心とした8月に実施された試遊会の感想記事も掲載中 なので、そちらもぜひ読んでほしい。。\n『ファイナルファンタジーVII リベレーション』の容量、「約200GB」になりそう。『FFVII リメイク』2本分\n弊誌は、TGS2026で試遊可能なビルドを体験できるメディア向けセッションに参加することができた。TGS2026で試遊できるビルドはバトル体験を重視したものでありながらも、クラウドとセフィロスの因縁に関する重要なストーリーも垣間見えることができた。約30分の試遊を通じて得られたプレイフィールを、本稿でお伝えしたい。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6a6d43d948411ebdaad3",
+        "eventKind": "other",
+        "subjectKey": "魔法少女ノ因習村",
+        "subject": {
+          "kind": "game",
+          "key": "魔法少女ノ因習村"
+        },
+        "publishability": "direct",
+        "headline": "『魔法少女ノ因習村』は前作『まのさば』以上に容赦なし、プレイヤーの内面をえぐるかも。御影リズ役の柊優花さんに、新キャラの“ドロドロ”具合なども訊いた",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/manomura-20260922-469275/",
+            "publishedAt": "2026-09-22T02:40:26+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/manomura-20260922-469275/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/manomura-20260922-469275-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "TGS2026では、御影リズ役の柊優花氏を招いたメディア向け合同インタビューが開催された。弊誌も参加することができたので、その模様を本稿でお伝えしたい。\n『魔法少女ノ因習村』は前作『まのさば』以上に容赦なし、プレイヤーの内面をえぐるかも。御影リズ役の柊優花さんに、新キャラの“ドロドロ”具合なども訊いた\n閉じ込められた13人の少女たちが殺人犯を探し出して処刑する『魔法少女ノ魔女裁判』は、近年稀に見るアドベンチャーゲームのヒット作だ。2025年に発売された同作はシナリオ制作会社Re,AERのブランドであるAcaciaの第1作目でありながらも非常に高く評価され、今年7月にはNintendo Switch版も発売。Steam版とNintendo Switch版を合わせると、『魔法少女ノ魔女裁判』は2026年8月時点で累計販売本数70万本を達成している。その続編として、2026年発売予定の『魔法少女ノ因習村』も注目されている。同作は、日本ゲーム大賞2026 フューチャー部門も受賞している\n東京ゲームショウ2026（以下、TGS2026）では、ハピネットのブースに『魔法少女ノ因習村』が出展された。綿貫サクヤ（CV:三木谷奈々）、二階堂ヒロ（CV:東雲はる）、御影リズ（CV:柊優花）の主要キャラクター3名の等身大アクリルスタンドが展示されたほか、各キャラクターに関連する花も展示されている。TGS2026では、御影リズ役の柊優花氏を招いたメディア向け合同インタビューが開催された。弊誌も参加することができたので、その模様を本稿でお伝えしたい。インタビューはまず柊氏が自身の演じる御影リズの等身大アクリルスタンドにサインをし、その後に質疑応答という形式で進行した。 インタビューの一部については『魔法少女ノ魔女裁判』のネタバレが含まれるため、留意してほしい。\n柊優花氏（以下、柊氏）： 声優の柊優花（ひいらぎゆか）と申します。第1作目の『魔法少女ノ魔女裁判』と第2作目の『魔法少女ノ因習村』というゲームに出演させていただきました。『魔法少女ノ魔女裁判』では橘シェリーを演じ、『魔法少女ノ因習村』では御影リズを演じています。\n――『魔法少女ノ因習村』には、どのような印象を受けていますか。\n――『魔法少女ノ因習村』のゲームそれ自体についての印象はどうでしょうか。\n柊氏： 現時点での印象としては、今回の『魔法少女ノ因習村』は前作の『魔法少女ノ魔女裁判』よりもプレイヤーの内面をもっとえぐってくるような作品になると思います。前作の『魔法少女ノ魔女裁判』にもグロテスクな部分は当然あったんですけど、第1作目として試験的に柔らかくなっていたのかもしれません。そうした意味で、『魔法少女ノ因習村』には『魔法少女ノ魔女裁判』とは違った一面があるかなとは思いますね。\n――『魔法少女ノ因習村』の御影リズについて、プレイヤーに注目してほしいポイントはなんでしょうか。"
+          }
+        ]
+      },
+      {
+        "eventKey": "22ff25005028c1ba8bfd",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Blizzard Reveals the World of Warcraft Forever Feature 'We Simply Must Hold the Line On'",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/blizzard-reveals-the-world-of-warcraft-forever-feature-we-simply-must-hold-the-line-on",
+            "publishedAt": "2026-09-22T14:46:05.375Z",
+            "canonicalUrl": "https://www.ign.com/articles/blizzard-reveals-the-world-of-warcraft-forever-feature-we-simply-must-hold-the-line-on",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/19/forever-1789805930640.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Ever since Blizzard revealed World of Warcraft: Forever at Blizzcon 2026, the company has been laser-focused on maintaining its Classic+ identity, even if that means not implementing some quality-of-life features the game&#x27;s retail version has had for years.\nBlizzard Reveals the World of Warcraft Forever Feature &#x27;We Simply Must Hold the Line On&#x27;\nKeeping the spirit of Classic.\nEver since Blizzard revealed World of Warcraft: Forever at Blizzcon 2026 , the company has been laser-focused on maintaining its Classic+ identity, even if that means not implementing some quality-of-life features the game&#x27;s retail version has had for years.\nIn a reply to GingiTV and Nobbel87 , two of the biggest WoW personalities on X/Twitter (albeit from complete opposite ends of the community), Blizzard developer Josh Greenfield confirmed that not implementing shared drops and tagging was \"one of those things that we simply must hold the line on.\" He continued, saying \"It’s hard to see the value in something like this when you are frustrated in the moment but it is extremely important to our social pillar to maintain some of this friction.\"\nYep, this. This is one of those things that we simply must hold the line on. I think there are other things we can do to help alleviate some frustration here but shared tagging is not it. It’s hard to see the value in something like this when you are frustrated in the moment but…\nIn the retail version of World of Warcraft, players who are questing or trying to farm rare spawns can all tag the same enemy (to a limit), so that everyone can get the rewards for killing it. This makes it a lot easier to play the game outside of a group, but it all but eliminates the need to group up with other players outside of high-end group content like dungeons and raids.\nIt&#x27;s not hard to see why some people would want shared tagging implemented in Forever, too. The beta for this new version of old World of Warcraft has been incredibly popular , which means there&#x27;s a lot of competition for anyone that just wants to kill some boars for some bones. The solution, which was suggested by Nobbel and confirmed by Greenfield is to \"group up and get it done together,\" which will give people more opportunity to socialize, which is really what WoW Forever is designed for.\nWorld of Warcraft Forever or Retail?"
+          }
+        ]
+      },
+      {
+        "eventKey": "b106fc76f7355cad9e59",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Garfield - Escape from Monday Review",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/garfield-escape-from-monday-review",
+            "publishedAt": "2026-09-22T19:53:45.510Z",
+            "canonicalUrl": "https://www.ign.com/articles/garfield-escape-from-monday-review",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/22/garfield-escape-from-monday-review-blogroll-1790105709488.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "A lackluster 3D platformer that leaves you feline hungry for something better.\nGarfield - Escape from Monday Review\nIf there are two things to know about Garfield, it’s that he loves lasagne and he hates Mondays. So, it should come as no surprise that developer OSome Studio’s rendition of Jim Davis’s beloved cartoon series, Garfield - Escape from Monday, is heavily bound to those two themes. Set across a series of foodie nightmare worlds, this 3D platformer sees the famous tabby kicking veggies and chomping processed snacks to awaken from a fibre-fuelled fugue state. Sadly, like other disappointing cartoon adaptations (such as SpongeBob SquarePants: The Patrick Star Game ), this exploration of the food-obsessed feline’s psyche is actually rather dull. Its overly familiar platforming and excessively camera-winking writing make it little more than a dazzling but sarcasm-laden slog.\nEscape from Monday kicks off with a toon-shaded Garfield haphazardly shoveling a slice of what he thinks is Jon’s lasagne into his gullet. Once he realizes the meal is actually laden with veggies, he quickly passes out and is transported to an inner world called the Dreamland, which conveniently takes the form of a board-game course reminiscent of Super Mario Galaxy 2. Here, a vegetarian TV chef, knowingly named Monday, has transformed his cheese-and-meat fantasies into approachable, obstacle-filled levels, stocking them with aggressive snacks to boot. With a kick, a jump, and a forward boost in your arsenal, plus a forgiving health bar, you run Garfield through these stages to eventually wake him up.\nThe story rarely dives deeper than this initial premise, and leaves you with little more to chew on than \"bad food is yummy\" and \"veggies are gross.\" I’m not looking for Shakespeare, but it does feel like a wasted opportunity considering how much personality Garfield has in other incarnations (heck, even Bill Murray’s 2004 interpretation had a heart), and how much room there is to have fun with that here. Alas, instead of a sarcastic hero you can root for, Escape from Monday orbits something much worse: an unlikeable cat who delivers a stream of constant complaints until you hit the credits 40-plus levels later.\nThis one-dimensional attitude grows increasingly grating throughout the roughly 9-hour runtime. Garfield is relentlessly grumbling. When he’s not lamenting his situation, he’s waxing lyrical about the developers, pointing out how certain obstacles or puzzles are repetitive and uninteresting. When his friends appear like expository force ghosts, he continues to disparage them, too. Parading as a PG-13 Deadpool, the meta-humour gradually begins to feel like an excuse, his hypercritical lens intending to lower my own expectations rather than make me laugh.\nAs you work your way through the zany levels, you’ll also collect hunks of lasagna that fuel a metagame where you furnish a surreal version of Jon Arbuckle’s apartment. To unlock physical versions of sofas and lampshades, you need to find slices hidden in each level, whilst simultaneously gathering enough snacks to fill an on-screen pressure gauge called the Yum-o-meter. While this technically provides extra goals beyond simply reaching the end, the system ultimately feels like an afterthought, so disconnected from the main game it’s easy to forget about his fantasy apartment altogether – I know I did.\nThankfully, the art style provides a much-needed distraction. Escape from Monday’s aesthetics are delightful, evoking the blocky simplicity of PS1 platformers like Rugrats: Royal Ransom. The Dreamland is split into three themed overworlds – Veggie Nightmare, Sweet Kingdom, and the Barbecue Desert – with each featuring a basic, bullet-hell-lite miniboss to defeat as you bounce toward an edible point of interest. By fusing confectionery with familiar adventure tropes like pirates, farmers, and the western frontier, Escape from Monday cleverly conjures the tone of the classic comic strips. Particular s"
+          }
+        ]
+      },
+      {
+        "eventKey": "135344f738c7fa6bfffc",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Grand Theft Auto 6's Miami Takeover Begins as Rockstar Spends Nearly $1 Million on 'Welcome to Vice City' Signage",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/grand-theft-auto-6s-miami-takeover-begins-as-rockstar-spends-nearly-1-million-on-welcome-to-vice-city-signage",
+            "publishedAt": "2026-09-22T20:26:52.108Z",
+            "canonicalUrl": "https://www.ign.com/articles/grand-theft-auto-6s-miami-takeover-begins-as-rockstar-spends-nearly-1-million-on-welcome-to-vice-city-signage",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/22/gta-6-vice-city-sign-1790108459424.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Rockstar Games has reportedly spent $1 million to install a \"Welcome to Vice City\" sign in Miami as part of Grand Theft Auto 6&#x27;s marketing push.\nGrand Theft Auto 6&#x27;s Miami Takeover Begins as Rockstar Spends Nearly $1 Million on &#x27;Welcome to Vice City&#x27; Signage\nRockstar Games has reportedly spent nearly $1 million to install a \"Welcome to Vice City\" sign in Miami as part of Grand Theft Auto 6&#x27;s marketing push.\nFans have been monitoring the construction of the sign for the last few days, and it&#x27;s finally complete. The sign was lifted to the top of the Kaseya Center by a helicopter this afternoon and firmly installed on the roof. Now, those who fly over the arena will be able to look out their window and see a greeting from Rockstar itself. You can see the sign below.\nWelcome to Vice City y&#x27;all 😎 #miami #gta #vicecity #gtavı https://t.co/IxrIZRegwX pic.twitter.com/iGUvA7ScUX\nAccording to Miami Herald journalist Doug Hanks , Rockstar Games paid just shy of $1 million to install this sign. Miami-Dade is expected to collect $975,000 for the sign from Rockstar as part of a marketing agreement. As of right now, it&#x27;s unclear how else Rockstar plans to market GTA 6 in Miami, but there were extensive conversations with the city in August that involved pitches for various events, a takeover of the airport, and more. Whether any of those will actually happen are up in the air at the moment.\nThe city also had a somewhat contentious battle over whether or not it should play a role in marketing Grand Theft Auto 6 , since the game revolves around crime and allows the player to gun down police and civilians. However, the city ultimately ruled in favor of the campaign in the end .\nThe Kaseya Center is also where the Miami Heat plays, so it&#x27;s possible Rockstar might also leverage the NBA to market GTA 6. Miami Heat&#x27;s first regular season home game will be on October 21, and it wouldn&#x27;t be surprising if the broadcast features a shot of the signange. Whether Rockstar will debut any kind of trailer or other marketing around the broadcast remains to be seen, but it would come at an ideal time. By that point, GTA 6 will be just under a month away from launch, and TV spots will likely begin advertising the release to get more mainstream audiences aware.\nDocuments reviewed by IGN reveal that the sign will remain on top of the arena either for \"the latter of one year after\" installation or until the last home game of Miami Heat&#x27;s 26-27 season, which is scheduled for April 11, 2027. This suggets that the signage will be visible through the rest of 2026, with it also possibly lasting until the spring. The documents also reveal that the sign had an installation deadline of October 15 or else Rockstar could terminate the agreement. It&#x27;s possible that October 15 will be another marketing beat for GTA 6, as it falls on a Thursday, which is a day that Rockstar has historically used for news about the game."
+          }
+        ]
+      },
+      {
+        "eventKey": "d6198e9958187f19895f",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Halo Fans Can't Decide if Activision Takeover Is a Good Thing or Not",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/halo-fans-cant-decide-if-activision-takeover-is-a-good-thing-or-not",
+            "publishedAt": "2026-09-22T18:19:40.953Z",
+            "canonicalUrl": "https://www.ign.com/articles/halo-fans-cant-decide-if-activision-takeover-is-a-good-thing-or-not",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/07/09/halo-ce-operation-meteorite-1783609603807.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Call of Duty developer Activision is now taking over creation of the next Halo game, and fans are understandably divided about it.\nHalo Fans Can&#x27;t Decide if Activision Takeover Is a Good Thing or Not\nXbox’s latest shakeup saw a few big developments, most notably the mass layoffs at Halo Studios and the handover of Halo&#x27;s next title to Activision .\nThis came as a wildly unexpected move from the company, and one that has sparked no end of debate across social media as fans discuss the future of the Halo franchise and what its next game could look like. Many comments are humorously envisioning a Halo game with absurd amounts of monetization, with wild celebrity skin crossovers a la Nicki Minaj .\n“I remember in 2009, the Halo and COD communities were vastly different. We treated each other like different military powers in a war. I remember playing Halo: Reach and bouncing over to Black Ops II and it was a night and day difference in every aspect. I&#x27;d never believe that Halo would ever be made by a COD publisher,” one nostalgic player mused on Reddit .\n“Bro, Halo Studios lasted less time than it took for them to add Slayer to Halo Infinite,” another joked , referencing how the developer had rebranded itself from Halo Studios to 343 Studios, only to get gutted by Xbox merely two years later.\n“Welp, Halo is ruined. About to get hijacked from a Banshee by Nicki Minaj, who also has an Energy Sword that’s purple because someone got a $20 sword skin,” another said .\nWelp Halo is ruined. About to get hijacked from a banshee by Nicki Minaj, who also has a energy sword that’s purple because someone got a $20 sword skin.\nThis change has resulted in an endless stream of memes, jokes, despair, and cautious optimism."
+          }
+        ]
+      },
+      {
+        "eventKey": "ebeeeb4b5464b47ba78f",
+        "eventKind": "other",
+        "subjectKey": "地球防衛軍 6 2",
+        "subject": {
+          "kind": "game",
+          "key": "地球防衛軍 6 2"
+        },
+        "publishability": "direct",
+        "headline": "PS5『地球防衛軍 6.2』は敵が多すぎるが、こっちの火力も暴力的。“画面全部が敵”の絶望を味わい、「カスタム武器」でなぎ倒したインフレバトル試遊体験",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/20260922-469284/",
+            "publishedAt": "2026-09-22T03:00:52+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/20260922-469284/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260922-469284-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『地球防衛軍6.2』のTGS2026イベントに参加し、試遊した感想をお届けする。\nPS5『地球防衛軍 6.2』は敵が多すぎるが、こっちの火力も暴力的。“画面全部が敵”の絶望を味わい、「カスタム武器」でなぎ倒したインフレバトル試遊体験\nディースリー・パブリッシャーは『 地球防衛軍 6.2 INVADERS FROM ANOTHER WORLD 』（以下、『地球防衛軍6.2』）を2027年3月18日に発売予定だ。対応プラットフォームはPS5。本作は先日開催された東京ゲームショウ2026に出展していた。弊誌も現地で取材してきたため、イベントの内容と試遊してきた感想をお届けしよう。\n本作は2022年に発売されたアクションTPS『地球防衛軍6』のパワーアップ改変版だ。ソロプレイおよび最大4人協力プレイに対応する。プレイヤーはエイリアンの大軍勢に侵略を受けた地球を守るため、地球防衛軍「EDF」の一兵士となって過酷な戦いに身を投じる。\n原作となる『地球防衛軍6』はもともとPS4/PS5向けにマルチ展開されていた作品だった。一方『地球防衛軍6.2』はPS5専用タイトルとして再構築。ビジュアル面が進化したほか、ゲームプレイにもさまざまな新要素が導入される。既存ミッションの半数以上がリニューアルされるほか完全新作ミッションも収録され、敵の数は最大2倍に増量されているという。\nそんな『地球防衛軍6.2』は、今回Nintendo Switch 2向けにリリース予定の『地球防衛軍5』および『地球防衛軍6』とあわせて、東京ゲームショウ2026に出展していた。弊誌が取材したメディア向けブリーフィングでは、シリーズのプロデューサーを務める岡島信幸氏と、MCの篠原みなみ氏が登壇。まず『地球防衛軍5』が披露され、協力プレイの実演がおこなわれた。岡島氏が「シリーズ初心者の方向けに説明すると、ロケットランチャーのような爆発物は近くに撃つと自爆してしまうので気をつけてください」と言いつつ何度か自爆すると、篠原氏が「なんで何度も実演するんですか……？」とツッコむなど、イベントは和やかな雰囲気で進行していった。\nそしてイベントの次の幕では、『地球防衛軍6.2』について紹介された。同作の最大の特徴は、一度に出現する敵の数が『地球防衛軍6』よりも格段に増えていることだ。画面が埋まるほどのアリやハチなどが登場するシーンが映し出され、本作では数の暴力による圧倒的な絶望感が描かれると説明された。\n続いて実演として、今回は岡島氏が単独で『地球防衛軍6.2』をプレイした。まずはデフォルト状態での絶望感を紹介するとして、岡島氏は武器カスタマイズはおこなわずにハードモードを選んで出撃。「僕の腕前は平均的なプレイヤーと同程度」と語る岡島氏はアサルトライフルとグレネードランチャーで戦ったものの、圧倒的な数のアリに太刀打ちできず。ほどなくゲームオーバーとなってしまった。"
+          }
+        ]
+      },
+      {
+        "eventKey": "191309725cbc7bde54c6",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Dancing with Ghosts launches in Early Access on October 8",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/dancing-with-ghosts-launches-in-early-access-on-october-8",
+            "publishedAt": "2026-09-22T13:24:46+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/dancing-with-ghosts-launches-in-early-access-on-october-8",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/DWG-Early-Access_09-22-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Dancing with Ghosts, the life simulation game about finding joy from grief by game developer Greg Johnson, will launch in Early Access for PC via Steam on October 8 for $14.99, developer HumaNature…\nDancing with Ghosts launches in Early Access on October 8\nDancing with Ghosts , the life simulation game about finding joy from grief by game developer Greg Johnson, will launch in Early Access for PC via Steam on October 8 for $14.99, developer HumaNature Studios announced. It will support English and Thai language options. A demo is available now.\n&#8220; Dancing with Ghosts is a deliberately joyful experience,&#8221; said Dancing with Ghosts creator and HumaNature Studios founder Greg Johnson in a press release. &#8220;We all experience sadness because that&#8217;s a natural part of being human&#8212;I had to find my way back to joy, and I want this game to help others on their path, while celebrating the Thai culture that guided me there.&#8221;\nDancing with Ghosts is a passion project for Johnson, whose work includes lead design on the ToeJam and Earl franchise, the Starflight series, and Doki-Doki Universe . The game was born in the wake of the tragic passing of Greg&#8217;s 28-year-old daughter and his family&#8217;s devastating loss in the 2023 Maui wildfires.\nGreg found solace in the Thai culture and traditions his wife Sirena brought into his life, offering ways to rise and grow from grief. This philosophy, combined with his mind for game design, created a cozy experience celebrating joy and Thai culture, enlisting talent from both Thailand and the diaspora for art, programming, animation, and voice acting.\nIn Dancing with Ghosts , after a tragic accident claims the lives of her parents, 15-year-old Mai must rebuild her life in the Thai river village where she grew up. As Mai processes the loss of her family and struggles with grief, she meets a friendly young ghost named Pim struggling to remember almost any of her time in the world of the living&#8212;but is overjoyed to discover Mai can see and talk to her.\nHelp Mai and Pim make something positive out of their unfortunate situations by helping others, inspired by the Thai concept of utit suan boon kusohn, dedicating good karma to ease the way for those who have passed. Play mini-games like making deliveries by boat and scooter and cooking up delicious Thai food to help villagers with their daily tasks and earn Karma for Pim.\nEarly Access Release Date Trailer\nHere is an overview of the game, via HumaNature Studios:"
+          }
+        ]
+      },
+      {
+        "eventKey": "1294e84addf1c27921cc",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'Do not': Rockstar outlines modding rules before GTA VI touches down",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-developer",
+            "label": "Game Developer",
+            "url": "https://www.gamedeveloper.com/production/-do-not-rockstar-outlines-modding-rules-before-gta-vi-touches-down",
+            "publishedAt": "2026-09-22T12:33:14.000Z",
+            "canonicalUrl": "https://www.gamedeveloper.com/production/-do-not-rockstar-outlines-modding-rules-before-gta-vi-touches-down",
+            "imageUrl": "https://eu-images.contentstack.com/v3/assets/blt740a130ae3c5d529/bltfc3e2c968d67cd06/6ab27759fc43822973907454/GTA_Mod.png?disable=upscale&width=1200&height=630&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Official Rockstar storylines, characters, and other elements from the studio's 'established continuity' are off-limits.\n'Do not': Rockstar outlines modding rules before GTA VI touches down\nRockstar has restated its modding guidelines with the launch of Grand Theft Auto VI looming large, and the words \"do not\" appear in abundance.\nAlthough the studio has yet to confirm a launch date for GTA VI on PC, it is being proactive about laying down the law for those who might want to tinker with the title when the time comes. The guidelines will also apply to existing releases such as GTA V and Red Dead Redemption II, both of which have well-established modding and roleplaying communities.\nThe rulebook was shared by Rockstar on September 10, 2026, and prohibits modders from creating content that combines maps, locations, characters, storylines, in-game assets, or other IP from one Rockstar title into another.\nNotably, they also seek to prevent people from expanding or modifying official Rockstar storylines, plots, missions, characters, or other elements from the studio&#x27;s \"established continuity.\"\nMultiplayer modding has been restricted to Rockstar&#x27;s official licensed Creator Platform—unless the studio has stated otherwise. Any creations that infringe on Rockstar Games&#x27; own or third-party IP and services are off-limits, too.\n\"Do not use protected elements of anyone else&#x27;s intellectual property in your mod, including art, characters, music, photos, games, advertisements, brands or logos, real-world locations, etc,\" read the guidelines. \"Do not modify or reuse voiceover performances from any game released by Rockstar Games. Do not use any real-world person&#x27;s voice, image, or likeness without written permission.\""
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 64932,
+      "estimatedInputTokens": 15449,
+      "activeTrackingItems": 0,
+      "candidateItems": 24,
+      "includedItems": 24,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Ancient Farm",
+        "subjectKey": "Ancient Farm",
+        "titleKey": "ancient-farm",
+        "titleZhCn": "古农庄",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2024/ancient-farm/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "古农庄_古农庄下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "古农庄_古农庄下载_中文_攻略_视频_评价_游民星空 Gamersky.com 古农庄 Ancient Farm 分享 QQ 微博 微信 综合 资讯 攻略 下载 专区 社区 查看全部28 截图 壁纸 原画 设定图 其他 视频 1/2 《古农庄》是一款益智游戏。在从头开始建造古埃及农场的过程中，犁地、种植、浇水和收割。从无到有，通过自己的努力解锁车间、生产大楼和寺庙。 PC 发布时间 2026-01-08 PC 2026-01-08 游戏时长 未知 游戏类型 益智游戏 官方中文 不支持 制作发行 A2 Softworks/Ultimate Games S.A.,PlayWay S.A.,Ultimate Publishing 制作太糙"
+          },
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/148382.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "古农庄官方版-古农庄官网版下载安装_3DM单机",
+            "excerpt": "古农庄官方版-古农庄官网版下载安装_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 模拟经营 > 《古农庄》官方版 《古农庄》官方版 进入专题 游戏类型： 模拟经营 开发厂商： A2 Softworks 更新时间： 2026-01-12 发售日期： 2026年1月8日 游戏平台： PC 游戏语言： 简中 标签： 中世纪 建造 开放世界 自然 休闲 8.0 已有 5 人评分 您还未评分！ 本地下载 普通http下载，速度慢 去论坛 看专题 重要提示！ 此版"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Beer Manufacture Simulator",
+        "subjectKey": "Beer Manufacture Simulator",
+        "titleKey": "beer-manufacture-simulator",
+        "titleZhCn": "啤酒制造模拟器",
+        "suggestedStatus": "official_simplified",
+        "reason": "",
+        "sources": [
+          {
+            "label": "dl.3dmgame.com",
+            "url": "https://dl.3dmgame.com/pc/149394.html",
+            "hostname": "dl.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "啤酒制造模拟器下载-Beer Manufacture Simulator免安装中文版下载_3DM单机",
+            "excerpt": "啤酒制造模拟器下载-Beer Manufacture Simulator免安装中文版下载_3DM单机 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 单机 手游 软件 网游 自运营 商城 专区 下载 攻略 补丁 汉化 ns ps xbox 发售表 排行榜 您的位置： 首页 > 游戏 > 模拟经营 > 《啤酒制造模拟器》免安装中文版 《啤酒制造模拟器》免安装中文版 游戏类型： 模拟经营 开发厂商： Games Incubator 更新时间： 2026-03-12 发售日期： 2026年3月5日 游戏平台： PC 游戏语言： 简中 标签： 建造 教育 沉浸式模拟 休闲 自动化 8.8 已有 60 人评分"
+          },
+          {
+            "label": "0day.ali213.net",
+            "url": "https://0day.ali213.net/html/2026/154279.html",
+            "hostname": "0day.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "啤酒制造模拟器好玩吗_啤酒制造模拟器玩家评价_口碑_虾说_游侠网",
+            "excerpt": "啤酒制造模拟器好玩吗_啤酒制造模拟器玩家评价_口碑_虾说_游侠网 游侠网 资讯 下载 补丁 游戏库 攻略 论坛 商城 网游 手游 页游 大侠号 更多 游侠网APP 首页 游戏发售表 单机游戏排行榜 2026热门游戏 单机下载 暂无专题 下载游戏 PC 啤酒制造模拟器 Beer Manufacture Simulator 2026年03月05日PC上市 - 经营/模拟/休闲/独立 游戏类型：模拟经营SIM 制作公司：Games Incubator 游戏语言： 中文/英文/日文/其他 发行公司：Games Incubator, PlayWay S.A. 单人单机 3D画面 不支持手柄 不支持VR 游戏简介 从零开始酿造属于你的啤酒！扮演"
+          },
+          {
+            "label": "store.steampowered.com",
+            "url": "https://store.steampowered.com/app/3809420/Beer_Manufacture_Simulator_Demo/?l=schinese",
+            "hostname": "store.steampowered.com",
+            "family": "steam",
+            "kind": "official_simplified",
+            "pageTitle": "Steam 上的 Beer Manufacture Simulator Demo",
+            "excerpt": "月 13 日 访问网站 Discord TikTok X YouTube Facebook Instagram 查看讨论 查找社区组 嵌入 &nbsp; 链接与信息 免费试用版 玩 Beer Manufacture Simulator Demo 安装试玩 查看完整游戏 浏览社区中心 &nbsp; 关于此试用版 啤酒制造模拟器诚邀您体验免费试玩版！ 扮演酿酒师，从零开始酿造您自己的啤酒。学习酿造过程的每个阶段，将您的热情从小爱好发展成一个规模庞大的啤酒工厂。 试玩版内容： 啤酒生产流程：从麦芽捣碎到封盖和贴标 三种啤酒风格的配方 基于原料质量的啤酒评级 啤酒特性和原料混合能力 9 件啤酒生产设备 24 种可用原料 不同参数的啤酒合同"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
