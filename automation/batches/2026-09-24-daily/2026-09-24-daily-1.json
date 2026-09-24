@@ -1,0 +1,1442 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-24T02:22:04.884Z",
+  "finalizedAt": "2026-09-24T02:22:04.884Z",
+  "coverageThrough": "2026-09-24 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-24-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-24 12:00",
+      "windowStart": "2026-09-23 10:10",
+      "windowEnd": "2026-09-24 10:10"
+    },
+    "adjacentEdition": "2026-09-23-daily",
+    "packages": [
+      {
+        "eventKey": "0c35b7265c13cec8b1b9",
+        "eventKind": "other",
+        "subjectKey": "風来のシレン6",
+        "subject": {
+          "kind": "game",
+          "key": "風来のシレン6"
+        },
+        "publishability": "direct",
+        "headline": "『風来のシレン６』Steamにて過去最高同接プレイヤー数更新。『トルネコの大冒険』リマスター登場もあり、「不思議のダンジョン」ブーム再燃か",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260923-469521/",
+            "publishedAt": "2026-09-23T08:26:07+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260923-469521/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260923-469521-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『不思議のダンジョン 風来のシレン６ とぐろ島探検録』について、Steamにて人気が再燃しているようだ。\n『風来のシレン６』Steamにて過去最高同接プレイヤー数更新。『トルネコの大冒険』リマスター登場もあり、「不思議のダンジョン」ブーム再燃か\nスパイク・チュンソフトより配信中の『 不思議のダンジョン 風来のシレン６ とぐろ島探検録（以下、風来のシレン６） 』について、Steam同時接続ユーザー数が9月21日に過去最高を更新した。9月18日までおこなわれていた50％オフセールのほか、9月9日に発売された『トルネコの大冒険 不思議のダンジョン ちょっとステキなリマスター（以下、トルネコの大冒険リマスター）』の影響もあるようだ。\n『風来のシレン６』は、挑戦する度に構造が変化する不思議なダンジョンを攻略する、『風来のシレン』シリーズの最新作だ。本作で主人公シレンと語りイタチのコッパは、不思議な夢に導かれてとびっきりのお宝が眠るという「とぐろ島」にて、シリーズ14年ぶりとなる新たな冒険を繰り広げていく。マス目上のダンジョンではアイテムや敵の配置も毎回変化し、ターン制での戦いの末に倒れるとすべてのアイテムを失い、レベル1にリセットされるという正統派ローグライクゲームとなっている。\n本作は2024年1月にNintendo Switch向けに発売。原点回帰を掲げられた本作は好評を博し、発売から2週間足らずで国内累計出荷本数が『風来のシレン』シリーズ最速となる20万本を突破（ 関連記事 ）。同年9月にDLCが配信され、同年12月にはSteam版がリリースされた。Steamユーザーレビューは、約500件のうち84%が好評とする「非常に好評」ステータスを獲得。2026年2月にはDLCも収録された『不思議のダンジョン 風来のシレン6plus』がiOS/Android向けにも配信されている。\nこうした状況もあってか、SNSにて『風来のシレン6』をおすすめする 投稿 が増加。シリーズ最高傑作と評する声もあり、同時期の50%オフセールによって、発売直後である『トルネコの大冒険リマスター』よりも結果的にお安くなっていたことも後押しとなっただろう。また、『トルネコの大冒険リマスター』は初代のリマスター作品ということもあり、収録されているダンジョンは3つとボリュームとしてはやや少なめ。リマスター版をクリアしたプレイヤーが、さらなる冒険を求めて『風来のシレン6』を遊んでいる可能性もありそうだ。\n『 不思議のダンジョン 風来のシレン６ とぐろ島探検録 』は、PC（Steam）/Nintendo Switch/iOS/Androidにて配信中。Nintendo Switch版は本日まで、60%オフのセール中だ。また、『 トルネコの大冒険 不思議のダンジョン ちょっとステキなリマスター 』は、Nintendo Switch 2/Nintendo Switch/PS5/XBOX Series X|S/PC（Steam/Google Play Games on PC）/iOS/Android向けに配信中だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "ca0b83971d0ed2276a2e",
+        "eventKind": "announcement",
+        "subjectKey": "avelune",
+        "subject": {
+          "kind": "game",
+          "key": "avelune"
+        },
+        "publishability": "direct",
+        "headline": "2D機械世界メトロイドヴァニア『AVELUNE』発表。“カスタム可”なお助けロボットとともに行く、滅びゆく王国探索",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/avelune-20260923-469486/",
+            "publishedAt": "2026-09-23T04:19:18+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/avelune-20260923-469486/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/avelune-20260923-469486-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Skyho氏は9月23日、『AVELUNE』を発表した。本作は滅びた王国を探索する、2Dメトロイドヴァニアだ。\n2D機械世界メトロイドヴァニア『AVELUNE』発表。“カスタム可”なお助けロボットとともに行く、滅びゆく王国探索\n個人ゲーム開発者のSkyho氏は9月23日、2Dアクションゲーム 『 AVELUNE 』 を発表した。対応プラットフォームはPC（Steam）。\n『AVELUNE』は、スピード感あるバトルが特徴の2Dメトロイドヴァニア・アクションゲームである。舞台は滅びてしまったアベル王国。かつてはアベルの恩寵の元で永遠の輝きを誇っていた王国は、突如として天から降ってきた巨大な塔により壊滅的な被害に遭ってしまった。王は何処かへと姿を消し、王国が滅びゆく中で、プレイヤーは塔の正体やその内部に隠された秘密を解き明かすための旅に出ることになる。\n『AVELUNE』は、PC（ Steam ）向けに開発中だ。\n本作はスキルの習得やアイテムの入手により行動範囲が広がっていく2Dアクション、いわゆるメトロイドヴァニアというジャンルの作品である。プレイヤーは3つのスロットに任意のスキルをセットして使うことができる。スキルにはたとえば、素早く動いて回避に使うことのできる「ダッシュ（DASH）」や、通常攻撃の2倍のダメージを出せる「ピアシングウェーブ（PIERCING WAVE）」などが存在する。どのようなスキルをセットするかにより、戦い方も変わってくるだろう。"
+          }
+        ]
+      },
+      {
+        "eventKey": "c1961a6e2698145deea1",
+        "eventKind": "other",
+        "subjectKey": "ドラゴンクエストvii reimagined",
+        "subject": {
+          "kind": "game",
+          "key": "ドラゴンクエストvii reimagined"
+        },
+        "publishability": "direct",
+        "headline": "Nintendo Switch 2/Switch向けセールに約290本追加。『ドラゴンクエストVII Reimagined』『ミンサガ』リマスターが最安値更新、『リトルナイトメア3』なども最安値級でお求めやすく",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/nintendo-switch-sale-20260923-469511/",
+            "publishedAt": "2026-09-23T07:43:56+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/nintendo-switch-sale-20260923-469511/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/nintendo-switch-sale-20260923-469511-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ニンテンドーeショップにて9月23日、Nintendo Switch 2/Nintendo Switch向けタイトルの新たなセールが開始。対象となる約290本のうち、一部を紹介する。\nNintendo Switch 2/Switch向けセールに約290本追加。『ドラゴンクエストVII Reimagined』『ミンサガ』リマスターが最安値更新、『リトルナイトメア3』なども最安値級でお求めやすく\n『 ドラゴンクエストVII Reimagined 』（Nintendo Switch 2版） ・RPG『ドラゴンクエストVII エデンの戦士たち』のリメイク版。孤島に住む少年少女たちが、ふしぎな石版のかけらを発見したことをきっかけに大冒険をおこなう。主人公たちは、さまざまな職業に就かせることができ、固有の呪文や特技で敵と戦う。本作では、同時に2つの職業に就ける「かけもち」要素が導入。また「オートバトル」などの便利機能も追加されている。なお、 Nintendo Switch版 も同価格にてセール中だ。 税込5705円/35％オフ（ ストアページ ）\nニンテンドーeショップにて9月23日、Nintendo Switch 2/Nintendo Switch向けタイトルの新たなセールが開始された。対象タイトルは約290本。本記事では、その中から注目タイトルをいくつか紹介する。\n今回のセールには、スクウェア・エニックスやバンダイナムコなど国内大手メーカーも参加。その中で、Nintendo Switch 2版『FINAL FANTASY X/X-2 HD Remaster』などが初セールとなっている。\nまずは最安値を更新したタイトルから見ていこう。今回が初セールとなったタイトルもここで紹介する。"
+          }
+        ]
+      },
+      {
+        "eventKey": "87c74eb8e522c0f03a66",
+        "eventKind": "dlc",
+        "subjectKey": "scrapped gta 5 story",
+        "subject": {
+          "kind": "game",
+          "key": "scrapped gta 5 story"
+        },
+        "publishability": "direct",
+        "headline": "Scrapped GTA 5 Story DLC Might Have Taken the Series Overseas for the First Time in 15 Years",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/scrapped-gta-5-story-dlc-might-have-taken-the-series-overseas-for-the-first-time-in-15-years",
+            "publishedAt": "2026-09-23T16:20:41.852Z",
+            "canonicalUrl": "https://www.ign.com/articles/scrapped-gta-5-story-dlc-might-have-taken-the-series-overseas-for-the-first-time-in-15-years",
+            "imageUrl": "https://assets-prd.ignimgs.com/2024/12/03/gta-5-world-blog-1733224118837.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Grand Theft Auto 5&#x27;s story DLC was seemingly going to take players to Paris, if leaked footage is anything to go by.\nScrapped GTA 5 Story DLC Might Have Taken the Series Overseas for the First Time in 15 Years\nLast week, a slew of files and assets from GTA 5 surfaced online. This leak showed off variety of cut content, prompting Rockstar to take action and issue takedowns to creators who were showing it in their videos. One of the most interesting parts of this leak has been seeing all of the scrapped DLC, which includes a Liberty City map expansion .\nFans have also uncovered new information about the game&#x27;s fabled story DLC, which was formally announced by Rockstar in 2013 with a 2014 release window in mind. Unfortunately, none of it ever saw the light of day, as Red Dead Redemption 2 and GTA Online became higher priorities. One of the DLCs would&#x27;ve followed Trevor assuming the role of a secret agent, tackling dirty jobs for the government and assassinating powerful foes. Much of this was already known, but what fans likely weren&#x27;t aware that this DLC was also seemingly going to take players to Paris.\nThe only other time Grand Theft Auto has taken players overseas was in GTA: London 1969, which was an expansion for the original game released in 1999. Some fans have hoped to see the series go abroad, but the franchise&#x27;s former writer and creative director, Dan Houser, suggested that the series wouldn&#x27;t work as well outside of America .\n\"I think for a full GTA game, we always decided there was so much Americana inherent in the IP, it would be really hard to make it work in London or anywhere else,\" said Houser in 2025. \"You know, you needed guns, you needed these larger-than-life characters. It just felt like the game was so much about America, possibly from an outsider&#x27;s perspective. But that was so much about what the thing was that it wouldn&#x27;t really have worked in the same way elsewhere.”\nTrevor actor Steven Ogg has spoken loosely about the scrapped GTA 5 story DLC in the past. He shot some scenes for it, but Rockstar never followed up on the project, and that was the end of it. A former developer estimated that the DLC was about halfway finished when the plug was pulled and was sour about its cancellation.\n“It was really really good,\" said ex-Rockstar Senior Camera Artist Joe Robino. \"But when GTA Online came out, it was so much of a cash cow and people were loving it so much that it was hard to make an argument that a standalone DLC would outcompete that. I think looking back now you could probably do both. But that was a business decision they made. I was a little upset about that. That actually was a lot of the reason for me being a little sour at that time. Because I was like yo, WTF guys? This s**t’s awesome. Let’s keep going. Let’s finish this s**t.”\nIn the leaked files, players were able to look at some of the unfinished levels made for this DLC, and one of them includes some kind of luxury apartment that overlooks Paris. The Eiffel Tower can be seen outside of a balcony, though it&#x27;s just a flat image rather than an explorable 3D environment. It&#x27;s entirely possible that this apartment would&#x27;ve been the extent of the overseas adventure, potentially being used for a cutscene or maybe some kind of assassination mission."
+          }
+        ]
+      },
+      {
+        "eventKey": "c41aed550723e749c819",
+        "eventKind": "announcement",
+        "subjectKey": "ディスプレイ付き交換用フロントパネル",
+        "subject": {
+          "kind": "game",
+          "key": "ディスプレイ付き交換用フロントパネル"
+        },
+        "publishability": "direct",
+        "headline": "Steam Machineの“ディスプレイ付き交換用フロントパネル”2種発表、10月発売へ。時計や天気予報、機器ステータスなどを映してカスタマイズ",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260923-469531/",
+            "publishedAt": "2026-09-23T09:47:39+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260923-469531/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260923-469531-header.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "JSAUX GAMINGは9月22日、Steam Machine向けフロントパネル「E-Ink Faceplate」と「Pixel Matrix Faceplate」を発表した。本製品は、Steam Machineに対応する交換用フロントパネルだ。\nSteam Machineの“ディスプレイ付き交換用フロントパネル”2種発表、10月発売へ。時計や天気予報、機器ステータスなどを映してカスタマイズ\n海外ゲーム周辺機器メーカーのJSAUX GAMINGは9月22日、Steam Machine向けフロントパネル「E-Ink Faceplate」と「Pixel Matrix Faceplate」を発表した。価格は前者が99.99ドル（約1万6000円）、後者が89.99ドル（約1万4000円）で、ともに10月初旬より出荷予定。\n両製品は、ValveのゲーミングPCであるSteam Machineに対応する交換用フロントパネルだ。それぞれ異なる方式のディスプレイを搭載していることが特徴となる。\nSteam Machineの筐体前面のフロントパネルは簡単に付け外し可能となっており、ユーザー自身でデザインをアレンジして楽しむことができる。これに関してValveは、フロントパネルをE-Inkディスプレイ化するカスタマイズ方法を公開しているが（ 関連記事 ）、それと同様のコンセプトで製品化したものが今回発表された格好だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "07f72f21b456a055fc19",
+        "eventKind": "update",
+        "subjectKey": "blazblue entropy effect x fall 2026 major free",
+        "subject": {
+          "kind": "game",
+          "key": "blazblue entropy effect x fall 2026 major free"
+        },
+        "publishability": "direct",
+        "headline": "BlazBlue: Entropy Effect X fall 2026 major free update now available",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/blazblue-entropy-effect-x-fall-2026-major-free-update-now-available",
+            "publishedAt": "2026-09-24T02:00:29+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/blazblue-entropy-effect-x-fall-2026-major-free-update-now-available",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/BB-Entropy-Effect-X_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher Astrolabe Games and developer 91Act have released the fall 2026 major free content update for 2D action roguelite game BlazBlue: Entropy Effect X, which adds new elite enemies Nine the Ph…\nBlazBlue: Entropy Effect X fall 2026 major free update now available\nPublisher Astrolabe Games and developer 91Act have released the fall 2026 major free content update for 2D action roguelite game BlazBlue: Entropy Effect X , which adds new elite enemies Nine the Phantom and The Lost Gearhulk, as well as the new stage &#8220;Remains.&#8221; The Switch 2 and Switch versions of the update will launch at a slightly later date.\nBlazBlue: Entropy Effect X is available now for PlayStation 5 , Xbox Series , Switch 2, and Switch.\nFall 2026 Major Free Update Trailer\nHere is an overview of the update, via Astrolabe Games:\nA Storm of Spells: New Elite Enemy Nine the Phantom Arrives\nThe powerful opponent Nine the Phantom joins the game as a new elite enemy, challenging players to an intense showdown. Nine can attack by casting individual element spells or combine different elements to unleash a variety of devastating spells."
+          }
+        ]
+      },
+      {
+        "eventKey": "bb8790e530628de87328",
+        "eventKind": "announcement",
+        "subjectKey": "phoenix wright ace attorney 8211 dual destinies vr",
+        "subject": {
+          "kind": "game",
+          "key": "phoenix wright ace attorney 8211 dual destinies vr"
+        },
+        "publishability": "direct",
+        "headline": "Phoenix Wright: Ace Attorney &#8211; Dual Destinies VR announced for Quest, Meta VR Glasses",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/phoenix-wright-ace-attorney-dual-destinies-vr-announced-for-quest-meta-vr-glasses",
+            "publishedAt": "2026-09-24T00:26:23+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/phoenix-wright-ace-attorney-dual-destinies-vr-announced-for-quest-meta-vr-glasses",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/AA5-VR-Ann_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "AMATA Games, under licensing from Capcom, has announced Phoenix Wright: Ace Attorney &#8211; Dual Destinies VR for Quest and the newly announced Meta VR Glasses. It will launch in 2027 with English…\nPhoenix Wright: Ace Attorney &#8211; Dual Destinies VR announced for Quest, Meta VR Glasses\nAMATA Games , under licensing from Capcom , has announced Phoenix Wright: Ace Attorney &#8211; Dual Destinies VR for Quest and the newly announced Meta VR Glasses . It will launch in 2027 with English, French, German, Japanese, Korean, Traditional Chinese, and Simplified Chinese language support.\nThe hit Ace Attorney series finally comes to the immersive world of virtual reality! Take on the roles of Phoenix Wright, Apollo Justice, and Athena Cykes&#8212;and prove your clients innocent of all charges!\nAfter eight long years, Phoenix Wright makes his return as a lawyer in this fifth mainline game. The story starts with a bang in the middle of a badly-damaged courtroom. Along with Apollo Justice and Athena Cykes, Phoenix works to bring an end to the current &#8220;Dark Age of the Law,&#8221; where the pursuit of victory trumps the pursuit of the truth.\nThe game, as its title implies, is a virtual reality version of the fifth mainline entry in the courtroom battle / narrative adventure game series.\nHere is an overview of the game, via AMATA Games:"
+          }
+        ]
+      },
+      {
+        "eventKey": "11a5085e19aeb2a7df6a",
+        "eventKind": "announcement",
+        "subjectKey": "tetris effect mixed realities",
+        "subject": {
+          "kind": "game",
+          "key": "tetris effect mixed realities"
+        },
+        "publishability": "direct",
+        "headline": "Tetris Effect: Mixed Realities announced for Quest 3, Meta VR Glasses",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/tetris-effect-mixed-realities-announced-for-quest-3-meta-vr-glasses",
+            "publishedAt": "2026-09-24T00:53:30+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/tetris-effect-mixed-realities-announced-for-quest-3-meta-vr-glasses",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Tetris-Effect-MR-Ann_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Publisher Enhance and developers Monstars and Resonair have announced Tetris Effect: Mixed Realities for Quest 3 and the newly announced Meta VR Glasses. It will launch in 2027.\nTetris Effect: Mixed Realities announced for Quest 3, Meta VR Glasses\nPublisher Enhance and developers Monstars and Resonair have announced Tetris Effect: Mixed Realities for Quest 3 and the newly announced Meta VR Glasses . It will launch in 2027.\nA mind-blowing reinvention of Tetris Effect that uses the full power of mixed reality and Tetris &#8216; absorbing gameplay to transport you into magical, musical realms. Your room transforms into a deep-sea aquarium, remote space station, and more, as you build&#8212;Tetrimino by Tetrimino&#8212;gateways to other dimensions that blur the line between the real and the virtual.\nHere is an overview of the game, via Enhance:\nSeptember 29 @ 1:00 pm - 2:00 pm EDT"
+          }
+        ]
+      },
+      {
+        "eventKey": "7f52ea1387b0be0a1eff",
+        "eventKind": "company",
+        "subjectKey": "discord re introduces age verification",
+        "subject": {
+          "kind": "entity",
+          "key": "discord re introduces age verification"
+        },
+        "publishability": "direct",
+        "headline": "Discord re-introduces age verification policy based on 'account signal' methodology",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-developer",
+            "label": "Game Developer",
+            "url": "https://www.gamedeveloper.com/business/discord-re-introduces-age-verification-policy-with-new-methods",
+            "publishedAt": "2026-09-23T18:30:00.000Z",
+            "canonicalUrl": "https://www.gamedeveloper.com/business/discord-re-introduces-age-verification-policy-with-new-methods",
+            "imageUrl": "https://eu-images.contentstack.com/v3/assets/blt740a130ae3c5d529/blt6fbdb1e9ed7829fb/6ab3fadacc9371b224931b5d/New_Project(44).png?disable=upscale&width=1200&height=630&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Discord is re-introducing its age verification policy eight months after first try, saying it has built an age estimation model based on 'account signals.'\nDiscord re-introduces age verification policy based on 'account signal' methodology\nDiscord says it has built an age estimation model based on 'account signals' to determine an user's age group.\nDiscord is re-introducing its age verification policy eight months after its first attempt, saying it has built an age estimation model based on \"account signals.\" Moreover, it will now be offering more verification options rather than exclusively asking users to submit face scans or identity documents.\nIn an announcement shared yesterday , penned by Discord CTO and co-founder Stanislav Vishnevskiy, the company outlined \"more transparent\" steps when it comes to age verification. This the second attempt after Discord said it failed at its \"most basic job\" with the initial February rollout, acknowledging that it knew it would prove to be controversial, and that it failed to clearly explain why it was being implemented in the first place.\nThe unclear communication led a large part of its user base to believe that almost everybody needed to submit identity documents or face scans in order to continue using the app. Vishnevskiy claims the contrary, saying that more than 90 percent of existing users won&#x27;t have to go through age verification.\nThis is in part due to an age estimation model based on account-level signals (how long an account has existed) and payment methods on file, which are used to estimate a user&#x27;s age and place them in either the adult or teen age group, the latter spanning the age of 13-17 and having additional protections.\nIf an user&#x27;s account needs verification, Discord will now offer additional verification methods than don&#x27;t require an ID or video selfie. These include credit cards, Apple App Store, Google Play Store, Google Waller, and AgeKey. Some methods may differ depending on an account&#x27;s region or device.\n\"We&#x27;ve vetted every method, and the data you provide to us and our vendors is only ever used to determine your age group, so you can pick whichever option you&#x27;re most comfortable with,\" Vishnevskiy says."
+          }
+        ]
+      },
+      {
+        "eventKey": "7168e592f43348c8f350",
+        "eventKind": "launch",
+        "subjectKey": "夜勤事件",
+        "subject": {
+          "kind": "game",
+          "key": "夜勤事件"
+        },
+        "publishability": "direct",
+        "headline": "Switch 2版「夜勤事件」が本日配信開始。発売を記念して30％オフの690円で販売中",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/044/G104430/20260918077/",
+            "publishedAt": "2026-09-23T15:00:00.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/044/G104430/20260918077/",
+            "imageUrl": "https://www.4gamer.net/games/044/G104430/20260918077/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "レジスタは本日（2026年9月24日），Chilla's Artが手がけるホラーゲーム「夜勤事件」のNintendo Switch 2版を配信開始した。Switch 2版では，新規エンディングに加え…\nSwitch 2版「夜勤事件」が本日配信開始。発売を記念して30％オフの690円で販売中\nスマホゲームのセルラン分析（2026年9月10日〜9月16日）。今週の1位は「ドラゴンクエストウォーク」。筆者都合により，今週は簡略版でお届け\n【今週のモチベ】「SILENT HILL: Townfall」や「CONTROL Resonant」が発売される 2026年9月21日〜9月27日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月14日〜9月20日\n週刊Steam広場 第171号：「ENDLESS Legend 2」や「RuneScape: Dragonwilds」の早期アクセスが終了に"
+          }
+        ]
+      },
+      {
+        "eventKey": "b2c541d1ac9588cb9e38",
+        "eventKind": "launch",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Sorry early adopters, Logitech is releasing an improved Superstrike making the original all but obsolete just months after launch",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/hardware/gaming-mice/sorry-early-adopters-logitech-is-releasing-an-improved-superstrike-making-the-original-all-but-obsolete-just-months-after-launch/",
+            "publishedAt": "2026-09-23T16:01:00Z",
+            "canonicalUrl": "https://www.pcgamer.com/hardware/gaming-mice/sorry-early-adopters-logitech-is-releasing-an-improved-superstrike-making-the-original-all-but-obsolete-just-months-after-launch/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/FVTRrBNCxLzTZ9ue6qC2AJ-2560-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "While the new one is a great mouse, it's what the first should have been.\nSorry early adopters, Logitech is releasing an improved Superstrike making the original all but obsolete just months after launch\nIt's fair to say I was pretty taken by the G Pro X2 Superstrike when Logitech launched it earlier this year. It was the first mouse I'd seen in a long time that did something genuinely revolutionary. But, just seven months later, it is being rendered all but obsolete by the new G Pro X3 Superstrike.\nIt's pretty much the same as the Superlight 2 in other respects, from the shape to the weight, side buttons, and scroll wheel. The side buttons are pretty mushy, the scroll wheel has problems with long-presses, and most importantly&mdash;and specifically in the case of the original Superstrike, not the Superlight 2&mdash;it's quite top-heavy thanks to those new internals.\nSo, these seven months later, stepping up to the plate is the X3 Superstrike, which fixes this weighting issue and has a couple of other benefits, but it makes me wonder why Logitech didn't just wait and release this version in the first place.\nIt's basically the same weight, with a couple of grams shaved off only if you're outside of Europe, but battery life has been improved by 50% up to 135 hours at 1 kHz polling, assuming you're clicking just shy of once per second. It's also got a slightly upgraded sensor, with a bump to DPI, acceleration, and max speed&mdash;but nothing major.\nIn terms of what it actually feels like to use, it feels almost exactly the same as the original X2 Superstrike&mdash;except the weighting is more balanced. I've been using it for the past few days and most of the time I forget I'm not just using the X2 Superstrike. Occasionally I'm reminded of the better balance, but apart from that both feel about the same to use, whether for work or gaming.\nIn other words, just seven months after the X2's launch, the X3 launches&mdash;for an extra $20 at $200/&euro;190, mind you&mdash;and very much feels like the X2, but improved in a couple of simple ways.\nIt's the time frame that makes this a little difficult to swallow, because Logitech must surely have known back in February that a new version was on the cards before very long. Which, if so, means it was hyping up and selling a very expensive mouse it knew would very soon be superseded by a slightly more expensive one that essentially matches it but eliminates a couple of pain points.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-24T10:21:36+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "19702bd4aaec8dbd0c33",
+        "eventKind": "other",
+        "subjectKey": "scp idle secure",
+        "subject": {
+          "kind": "game",
+          "key": "scp idle secure"
+        },
+        "publishability": "direct",
+        "headline": "「SCP収容施設」運営ゲーム『SCP Idle: SECURE』10月30日配信へ。Dクラス職員や科学者を増やしてSCP管理、収容違反が起きても“ただでは転ばぬ”施設運営",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/scp-idle-20260924-469569/",
+            "publishedAt": "2026-09-24T00:42:22+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/scp-idle-20260924-469569/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/scp-idle-20260924-469569-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Ahroma Gamesは9月23日、『SCP Idle: SECURE. CONTAIN. PROGRESS.』を日本時間10月30日に配信開始すると発表した。本作はSCP財団の研究施設を管理するインクリメンタル型シミュレーションゲームだ。\n「SCP収容施設」運営ゲーム『SCP Idle: SECURE』10月30日配信へ。Dクラス職員や科学者を増やしてSCP管理、収容違反が起きても“ただでは転ばぬ”施設運営\nデベロッパーのAhroma Gamesは9月23日、『 SCP Idle: SECURE. CONTAIN. PROGRESS. 』を10月29日に配信開始すると発表した。日本では時差の関係で10月30日となるようだ。対応プラットフォームはPC（Steam）で、現在はデモ版が配信されている。\n『SCP Idle: SECURE. CONTAIN. PROGRESS.』は、SCP財団の研究施設を管理するインクリメンタル型シミュレーションゲームだ。SCP財団とは、共同創作サイト「SCP Wiki」を起源とし、多数のコミュニティ参加者によって作られてきた架空の組織。さまざまな異常存在を確保・収容し、研究している。本作ではそんな施設の運営者となり、SCPを研究しながら収容室を増やし、施設を拡張していくのだ。\nゲーム開始時には、プレイヤー自身がSCPを手動で研究して資源を集めるところからスタートする。研究を進めれば、Dクラス職員の採用や科学者の雇用、新たな収容室の建設などが可能。さらにアップグレードを重ねることで実験を自動化でき、施設内で働く人員も増えていく。\n施設は見下ろし視点のドット絵で描かれ、職員たちは各部屋を実際に行き来する。実験には一定の時間がかかり、各SCPの収容室にはそれぞれ異なる実験内容やリスク、報酬、専用の仕組みが用意されているという。たとえばデモ版では、「SCP-1123」の研究を進めて科学資源を集め、アップグレードや施設管理機能を順次開放していく様子を確認できる。\nただし、SCPは大人しく研究され続けるとは限らない。なかには収容違反を起こす存在もおり、施設内へ飛び出せば混乱が起きる。一方で、こうした収容違反からは「Incident Data」を獲得可能。研究などで得る資源に加え、政府資金、人員、Incident Dataなどを使って新たな施設システムを開放していくことになる。また、長期的な成長要素として「Prestige Directives」も存在する。施設運営で得られる「FALポイント」という専用ポイントを使い、新たなボーナスや相乗効果を開放できる仕組みだ。そして最終目標となる「Thaumiel Containment Engine」の完成を目指し、施設を発展させていく。\n製品版では、SafeおよびEuclidに分類されるSCPが追加されるほか、施設への訪問者といった新システムも実装予定。また、Thaumiel Containment Engineは4段階に分けて建設していく形式となり、各段階を完成させるたびに新たな部屋や施設管理システムが開放される。建設に必要な資源量も段階ごとに増えていく一方、施設全体の処理能力も向上していくという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "123ba4c5a0dacfcd9ca0",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "72-Year-Old Pokémon Collector Arrested After Illegally Tracking Woman Who Restocked Local Stores",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/72-year-old-pokemon-collector-arrested-after-illegally-tracking-woman-who-restocked-local-stores",
+            "publishedAt": "2026-09-23T15:27:26.456Z",
+            "canonicalUrl": "https://www.ign.com/articles/72-year-old-pokemon-collector-arrested-after-illegally-tracking-woman-who-restocked-local-stores",
+            "imageUrl": "https://assets1.ignimgs.com/2018/10/15/p001-1539586785236.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "A 72-year-old Pokémon card collector has been arrested for illegally tracking a woman who restocked local stores.\n72-Year-Old Pokémon Collector Arrested After Illegally Tracking Woman Who Restocked Local Stores\nPOKÉMON COLLECTOR FOUND GUILTY FOR TRACKING A CARD VENDOR 🚨 A collector used a GPS tracker to follow a woman who stocked Pokémon cards, allowing him to track her route from store to store. Could’ve just turned notifications on 🤷‍♂️ pic.twitter.com/EpnYUPlg3a\nWhile word of when and where additional card stock will be available locally is of huge importance to fans struggling to get a hold of the in-demand cards, Kubasta&#x27;s actions went beyond the usual sharing of intel via social media and online groups, or being tipped off by friendly store owners and delivery drivers. It was also just downright creepy.\nThis month&#x27;s release of the Pokémon trading card game&#x27;s 30th Anniversary set has been marred by long lines , \"ghost chairs\" , in-person fights and now frustration from scalpers that rare cards are too easy to find . All of which is bad, except for that last one.\nWhile the 30th Anniversary set has now launched, the next is not far behind. Earlier this week, IGN revealed three new card designs from the upcoming set Pokémon TCG: Mega Evolution — Delta Reign set , a fresh batch of Mega Evolution-themed cards that is due out on November 6.\nCleveland resident Kent Kubasta has admitted following the woman&#x27;s delivery route via an electronic tracker he had secretly placed on her vehicle, in order to see where new card boxes had been dropped off.\nAccording to Fox8 , Kubasta entered a plea of no contest to the charge, and declined to comment further when approached by press for an explanation. It is assumed, however, that he was then planning to visit each store and buy up stock as soon as it was placed on sale."
+          }
+        ]
+      },
+      {
+        "eventKey": "30d8ee81b4825212470c",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "After Asking Very Nicely For a Skin, Madison Beer Joins Fortnite Tomorrow",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/after-asking-very-nicely-for-a-skin-madison-beer-joins-fortnite-tomorrow",
+            "publishedAt": "2026-09-23T16:30:41.787Z",
+            "canonicalUrl": "https://www.ign.com/articles/after-asking-very-nicely-for-a-skin-madison-beer-joins-fortnite-tomorrow",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/23/madison-beer-is-our-new-fortnite-icon-00-00-21-1790179657533.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Madison Beer is the latest music icon to join the world of Fortnite, after previously issuing a public call to Epic Games for her to become a skin.\nAfter Asking Very Nicely For a Skin, Madison Beer Joins Fortnite Tomorrow\nMadison Beer is the latest music icon to join the world of Fortnite , after previously issuing a public call to Epic Games for her to become a skin.\nThe Selfish and Make You Mine singer has long been a fan of Epic Games&#x27; battle royale, and has helped promote some of its LEGO-focused modes. Now, Beer is pulling up her socks to join the core Fortnite experience, following her callout to be included — made during an episode of the Hot Ones podcast earlier this year.\nBeer follows in the footsteps of other pop icons such as Sabrina Carpenter, Ariana Grande, and Olivia Rodrigo, as well as a swathe of other musical artists including Billie Eilish, Lady Gaga, Eminem and Snoop Dogg, all of whom have multiple in-game skins.\nThis latest addition will see Beer gain two skins, one of which is themed after her 2025 Victoria&#x27;s Secret Fashion Show appearance, plus a pickaxe, backblings, emotes, a gun skin, microphone instrument, a loading screen and three more in-game tracks: \"yes, baby,\" \"bittersweet,\" and \"complexity.\"\n\"I would say this is definitely up there with being nominated for a Grammy and playing Madison Square Garden,\" Beer said in a statement today. \"There&#x27;s things in my life that I am just obsessed with, and that I would die for, and Fortnite is one of them.\"\nMadison Beer lands in the Fortnite shop tomorrow, and will be streaming the game via Twitch on Friday to celebrate her collaboration finally happening. Who will join Fortnite next?"
+          }
+        ]
+      },
+      {
+        "eventKey": "1b20e96ed28026eb7183",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Artist Behind Pokémon 30th Anniversary Jirachi SIR Card Gives Tearful Response to Late Influencer's Heart-Wrenching Final Pack Opening",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/artist-behind-pokemon-30th-anniversary-jirachi-sir-card-gives-tearful-response-to-late-influencers-heart-wrenching-final-pack-opening",
+            "publishedAt": "2026-09-23T23:24:15.172Z",
+            "canonicalUrl": "https://www.ign.com/articles/artist-behind-pokemon-30th-anniversary-jirachi-sir-card-gives-tearful-response-to-late-influencers-heart-wrenching-final-pack-opening",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/23/jirachi-card-artist-responds-avery-poke-kid-1790205304963.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The artist behind a Pokémon 30th Anniversary Jirachi SIR card has responded after beloved influencer Avery the Poké Kid pulled the card in his last pack opening before his death from pancreatic cancer.\nArtist Behind Pokémon 30th Anniversary Jirachi SIR Card Gives Tearful Response to Late Influencer&#x27;s Heart-Wrenching Final Pack Opening\nAvery the Poké Kid was just 12 years old when he died of pancreatic cancer on September 19, 2026. To celebrate his life, the young Pokémon influencer’s parents posted a video showing him opening his very last set of trading card packs from the brand’s recent 30th Anniversary drop.\nOn the very last pull of his second and final pack, Avery pulled a Jirachi SIR, a major win that caused him to shout in excitement. The heartwarming moment went viral within the Pokémon community and beyond, leaving viewers misty-eyed and sorrowful that such a bright and cheerful voice in the space had been tragically lost at such a young age.\nEven the artist of the card, who lives halfway across the globe from Avery’s home in Everett, Washington, saw his viral pull. Speaking on Twitter/X, prolific Pokémon trading card artist Akira Egawa said she was heavily impacted by the video and couldn’t stop crying after watching it.\nFans were equally moved by her reaction, with many pointing out the poetic lore behind Jirachi in the Pokémon universe.\nJirachi is a Legendary Steel and Psychic Type Pokémon that spends most of its life in hibernation. It only wakes up for seven days every thousand years or so, and is only awakened if you “sing to it in a voice of purity.”\nAvery had battled with stage four pancreatoblastoma for over seven years. He became a beloved figure within the Pokémon community during his lifetime, sharing his love for the series’ trading card game to the tune of 313,000 avid followers.\n\"I&#x27;ve honestly been in tears ever since I saw this.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "c0636446adb5c33568f9",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Bethesda Boss Issues Memo to Staff After Xbox Moves Obsidian Into the Fallout Company",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bethesda-boss-issues-memo-to-staff-after-xbox-moves-obsidian-into-the-fallout-company",
+            "publishedAt": "2026-09-23T15:59:50.206Z",
+            "canonicalUrl": "https://www.ign.com/articles/bethesda-boss-issues-memo-to-staff-after-xbox-moves-obsidian-into-the-fallout-company",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/23/fallout-1790179031600.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The boss of Bethesda has issued a memo to staff reassuring them that Obsidian Entertainment remains “distinct” despite being absorbed into the company as part of this week’s seismic Xbox studios reorganisation.\nBethesda Boss Issues Memo to Staff After Xbox Moves Obsidian Into the Fallout Company\nThis week, Microsoft announced hundreds more layoffs as it gutted Halo Studios and handed the next mainline Halo game, Sea of Thieves developer Rare, and Age of Empires developer World&#x27;s Edge to Activision . Meanwhile, Obsidian, the Microsoft-owned studio behind the likes of Grounded, The Outer Worlds, and Avowed, was made a part of Bethesda.\nObsidian, perhaps most famous for developing the much-loved Fallout: New Vegas, was confirmed to be working on a Fallout game in the wake of new Xbox boss Asha Sharma’s “reset” of Microsoft’s gaming business, which has seen nearly 2,000 staff cut in a bid for improved financial performance. More staff are set to lose their jobs over the course of the rest of the current financial year.\nBringing Obsidian into the Bethesda fold makes sense given it’s working on Fallout, but some had worried the move signalled an eventual relegation to Fallout support studio status. But in a memo to staff viewed by IGN, Bethesda boss Jill Braff insisted Obsidian would retain its leadership and identity, while confirming Bethesda Game Studios would “continue to lead the Fallout franchise.”\nI’ve had the opportunity to get to know Feargus Urquhart and his team over the past six years, and I have great respect for what they’ve built. Obsidian has extraordinary creative talent, deep expertise, and a long history of creating memorable games and experiences. I’m looking forward to working more closely with them.\nFeargus and the Obsidian leadership team will continue to lead Obsidian, with the studio reporting to me. Bethesda Game Studios will continue to lead the Fallout franchise. Together, the teams will build on their longstanding relationship and the early work already underway on a new Fallout project, with more to share in the months ahead. This structure supports the franchise-led model we’ve been strengthening while keeping accountability for both the studio and the franchise clear.\nThere is of course a huge amount going on at Bethesda right now, with The Elder Scrolls 6 the focus. Fallout 5 is in pre-production. BGS has also confirmed Fallout 3 and Fallout: New Vegas remasters are in the works. No release windows are known for any of these games, nor Obsidian’s Fallout game.\n\"We’re not resetting our roadmap or asking teams to change what they’re focused on.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "b4c05ec14f52aec39c74",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Game of Thrones Star Kit Harington Isn't a Gamer, but He's Excited for Grand Theft Auto 6",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/game-of-thrones-star-kit-harington-isnt-a-gamer-but-hes-excited-for-grand-theft-auto-6",
+            "publishedAt": "2026-09-23T18:50:42.677Z",
+            "canonicalUrl": "https://www.ign.com/articles/game-of-thrones-star-kit-harington-isnt-a-gamer-but-hes-excited-for-grand-theft-auto-6",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/23/kit-harington-1790188983586.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Game of Thrones star Kit Harington has confessed that he isn&#x27;t much of a gamer, but wants to play Grand Theft Auto 6.\nGame of Thrones Star Kit Harington Isn&#x27;t a Gamer, but He&#x27;s Excited for Grand Theft Auto 6\nGame of Thrones star Kit Harington has confessed that he isn&#x27;t much of a gamer, but wants to play Grand Theft Auto 6 .\nThe actor best known for playing Jon Snow reflected on his experience with the gaming world with Josh Horowitz in a recent interview . After recalling his experience working on Silent Hill: Revelation, a live-action film based on the beloved horror gaming franchise, he was asked if he was much of a gamer. Harington noted he didn&#x27;t have much experience with the Silent Hill games, but played a bit of Tekken, Mario Kart, Diddy Kong Racing, and most recently, Hogwarts Legacy.\nWhen Horowitz asked if he&#x27;d ever dabbled in Grand Theft Auto, Harington said that he wants to play Grand Theft Auto 6 after seeing some of the advertising. He went on to express an admiration for videos that mimic GTA&#x27;s tropes in real life. All of this sort of goes to show that the GTA 6 effect is beginning to happen, as even non-gamers are getting pulled in by its trance.\nRockstar is spending a boatload of cash to get the game in front of as many people as possible. It has assembled an Avengers-level ensemble of musicians to craft an original soundtrack for Grand Theft Auto 6, spent nearly $1 million on a \"Welcome to Vice City\" sign in Miami , and is likely only going to continue to ramp things up as we get closer to launch. NBA star Steven Adams also joked that he expects the performance of the league to drop when GTA 6 releases in November.\nAs for Harington specifically, he didn&#x27;t say whether or not he will actually end up playing GTA 6 or not. He&#x27;s had some experience in the gaming world, as he was the main antagonist in Call of Duty: Infinite Warfare and voiced Jon Snow in Telltale&#x27;s Game of Thrones video game. His next big role will be playing Gildroy Lockhart in HBO&#x27;s Harry Potter TV series, which may explain why he recently dabbled in Hogwarts Legacy."
+          }
+        ]
+      },
+      {
+        "eventKey": "3e90141e097ffde18657",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "GTA 6 Shirts Given Away for Free at Tokyo Game Show Are Being Resold Online for Hundreds of Dollars",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/grand-theft-auto-6-shirts-given-away-for-free-at-tokyo-game-show-are-being-resold-online-for-hundreds-of-dollars",
+            "publishedAt": "2026-09-23T17:30:01.169Z",
+            "canonicalUrl": "https://www.ign.com/articles/grand-theft-auto-6-shirts-given-away-for-free-at-tokyo-game-show-are-being-resold-online-for-hundreds-of-dollars",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/27/exclusivelookbr-gtfm-1787873244868.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "GTA 6 shirts that were given away for free exclusively at Tokyo Game Show 2026 are already being resold online for hundreds of dollars.\nGTA 6 Shirts Given Away for Free at Tokyo Game Show Are Being Resold Online for Hundreds of Dollars\nAttendees at Tokyo Game Show who got the chance to participate in a special immersive screening for GTA 6’s viral Netflix special were treated to commemorative T-shirts to celebrate the occasion.\nThe experience was so popular that the GTA 6 booth closed after just 10 minutes , having already reached capacity — but savvy fans saw an opportunity to capitalize on the overwhelming demand and make some quick cash.\nAs spotted by Dexerto , the commemorative T-shirts handed out by PlayStation at the game&#x27;s TGS 2026 booth for free have already made their way online and are being resold on platforms like eBay for hundreds of dollars.\nA quick browse on eBay shows a handful of listings pricing the shirts around $140 - $200, while other goodies that were given out at Rockstar’s booth, like GTA 6-branded stickers and carabiners , are being marked up to the tune of $30 - $40.\nThis isn’t a new phenomenon, by far; exclusive merchandise like this has become a target for scalpers across several big franchises over the last few years. One Piece’s viral collaboration with Popeye’s is a prime example of this, as scalpers waited in lines that trailed blocks away from their local fast food franchises to snag special Luffy-themed bento boxes, only to list them online for staggeringly high prices.\nThe same can be said of the Pokemon Trading Card scene; scalpers have become ravenous for Pokemon card packs and merchandise, causing chaos at retailers and even sparking violent confrontations that have ended in arrests.\nTGS is over, but the hustle continues.\nThis screening was the exact same extended trailer that launched on Netflix last month, but with more bells and whistles; it featured tricks like surround sound and 4D haptic effects that correlated with what was happening on screen, letting viewers feel like they were actually tagging along with Jason and Lucia as they fled from the fuzz and held up corner stores."
+          }
+        ]
+      },
+      {
+        "eventKey": "31e902ad57ff78ffba38",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Arcade Archives 2 Xevious 3D/G launches September 24",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/arcade-archives-2-xevious-3d-g-launches-september-24",
+            "publishedAt": "2026-09-23T08:15:35+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/arcade-archives-2-xevious-3d-g-launches-september-24",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Arcade-Archives-Xevious-3DG-Ann_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Arcade Archives 2 Xevious 3D/G will launch for PlayStation 5, Xbox Series, and Switch 2 on September 24, developer Hamster announced. It will cost $16.99 / 1,800 yen.\nArcade Archives 2 Xevious 3D/G launches September 24\nArcade Archives 2 Xevious 3D/G will launch for PlayStation 5 , Xbox Series , and Switch 2 on September 24, developer Hamster announced . It will cost $16.99 / 1,800 yen.\nXevious 3D/G is a shooting game released by Namco Limited (current Bandai Namco Entertainment Inc.) in 1996.\nThe classic masterpiece Xevious is reborn in polygons! Everything is rendered in 3D with diverse screen angles and camera work, plus new weapons and enemy characters have been added.\nThe Arcade Archives series is developed with the concept of faithfully reproducing classic arcade games. It also includes convenient features such as difficulty and screen settings, rewind, rapid-fire, and multiple save slots. In addition, players can compete for the best scores with players around the world through online rankings.\nArcade Archives 2 series introduces a brand-new mode called Time Attack Mode, in addition to the Original Mode, Hi Score Mode, and Caravan Mode from Arcade Archives . Time Attack Mode focuses on how quickly you can complete the game, regardless of the score you achieve.\nWhat&#8217;s more, with VRR (Variable Refresh Rate) support, the gameplay can be reproduced even more accurately, closer to the original arcade experience.\nPlease enjoy these iconic arcade games that defined an era with the Arcade Archives series!\nHere is an overview of the game, via Hamster:"
+          }
+        ]
+      },
+      {
+        "eventKey": "bdfc3642078da4dd91e2",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Console Archives Karate Champ launches September 24",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/console-archives-karate-champ-launches-september-24",
+            "publishedAt": "2026-09-23T10:05:35+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/console-archives-karate-champ-launches-september-24",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Console-Archives-Karate-Champ-Ann_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Console Archives Karate Champ will launch for PlayStation 5 and Switch 2 on September 24 for $7.99 / 800 yen, developer Hamster announced.\nConsole Archives Karate Champ launches September 24\nConsole Archives Karate Champ will launch for PlayStation 5 and Switch 2 on September 24 for $7.99 / 800 yen, developer Hamster announced .\nKarate Champ was released by Data East in 1986 for an 8-bit home console.\nThis game is an action game where you fight using a wide variety of moves through simple control combinations. Successfully executing major moves earns you many score points. Execute your moves with precision and aim for &#8220;Champ&#8221;!\nThe Console Archives series is designed to bring classic games originally released on home consoles to modern gaming platforms.\nIn Console Archives series, features such as customizable button layouts, rapid-fire settings, multiple save points, and for some titles, a rewind function have been added, to support players in completing these classics.\nSeptember 29 @ 1:00 pm - 2:00 pm EDT\nHere is an overview of the game, via Hamster:"
+          }
+        ]
+      },
+      {
+        "eventKey": "940842b7b02f435f83b7",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Theos: Cities of Myth launches November 4",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/theos-cities-of-myth-launches-november-4",
+            "publishedAt": "2026-09-23T15:09:32+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/theos-cities-of-myth-launches-november-4",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Theos-Date_09-23-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Pantheon-themed strategic city builder Theos: Cities of Myth will launch for PC via Steam on November 4, publisher Dotemu and developer Triskell Interactive announced.\nTheos: Cities of Myth launches November 4\nA modern take on classic city-builders, Theos: Cities of Myth lets you develop a thriving metropolis dedicated to one of 7 Greek Deities. Raise an imposing sanctuary, meet your citizens&#8217; needs, and found a city worthy of the Gods.\nIn Theos: Cities of Myth , cities are shaped by the will of the people as much as that of the Gods watching over them. You will rise as the founder of a new, promising Polis, in a reimagined Ancient Greece where history and myth walk hand in hand.\nEvolve your land from a modest settlement into a metropolis that can attract mythological and historical figures alike through economic, cultural, or military power.\nYour Polis is surrounded by other cities, with their own ambitions. They grow, and evolve just like you, reacting to your decisions and influencing the region&#8217;s balance of power.\nThe God you choose as patron of your Polis will shape your adventure, influencing how you develop and sustain your city. Raise temples and monuments to earn the favor of your God, attract legendary heroes, and send them on quests made famous by the myths and stories of Ancient Greece.\nHere is an overview of the game, via its Steam page :\nFrom the team behind Pharaoh: A New Era, a loving tribute to the classic games that established the City Builder genre."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 57554,
+      "estimatedInputTokens": 13942,
+      "activeTrackingItems": 0,
+      "candidateItems": 22,
+      "includedItems": 22,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Angle Of Attack",
+        "subjectKey": "Angle Of Attack",
+        "titleKey": "angle-of-attack",
+        "titleZhCn": "攻击角",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "ku.gamersky.com",
+            "url": "https://ku.gamersky.com/2009/angle-of-attack/",
+            "hostname": "ku.gamersky.com",
+            "family": "gamersky",
+            "kind": "media",
+            "pageTitle": "攻击角_攻击角下载_中文_攻略_视频_评价_游民星空 Gamersky.com",
+            "excerpt": "攻击角_攻击角下载_中文_攻略_视频_评价_游民星空 Gamersky.com 攻击角 Angle of Attack 分享 QQ 微博 微信 综合 资讯 攻略 下载 查看全部24 截图 壁纸 原画 设定图 其他 视频 1/2 《攻击角》是由3000AD制作并发行的一款飞行射击。本作是从《全方位战争》中剥离出的空战部分，同时也包含在《全方位战争》中。游戏背景与《全方位战争》大体一致，同样设定在敌对星球Gammulan行星之上，《全方位战争》的特色被形容为“地面交锋”，而《攻击角》则以“空中打击”为亮点。 玩家可使用四种负载战斗机作战或是参加任意的即时行动，每种飞行器都具备独特的空气动力学性能与武装系统，提供了出色的反复游玩价值。操控"
+          },
+          {
+            "label": "www.3dmgame.com",
+            "url": "https://www.3dmgame.com/games/Angleofattack/gl/",
+            "hostname": "www.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "攻击角攻略_攻击角心得,秘籍,视频,流程攻略_3DM游戏网",
+            "excerpt": "攻击角攻略_攻击角心得,秘籍,视频,流程攻略_3DM游戏网 主站 商城 论坛 自运营 登录 注册 简体中文 简体中文 English 首页 新闻 攻略 资源 图片 论坛 攻击角 Angle of Attack 发售：2009年8月18日 语言：英文 类型：第三人称射击 开发：3000AD 平台：PC 7.2 已有 38 人评分 您还未评分！ Terrans和Gammulan种族之间的战争已经持续数年之久。为了扭转战争的形势，并把战场直接开到敌人的地盘，Terran的军事总部——Galactic Command实施了一个总攻行动，目标直指Gammulan的老家。 攻击角中发生的事件是在突袭LV-115星球空中战役的末尾。lv-115星"
+          },
+          {
+            "label": "3g.ali213.net",
+            "url": "https://3g.ali213.net/down/AngleOfAttack.html",
+            "hostname": "3g.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "单机游戏下载_单机游戏大全_经典单机_单机游戏下载基地_游侠网",
+            "excerpt": "单机游戏下载_单机游戏大全_经典单机_单机游戏下载基地_游侠网 首页 资讯 游戏 手游 攻略 论坛 专题 VR 图库 视频 补丁 下载 热门搜索： 攻略 评分 下载 《攻击角》 完整硬盘版 游戏类型： 动作游戏ACT 游戏发行： 3000AD, Inc 更新时间： 2009-08-31 游戏语言： 英文 游戏大小： 208M 下载APP可查看更多精彩资讯 下载 PC版资源请在电脑上下载 提示：该资源为PC端资源不适用于移动端 游戏详情 相关内容 同类游戏 中文名称: 攻击角 英文名称: Angle of Attack 游戏类型: ACT 动作游戏 资源格式: 压缩包 游戏版本: 完整硬盘版 发行时间: 2009年 制作发行: 300"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
