@@ -1,0 +1,1390 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-25T07:42:22.775Z",
+  "finalizedAt": "2026-09-25T07:42:22.775Z",
+  "coverageThrough": "2026-09-25 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-25-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-25 12:00",
+      "windowStart": "2026-09-24 10:10",
+      "windowEnd": "2026-09-25 10:10"
+    },
+    "adjacentEdition": "2026-09-24-daily",
+    "packages": [
+      {
+        "eventKey": "23509ec42691a7c85cbb",
+        "eventKind": "announcement",
+        "subjectKey": "age of transport blue marble",
+        "subject": {
+          "kind": "game",
+          "key": "age of transport blue marble"
+        },
+        "publishability": "direct",
+        "headline": "世界丸ごと“MMO風”物流シム『Age of Transport – Blue Marble』発表。「最大255社」ひしめく永続マルチプレイワールド、地球1/4の巨大スケール",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/age-of-transport-20260924-469597/",
+            "publishedAt": "2026-09-24T02:30:32+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/age-of-transport-20260924-469597/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/age-of-transport-20260924-469597-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Amazing Gamesは9月22日、『Age of Transport - Blue Marble』のSteamストアページを公開した。本作は鉄道や船舶、航空機などを使って世界規模の物流網を築くシミュレーションゲームだ。\n世界丸ごと“MMO風”物流シム『Age of Transport – Blue Marble』発表。「最大255社」ひしめく永続マルチプレイワールド、地球1/4の巨大スケール\nデベロッパーのAmazing Gamesは9月22日、『 Age of Transport &#8211; Blue Marble 』のSteamストアページを公開した。2027年に早期アクセス配信予定。対応プラットフォームはPC（Steam）で、ストアページによるとゲーム内は日本語表示に対応予定だ。\n『Age of Transport &#8211; Blue Marble』は、鉄道や船舶、航空機などを使って世界規模の物流網を築くシミュレーションゲームだ。舞台となるのは、実際の地球を約4分の1スケールで再現した約3500万平方キロメートルのマップ。7万以上の実在都市に加え、山脈や河川、海岸線なども盛り込まれている。1830年代から現代まで12の時代を進みながら、鉱山や工場、発電所、学校などを建設し、それらを交通網で結んでいくのだ。\n本作の開発を手がけるのは、ノルウェーのインディーデベロッパーAmazing Gamesだ。同デベロッパーは1996年に設立され、2009年には1860年代のアメリカで大陸横断鉄道の建設を扱う『Railroad Revolution』を発表。2010年には鉄道シミュレーション・ストラテジーゲーム『Age of Trains』の開発も進めていた。『Age of Transport &#8211; Blue Marble』は同デベロッパーが長年扱ってきた鉄道ゲームの系譜に連なる新作となる。\n『Age of Transport &#8211; Blue Marble』はPC（ Steam ）向けに2027年早期アクセス配信予定。\n本作の大きな特徴は、ゲーム内に「お金」が存在しないこと。機関車などの乗り物は購入するのではなく、鉱石を運び、必要な部品を生産し、それらを工場で組み立てて乗り物を製造する仕組みだ。扱われる物資は199種類で、生産工程は最大9段階存在。鉄鉱石や木材といった原料から部品を作り、最終的に乗り物や設備へとつなげていく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "58506c4c9e139f643ab3",
+        "eventKind": "announcement",
+        "subjectKey": "slam tank",
+        "subject": {
+          "kind": "game",
+          "key": "slam tank"
+        },
+        "publishability": "direct",
+        "headline": "体当たりハイスピードバトル戦車アクション『SLAM TANK』発表。AI機械たちに砲身大回転攻撃、「砲撃なし」の“肉弾戦車”がゆく",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/slam-tank-20260924-469729/",
+            "publishedAt": "2026-09-24T08:34:10+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/slam-tank-20260924-469729/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/slam-tank-20260924-469729-header.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Next Stageは9月23日、Steam向けに『SLAM TANK』を発表した。本作は戦車を操縦し、近接攻撃でロボットなどと戦うアクションゲームだ。\n体当たりハイスピードバトル戦車アクション『SLAM TANK』発表。AI機械たちに砲身大回転攻撃、「砲撃なし」の“肉弾戦車”がゆく\nデベロッパーのNext Stageは9月23日、戦車アクションゲーム『 SLAM TANK 』を発表した。対応プラットフォームはPC（Steam）で、配信時期は未定。\n『SLAM TANK』の世界では、AIがあらゆる機械をその支配下に置いており、プレイヤーは産業用機械であるロボットや重機などの敵と戦う。敵に与えたダメージをもとに被害金額が算出され、できるだけ多くの損害を与えることがステージでの目標となる。工場や港、軍事施設のような環境のステージが登場し、敵と戦いながら進み、最後にボスが待ち受けている、という流れとなるようだ。\n本作の開発元Next Stageは、アクションゲーム『Ultra Age（ウルトラエージ）』を手がけたことで知られる韓国のスタジオだ。同作は、剣を使ったスタイリッシュかつハイテンポなアクションで高評価を獲得。本作『SLAM TANK』においても、戦車ではあるものの、スタジオの得意とする表現を活かして開発している様子である。\n『SLAM TANK』は、PC（ Steam ）向けに開発中。配信時期は未定だ。\n本作は、戦車を操縦してロボットなどと戦うゲームだ。ただし戦車は砲撃ではなく、“近接攻撃”を駆使する模様である。"
+          }
+        ]
+      },
+      {
+        "eventKey": "bb27c7f00f369e605ef9",
+        "eventKind": "announcement",
+        "subjectKey": "grand-theft-auto-vi",
+        "subject": {
+          "kind": "game",
+          "key": "grand-theft-auto-vi"
+        },
+        "publishability": "direct",
+        "headline": "Grand Theft Auto VI: The Goodtime State &#8211; Vice City Collection collectible set announced",
+        "tier": "B",
+        "score": 110,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/grand-theft-auto-vi-the-goodtime-state-vice-city-collection-collectible-set-announced",
+            "publishedAt": "2026-09-24T15:10:53+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/grand-theft-auto-vi-the-goodtime-state-vice-city-collection-collectible-set-announced",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/GTA6-Set_09-24-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Rockstar Games has announced &#8220;Grand Theft Auto VI: The Goodtime State &#8211; Vice City Collection,&#8221; a premium Grand Theft Auto VI collectible set featuring &#8220;all the essentials fo…\nGrand Theft Auto VI: The Goodtime State &#8211; Vice City Collection collectible set announced\nRockstar Games has announced &#8220; Grand Theft Auto VI : The Goodtime State &#8211; Vice City Collection ,&#8221; a premium Grand Theft Auto VI collectible set featuring &#8220;all the essentials for a good time,&#8221; inspired by Leonida TV show Macca the Gator . Pre-orders are available now via Rockstar Games for $399.99.\nThe Grand Theft Auto VI game is not included with the collection.\nGrand Theft Auto VI is due out for PlayStation 5 and Xbox Series on November 19.\nThe Goodtime State &#8211; Vice City Collection includes:"
+          }
+        ]
+      },
+      {
+        "eventKey": "47e8496aa4d2fd4cb169",
+        "eventKind": "launch",
+        "subjectKey": "the day before ea sports fc 27 is",
+        "subject": {
+          "kind": "game",
+          "key": "the day before ea sports fc 27 is"
+        },
+        "publishability": "direct",
+        "headline": "The day before EA Sports FC 27 is released, Konami&#8217;s Switch 2 rival eFootball Kick-Off gets a major new update",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/the-day-before-ea-sports-fc-27-is-released-konamis-switch-2-rival-efootball-kick-off-gets-a-major-new-update/",
+            "publishedAt": "2026-09-24T09:58:02+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/06/efootball.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "A Leagues mode with 25 league tournaments has been added, along with 13 new legends…\nThe day before EA Sports FC 27 is released, Konami&#8217;s Switch 2 rival eFootball Kick-Off gets a major new update\nTomorrow marks the release of EA Sports FC 27 so, not to be outdone, Konami has released a major new update for its Switch 2 alternative.\nThis paid edition is priced at £15.99 / $19.99, and launched with a World Tour mode where players travel around the planet, playing against club teams. Each time a club team is defeated, one of their players can be transferred to your squad.\nThe game also included an International Cup mode at launch (with the same groups as the FIFA World Cup 2026), as well as the option to play both modes in co-op.\nNow Konami has released a free update to the game, adding a new Leagues mode.\nAs is the case in other football games, Leagues mode lets you choose a team from any of the leagues in the game – of which there are 25 set across Europe, South America and Asia-Oceania – and play a full season in an attempt to win the league.\nThe following leagues are supported (some are unlicensed):\nLike the World Tour and International Cup modes, Leagues mode also offers co-op support, with up to four players able to play together and guide the same team through the season.\nA Leagues mode with 25 league tournaments has been added, along with 13 new legends\nWhile Konami &#8216;s main free-to-play live service game eFootball is available on PlayStation , Xbox , PC and mobile, it doesn&#8217;t have a Switch 2 port.\nInstead, Konami released an entirely separate, paid release for Switch 2 called eFootball Kick-Off, which focuses mainly on single-player (although it does also have local and online multiplayer)."
+          }
+        ]
+      },
+      {
+        "eventKey": "b73887f1cb89a84f9349",
+        "eventKind": "announcement",
+        "subjectKey": "pro x3 superstrike",
+        "subject": {
+          "kind": "game",
+          "key": "pro x3 superstrike"
+        },
+        "publishability": "direct",
+        "headline": "ラピッドトリガー対応マウスに早くも改良版登場！ 「PRO X3 SUPERSTRIKE」などPROシリーズのゲーミングデバイスが発表に",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/023/G002336/20260924066/",
+            "publishedAt": "2026-09-24T12:39:52.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/023/G002336/20260924066/",
+            "imageUrl": "https://www.4gamer.net/games/023/G002336/20260924066/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "2026年9月24日，ロジクールは，ゲーマー向け製品ブランド「Logicool G」から，「PROシリーズ」のマウス，キーボード，ヘッドセット，マウスパッドを発表した。\nラピッドトリガー対応マウスに早くも改良版登場！ 「PRO X3 SUPERSTRIKE」などPROシリーズのゲーミングデバイスが発表に\n剣戟アクション「鬼武者 Way of the Sword」も快適動作。LenovoのノートPC「Legion Pro 5 Gen 10」は頼もしいゲーマーの相棒だ【PR】\nゲームに高い没入感をもたらし，普段使いにも便利なウルトラワイドディスプレイの入門機「AMZFAST AMZG34C8 Pro」【レビュー】\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」\nスマホゲームのセルラン分析（2026年9月10日〜9月16日）。今週の1位は「ドラゴンクエストウォーク」。筆者都合により，今週は簡略版でお届け"
+          }
+        ]
+      },
+      {
+        "eventKey": "b6c6a29c6d24e4f11590",
+        "eventKind": "launch",
+        "subjectKey": "haele 3d portrait studio pro",
+        "subject": {
+          "kind": "game",
+          "key": "haele 3d portrait studio pro"
+        },
+        "publishability": "direct",
+        "headline": "人間の顔や頭部の作画に特化した3Dリファレンスツール「HAELE 3D - Portrait Studio Pro」，本日配信開始。豊富なプリセットに加え，表情編集や照明調整などにも対応",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/037/G103758/20260924045/",
+            "publishedAt": "2026-09-24T11:26:51.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/037/G103758/20260924045/",
+            "imageUrl": "https://www.4gamer.net/games/037/G103758/20260924045/SS/005.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "HAELE 3Dは本日，アーティスト向けツール「HAELE 3D - Portrait Studio Pro - Drawing References」をSteamで配信開始した。本ツールは，人間の…\n人間の顔や頭部の作画に特化した3Dリファレンスツール「HAELE 3D - Portrait Studio Pro」，本日配信開始。豊富なプリセットに加え，表情編集や照明調整などにも対応\n剣戟アクション「鬼武者 Way of the Sword」も快適動作。LenovoのノートPC「Legion Pro 5 Gen 10」は頼もしいゲーマーの相棒だ【PR】\nゲームに高い没入感をもたらし，普段使いにも便利なウルトラワイドディスプレイの入門機「AMZFAST AMZG34C8 Pro」【レビュー】\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」\nスマホゲームのセルラン分析（2026年9月10日〜9月16日）。今週の1位は「ドラゴンクエストウォーク」。筆者都合により，今週は簡略版でお届け"
+          }
+        ]
+      },
+      {
+        "eventKey": "c24aabd13f848da421f3",
+        "eventKind": "launch",
+        "subjectKey": "井戸の鳥 well dweller",
+        "subject": {
+          "kind": "game",
+          "key": "井戸の鳥 well dweller"
+        },
+        "publishability": "direct",
+        "headline": "臆病な小鳥がマッチを手に戦うダークメルヘンメトロイドヴァニア「井戸の鳥（Well Dweller）」，配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/995/G099511/20260924049/",
+            "publishedAt": "2026-09-24T11:44:41.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/995/G099511/20260924049/",
+            "imageUrl": "https://www.4gamer.net/games/995/G099511/20260924049/SS/006.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "個人開発者のKyle Thompson氏は2026年9月22日，新作タイトル「井戸の鳥（Well Dweller）」をリリースした。本作は，邪悪な女王が支配する崩壊した王国を舞台に，マッチ棒を手にし…\n臆病な小鳥がマッチを手に戦うダークメルヘンメトロイドヴァニア「井戸の鳥（Well Dweller）」，配信開始\n頼れるのはマッチ棒のみ……長男だから耐えられる？ 暗黒童話メトロイドヴァニア「井戸の鳥（Well Dweller）」試遊レポート［TGS2026］\n鳥が狩られる王国で，頼れる武器は小さなマッチ棒一本だけ。東京ゲームショウ2026で試遊した 「井戸の鳥」 は，臆病で非力な鳥の長男坊・グリマーが，家族のために危険な世界へと旅立つ暗黒童話メトロイドヴァニアだ。可愛らしい見た目に反して，その冒険はなかなか過酷だった。\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）"
+          }
+        ]
+      },
+      {
+        "eventKey": "25bcde12495b5bfa9c78",
+        "eventKind": "other",
+        "subjectKey": "マイクラ",
+        "subject": {
+          "kind": "game",
+          "key": "マイクラ"
+        },
+        "publishability": "direct",
+        "headline": "『マイクラ』風のサンドボックスRPG『Hytale』早期アクセス版の「第1章」が10月12日にリリース決定。大量のゴブリンが蠢くダンジョンに挑めるほか新規アイテムも複数実装。一度は開発中止となるも再始動したタイトル",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260925g",
+            "publishedAt": "2026-09-24T22:02:41+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260925g",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/Hytale-Chapter-I-Teaser-0-33-screenshot.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "一度は開発中止となるも再始動したタイトル。ロケットブーツやグライダー、フックショットなどの移動アイテムも複数追加予定\n『マイクラ』風のサンドボックスRPG『Hytale』早期アクセス版の「第1章」が10月12日にリリース決定。大量のゴブリンが蠢くダンジョンに挑めるほか新規アイテムも複数実装。一度は開発中止となるも再始動したタイトル\nHypixel Studiosは 『マインクラフト』 風のサンドボックスRPG 『Hytale』 の早期アクセス版における「第1章」が2026年10月12日にリリースされることを 発表 した。\n本作は、サンドボックスゲームの自由度とRPGの要素を組み合わせた新作だ。プレイヤーは広大な世界を探索し、拠点となる家や要塞を自由に建築しながら各地に点在するダンジョンや強敵に挑んでいくことになる。\nあらたに公開された映像では、大量のゴブリンが蠢く様子や、広大な地下ダンジョンを冒険するプレイヤーたちの姿が見られる。\nこの度、配信日が発表された「第1章」では、手作りのダンジョンとボス、「ゴブリン」が登場するワールドイベント「Goblin Breach」や、ルーンアビリティシステムなどが実装される。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6e166794c14e11e28e89",
+        "eventKind": "launch",
+        "subjectKey": "control resonant embarrasses me specifically with a",
+        "subject": {
+          "kind": "game",
+          "key": "control resonant embarrasses me specifically with a"
+        },
+        "publishability": "direct",
+        "headline": "Control Resonant embarrasses me, specifically, with a launch day hotfix negating my main review complaint",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/action/control-resonant-embarrasses-me-specifically-with-a-launch-day-hotfix-negating-my-main-review-complaint/",
+            "publishedAt": "2026-09-24T19:13:01Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/action/control-resonant-embarrasses-me-specifically-with-a-launch-day-hotfix-negating-my-main-review-complaint/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/WcjUWGKChMoMQDoCxmjz3P-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Enemy damage sponginess shouldn't be as severe for the rest of you, at least.\nKeep up to date with the most important stories and the best deals, as picked by the PC Gamer team.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nControl Resonant embarrasses me, specifically, with a launch day hotfix negating my main review complaint\nToday is Control Resonant's launch day, and as I wrote in our review , it's peak Remedy. It's a gorgeously surreal atmosphere to sink into&mdash;but I had one main complaint. Its combat system centers around building ways to turn your piddly attacks into heavy hitters, which has the unfortunate side effect of making most of its hours of monster fighting a slog of inflated health pools.\nRemedy also made sure to note that, if you still want to do more fiddling with flow of shapeshifting weapons and boulder-throwing, there's a suite of granular Assist Mode options like enemy aggression adjustments and ability recovery rates for fine-tuning your play experience. If you want, you can even turn Dylan invulnerable and basically set combat to \"no.\" If that sounds appealing, go with God. I won't judge. It's not like it's your job to know.\nControl Resonant is available now on Steam .\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "6c8dec60cf476eb89209",
+        "eventKind": "launch",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "There are 39* Stardew Valley-shaped farm sims that are still planning to launch in 2026 and I have 234 hours** of gaming time remaining.",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/there-are-39-stardew-valley-shaped-farm-sims-that-are-still-planning-to-launch-in-2026-and-i-have-234-hours-of-gaming-time-remaining/",
+            "publishedAt": "2026-09-24T15:15:00Z",
+            "canonicalUrl": null,
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/npXJE43nEhE5JvZYkCctsA-1280-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The latest Feature,/features,,features, breaking news, comment, reviews and features from the experts at PC Gamer\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nSubscribe for a weekly digest of the movie and TV news that matters, direct to your inbox. From first-look trailers, interviews, reviews and explainers, we've got you covered.\nThere are 39* Stardew Valley-shaped farm sims that are still planning to launch in 2026 and I have 234 hours** of gaming time remaining.\nThere are 39* Stardew Valley-shaped farm sims that are still planning to launch in 2026 and I have 234 hours** of gaming time remaining. Someone who is good at time management please help me budget this. My crops are dying.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-25T15:41:46+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "803026eb1cbf43c8158b",
+        "eventKind": "launch",
+        "subjectKey": "new xbox console",
+        "subject": {
+          "kind": "game",
+          "key": "new xbox console"
+        },
+        "publishability": "direct",
+        "headline": "New Xbox Console Update for September 2026 Quietly Released",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/xbox-console-update-patch-notes-september-2026/",
+            "publishedAt": "2026-09-24T22:58:04Z",
+            "canonicalUrl": "https://gamerant.com/xbox-console-update-patch-notes-september-2026/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/wm/2026/09/xbox-series-x-and-series-s-september-2026-console-update-graphic.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The September 2026 Xbox console update debuts without much fanfare, while Insider program testing points to more visible changes still in development.\nNew Xbox Console Update for September 2026 Quietly Released\nXbox has quietly rolled out a new console update for September 2026, bringing several fixes to the Xbox Series X, Series S, and Xbox One. While the update is focused primarily on maintenance rather than major user-facing features, there are separate signs that more substantial Xbox system changes are currently in development.\nThe modest public release comes as Microsoft continues testing much more noticeable console changes through its never-ending Xbox Insider program. Recent examples include the Xbox Disc to Digital scheme , which entered Insider testing in August 2026, alongside selectable startup animations, additional profile customization options, improved console search, and higher-quality Remote Play. On September 9, Microsoft announced that members of the Alpha and Alpha Skip-Ahead Insiders tiers could begin testing Remote Play at up to 1440p as part of another batch of experimental features.\nNew alleged PS6 and Xbox Helix specifications offer an early glimpse at next generation console performance and potential differences.\nSeptember 2026 Xbox Console Update Introduces 4 Fixes\nAccording to Microsoft's official changelog, the latest version of its console OS began rolling out on September 22, fixing an issue that prevented the Share button from being remapped through the Xbox Accessories app. It also addresses errors triggered by certain search terms and crashes that could occur when opening the Manage queue page in the \"My games and apps\" menu. Microsoft additionally lists unspecified stability and performance improvements, making this a considerably smaller public-facing release than many Xbox updates that debuted earlier in 2026 .\nXbox Insiders Are Seeing New Game Tile Information\nWhile the limited scope of the September 2026 update makes it look primarily like a maintenance patch, more substantial user-facing changes may be just around the corner. Some are already said to be in testing, with Pure Xbox reporting that select Xbox Insiders are now seeing additional information attached to game tiles, including achievement details and indicators related to friends. The experiment comes during a year in which Microsoft has also been making broader changes to Xbox achievements , including the introduction of tiered Gamerscore badges for some Insiders that are eventually expected to roll out to all users."
+          }
+        ]
+      },
+      {
+        "eventKey": "71564049dfc12ff882c9",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'I Don’t Think Starfield Was Anywhere Near Successful Enough to Do a Starfield 2' – Former Bethesda Dev Casts Doubt on Sequel",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/i-dont-think-starfield-was-anywhere-near-successful-enough-to-do-a-starfield-2-former-bethesda-dev-casts-doubt-on-sequel",
+            "publishedAt": "2026-09-24T15:36:00.507Z",
+            "canonicalUrl": "https://www.ign.com/articles/i-dont-think-starfield-was-anywhere-near-successful-enough-to-do-a-starfield-2-former-bethesda-dev-casts-doubt-on-sequel",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/04/15/ss-aae99c177004bb5ec653d2fcb65a5d30489ec7b8-1920x1080-1776241512049.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Former Bethesda Lead Systems Designer Kurt Kuhlmann spoke to FRVR, and when he was asked about a potential Starfield sequel, he told the outlet \"I don’t think Starfield was anywhere near successful enough to do a Starfield 2.\"\n&#x27;I Don’t Think Starfield Was Anywhere Near Successful Enough to Do a Starfield 2&#x27; – Former Bethesda Dev Casts Doubt on Sequel\nBethesda is still hard at work on new DLC for Starfield , but you probably shouldn&#x27;t expect a sequel anytime soon.\nFormer Bethesda Lead Systems Designer Kurt Kuhlmann spoke to FRVR , and when he was asked about a potential Starfield sequel, he told the outlet: \"I don’t think Starfield was anywhere near successful enough to do a Starfield 2.\"\nThat&#x27;s not too surprising, as the game has been massively divisive since it came out, despite getting a mostly-positive review from us here at IGN. Our reviewer Dan Stapleton said: \"Starfield has a lot of forces working against it, but eventually the allure of its expansive roleplaying quests and respectable combat make its gravitational pull difficult to resist.\"\nKuhlmann then goes on to reminisce on the ambition of Starfield, and how a sequel could have done something great, saying \"It’s, in a way, too bad, because I think with the lessons learned on Starfield, a Starfield 2 could have been much closer to the game that Todd [Howard] had [in mind].\" Starfield has improved a lot since it first came out, and it&#x27;s still has improvements down the pipeline, but it&#x27;s pretty clear that it fell short of Todd Howard&#x27;s ambitions ahead of its release.\nStill, Howard reiterated Starfield&#x27;s support back in July, when he put out a statement saying: \"As we enter Year 3, we&#x27;ll continue expanding the Settled Systems with new stories, targeted gameplay improvements, and additional updates, while preparing for the launch of new Starborn content next year.\" It&#x27;s possible that despite Kuhlmann&#x27;s predictions, these updates will be able to turn Starfield around, but it&#x27;s unlikely.\nInstead, it seems like Bethesda is entirely focused on getting The Elder Scrolls VI out the door (even if it&#x27;s still likely a couple years away), and Obsidian has been tapped to develop a new Fallout game . Even if a new Starfield game was somehow in the works, it&#x27;d be years before we ever heard about it. It&#x27;s probably safe to assume that it&#x27;s not going to happen any time in the near future.\nWe&#x27;ll just have to imagine the stars."
+          }
+        ]
+      },
+      {
+        "eventKey": "bed9d454184a2c22934e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "'It's Not Great Content': Ex-Dragon Age Exec Says He'd Now Change or Ditch Several Key Moments From the Series",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/its-not-great-content-ex-dragon-age-exec-says-hed-now-change-or-ditch-several-key-moments-from-the-series",
+            "publishedAt": "2026-09-24T17:19:39.933Z",
+            "canonicalUrl": "https://www.ign.com/articles/its-not-great-content-ex-dragon-age-exec-says-hed-now-change-or-ditch-several-key-moments-from-the-series",
+            "imageUrl": "https://assets-prd.ignimgs.com/2022/10/26/dragonageinquisitionjpg-a2a564-1280w-1415667815153-1666759988152.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Former Dragon Age exec Mark Darrah has revealed what he&#x27;d change about BioWare&#x27;s beloved fantasy series, after spending more than 20 years at the studio.\n&#x27;It&#x27;s Not Great Content&#x27;: Ex-Dragon Age Exec Says He&#x27;d Now Change or Ditch Several Key Moments From the Series\n\"That&#x27;s there for not super great reasons...\"\nDarrah was a director or executive producer on all of the Dragon Age series, though departed the company back in 2021, years before the final version of Dragon Age: The Veilguard launched. He returned as a consultant on the game in 2023, in time for its final stretch of development.\nNow, looking back on the franchise&#x27;s four main games via a Q&A posted on TikTok , Darrah has reflected on what he would recommend ditching or adding to each title in an ideal world, if he were making the games all over again.\n\"I would be tempted to cut or dramatically reduce the dream sequence content in the Mage Tower,\" Darrah began, discussing Dragon Age: Origins&#x27; rather lengthy sojourn into the Fade that he admitted felt like \"filler.\" Continuing, he added: \"It&#x27;s not great content, and it was definitely done pretty fast in the end.\"\nConversely, Darrah said he&#x27;d like to add in some extra character options, with another human origin, and potentially the Avvar.\nFor Dragon Age 2, Darrah said he&#x27;d address the game&#x27;s ending, where players are forced to pick a side between the templars and the mages. Whichever you pick, however, things do not go well for the mage&#x27;s Orsino, while the templar&#x27;s leader Meredith is proven correct — and the whole thing feels less like a proper choice at all."
+          }
+        ]
+      },
+      {
+        "eventKey": "29233ca320eb30cacb8e",
+        "eventKind": "other",
+        "subjectKey": "stick it to the stickman",
+        "subject": {
+          "kind": "game",
+          "key": "stick it to the stickman"
+        },
+        "publishability": "direct",
+        "headline": "“「小小作品」っぽい” 物理演算棒人間アクション『Stick It to the Stickman』正式リリースで人気白熱。マルチ対応・大暴れ棒人間が職場の上司を“わからせる”",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/stick-it-to-the-stickman-20260924-469721/",
+            "publishedAt": "2026-09-24T08:11:36+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/stick-it-to-the-stickman-20260924-469721/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/stick-it-to-the-stickman-20260924-469721-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Devolver Digitalは9月24日、『Stick It To The Stickman - ヤバすぎ企業のトップを目指せ』に向けて、バージョン1.0の配信を開始した。本作は正式リリースを迎え、再び盛況を博している。\n“「小小作品」っぽい” 物理演算棒人間アクション『Stick It to the Stickman』正式リリースで人気白熱。マルチ対応・大暴れ棒人間が職場の上司を“わからせる”\nパブリッシャーのDevolver Digitalは9月24日、『 Stick It To The Stickman &#8211; ヤバすぎ企業のトップを目指せ 』（以下、Stick It To The Stickman）の製品版アップデート（バージョン1.0）の配信を開始した。対応プラットフォームはPC（Steam）。ゲーム内表示は日本語に対応している。本作はバージョン1.0配信後からさっそく、Steamの同時接続者数が2000人を超える盛況を見せている。\n『Stick It to the Stickman』は、棒人間のキャラクターが乱闘を繰り広げる、物理演算要素を採り入れたローグライト乱闘アクションゲームだ。\nプレイヤーは元飲んだくれで新入社員の青い棒人間になり、社員たちを殴り飛ばし、上司を物理的に引きずり下ろして会社トップのCEOの座を奪い取ることを目指す。シングルプレイのほか、ローカルおよび「Remote Play Together」による協力型マルチプレイにも対応しており、フレンドと一緒に同じ会社で働く（戦う）こともできる。\n本作は『 Broforce 』『 GORN 』『 Anger Foot 』などを手がけた、アメリカのインディースタジオであるFree Livesが開発。同スタジオの最新作にあたる『Stick It to the Stickman』は2025年8月に早期アクセス版がリリース。過去作に負けず劣らず、ブラックジョーク全開の過激かつコミカルなスタイルの本作はたちまち人気を博した。そのほか物理演算ベースのカオスでカジュアルなコンボアクションも高評価（ 関連記事 ）。そうした人気から、本稿執筆時点でSteamのユーザーレビューは約8000件のうち、その96％が好評の「圧倒的に好評」ステータスを獲得している。\n『Stick It to the Stickman』は、PC（ Steam ）向けに配信中。ゲーム内表示は日本語に対応しており、価格は通常税込1600円。10月2日午前2時まではリリース記念の期間限定として50％オフの税込800円で販売される。\n『空の軌跡 the 2nd』いきなり大人気、Steam同接はファルコム史上トップに。『the 1st』を超え、続編リメイクも絶好調"
+          }
+        ]
+      },
+      {
+        "eventKey": "a83040078eddb70de084",
+        "eventKind": "other",
+        "subjectKey": "スクジサマ",
+        "subject": {
+          "kind": "game",
+          "key": "スクジサマ"
+        },
+        "publishability": "direct",
+        "headline": "“いわくつき資料”を読み解くホラー『『スクジサマ』を巡る考察』9月27日配信へ。高評価ホラー『失踪した友人の部屋に残されていたゲーム 』開発者による新作モキュメンタリー",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260924-469646/",
+            "publishedAt": "2026-09-24T03:46:53+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260924-469646/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260924-469646-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "れんたか氏は、『『スクジサマ』を巡る考察』を9月27日にリリース予定と発表した。本作はあるオカルトライターが遺したという資料を読み解くという形式の、モキュメンタリーホラーゲーム作品だ。\n“いわくつき資料”を読み解くホラー『『スクジサマ』を巡る考察』9月27日配信へ。高評価ホラー『失踪した友人の部屋に残されていたゲーム 』開発者による新作モキュメンタリー\n開発者のれんたか氏は9月24日、『 『スクジサマ』を巡る考察 』を9月27日にリリース予定と告知した。対応プラットフォームはPC（Steam）。9月下旬にリリース予定とされてきたが、無事にSteamの審査を突破しリリース日が決定となったようだ。\n『『スクジサマ』を巡る考察』は、あるオカルト・民族分野のライターが遺したという資料などを読み解いていく、ホラーゲーム作品である。本作の世界では、久我洋介というライターがある編集部に勤務していた。生前、久我はオカルトや民族分野を中心とした取材・執筆などを実施。亡くなる数か月前から執筆は休止し、その後自宅にて遺体となって発見されたのだという。そこで同編集部は、可能な限り発見当時の状態を維持したまま、資料などを収録。久我洋介が遺したというデジタル作品を、株主への優待コンテンツとして、一般公開に先立ち先行配布することにしたそうだ。\n本作『『スクジサマ』を巡る考察』はストアページを見る限り、れんたか氏による新作のモキュメンタリーホラーとなるのだろう。本作は9月1日に、ストアページ公開とともに発表。9月20日から30日にリリース予定とされていたが、無事にSteamの審査を通過し、発売日が決定となったようだ。なお同氏のX（旧Twitter）によれば、平均プレイ時間は8時間から10時間程度。制作中のポストを見る限り、過去作『失踪した友人の部屋に残されていたゲーム』が4万字程度だったのに対し、本作は6月末時点で約7万6000字を突破。そこから少なくとも2万字程度の追加があったようなので、テキスト量は前作を大きく超えているようだ。\nhttps://t.co/Por96eUvfE 『スクジサマ』を巡る考察 9/27リリース予定 1800円 2週間30%OFF\n『『スクジサマ』を巡る考察』はPC（ Steam ）向けに、9月27日リリース予定だ。通常価格は税込1800円。リリースから2週間は30％オフのセールも実施予定であるそうだ。\nなお同作は、公開にあたって遺族から正式な許諾を得ているという。収録データが膨大であるため、性質上すべての精査はおこなわれていない。また久保から説明を受けた編集者がいないため、制作期間や完成時期などは不明。どの段階まで制作されていたかもわからないそうだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "454535e3abd04c494b76",
+        "eventKind": "other",
+        "subjectKey": "forza horizon 6",
+        "subject": {
+          "kind": "game",
+          "key": "forza horizon 6"
+        },
+        "publishability": "direct",
+        "headline": "“痛車BAN”で物議醸す『Forza Horizon 6』公式が「通報は人力で審査」「通報数は関係ない」と強調。“集団通報が原因”との疑惑渦巻くなかで",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260924-469608/",
+            "publishedAt": "2026-09-24T02:45:31+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260924-469608/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260924-469608-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『Forza Horizon 6』のサポートを担当するTurn 10からは、人力でのモデレーションをおこなっている旨が強調されている。\n“痛車BAN”で物議醸す『Forza Horizon 6』公式が「通報は人力で審査」「通報数は関係ない」と強調。“集団通報が原因”との疑惑渦巻くなかで\n『 Forza Horizon 6 』のサポートを担当するTurn 10は9月24日、「Forza Code of Conduct」を更新した。直近ではいわゆる“痛車”デザインを手がけるユーザーがBANされたという報告が相次いでおり、国内ユーザーコミュニティを中心に批判も渦巻いていた。そうしたなかで更新されたForza Code of Conductでは、人力でのモデレーションをおこなっている旨が強調されている。\n『Forza Horizon 6』は、オープンワールド・ドライビングゲーム『Forza Horizon』シリーズの最新作だ。対応プラットフォームはPC（Steam/Microsoft Store）/XBOX Series X|Sで、XBOX/PC Game Pass向けにも展開。PS5向けには今年後半の発売が予定されている。世界各地を舞台としてきた同シリーズにて、『Forza Horizon 6』ではついに日本が舞台に。東京の繁華街や田舎、峠道から雪山まで、さまざまなロケーションでのドライブやレースを楽しめる。\n本作を含む『Forza』シリーズ作品では、車体のチューニングのほか、デカールやペイントを用いてデザインをカスタマイズすることが可能。作成したデザインは共有することも可能で、ユーザーは自由にダウンロードして、作者にはゲーム内通貨が還元される。そんなデザインの人気カテゴリとして、アニメ絵のキャラクターが描かれた「痛車」が存在した。\nそうした混乱が巻き起こるなかで、Turn 10のサポートチームは9月24日、「 Forza Code of Conduct （Forza行動規範）」を更新。違反行為として挙げている「不適切なユーザー生成コンテンツ」について、そのモデレーションのフローが説明された。\nToday we’ve published an update to our Forza Code of Conduct to provide additional clarity around the steps taken by a human moderator when reviewing User Generated Content (UGC) that has been reported by a player using the in-game reporting tools: https://t.co/VWRno3KkfK\nなお今回のForza Code of Conductの更新では先述のとおり「通報の数は優先度やキュー内の位置に影響を与えない」と強調された。もし“通報運動”というかたちで組織的に通報機能が悪用されているとしても、通報数ではなくあくまで通報されたコンテンツの内容などから判断しているという説明なのだろう。いずれにせよ国内ユーザーからは、痛車文化の根付く日本を舞台とする新作で、痛車をめぐるデザイン規制が厳しくなったとみられる状況に対する批判が加熱している。今後の対応によってユーザーコミュニティとの溝が埋まるのかどうかは注目される。"
+          }
+        ]
+      },
+      {
+        "eventKey": "03d534b707dd36e75d4e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Activision’s Halo Must Go Beyond Bungie",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/activisions-halo-must-go-beyond-bungie",
+            "publishedAt": "2026-09-24T15:30:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/activisions-halo-must-go-beyond-bungie",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/24/halo-bungie-1790261905570.webp?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Xbox has struggled to recapture Bungie&#x27;s Halo magic for 15 years. Activision&#x27;s new game needs to give the series a Doom (2016) style rethink.\nActivision’s Halo Must Go Beyond Bungie\nThis is an IGN opinion piece from Matt Purslow, who was brought up on the golden era of Halo and Half-Life. He loves story-driven FPS campaigns and wishes there was more of them (but perhaps not quite as many as there were in the 2000s - that was pretty excessive.)\nHalo should be Xbox’s Call of Duty.\nOf course, thanks to a $69 billion acquisition, Call of Duty is now Xbox’s Call of Duty. But I think you get the idea: Halo should be massive. It should be the premier first-person shooter on Xbox. It should be delivering stellar campaigns and phenomenal multiplayer on a regular basis. It should be among Team Green’s most-played games on any given day.\nBut it isn’t. And perhaps the reason why is nothing more than the passage of time and the shifting of trends. Can any game sit on the popularity throne forever? The simple truth may be that Master Chief is an artefact of the original Xbox and 360 days, and that 2010’s incredible Halo: Reach was a natural end point that should have been respected.\nBut while that may indeed be the case, that story doesn’t reflect Microsoft’s uneven handling of the series. Bungie delivered lightning in a bottle five times in a row over the course of a decade. Its successor, the purpose-built 343 Industries (now Halo Studios), found it all but impossible to replicate those achievements. Across 15 years, it struggled to hit a regular cadence; the development pipelines of yesteryear allowed Bungie to deliver a new game every couple of years or so, but there was a six-year gap between Halo 5 and Infinite, and very soon another six years will have passed without a mainline entry. Halo simply isn’t in the public eye in the way it was during the 360 era, nor the way Call of Duty is today.\nWith this in mind, it’s entirely unsurprising to see that Xbox’s CEO, Asha Sharma, has assigned Activision the task of developing the next Halo . If nothing else, Activision is an unrelenting video game factory; a colossal machine of rotating studios that assembles high-budget shooters year in, year out. If Sharma wants to ship Halo games – lots of Halo games – there’s no better Microsoft division to rectify that issue.\nBut cadence hasn’t been the only problem that Halo has had to contend with over the past two console generations. Simply put, there hasn’t been a must-play Halo since Bungie called it quits. The days of 90+ on Metacritic are a distant memory. That’s not to say Halo Studios’ games have been anything close to a disaster, but every one of its projects suggests a studio struggling to stay true to a formula it didn’t invent. It’s an odd situation, because (at least in theory) it followed the Bungie playbook to the letter; each of its games honors the past, maintaining traditions established way back in 2001, while also attempting to push the series into the future with brand new ideas and reworked mechanics. The Bungie era never stood still, each new game building atop its predecessor with new playable characters, new enemies, new abilities, new multiplayer modes, and even entirely new approaches to campaign design. All of this can be said of Halo Studios’ games, yet none of them ever successfully captured the magic.\nThe past is not helping Master Chief move forward."
+          }
+        ]
+      },
+      {
+        "eventKey": "70b33d50d791cb20b357",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Arc Raiders Is Testing a PvE Mode Very Soon",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/arc-raiders-is-testing-a-pve-mode-very-soon",
+            "publishedAt": "2026-09-24T22:24:51.852Z",
+            "canonicalUrl": "https://www.ign.com/articles/arc-raiders-is-testing-a-pve-mode-very-soon",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/08/22/arc-raiders-expedition-delay-1787357374549.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Embark Studios has announced that it will be testing a PvE mode for Arc Raiders next month.\nArc Raiders Is Testing a PvE Mode Very Soon\nFrom October 13 to October 20, Arc Raiders will have a PvE toggle, allowing you to seamlessly switch between lobbies where you can fight other players and lobbies where players can&#x27;t do damage to you. The aim is to give players more choice and test the ability to let players completely disengage from PvP gameplay. As a result, loot in PvE will be lower-valued because the mode has lower stakes. Additionally, ARCs will target downed players to create some form of tension, but if players stay still, they will be ignored by AI foes.\nEmbark will be monitoring the player economy and matchmaking times during this period. The team has noted that \"it&#x27;s possible that this will not work,\" meaning PvE may not actually make its way into the game permanently. This is a test to see how well they can make it&#x27;ll operate, rather than some kind of stress test.\n\"It’s important to mention that this is not a risk-free test,\" said the studio . \"The first, unlaunched iteration of ARC Raiders was conceived as a PvE game, and we have been hesitant to return to that concept. There is a risk that introducing a PvE matchmaking toggle could reduce some of the tension that the game was built around. At the same time, we have to respect that some players want to enjoy the game in their own way, and we can’t ignore what the data is telling us.\nIt&#x27;ll be interesting to see what comes of this test and it&#x27;s refreshing to see a studio experimenting with something so publicly, even if it doesn&#x27;t result in any permanent changes. Either way, the community will have to show whether it wants Arc Raiders to have PvE or not and provide actionable feedback to make it feasible.\n\"It’s possible that this will not work.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "f5b0ab2cbbe93f152727",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Beyond Good & Evil 2 Is Still Alive, and Just Added an Assassin's Creed Shadows Writer",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/beyond-good-evil-2-is-still-alive-and-just-added-an-assassins-creed-shadows-writer",
+            "publishedAt": "2026-09-24T15:59:55.102Z",
+            "canonicalUrl": "https://www.ign.com/articles/beyond-good-evil-2-is-still-alive-and-just-added-an-assassins-creed-shadows-writer",
+            "imageUrl": "https://assets-prd.ignimgs.com/2024/06/20/gp9sisqwoaalkml-1718901769210.jfif?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Beyond Good & Evil 2 is still in development, and just added another writer to its team.\nBeyond Good & Evil 2 Is Still Alive, and Just Added an Assassin&#x27;s Creed Shadows Writer\n18 years on from its initial announcement and a decade on from its re-announcement at E3 2016, Ubisoft is still plugging away on its sci-fi fantasy sequel — though there&#x27;s still no word on when the game will actually release.\nThat said, work is clearly continuing. Just this week, Ubisoft Bordeaux&#x27;s lead writer/associate narrative director Rik Godwin confirmed via social media that he had joined the project a few months ago, working in a support/consultant role.\nFounded in 2017, Ubisoft Bordeaux has typically acted as a support studio for other projects, though led work on Assassin&#x27;s Creed Mirage and most recently released Claws of Awaji, the one and only expansion for Assassin&#x27;s Creed Shadows. Geographically, it makes sense that Bordeaux-based personnel are helping out on Beyond Good & Evil 2, which is led by Ubisoft Montpellier, situated to the south.\nIt&#x27;s another intriguing development for Beyond Good & Evil 2 for those who have been tracking its extremely slow progress (yet progress nonetheless) in recent years, ever since it gained a new creative director, Fawzi Mesmar to steady its ship. The last while has subsequently seen work coalesce once more, with the sequel&#x27;s characters given intriguing cameos in the new Beyond Good & Evil 20th Anniversary Edition , cementing a sense that the project now had a firm direction.\nThen there&#x27;s the fact that the project survived Ubisoft&#x27;s existential reshuffle of projects, brands and development studios earlier this year — despite various other games falling by the wayside (Prince of Persia: Sands of Time Remake, we&#x27;ll never forget you.)\n\"Needless to say, I am saddened by the cancellations that has affected my colleagues in other parts of Ubisoft and the industry,\" Mesmar said at the time. \"I urge everyone — myself included — to offer support whenever and however they can during these times. We remain committed and focused on delivering a remarkable game for our players to enjoy.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "6bc843cac92c27224b0c",
+        "eventKind": "other",
+        "subjectKey": "marathon",
+        "subject": {
+          "kind": "game",
+          "key": "marathon"
+        },
+        "publishability": "direct",
+        "headline": "Bungie Finally Details Radical Changes for Marathon",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bungie-finally-details-radical-changes-for-marathon",
+            "publishedAt": "2026-09-24T18:17:42.679Z",
+            "canonicalUrl": "https://www.ign.com/articles/bungie-finally-details-radical-changes-for-marathon",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/24/marathonthumb-1790271185101.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "It&#x27;s no secret that Marathon has had a rough time since launching in March 2026, but Bungie is hard at work on new game modes that it&#x27;s hoping will breathe new life into the game.\nBungie Finally Details Radical Changes for Marathon\nPrevously, Bungie teased that new game modes were coming to Marathon, and even released an &#x27;experimental&#x27; mode with Vault Breaker. Today, the company posted on Twitter detailing the new ways people can play game. The Extraction modes that it was launched with aren&#x27;t going anywhere, but Bungie will be adding a team deathmatch mode, along with new PvE modes that should be reminiscent of Destiny. Bungie will also be expanding Perimeter, essentially its tutorial level, to be closer in scope to other full zones.\nAll of this new content and game modes aren&#x27;t going to come at the same time, though. In its post, Bungie laid out a road map, with a Nightfall refresh coming first in October. Then, in December, there will be the Symbiosis update, which will bring Marathon&#x27;s first permanent PvE mode, along with Team Deathmatch. Bungie doesn&#x27;t go into a lot of detail on what this new PvE mode will look like, but says it will give more details closer to launch.\nIn March, which will mark Marathon&#x27;s one-year anniversary, Bungie is planning a much larger update that will apparently link all of these gameplay modes together. There will also be a new onboarding experience, which the company previewed a little bit in a behind-the-scenes documentary that dropped earlier today. There will even be a giant Tick Queen.\nAll of these updates seem like a promising way to bring players back to Marathon, but only time will tell if it&#x27;s enough. Either way, Bungie will be returning to Destiny, starting with returning vaulted content back to Destiny 2. Beyond that, it seems like fans have convinced Bungie to return to Destiny long-term , with developer Poria Torkan saying, \"Bungie wouldn&#x27;t be what it is today without it. It&#x27;s the foundation upon which everything else rests, and we are absolutely not done with Destiny.\"\nHave you played Marathon&#x27;s Vault Breaker mode?\nBungie&#x27;s goal seems to be limiting the friction that new players feel and letting them filter themselves into more familiar gameplay types. That should, in theory, let people ease themselves into the traditional extraction mode that&#x27;s proven so divisive."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 51859,
+      "estimatedInputTokens": 12767,
+      "activeTrackingItems": 0,
+      "candidateItems": 21,
+      "includedItems": 21,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Nivalis Nights",
+        "subjectKey": "Nivalis Nights",
+        "titleKey": "nivalis-nights",
+        "titleZhCn": "尼瓦利斯之夜",
+        "suggestedStatus": "official_simplified",
+        "reason": "",
+        "sources": [
+          {
+            "label": "store.steampowered.com",
+            "url": "https://store.steampowered.com/app/1488490/__Nivalis_Nights/?l=schinese",
+            "hostname": "store.steampowered.com",
+            "family": "steam",
+            "kind": "official_simplified",
+            "pageTitle": "Steam 上的 《尼瓦利斯之夜》 Nivalis Nights",
+            "excerpt": "Steam 上的 《尼瓦利斯之夜》 Nivalis Nights 登录 商店 主页 探索队列 愿望单 点数商店 新闻 排行榜 社区 主页 讨论 创意工坊 市场 实况直播 关于 客服 更改语言 获取 Steam 手机应用 查看桌面版网站 © Valve Corporation。保留所有权利。所有商标均为其在美国及其它国家/地区的各自持有者所有。 隐私政策 &nbsp;| &nbsp; 法律信息 &nbsp;| &nbsp; 无障碍 &nbsp;| &nbsp; Steam 订户协议 &nbsp;| &nbsp; 退款 &nbsp;| &nbsp; Cookie 商店 主页 探索队列 愿望单 点数商店 新闻 排行榜 社区 主页 讨论 创"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
