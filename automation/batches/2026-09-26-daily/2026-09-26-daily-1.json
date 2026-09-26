@@ -1,0 +1,1502 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-26T07:35:45.424Z",
+  "finalizedAt": "2026-09-26T07:35:45.424Z",
+  "coverageThrough": "2026-09-26 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-26-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-26 12:00",
+      "windowStart": "2026-09-25 10:10",
+      "windowEnd": "2026-09-26 10:10"
+    },
+    "adjacentEdition": "2026-09-24-daily",
+    "packages": [
+      {
+        "eventKey": "3e0e86b6125100bb9f5d",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Next Week on XBOX: New Games for September 28 to October 2",
+        "tier": "A",
+        "score": 135,
+        "timeRelation": "window",
+        "readiness": "primary-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "microsoft-gaming",
+            "label": "Xbox Wire",
+            "url": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+            "publishedAt": "2026-09-25T14:00:00+00:00",
+            "canonicalUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+            "imageUrl": "https://xboxwire.thesourcemediaassets.com/sites/2/2026/09/NWOX_HERO_JPG-77b9d7d8c68d7f8d346a.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Minecraft Dungeons II, Gears of War: E- Day Premium Edition, Ace Combat 8: Wings of Theve, The Witcher 3: Wild Hunt — Remastered, and more coming soon to XBOX.\nNext Week on XBOX: New Games for September 28 to October 2\nWelcome to Next Week on XBOX! In this weekly feature we cover all the games coming soon to XBOX Series X|S, XBOX One, XBOX on PC, and Game Pass! Get more details on these upcoming games below and click their profiles for further info (release dates subject to change). Let’s jump in!\nMinecraft Dungeons II – September 28 Game Pass / XBOX Play Anywhere\nDrop the pickaxe, grab a sword, and charge into a thrilling new adventure in Minecraft Dungeons II . Journey through unexplored lands and mysterious locations, in a quest to stop a new evil from causing chaos in not one, but two worlds! Clash with menacing foes in explosive encounters and fight your way through hordes of mobs that will do everything in their power to stop you!\nGears of War: E-Day Premium Edition – October 1 XBOX Play Anywhere\nExperience the horror and brutality of Emergence Day. Fourteen years before the original Gears of War, join Marcus Fenix and Dominic Santiago in a gripping origin-story campaign as the Locust Horde first erupt from below, igniting a desperate fight for survival. Rally your squad and fight on in multiplayer with a reimagination of Gears’ iconic PvE mode, Horde Siege, or go head-to-head with a refined Versus PvP. &nbsp;Built from the ground up in Unreal Engine 5, Gears of War: E-Day delivers the most immersive Gears yet.\nAce Combat 8: Wings of Theve – October 2 Step into the cockpit and take flight as an elite pilot across stunning skies. Enter intense dogfights, eliminate threats, and rise through gripping missions to earn your wings in this game developed by PROJECT ACES, the acclaimed team behind the franchise. Early Access starts September 28 for those who pre-order the Ace Combat 8: Wings of Theve Deluxe Edition .\nThe Witcher 3: Wild Hunt — Remastered &#8211; September 29 XBOX Play Anywhere\nGears of War: E-Day Premium Edition Pre-Order"
+          }
+        ]
+      },
+      {
+        "eventKey": "dcf5604243dd1fd77736",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Official PlayStation Podcast Episode 548: September Selects",
+        "tier": "A",
+        "score": 135,
+        "timeRelation": "window",
+        "readiness": "primary-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "sony-interactive-entertainment",
+            "label": "PlayStation Blog",
+            "url": "https://blog.playstation.com/2026/09/25/official-playstation-podcast-episode-548-september-selects/",
+            "publishedAt": "2026-09-25T10:20:35-07:00",
+            "canonicalUrl": "https://blog.playstation.com/2026/09/25/official-playstation-podcast-episode-548-september-selects/",
+            "imageUrl": "https://blog.playstation.com/tachyon/2026/09/e28a9f70ce0ea092045670585fba740f3fd71591.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "This week the podcast crew discusses the recent wave of big third-party releases, like The Blood of Dawnwalker and Control Resonant.\nOfficial PlayStation Podcast Episode 548: September Selects\nSubscribe via Apple Podcasts , Spotify , or download here\nHey, everybody! We’re back this week to talk through September&#8217;s big releases and other recent titles we’re still playing.\nPlease be kind, considerate, and constructive. Report inappropriate comments to PlayStationBlogModeration@sony.com\nCorey Brotherson PlayStation Blog Contributor\nSid Shuman – Senior Director of Content Communications, SIE"
+          }
+        ]
+      },
+      {
+        "eventKey": "9c1b80200d641780411f",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Share of the Week &#8211; Marvel’s Wolverine",
+        "tier": "A",
+        "score": 135,
+        "timeRelation": "window",
+        "readiness": "primary-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "sony-interactive-entertainment",
+            "label": "PlayStation Blog",
+            "url": "https://blog.playstation.com/2026/09/25/share-of-the-week-marvels-wolverine/",
+            "publishedAt": "2026-09-25T09:00:47-07:00",
+            "canonicalUrl": "https://blog.playstation.com/2026/09/25/share-of-the-week-marvels-wolverine/",
+            "imageUrl": "https://blog.playstation.com/tachyon/2028/09/65e085ff586221d85646572c475753b3a82095da.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Players unleashed these ferocious shares.\nShare of the Week &#8211; Marvel’s Wolverine\nLast week, we asked you to share ferocious moments from Marvel’s Wolverine using #PSshare #PSBlog for a chance to be featured. Here are this week’s highlights:\nadambomb2mk shares Wolverine’s claws illuminated in the shadows\nNickVPgamer shares a hairy and shirtless Wolverine\ncrisg_art shares Wolverine lunging past a fiery backdrop\nRhodWulfLeon Wolverine taking on Omega Red\nscionjay96 shares Jean ready to attack"
+          }
+        ]
+      },
+      {
+        "eventKey": "a2503dfaad15ecc4d51f",
+        "eventKind": "announcement",
+        "subjectKey": "ユニコーンオーバーロード",
+        "subject": {
+          "kind": "game",
+          "key": "ユニコーンオーバーロード"
+        },
+        "publishability": "direct",
+        "headline": "『ユニコーンオーバーロード』野間崇史氏の新作アクションRPG『ドーンゲイザー』発表。新スタジオで手がける、壮大世界「イグニスフィア」の幕開け",
+        "tier": "A",
+        "score": 128,
+        "timeRelation": "window",
+        "readiness": "two-media-no-primary",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469896/",
+            "publishedAt": "2026-09-25T03:00:01+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469896/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469896-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "モノクロおよびグッドスマイルカンパニーは9月25日、『ドーンゲイザー（DAWNGAZER）』を発表した。\n『ユニコーンオーバーロード』野間崇史氏の新作アクションRPG『ドーンゲイザー』発表。新スタジオで手がける、壮大世界「イグニスフィア」の幕開け\n『ドーンゲイザー』は、元ヴァニラウェアの野間崇史氏が中心となってゲームを開発する「イグニスフィアスタジオ」による、アクションRPGである。野間崇史氏は、過去に大阪のゲーム開発会社ヴァニラウェアに所属し、多数の作品に携わってきたクリエイターだ。具体的には、『ユニコーンオーバーロード』にてディレクター/キャラクターデザインを担当していた。また『十三機兵防衛圏』『ドラゴンズクラウン・プロ』『オーディンスフィア レイヴスラシル』などの開発にも参加していた。そんな同氏は、2025年3月にヴァニラウェアを退職。グッドスマイルカンパニーおよびモノクロのプレスリリースによれば、モノクロのゲームスタジオ「イグニスフィアスタジオ」にて、野間崇史氏を中心としたゲーム開発がおこなわれることとなったようだ。\n本作『ドーンゲイザー』は、そんなイグニスフィアスタジオによるゲーム作品となる。ゲームの内容については明かされていないものの、公開されたティザーPVには中世ファンタジーの街並みが登場。白髪の剣を携えたキャラクターが歩き、大勢のキャラクターが隊列に加わっていく様子や、誰かの墓前に跪くシーンなどが映されている。まずはビジュアルや世界観の一端などが披露されたかたちだろう。制作陣としては、企画・開発はモノクロ、配信・宣伝がグッドスマイルカンパニーとなる。楽曲は『ユニコーンオーバーロード』『ELDEN RING』などにも携わってきた工藤吉三氏が担当するそうだ。\n株式会社モノクロおよびグッドスマイルカンパニーは9月25日、『 ドーンゲイザー（DAWNGAZER） 』を発表した。対応プラットフォームはPS5/Nintendo Switch 2/PC（Steam）で、2028年にリリース予定。発表にあわせて、ティザーPVが公開されている。"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260925j",
+            "publishedAt": "2026-09-25T03:00:05+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260925j",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/cfca1f2417a8dd76ef9a9fcf750e9841-1024x576.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "工藤吉三氏が楽曲制作を担当する『イグニスフィア』のティザーPVも公開。本世界を舞台とした第1弾ゲーム『ドーンゲイザー』も制作中\n『ユニコーンオーバーロード』ディレクター・野間崇史氏が中心の新規IP『イグニスフィア』 が発表。第1弾ゲーム『ドーンゲイザー』も制作中\n『 イグニスフィア』は、数々の国と種族が織りなす完全新規の壮大な原作世界で、ゲームクリエイター 野間崇史氏 が中心となり開発を行うゲームスタジオの名称となる。同氏は、代表作「ユニコーンオーバーロード」ではディレクターを務め、シナリオやキャラクターデザインなど全ての工程に携わってきたゲームクリエイターだ。\nゲーム内の楽曲制作は工藤吉三氏（代表作「ユニコーンオーバーロード」「ELDEN RING」）が担当する。今回のティザーPVでは、ボーカル・シンガーコーディネートをドラマ「アンナチュラル」メインテーマなどのKOCHOさんが担当する。\n野間崇史氏( https://x.com/takafumi_noma )は数多くのヒット作品にプログラマーとして携わり、代表作「ユニコーンオーバーロード」ではディレクターを務め、シナリオやキャラクターデザインなど全ての工程に携わってきたゲームクリエイターです。分業では成し得ない統一感と没入感のある作品世界の確立を目指します。\nゲーム内で使用される楽曲の制作を 工藤吉三氏が担当します。今回の PVを彩るティザー曲は、作編曲を工藤吉三氏(代表作「ユニコーンオーバーロード」「ELDEN RING」)、ボーカルおよびシンガーコーディネートをKOCHOさん（ドラマ「アンナチュラル」メインテーマ、他）が担当されています。\n株式会社モノクロと株式会社グッドスマイルカンパニーは9月25日、完全新規IPブランド 『イグニスフィア（IGNISPHERE）』 を発表した。また、その世界を舞台とする第1弾となるゲーム 『ドーンゲイザー（DAWNGAZER）』 を、モノクロの野間崇史氏が率いるイグニスフィアスタジオが開発、グッドスマイルカンパニーがパブリッシングの体制で制作中だ。\n今回の発表にあわせて、「イグニスフィア」の世界観を紹介するティザーPVが公開されている。\nまた、 『 イグニスフィア』を舞台とする第一弾ゲーム『ドーンゲイザー』の共同開発にも着手しており、本作はアクションRPGとなるようだ。リリースは2028年予定で、対応プラットフォームはNintendo Switch 2、PlayStation 5、PC（Steam）を予定している。"
+          }
+        ]
+      },
+      {
+        "eventKey": "e652dd7248c1a8814475",
+        "eventKind": "announcement",
+        "subjectKey": "roco kingdom",
+        "subject": {
+          "kind": "game",
+          "key": "roco kingdom"
+        },
+        "publishability": "direct",
+        "headline": "「Roco Kingdom」，KENNさんと相羽あいなさんが登壇した発表・試遊会レポートを公開。生アフレコやデモプレイを披露",
+        "tier": "B",
+        "score": 124,
+        "timeRelation": "window",
+        "readiness": "two-media-no-primary",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/640/G064053/20260925041/",
+            "publishedAt": "2026-09-25T10:51:33.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/640/G064053/20260925041/",
+            "imageUrl": "https://www.4gamer.net/games/640/G064053/20260925041/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Morefun Studiosは本日（2026年9月25日），9月21日にベルサール渋谷ファーストで開催された「Roco Kingdom」の発表・試遊会レポートを公開した。イベントにはKENNさんと…\n「Roco Kingdom」，KENNさんと相羽あいなさんが登壇した発表・試遊会レポートを公開。生アフレコやデモプレイを披露\n「バイオハザード2」になぜ“関西弁の豆腐”がいたのか。恐怖の歴史を振り返りながら，生き残れる豆腐を作る。俺のコラボカフェ：Menu 092\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260925r",
+            "publishedAt": "2026-09-25T04:33:33+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260925r",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/01-13-1024x683.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "初のグローバルクローズドβテスト(クワックテスト)を10月27日より開始予定\nオープンワールドモンスター育成RPG『Roco Kingdom』鬼頭明里さんや日笠陽子さんら出演決定！KENNさん、相羽あいなさん登壇イベントにて発表\nテンセントゲームズ傘下の主要スタジオグループ4社の一つであるMorefun Studiosは 『Roco Kingdom（ロコキングダム）』 の日本初となるクローズドβテストを10月27日より実施予定だ。これに先立ち、9月21日には、ベルサール渋谷ファーストにて日本のメディア関係者を対象とした発表・試遊会が開催された。\n『Roco Kingdom』シリーズは、主に中国で長年にわたり多くのプレイヤーに親しまれてきた作品。本作は2010年にサービスを開始したブラウザゲームで、これまでの16年間で累計登録プレイヤー数は3.5億人以上を記録している。\nあわせて、本作『Roco Kingdom』に登場するキャラクターを演じる 追加キャストもサプライズ発表された 。「エンザー」を小林裕介さん、「クラリッサ」を古賀葵さん、「フレイヤ」を鬼頭明里さん、「白樹」を日笠陽子さん、「ルイス」を河瀬茉希さん、「ホイッホル」を大河元気さんが担当する。\n『Roco Kingdom』はグローバルクローズドβテスト（クワックテスト）を10月27日より開始予定で、現在 テスト参加者を募集 している。本作のサービス開始時期は現在未定となっている。\nテンセントゲームズ傘下の主要スタジオグループ4社の一つであるMorefun Studiosは、『Roco Kingdom（ロコキングダム）』の日本初となるクローズドβテストを、2026年10月27日（火）より実施する予定です。これに先立ち、2026年9月21日（月・祝）には、ベルサール渋谷ファーストにて日本のメディア関係者を対象とした発表・試遊会を開催しました。\n『Roco Kingdom』シリーズは、中国で16年以上のIPの歴史を持ち、その完全新作となる本作はサービス開始初月の平均DAUが1,300万人を突破するなど、中国で高い人気を誇るオープンワールド・モンスター収集RPGです。魔法生物「ジニ」の収集・育成やターン制バトルを楽しめるほか、友達とチームを組んだりしながら広大な世界を自由に探索できる要素も特徴です。魔法の世界「カロシア大陸」を舞台に、魔法に満ちた世界での冒険や暮らしを楽しめる作品となっております。\n『Roco Kingdom』のナラティブディレクター兼ローカライズ責任者である小野（シャオ・イェ）が、日本のメディアおよびゲストの皆様に向けて挨拶を行うとともに、ゲームの紹介を行いました。\nプレイヤーは「ロコ」となり、舞台となる「カロシア」大陸に生息する“400種以上”の生き物「ジニ」を発見し、捕まえ仲間にしていく。本作は初のグローバルクローズドβテスト（クワックテスト）を10月27日より開始予定で、現在 テスト参加者を募集 している。\n本発表会では、本作のキャラクターボイスを担当する 大人気声優のKENNさん、相羽あいなさんが登壇し 、実機でのデモプレイやゲーム内セリフの生アフレコなどを行った。"
+          }
+        ]
+      },
+      {
+        "eventKey": "99cf306b6b9d29f056d2",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "News and events",
+        "tier": "B",
+        "score": 115,
+        "timeRelation": "unknown",
+        "readiness": "primary-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "nintendo",
+            "label": "Nintendo News",
+            "url": "https://www.nintendo.com/us/whatsnew/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.nintendo.com/us/whatsnew/",
+            "imageUrl": "https://assets.nintendo.com/image/upload/v1643742733/ncom/global/social-share.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Your first stop for Nintendo news and announcements. See what’s new in the world of Nintendo, from site updates to game launches, deals, and more.\nThis year, Nintendo Switch™ 2 players gain access to boosted performance and Nintendo Switch 2-exclusive motion controlled mini-games—making this the most immersive and technically capable NBA 2K Nintendo title yet. NBA 2K27 can now be played at a s…\nStep into The Grounds*, a social football playground where the streets meet the stadium. From Kickabouts and 1v1s to teaming up with friends in Clubs, connect in-game with renowned football mentors, improve your abilities, and express yourself on an…\nFire Emblem Heroes celebrates the upcoming release of Fire Emblem: Fortune’s Weave with new characters, events, and goodies\nNintendo Direct reveals Metroid Ravenous, Kirby and the World Beyond, and more games for Nintendo Switch 2 and Nintendo Switch\nMario Kart World adds SNES courses and Knockout Tour routes in a free update\nGet exclusive digital cards and more from The Legend of Zelda in the Nintendo Today! app\nNintendo and Laced Records - The Legend of Zelda: Breath of the Wild vinyl soundtrack collection available today!\nMaximize your game with NBA 2K27 on the Nintendo Switch 2 system!\nWelcome to The World’s Game in EA SPORTS FC 27\nTry the latest Game Trial, Prince of Persia The Lost Crown"
+          }
+        ]
+      },
+      {
+        "eventKey": "3fb2512748395eeccc23",
+        "eventKind": "announcement",
+        "subjectKey": "thank you 4 playing",
+        "subject": {
+          "kind": "game",
+          "key": "thank you 4 playing"
+        },
+        "publishability": "direct",
+        "headline": "“高難度ゲームの攻略法を推理する”ゲーム『Thank You 4 Playing』Steam版発表、来年1月8日配信へ。SNSから役立つ攻略情報を見極める、『オブラディン』風情報集め",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469972/",
+            "publishedAt": "2026-09-25T06:06:33+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469972/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469972-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Libragamesは9月25日、『Thank You 4 Playing』Steam版を発表した。ボスやステージの攻略方法をSNSで調べて主人公にゲームをクリアさせる、推理パズルADVだ。\n“高難度ゲームの攻略法を推理する”ゲーム『Thank You 4 Playing』Steam版発表、来年1月8日配信へ。SNSから役立つ攻略情報を見極める、『オブラディン』風情報集め\nLibragamesは9月25日、『 Thank You 4 Playing 』Steam版を発表した。同作はPC（Steam）向けに、2027年1月8日にリリース予定。本作は8月末まで期間限定で無料公開されていたが、パワーアップ版が有償でSteamに登場するようだ。\n『Thank You 4 Playing』は、ボスやステージの攻略方法をSNSで調べて主人公にゲームをクリアさせる、推理パズルADVである。本作の世界では、「エイムマン2」という有名なゲームが発売。同作は特殊なボスやステージギミックなどが待ち受ける高難易度アクションとされており、発売当日からSNS上でも早速盛り上がりを見せていた。本作の主人公は、発売されたばかりの「エイムマン2」に挑むプレイヤーの一人だ。しかし主人公には「エイムマン2」の攻略を楽しむつもりはなく、とにかく速くクリアする必要があった。SNSで情報を集めて効率よくクリアを目指す、手段を問わないゲーム攻略が繰り広げられる。\n本作『Thank You 4 Playing』は、ブラウザ向けに8月に期間限定公開。推理ゲームとしてはカジュアルめな難易度なども含めて、SNSなどでは評価されていた。Steam版は、期間限定公開中に好評だったため、ブラッシュアップしてリリースすることになったとのこと。具体的な追加要素としては、ゲーム全体のUIやロゴが変更され、新規ボス「ゴーストマン」やSNSのキャラクター2名が登場。内容も25％ほど増えているという。昨今の推理ゲームとしては遊びやすい内容などはそのまま、追加要素などによりパワーアップした有償版となるわけだ。なお 期間限定版のプレイヤー向けの動画 によれば、Steam版は翻訳費用がかかるため、無料にはできなかったとのこと。なるべく安くリリースできるように調整中であるそうだ。なおイラストについては、「エアーマンが倒せない」などのせらみかる氏が引き続き担当。イラストもほぼすべて刷新されているそうだ。\n📢Steamでリリース決定📢 SNSで情報を集めてボスを倒せ！ オブラディンライク推理パズルADV 『Thank You 4 Playing』 パワーアップして2027年1月8日にリリース✨ 8月限定版を遊んでくれた人用の動画がリプ欄にあります！ ウィッシュリスト登録数次第で次回作も！？ #TY4P https://t.co/2ikGrYvf3p pic.twitter.com/vhnDeVxfKH\n『Thank You 4 Playing』PC（ Steam ）版は、2027年1月8日にリリース予定だ。\n本作でプレイヤーは、情報を集めて正しい攻略方法を探り当てることで、「エイムマン2」のクリアを目指していく。攻略対象となる作中作「エイムマン2」は、複数のステージやボスなどが登場するアクションゲームだ。一般的なアクションゲームには、ある程度のプレイングや攻略の幅が用意されている。しかし本作では、プレイヤーではなく主人公が「エイムマン2」をプレイ。主人公は効率的な攻略情報が揃っていなければ、ステージをクリアできない。そこで本作では、ステージごとの攻略情報を完成させることで、主人公にゲームを進めさせる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "904a9f31923f068a28b3",
+        "eventKind": "announcement",
+        "subjectKey": "a列車で行こう9 prime line",
+        "subject": {
+          "kind": "game",
+          "key": "a列車で行こう9 prime line"
+        },
+        "publishability": "direct",
+        "headline": "『A列車で行こう9 PRIME LINE』発表、12月10日発売へ。ついに「カーブ線＆ループ線」実装、自由度高まったパワーアップ最新作",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469909/",
+            "publishedAt": "2026-09-25T03:21:34+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469909/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469909-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "アートディンクは9月25日、『A列車で行こう9 PRIME LINE』を発表し、2026年12月10日に発売すると告知した。\n『A列車で行こう9 PRIME LINE』発表、12月10日発売へ。ついに「カーブ線＆ループ線」実装、自由度高まったパワーアップ最新作\nアートディンクは9月25日、『 A列車で行こう9 PRIME LINE 』を発表し、2026年12月10日に発売すると告知した。対応プラットフォームはPC（Steam）。\n『A列車で行こう9 PRIME LINE』は、アートディンクが手がける都市開発鉄道会社経営シミュレーションゲーム『A列車で行こう9』に新要素を多数収録したバージョンだ。『A列車で行こう』シリーズは、直接区画やエリアを設置し発展させていく他の都市開発シミュレーションゲームとは異なり、鉄道会社の運営を通じて間接的に都市を発展させていく点が特徴。駅や線路の間近に人が集まり、町ができ、広がっていくといった風に、鉄道会社経営だけでなく鉄道と共に歩む現代の街並みが表現されるゲームとなっている。\n『A列車で行こう9 PRIME LINE』は、シリーズ史上最大の収録ボリュームとされる『A列車で行こう9』をベースに、新要素を多数収録したバージョンだ。目玉としては長距離を緩やかに曲がるカーブやループ線など、今までは不可能だった路線がついに実現。自由な曲率や角度で、線路のカーブと勾配を生成する「フレキシブル」を敷設設定できるようになった。線路の見た目は、バラスト軌道（灰色）／（茶色）、直結軌道、スラブ軌道の4種類から選択可能になっている。また、湾曲したホームを作れる「カーブ駅」も新たに追加される。\nなおすでにSteamにて発売中の『A列車で行こう9 トレインコンストラクション』を所有している場合は、自作の車両やほかのユーザーが作ったSteamワークショップの車両を本作『A列車で行こう9 PRIME LINE』に取り込むことも可能だそうだ。また本作でも引き続きカスタム編成機能は搭載され、Steamワークショップへのアップロードが可能となる。\n『 A列車で行こう9 PRIME LINE 』はPC（ Steam ）向けに2026年12月10日に発売予定。価格は税込1万8480円となる予定だ。なお『A列車で行こう9』のVer.1.0～Ver.5.0のいずれかを所有しているユーザー向けに、特別価格で購入できる乗り換えキャンペーンも実施予定。キャンペーンの詳細は本作のSteamニュースや公式サイトにて告知されるそうなので、興味のある人はウィッシュリストに登録しておくといいだろう。\n「圧倒的に好評」ドラゴン娘育成ローグライト『DRAPLINE』正式リリースで人気沸騰。村人すらエサ候補な神竜育成、怒涛の「エンディング25種追加」でついに完結"
+          }
+        ]
+      },
+      {
+        "eventKey": "0c277dc3287f69373699",
+        "eventKind": "other",
+        "subjectKey": "フォートナイト",
+        "subject": {
+          "kind": "game",
+          "key": "フォートナイト"
+        },
+        "publishability": "direct",
+        "headline": "『フォートナイト』が「子どもへの課金圧出し過ぎ」として集団訴訟を突きつけられる。和解できなければ法廷へ、賠償請求額は「約180億円超」か",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469916/",
+            "publishedAt": "2026-09-25T03:45:56+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469916/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469916-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "オンラインゲーム『フォートナイト』について、オランダの消費者団体がEpic Gamesを相手取った集団訴訟に向けて動いている。\n『フォートナイト』が「子どもへの課金圧出し過ぎ」として集団訴訟を突きつけられる。和解できなければ法廷へ、賠償請求額は「約180億円超」か\nオンラインゲーム『フォートナイト』について、オランダの消費者団体がEpic Gamesを相手取った集団訴訟に向けて動いている。特に若年層から人気を集める同作で、子どもたちに不必要な課金を促したなどとして、返金や損害賠償を求めている。海外メディア GamesIndustry.biz が報じている。\nオランダの消費者団体であるStichting Massaschade & Consument（以下、SMC）は9月24日に、『フォートナイト』を運営するEpic Gamesに対する集団訴訟に向けた動きを 発表 した。集団訴訟に加わることができるのは、オランダ在住で、21歳未満で『フォートナイト』をプレイしていたユーザーだ。なお現在は裁判手続きはおこなわれておらず、SMCは現在Epic Gamesに対して集団的解決に向けた協議を申し入れている。これにより集団的解決に至らなかった場合には、裁判所を通じて集団訴訟の手続きが開始されるとのこと。\nSMCはまず、Epic Gamesが子どもたちに不必要な課金を促したとして、プレイヤーの意図していない取引の課金額の返金を要求している。さらに、『フォートナイト』から中毒性を排除し、その中毒性によってプレイヤーが受けた被害に対して賠償すること、GDPR（EU一般データ保護規則）に違反したプライバシー権の侵害に対する損害賠償などを求めている。現地メディア XGN は、賠償額はあわせて1億ユーロ（およそ180億円）を超えると見積もっている。\nオランダでは以前より、『フォートナイト』の販売手法を巡って懸念が強まっていた。オランダ消費者・市場庁（以下、ACM）は2024年に、Epic Gamesが『フォートナイト』において「不公正な商慣行（unfair commercial practices）」にあたるゲーム内のデザイン選択をおこなったとして、112万5000ユーロ（およそ2億円）の罰金を科した。具体的には、誤解を招くカウントダウンタイマーや、子どもたちに直接購入を促すゲーム内広告などが指摘されていた。その後Epic Gamesはこの判断を不服として訴えたものの、ロッテルダム地方裁判所がACMの判断を支持。Epic Gamesが上訴を断念したことで、罰金が確定していた（ ACM ）。\n今回はそうした当局の動きに続いて、消費者側からも法的措置に向けた動きが生じているかたちだ。ちなみにオランダに限らず、カナダでも『フォートナイト』の中毒性を巡って2019年から集団訴訟が繰り広げられており、世界中で根深い問題となっている（ 関連記事 ）。\nなお本件が報じられたあと、GamesIndustry.bizに対してEpic Gamesが声明を 発表 。同社いわく、『フォートナイト』では子どもを保護するための各種ペアレンタルコントロール機能を提供しているという。またオランダ在住のユーザーについては、18歳未満の場合、ショップでの販売期間が48時間以内のアイテムを閲覧・購入ができないほか、16歳未満の場合には保護者の同意を得るまで課金がおこなえない設計であると主張している。SMCの主張に反論する内容となっており、今後集団訴訟に向けた動きがどのように進展するかは注目される。"
+          }
+        ]
+      },
+      {
+        "eventKey": "19a0be5c7ca54517ba1a",
+        "eventKind": "release-date",
+        "subjectKey": "penguin colony",
+        "subject": {
+          "kind": "game",
+          "key": "penguin colony"
+        },
+        "publishability": "direct",
+        "headline": "コズミックホラーADV「Penguin Colony」，発売日を10月17日に変更。プレイヤーはペンギンとなって，人間による狂気の発掘現場を傍観せよ",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/001/G100114/20260925022/",
+            "publishedAt": "2026-09-25T07:19:31.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/001/G100114/20260925022/",
+            "imageUrl": "https://www.4gamer.net/games/001/G100114/20260925022/SS/002.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ORIGAME DIGITALとFellow Travellerは，コズミックホラーアドベンチャー「Penguin Colony」のPC（Steam）版を10月17日に発売すると発表した。1939年…\nコズミックホラーADV「Penguin Colony」，発売日を10月17日に変更。プレイヤーはペンギンとなって，人間による狂気の発掘現場を傍観せよ\n「バイオハザード2」になぜ“関西弁の豆腐”がいたのか。恐怖の歴史を振り返りながら，生き残れる豆腐を作る。俺のコラボカフェ：Menu 092\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」"
+          }
+        ]
+      },
+      {
+        "eventKey": "12e711de46933a15a995",
+        "eventKind": "launch",
+        "subjectKey": "sin reloaded",
+        "subject": {
+          "kind": "game",
+          "key": "sin reloaded"
+        },
+        "publishability": "direct",
+        "headline": "名作レトロFPSのフルリマスター版「SiN Reloaded」配信開始。FPSジャンルの黎明期にあたる1998年に登場したゲームが最新グラフィックスで蘇る",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/045/G104542/20260925045/",
+            "publishedAt": "2026-09-25T11:24:28.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/045/G104542/20260925045/",
+            "imageUrl": "https://www.4gamer.net/games/045/G104542/20260925045/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Nightdive StudiosとAtariは，1998年に発売されたFPS「SiN」のリマスター版「SiN Reloaded」をPC向けにリリースした。KEX Engineで現代向けに最適化され…\n名作レトロFPSのフルリマスター版「SiN Reloaded」配信開始。FPSジャンルの黎明期にあたる1998年に登場したゲームが最新グラフィックスで蘇る\n「バイオハザード2」になぜ“関西弁の豆腐”がいたのか。恐怖の歴史を振り返りながら，生き残れる豆腐を作る。俺のコラボカフェ：Menu 092\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」"
+          }
+        ]
+      },
+      {
+        "eventKey": "99731d9e5dde637bc3b9",
+        "eventKind": "launch",
+        "subjectKey": "apocalypter",
+        "subject": {
+          "kind": "game",
+          "key": "apocalypter"
+        },
+        "publishability": "direct",
+        "headline": "終末世界をカスタマイズしまくりのマイカーで走る。ドライビングサバイバルFPS「Apocalypter」，Steamで配信開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/045/G104560/20260925031/",
+            "publishedAt": "2026-09-25T09:39:37.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/045/G104560/20260925031/",
+            "imageUrl": "https://www.4gamer.net/games/045/G104560/20260925031/SS/004.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "SawyerK Gamesは2026年9月24日，新作タイトル「Apocalypter」をSteamでリリースした。本作は，一面の荒野が広がる終末世界で生きる，オープンワールド形式のドライビングサバ…\n終末世界をカスタマイズしまくりのマイカーで走る。ドライビングサバイバルFPS「Apocalypter」，Steamで配信開始\n「バイオハザード2」になぜ“関西弁の豆腐”がいたのか。恐怖の歴史を振り返りながら，生き残れる豆腐を作る。俺のコラボカフェ：Menu 092\n「テイルズ オブ グレイセス エフ リマスター」が1622円！ シンプル交易シム「サンセット・ルート」は60円！「今週のすべり込みセール情報」\n激亀たちがローグライトで大暴れする「TMNT Splintered Fate」（今日から始めろApple Arcade #84）\n男色ディーノのゲイムヒヒョー ゼロ：第908回「国内最大のゲイムイベントですよ？」"
+          }
+        ]
+      },
+      {
+        "eventKey": "713231682eccc71f1bce",
+        "eventKind": "result",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "I made two $50 gaming keyboards fight for my average-gamer affections, and for me there's one clear winner",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/hardware/gaming-keyboards/i-made-two-usd50-gaming-keyboards-fight-for-my-average-gamer-affections-and-for-me-theres-one-clear-winner/",
+            "publishedAt": "2026-09-25T13:45:10Z",
+            "canonicalUrl": "https://www.pcgamer.com/hardware/gaming-keyboards/i-made-two-usd50-gaming-keyboards-fight-for-my-average-gamer-affections-and-for-me-theres-one-clear-winner/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/R24eWGKqXZJihXm8XYeoxU-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "In the battle of the silly naming schemes, we all lose.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nThe PC Gamer Circuit Breaker newsletter breaks down the latest PC gaming tech, and finds you the best deals on the best products\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nSubscribe for a weekly digest of the movie and TV news that matters, direct to your inbox. From first-look trailers, interviews, reviews and explainers, we've got you covered.\nI made two $50 gaming keyboards fight for my average-gamer affections, and for me there's one clear winner\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-26T15:35:14+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "175492cb01a4301c96ce",
+        "eventKind": "other",
+        "subjectKey": "ドパ将棋",
+        "subject": {
+          "kind": "game",
+          "key": "ドパ将棋"
+        },
+        "publishability": "direct",
+        "headline": "“手番全無視”指したもん勝ち将棋ゲーム『ドパ将棋！』無料公開。相手なんか待っていられない、ドーパミンどばどばハイスピードバトル",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469998/",
+            "publishedAt": "2026-09-25T07:45:29+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469998/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469998-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "けいち氏は9月23日、『ドパ将棋！』を公開した。本作は将棋をベースとしていながらも、手番の概念が存在しないハイスピードなバトルが展開される点が特徴だ。\n“手番全無視”指したもん勝ち将棋ゲーム『ドパ将棋！』無料公開。相手なんか待っていられない、ドーパミンどばどばハイスピードバトル\n個人開発者のけいち氏は9月23日、ハイスピード将棋ゲーム 『ドパ将棋！』 を公開した。PCおよびスマートフォンのブラウザで、無料で遊ぶことができる。\n『ドパ将棋！』は、ドーパミンがドバドバ分泌されるハイスピードな将棋ゲームである。基本的なルールは現代の本将棋に準ずるが、本作には手番の概念が存在しない。お互いに相手を待つことなく、リアルタイムにどんどん自分の手を指し進めることが可能だ。いかに素早く相手の玉を取るか、思考や指の素早さを試される作品だ。\nなお、元になったゲームが将棋であるためか、プレイヤーの間ではいくつかの戦法も開発されている様子だ。初形でもっとも前線にある歩兵を突撃させるものや、機動力の高い飛車や角を活用するもの、特定の戦法へのカウンター型など、意外にも戦略性も存在しているようだ。腕を磨き、最強のドパ将棋プレイヤーを目指してみるのも良いかもしれない。\nゲームプレイは基本的には将棋と同じで、自分の駒を一手一手進めていくことになる。歩兵（ふひょう）であれば前に1マス進むことができる、移動先・移動元に敵陣側3段以内のマス目が含まれるときは「成る」ことができるなど、駒の動きや多くのルールは一般的に知られる将棋「本将棋」と同様だ。ただし、本作には手番の概念がない。双方が相手の手を待たずに、好きなタイミングで駒を動かすのだ。スマートフォンで動画コンテンツを大量にフリックして待つことが苦手になってしまった人でも問題なくプレイできるだろう。"
+          }
+        ]
+      },
+      {
+        "eventKey": "51f039fca08ce5096751",
+        "eventKind": "other",
+        "subjectKey": "walls were built to fall",
+        "subject": {
+          "kind": "game",
+          "key": "walls were built to fall"
+        },
+        "publishability": "direct",
+        "headline": "“敵100万体”魔法防衛ローグライク『Walls Were Built to Fall』たちまち大注目される。溢れんばかりの大群と「物量押し付け合い」壮絶バトル",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-469931/",
+            "publishedAt": "2026-09-25T04:19:03+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-469931/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-469931-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Zoomy Cat Gamesは9月10日、『Walls Were Built to Fall』のストアページを公開した。9月23日には、1万3000件のウィッシュリストを獲得したことが発表され、注目を集めている。\n“敵100万体”魔法防衛ローグライク『Walls Were Built to Fall』たちまち大注目される。溢れんばかりの大群と「物量押し付け合い」壮絶バトル\nインディーデベロッパーのZoomy Cat Gamesは9月10日、『 Walls Were Built to Fall 』のストアページを公開した。9月23日には、1万3000件のウィッシュリストを獲得したことが発表され、注目を集めている。対応プラットフォームはPC（Steam）。\n『Walls Were Built to Fall』は、ドット絵で描かれた敵の大群から魔法で拠点を防衛するFPSだ。最大の特徴は、最大100万体の敵が同時に表示される圧倒的な物量。対するプレイヤーは、所属する魔法教団が崩壊してしまい、修業を終えることができなかった見習い魔法使い。ローグライト要素およびインクリメンタル要素によるさまざまな強化をおこないながら、闇の軍勢から魔法の泉を守ることとなる。\n『Walls Were Built to Fall』は、PC（ Steam ）向けに2027年第2四半期に配信予定だ。\nゲームプレイでは、崖に挟まれた峡谷にて1方向から攻めてくる敵の大群を、プレイヤーは壁の上で待ち受ける。地上に降り立ち、大群の中で戦うことも可能だ。マシンガンのように連射する魔法や、爆発して炎上する魔法、一定範囲内に氷のトゲを降らせる魔法など、さまざまな魔法を駆使して敵を蹴散らしていく。しかし、敵の数は膨大で、壁も登ってくるため、見習い魔法使いでは防衛に失敗することもあるだろう。ちなみに、初心者難易度では20万体の敵が押し寄せるという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "1f960b40fec75f5ff67a",
+        "eventKind": "other",
+        "subjectKey": "drapline",
+        "subject": {
+          "kind": "game",
+          "key": "drapline"
+        },
+        "publishability": "direct",
+        "headline": "「圧倒的に好評」ドラゴン娘育成ローグライト『DRAPLINE』正式リリースで人気沸騰。村人すらエサ候補な神竜育成、怒涛の「エンディング25種追加」でついに完結",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/drapline-20260925-469950/",
+            "publishedAt": "2026-09-25T05:00:41+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/drapline-20260925-469950/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/drapline-20260925-469950-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "バカーは9月24日、カナヲ氏が手がける『DRAPLINE』を正式にリリースした。正式リリースにあたっては新エンディングが25種も追加されるなどしており、アプデを受けてプレイヤーが集まっているようだ。\n「圧倒的に好評」ドラゴン娘育成ローグライト『DRAPLINE』正式リリースで人気沸騰。村人すらエサ候補な神竜育成、怒涛の「エンディング25種追加」でついに完結\nパブリッシャーのバカー（Vaka Game Magazine）は9月24日、カナヲ氏が手がける 『 DRAPLINE 』 を正式にリリースした。対応プラットフォームはPC（Steam）。本作は正式リリースを機に多くのプレイヤーで賑わっている。\n『DRAPLINE』は、何でも食べるドラゴン娘を育て上げる育成ローグライトゲームである。プレイヤーはある日、お腹を空かせているドラゴンの子どもクー（デフォルト名・変更可）と出会い、なし崩し的に育て親となる。その後、家の壁を食べるほど旺盛な食欲を見せるクーが、実は世界の命運を握る「神竜」の子どもであることが判明。プレイヤーは1年後に迫っている滅びの運命を阻止すべく、クーを最強に鍛え上げることになる。\n1年間でなんでも食べるドラゴン娘を最強に育てる育成ローグライト『DRAPLINE』、1年3か月の早期アクセス期間を経てついに正式リリースされました🐉🎊 新シナリオ「DRAGON’S DISCIPLINE」と25種類のエンディングが追加され、神竜を巡るストーリーが決着します。 ストアページは👇 #DRAPLINE pic.twitter.com/4O4uRMEri7\n『DRAPLINE』は、PC（ Steam ）向けに配信中。定価の税込1680円で購入可能だが、いくつかの他作品とのバンドルも存在し、セットで購入するとややお得に購入することも可能だ。\n本作ではクーを育成するパートと、クーに指示を出して敵と戦うパートに分かれている。育成パートでは1週間が1ターンとなっており、食べ物に応じてクーはどんどん成長していく。ステータスは体力（HP）、物理攻撃力（STR）、物理防御力（VIT）、魔法攻撃力（INT）、魔法防御力（RES）、素早さ（AGI）に分かれており、育成方針に応じて食べ物を選択するのだ。ただし、クーの食費は高い。そのため、場合によっては泣く泣く欲しい食材を諦めたり、借金をしたりすることになる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "4663d483e4d023e4cc2a",
+        "eventKind": "other",
+        "subjectKey": "apex legends",
+        "subject": {
+          "kind": "game",
+          "key": "apex legends"
+        },
+        "publishability": "direct",
+        "headline": "『Apex Legends』、今月末で「Easy Anti Cheat」廃止へ。代わりに『バトルフィールド6』などで実績上げた“EA独自の強力アンチチート”を導入",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260925-470047/",
+            "publishedAt": "2026-09-25T09:52:06+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260925-470047/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260925-470047-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Electronic Artsは9月25日、バトルロイヤルFPS『Apex Legends』のPC版にて、「EA Javelin Anticheat」を導入すると発表した。\n『Apex Legends』、今月末で「Easy Anti Cheat」廃止へ。代わりに『バトルフィールド6』などで実績上げた“EA独自の強力アンチチート”を導入\nElectronic Artsは9月25日、バトルロイヤルFPS『Apex Legends』のPC版にて、「EA Javelin Anticheat」を導入すると 発表 した。チート対策の強化を進める方針が語られている。\n『Apex Legends』では、2019年のリリース当初から現在に至るまで、「Easy Anti Cheat」と呼ばれるアンチチートシステムが採用されていた。この「Easy Anti Cheat」は、Epic Gamesが提供する「Epic Online Services」上で無料提供されているもの。2026年9月現在では、200作品以上に採用、年間で200億以上のゲームプレイセッションを保護しているという。\nElectronic Artsは、『Apex Legends』PC版にて長年利用されてきたEasy Anti Cheatを9月29日に廃止し、以降は代わりに「EA Javelin Anticheat」を導入するという。これにより、アンチチートチームが新たな脅威を認識しやすくし、チート行為が進化に応じて検知機能の開発・改善における柔軟性を高める狙いがあるという。\n9月29日に配信されるアップデートによって、『Apex Legends』のPC版プレイヤーは、起動時に自動的に「EA Javelin Anticheat」に移行されるとのこと。なお他作品では「EA Javelin Anticheat」の利用に際して、BIOS（UEFI）のメニューからセキュアブートの有効化を求められる場合があるとする一方で、本作ではその必要はないそうだ。\n『Apex Legends』では、月平均10万件以上のアカウントがBANされていることが報告されており、長年にわたってチートの影響を受けてきたタイトルの一つといえる。とはいえ近年でも積極的にチート対策を進めており、今年6月には新たなチート検出システムの導入後わずか1週間で、不正行為をおこなったアカウント1000件を特定し削除したことを明かしていた（ 関連記事 ）。\nオンライン対戦ゲームでは、チートによって競技の公平性が損なわれ、これによりプレイ人口が減少するなど、大きな打撃を受けるケースも少なくない。日々手口が進化するチートに対して、アンチチート側も継続的な進化を求められている。近年のElectronic Artsタイトルで実績を重ねてきた「EA Javelin Anticheat」が『Apex Legends』のチート対策に変化をもたらすのかは注目される。"
+          }
+        ]
+      },
+      {
+        "eventKey": "f680c0c0654c3bf83fb6",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "As Resident Evil Requiem Passes $500m Revenue, Analysis Shows 8.6% Sales Were on Xbox, With Remaining 91% Shared Between PS5 and Steam",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/as-resident-evil-requiem-passes-500m-revenue-analysis-shows-86-sales-were-on-xbox-with-remaining-91-shared-between-ps5-and-steam",
+            "publishedAt": "2026-09-25T16:17:38.431Z",
+            "canonicalUrl": "https://www.ign.com/articles/as-resident-evil-requiem-passes-500m-revenue-analysis-shows-86-sales-were-on-xbox-with-remaining-91-shared-between-ps5-and-steam",
+            "imageUrl": "https://assets-prd.ignimgs.com/2023/07/12/xbox-2-blogroll-1689179393588.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Resident Evil Requiem sold just 8.6% of its copies on Xbox, new sales analysis indicates.\nAs Resident Evil Requiem Passes $500m Revenue, Analysis Shows 8.6% Sales Were on Xbox, With Remaining 91% Shared Between PS5 and Steam\nData published today by Alinea Analytics revealed the eye-opening split in platform sales for this year&#x27;s brilliant Resident Evil game, offering yet another glimpse into Xbox&#x27;s struggles against its rival, Sony&#x27;s dominant PlayStation 5.\nRequiem is still selling faster than any other game in Capcom&#x27;s survival horror series so far and has now passed $500 million in total revenue, with 8.5 million copies shifted across PC, PS5, and Xbox Series X/S. But only 8.6% of that 8.5 million (around 731,000 copies) were sold for Xbox consoles.\nToday&#x27;s data on Resident Evil Requiem sales comes just a day after report pointed to a similarly significant sales split for GTA 6 preorders. The Verge &#x27;s Tom Warren stated that pre-sales for Rockstar&#x27;s upcoming blockbuster were \"heavily skewed\" towards PS5, something that had set off \"alarm bells\" within Microsoft&#x27;s Redmond campus.\nOf course, no-one should expect a 50:50 sales split for Resident Evil Requiem or GTA 6 preorders across Sony and Microsoft&#x27;s consoles. PS5 has clearly outsold Xbox Series X/S this generation by some margin, and no one at Xbox is trying to pretend otherwise. Still, what Ball appears to be suggesting — that GTA 6&#x27;s pre-sales split simply represents the reality of the hardware situation — does not appear to hold up with Requiem sales, where Xbox can be seen lagging behind PS5 far more than its believed hardware sales might suggest.\nThere&#x27;s likely a number of reasons for this, and it&#x27;s fair to suggest that Resident Evil is a long-lived franchise that has historically enjoyed more of a home on PlayStation consoles than Xbox, particularly in the series&#x27; homeland of Japan, where Xbox has never gained a proper sales foothold. But it&#x27;s hard to look at just how far behind Requiem&#x27;s Xbox sales split is and draw anything positive from it for Xbox. Are people who actually have an Xbox Series X/S now leaving it behind to play on PC or another console? Can these fans be tempted back next console generation, when Microsoft is believed to be launching a machine that can also play games from third-party PC storefronts? Whatever the case, this is another concerning sign as the company struggles through a huge reorganization aimed at ensuring its survival .\nCompare that to the whopping 48.1% of copies sold on PS5 (around 4.01 million) and the relatively similar 43.4% of copies sold via Steam (around 3.69 million) and it&#x27;s clear how far behind Xbox is here."
+          }
+        ]
+      },
+      {
+        "eventKey": "cde72133d744910c0e4e",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Avery the Poké Kid’s Family Speaks Out After Scalpers Use Child’s Death to Inflate Card Prices",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/avery-the-pok-kids-family-speaks-out-after-scalpers-use-childs-death-to-inflate-card-prices",
+            "publishedAt": "2026-09-25T17:57:02.744Z",
+            "canonicalUrl": "https://www.ign.com/articles/avery-the-pok-kids-family-speaks-out-after-scalpers-use-childs-death-to-inflate-card-prices",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/23/jirachi-card-artist-responds-avery-poke-kid-1790205304963.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The family of late Pokémon influencer Avery the Poké Kid is speaking out after scalpers have reportedly started using his death to artificially inflate the prices of a 30th Anniversary Jirachi SIR card.\nAvery the Poké Kid’s Family Speaks Out After Scalpers Use Child’s Death to Inflate Card Prices\n\"We have not approved these sales,\" the statement says.\nAvery the Poké Kid died at 12 years old after a seven-year-battle with pancreatic cancer in late September. He was a huge fan of the Pokémon franchise and its accompanying trading card game ; his parents had recorded the last time he opened a pair of card packs and shared the video to Instagram a couple days later, showing him excitedly pulling a 30th Anniversary Jirachi SIR card.\nThe footage went viral within the Pokémon community and even caught the attention of the card’s artist , who tearfully reacted to the situation on social media — but now, scalpers are reportedly using the situation to their advantage.\nAs pointed out by Dexerto , Pokémon TCG collectors have discovered that the 30th Anniversary Jirachi SIR card has started climbing in price, with one user on X/Twitter noting that it rose from $70 up to $100, most likely due to Avery’s viral posthumous video.\nThe situation has sparked a wave of backlash within the TCG community, with one user writing on X, “So, what, we’re using a 12-year-old child’s death as a way to increase the price of a f**king Pokémon card? I’m utterly disgusted.”\n“I&#x27;m so glad I was able to get this card before these losers jack up the price. It would&#x27;ve been so much sweeter to make it so everyone could get it to remember him, but nothing matters more than money I guess…,” another remarked ."
+          }
+        ]
+      },
+      {
+        "eventKey": "d82deaabf421f8a3ba98",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Blizzard Dev Doubles Down on World of Warcraft Forever Being for Classic Players",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/blizzard-dev-doubles-down-on-world-of-warcraft-forever-being-for-classic-players",
+            "publishedAt": "2026-09-25T15:50:18.713Z",
+            "canonicalUrl": "https://www.ign.com/articles/blizzard-dev-doubles-down-on-world-of-warcraft-forever-being-for-classic-players",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/15/wowoo-1789495563832.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "World of Warcraft Forever has already been massively successful, but it&#x27;s widened the divide that&#x27;s always been there between the Retail and Classic versions of the game. And, it seems like some of the folks at Blizzard are standing firm on one side of that line.\nBlizzard Dev Doubles Down on World of Warcraft Forever Being for Classic Players\nWorld of Warcraft Forever has already been massively successful , but it&#x27;s widened the divide that&#x27;s always been there between the Retail and Classic versions of the game. And, it seems like some of the folks at Blizzard are standing firm on one side of that line.\nEarlier this week, Blizzard world builder Matthew Armstrong discussed his mindset when building the world of Forever via a lengthy post on X/Twitter . \"I am making WoW forever for the classic gamer,\" Armstrong began, \"and for the millions of people who have had their accounts lapse over the years because they were not satisfied with changes that were made to the game.\"\nThat stance isn&#x27;t too surprising, earlier in the week another WoW Forever developer stood by Blizzard&#x27;s decision not to include shared tagging as something \"we simply must hold the line on.\" It sounds like Blizzard is trying its hardest to provide new content for Classic players without succumbing to the temptation of adding the modern quality-of-life features that some WoW players find so divisive.\nThe reason this entire debate is even happening is because, of course, World of Warcraft Forever is the shiny new version of World of Warcraft and brings some improvements that Retail players would surely love in the modern version of the game. I for one, prefer retail for the more robust endgame pillars, but even I look at Forever&#x27;s improved lighting, controller support, and Undead Paladins, and yearn for them in Midnight – even if the latter will be coming in the Eclipse update in patch 12.2. Forever is even getting heavy rain effects !\nOf course, Armstrong&#x27;s statement has sown some division among the WoW community. The responses to his post range from user MesciuSandman tagging Blizzard and asking \"is it normal that one of your employees candidly states that the game that you are about to release was not created for a certain segment of your customer base?\" Meanwhile BanKsEsports posted: \"I just want to say THANK YOU. Jan 2021 was the last active sub I held, I had been playing constantly since day 1 release... then I just felt like it was an endless grind loop and too far away from something worth investing so much time into.\"\nThis battle over the identity of WoW Forever is taking place during a beta where you can only play until level 20, mind you. Only a fraction of the content that&#x27;ll be in the full game is available now, and we&#x27;ll have to wait until November 4 to really see how the community will coalesce. In the meantime, Blizzard is trying to crack down on offensive character names , though it seems like some outright silly ones have been caught in the crossfire.\nWorld of Warcraft Forever or Retail?\nWell, it&#x27;s not retail plus."
+          }
+        ]
+      },
+      {
+        "eventKey": "e008ef07da7ddac80450",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Blizzard Insists Actual Humans Are Reading Through All the WoW Forever Beta Character Names It Banned Players for This Week",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/blizzard-insists-actual-humans-are-reading-through-all-the-wow-forever-beta-character-names-it-banned-players-for-this-week",
+            "publishedAt": "2026-09-25T13:33:49.382Z",
+            "canonicalUrl": "https://www.ign.com/articles/blizzard-insists-actual-humans-are-reading-through-all-the-wow-forever-beta-character-names-it-banned-players-for-this-week",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/15/wowoo-1789495563832.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Blizzard is banning players who it feels have created highly offensive character names in the World of Warcraft: Forever beta, and warned fans against “testing” the system.\nBlizzard Insists Actual Humans Are Reading Through All the WoW Forever Beta Character Names It Banned Players for This Week\nWhile Forever, a new version of World of Warcraft that’s meant to act as a sort of “Classic+” experience, doesn’t launch until November 4, the beta was made available last week and it was immediately flooded by players . One of the new features in the game is dual names, so you can have a first and second name for your character. This opened the floodgates to some hilarious character names, but also some that crossed Blizzard’s line.\nIn a post on the Blizzard forum , the company issued a no-nonsense warning to forever beta players, saying actual humans were looking at character names to ban those it considers to be out of line.\n“We are in the process of issuing forced name changes to characters found to be in violation of our character naming policies that were created in the Forever Beta,” Blizzard said. “Additionally, we have removed beta access for some users who created names that were far outside of our Code of Conduct. The use of dual names has allowed players new levels of creativity and personalization with your characters, some took this opportunity to reveal too much about themselves and will no longer be participating in this Beta.\n“The World of Warcraft team takes the safety and inclusiveness of our game very seriously. These actions were performed directly by the World of Warcraft Development team and were individually reviewed. The Customer Service team cannot and will not assist with any appeals. Our system for enforcing naming standards will be coming online very shortly, we would appreciate testers refraining from &#x27;testing&#x27; this system, as you run the risk of being actioned and losing access to the Beta. Please keep your character names respectful and within policy.”\nThis week, some players took to social media to complain that they had been unfairly booted out of the beta due to their character names, and questioned whether humans were behind the decisions. “My name is Devil Tootsalot,” said one player . “How is that highly offensive? Are you guys auto-moderating this? There is no way a human banned my name.”\nBut senior game producer Tom Ellis defended Blizzard’s tough stance here, tweeting to say players were probably banned because of a character they created but aren’t necessarily playing.\n“I read the list. No sympathy.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "013e61bde01d01373fc8",
+        "eventKind": "other",
+        "subjectKey": "marathon",
+        "subject": {
+          "kind": "game",
+          "key": "marathon"
+        },
+        "publishability": "direct",
+        "headline": "Bungie Says Marathon Flopped Because It Was Too Hard",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/bungie-says-marathon-flopped-because-it-was-too-hard",
+            "publishedAt": "2026-09-25T12:17:15.661Z",
+            "canonicalUrl": "https://www.ign.com/articles/bungie-says-marathon-flopped-because-it-was-too-hard",
+            "imageUrl": "https://assets-prd.ignimgs.com/2023/05/24/marathon-blogroll-02-1684962151922.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Bungie has admitted that extraction shooter Marathon failed at launch because it was too hard to attract a mainstream audience.\nBungie Says Marathon Flopped Because It Was Too Hard\nMarathon was designed as an ultra hardcore PvPvE extraction shooter where repeated death was built into the risk / reward game loop. If you die, you lose all your gear. And not just what you looted while out on the battlefield, but what you brought in. And given how easy it was to die in Marathon, particularly in PvP situations, it could feel like a brutally punishing video game.\nPlayers certainly noticed this and made their feelings clear, even before Marathon launched. At the time, Bungie responded to concerns about its steep, unwelcoming learning curve to say that while the game was a “dangerous climb,” its difficulty could be overcome. The Sony-owned studio tried to make the point that players should play the long game, slowly improving their base stats and gaining access to better items by completing contracts and progressing faction upgrades. But unfortunately for Bungie, many players were immediately put off by the constant failure they experienced simply trying to get to grips with the game. The release of brutally difficult and complex endgame raid, Cryo Archive, in April only doubled down on the sense that Marathon was built for only the most hardcore of shooter fans.\nEven former professional Counter-Strike player, Shroud, expressed concern about Marathon’s difficulty, saying that while Cryo Archive offered an incredible experience, it was too hard for casual players. \"Cryo Archive is insane,” he said in April. “It&#x27;s the most elaborate extraction shooter map I&#x27;ve ever seen in a game ever. The loop that they made is truly something special. The problem is, is it too elaborate? Is it too complex? Is it too much of a grind? Is your 9-5 grandma and grandpa going to be able to do it? I don&#x27;t know.\"\nNow, in detailing radical changes coming to Marathon as part of Bungie’s bid to save the game, developers have talked about what went wrong.\nGame director Del Chafe III called out Marathon’s PvP, which he called “sweaty.”\nThe question now for Bungie and for Sony is, how can the developers turn Marathon around? Certainly part of the plan is to make it more accessible, but adding dedicated PvE modes is the key. Bungie will also add a team deathmatch mode, and expand Perimeter, essentially its tutorial level, to be closer in scope to other full zones.\n\"One of the things we learned at launch is that our game is pretty niche.\""
+          }
+        ]
+      },
+      {
+        "eventKey": "db462395e192ec9465b3",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "EA Sports FC 27 Review",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/ea-sports-fc-27-review",
+            "publishedAt": "2026-09-25T23:50:24.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/ea-sports-fc-27-review",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/19/ea-fc-27-1789778341891.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "EA Sports stands on shaky ground with a new open-world hub, but the realistic, intuitive Tactics system shows promise.\nI find myself in a weird place with EA Sports FC 27. On one hand, worthwhile strategic elements have finally been added that reflect real-world tactics in a concise, intuitive way. On the other hand, the promised improvements to the behavior and pathing of computer-controlled players on the field still ring hollow, carrying over many of the same issues the series has had for over a decade. Couple this with the dreaded introduction of open-world elements via The Grounds, and the result is yet another year where nearly positive change is balanced out by a negative one.Ever since NBA 2K14 introduced MyPark, which eventually evolved into The Neighborhood in NBA 2K18 and The City in NBA 2K21, I figured it was only a matter of time before EA brought a similar open world full of activities to its other sports franchises. While The Grounds isn&#x27;t without merit, it often feels like EA is trying to solve a problem that didn&#x27;t really exist.\nRead the full EA Sports FC 26 review .\nThat said, I was impressed with the improvements to crossing and corner kicks. Both systems produce more convincing positioning battles and give the player greater control inside the box. I scored several successful headers with Harry Maguire from corners during my time with the game, which stood out because I could count on one hand the number of corner routines and headed goals I had scored in previous EA Sports FC entries.\nI also appreciated that CPU-controlled clubs finally manage finances and recruitment around their tactical needs, making Career Mode substantially deeper overall. Despite these additions, menus are still slow, animations are recycled each season, and a lot of progression is still tied to the dreadful investment system introduced in EA Sports FC 24.\nEA Sports FC 27 is a game caught between two competing directions. The revamped passing and crossing, deeper Career Mode systems, and greater emphasis on strategy give me more meaningful control and reflect the improvements I’ve hoped for to help build on the series’ strongest foundations. At the same time, those improvements are repeatedly undermined by inconsistent CPU behavior, lingering defensive issues, technical problems, slow menus, and an open-world hub that is disconnected from what I actually want from my virtual soccer experience. So while the soccer itself is enjoyable, the series is still searching for the right balance between innovation and making the core game work the way it should.\nAfter hours of exploring The Grounds, it’s clear FC 27 didn’t need to have an open-world environment to deliver a more communal online mode. I don’t need to run through a visually saturated, low-resolution city populated by lifeless NPCs just to find a game mode to start up when simple menus devoted to the same function can do that in a more efficient manner. Sure, it works well as an active lobby for matchmaking and makes it easier to find other players and move between activities, but between the framerate drops and unnatural character animations, nothing is immersiveness enough about this hub to justify its existence.\nThe issues above are only compounded by the myriad of unskippable cutscenes and NBA 2K15-level voice acting that make up The Grounds. The irony is that I was initially excited by the new hub world because it brings back one of my favorite FIFA characters from The Journey story mode: Alex Hunter, who first appeared in FIFA 17 and FIFA 18, once again voiced by Adetomiwa Edun. That enthusiasm disappeared quickly once Hunter began speaking, as his delivery feels noticeably more rigid and detached than it did during his original story.\nEdun&#x27;s performance nearly a decade ago was passionate and natural, whereas The Grounds&#x27; version of Hunter sounds like he would rather be anywhere else. Things get even more painful when Kylian Mbappe appears shortly afterwa"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 59388,
+      "estimatedInputTokens": 14847,
+      "activeTrackingItems": 0,
+      "candidateItems": 24,
+      "includedItems": 24,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": []
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
