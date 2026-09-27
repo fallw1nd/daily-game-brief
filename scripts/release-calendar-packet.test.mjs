@@ -64,13 +64,14 @@ describe("release-calendar packet selection", () => {
     expect(JSON.stringify(packet).length).toBeLessThanOrEqual(24000);
   });
 
-  it("keeps dated review links independent from game tasks", () => {
-    const task = aggregateCalendarLeads([record("Dated Game", "publisher", "Nintendo Switch")]);
-    const link = { title: "Launches October 2", url: "https://example.com/story", published: "2026-09-20", sourceId: "media" };
-    const packet = selectCalendarPacket({ report: { candidates: task, reviewLinks: [link] } });
-    expect(packet.candidates).toHaveLength(1);
+  it("keeps an in-window PlayStation review link when PC task volume is high", () => {
+    const tasks = aggregateCalendarLeads(Array.from({ length: 8 }, (_, index) => record(`PC Game ${index}`, "steam", "PC", index === 0 ? { url: `https://example.com/${"x".repeat(10000)}` } : {})));
+    const link = { title: "Launches October 2", url: "https://example.com/story", published: "2026-09-20", sourceId: "media", dateStatus: "in_window", sourcePlatform: "PlayStation" };
+    const packet = selectCalendarPacket({ report: { candidates: tasks, reviewLinks: [link] }, maxChars: 3000 });
+    expect(packet.candidates.length).toBeGreaterThan(0);
     expect(packet.reviewLinks).toEqual([link]);
-    expect(decodeCalendarPacket(packet)[0].title).toBe("Dated Game");
+    expect(packet.omissionTelemetry.linkOmitted).toBe(0);
+    expect(packet.omissionTelemetry.platformFinalTaskCounts.PC).toBeGreaterThan(0);
   });
 
   it("accounts for row cap omissions separately from byte omissions", () => {
@@ -86,13 +87,36 @@ describe("release-calendar packet selection", () => {
     expect(packet.omittedCandidates).toBe(1);
   });
 
+
+  it("does not add report-stage cap omissions twice", () => {
+    const candidate = aggregateCalendarLeads([record("One task", "publisher", "PlayStation")]);
+    const packet = selectCalendarPacket({
+      report: { candidates: candidate, omittedCandidates: 5, omissionTelemetry: { capOmittedTasks: 5 }, reviewLinks: [] },
+    });
+    expect(packet.omissionTelemetry).toMatchObject({ capOmittedTasks: 5, packetCapOmittedTasks: 0, budgetOmittedTasks: 0 });
+    expect(packet.omittedCandidates).toBe(5);
+  });
+
+  it("keeps all four represented platform families after final sizing", () => {
+    const candidates = aggregateCalendarLeads([
+      record("PC Floor", "steam", "PC"),
+      record("PS Floor", "publisher", "PlayStation"),
+      record("Xbox Floor", "xbox", "Xbox"),
+      record("Nintendo Floor", "nintendo", "Nintendo Switch"),
+      record("Huge PC", "steam", "PC", { url: `https://example.com/${"x".repeat(12000)}` }),
+    ]);
+    const packet = selectCalendarPacket({ report: { candidates, reviewLinks: [] }, maxChars: 5000 });
+    expect(packet.omissionTelemetry.platformFinalTaskCounts).toMatchObject({ PC: 1, PlayStation: 1, Xbox: 1, Nintendo: 1 });
+    expect(JSON.stringify(packet).length).toBeLessThanOrEqual(5000);
+  });
   it("keeps material date conflicts ahead of popularity tie-breakers", () => {
     const leads = [
       { title: "Popular", date: "2026-09-10", knownTitle: true, crossSource: true, priority: 3 },
       { title: "Conflict", date: null, dateConflict: true, dateConflictStatus: "conflict", priority: 0 },
       { title: "Baseline", date: "2026-09-12", inBaseline: true, priority: 0 },
     ];
-    expect(rankCalendarLeads(leads).map((lead) => lead.title)).toEqual(["Conflict", "Baseline", "Popular"]);
+    expect(rankCalendarLeads(leads).map((lead) => lead.title)).toEqual(["Conflict", "Popular", "Baseline"]);
     expect(selectCalendarLeads(leads, 1).candidates[0].title).toBe("Conflict");
+    expect(rankCalendarLeads([{ title: "uncertain", dateConflictUncertain: true }, { title: "baseline-presence", inBaseline: true, knownTitle: true, crossSource: true }])[0].title).toBe("uncertain");
   });
 });

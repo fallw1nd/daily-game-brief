@@ -23,8 +23,9 @@ export function leadPlatformFamilies(lead) {
 function rankScore(lead) {
   // Material review work outranks popularity hints. The latter only break ties.
   const conflict = lead?.dateConflict === true || lead?.dateConflictStatus === "conflict";
-  const baseline = lead?.baselineChanged === true || lead?.inBaseline === true;
-  return Number(conflict) * 8 + Number(baseline) * 4
+  const uncertain = lead?.dateConflictUncertain === true || lead?.dateConflictStatus === "uncertain";
+  const baselineChange = lead?.baselineChanged === true;
+  return Number(conflict) * 8 + Number(uncertain) * 7 + Number(baselineChange) * 4
     + Number(Boolean(lead?.knownTitle)) * 0.25
     + Number(Boolean(lead?.crossSource)) * 0.25
     + Math.min(Math.max(Number(lead?.priority) || 0, 0), 3) * 0.05;

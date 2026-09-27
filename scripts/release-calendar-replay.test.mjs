@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadReplayFixture, replayCalendarBaseline, replayFixture } from "./lib/release-calendar-replay.mjs";
+import { loadReplayFixture, replayCalendarBaseline, replayFixture, replayHoldoutDirectory } from "./lib/release-calendar-replay.mjs";
 
 const fixtureRoot = resolve("scripts/fixtures/release-calendar");
 
@@ -25,12 +25,14 @@ describe("historical release-calendar replay baseline", () => {
       visibleRawRows: 82,
       uniqueTasks: 65,
       dedupeReduction: 17,
-      packetTasks: 65,
-      visibleTasksNotPacket: 0,
-      budgetOmittedTasks: 0,
+      packetTasks: 37,
+      visibleTasksNotPacket: 28,
+      omittedCandidates: 28,
+      budgetOmittedTasks: 28,
       overBudget: false,
     });
     expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
+    expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 37, omittedCandidates: 28 });
     expect(result.sourceDiagnostics.source).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.parser).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.reportedInWindowRows).toBe(82);
@@ -57,14 +59,16 @@ describe("historical release-calendar replay baseline", () => {
       visibleRawRows: 100,
       uniqueTasks: 76,
       dedupeReduction: 24,
-      packetTasks: 76,
-      visibleTasksNotPacket: 0,
-      budgetOmittedTasks: 0,
+      packetTasks: 33,
+      visibleTasksNotPacket: 43,
+      budgetOmittedTasks: 43,
+      omittedCandidates: 144,
       reportStageOmittedCandidates: 101,
       reportStageOmittedUnit: "unknown_rows_or_groups",
       overBudget: false,
     });
     expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
+    expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 144 });
     expect(result.omissionAccounting.capOmittedUnit).toBe("unknown_rows_or_groups");
     expect(result.sourceDiagnostics.source).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.parser).toEqual({ known: 0, unknown: 6, failed: null });
@@ -72,6 +76,12 @@ describe("historical release-calendar replay baseline", () => {
     expect(result.report.platformCoverage.byFamily).toEqual({ PC: 38, PlayStation: 14, Xbox: 38, Nintendo: 21 });
     expect(result.provenance.productionMainSha).toBe("df6791cfb4d0486329ae38064b9b1ba5b2cc45bf");
     expect(result.provenance.auditBaseSha).toBe("15bb0100277fd4f9b5e0ef67e56fdba2ed2f81e7");
+  });
+
+  it("round-trips all available fields in the read-only daily21 holdout", async () => {
+    const result = await replayHoldoutDirectory(resolve("..", "daily21"));
+    expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 77, platformFinalTaskCounts: { PC: 22, PlayStation: 14, Xbox: 17, Nintendo: 16 } });
+    expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
   });
 
   it("counts a repeated lead once per platform and family while retaining original labels", async () => {

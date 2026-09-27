@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { titleIdentity } from "./release-calendar-discovery.mjs";
 import { aggregateCalendarLeads } from "./release-calendar-identity.mjs";
-import { selectCalendarPacket } from "./release-calendar-packet.mjs";
+import { decodeCalendarPacket, selectCalendarPacket } from "./release-calendar-packet.mjs";
 
 const DEFAULT_FIXTURE_ROOT = resolve("scripts/fixtures/release-calendar");
 const FAILED_STATUSES = new Set(["failed", "partial_failure"]);
@@ -126,7 +127,7 @@ function collectSourceDiagnostics(report, rows) {
   };
 }
 
-const candidateChars = (rows) => JSON.stringify(rows).length;
+
 
 export async function loadReplayFixture(edition, fixtureRoot = DEFAULT_FIXTURE_ROOT) {
   const directory = resolve(fixtureRoot, edition);
@@ -150,7 +151,7 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
   const budgetOmittedRows = Math.max(0, reportAvailableRows - packetRows.length);
   const numericReconciliation = reportAvailableRows + capOmittedRows === packetRows.length + packetOmittedTotal;
   const packetLeadDiagnostics = collectNameDiagnostics(packetRows, leadKey);
-  const packetCandidateChars = candidateChars(packetRows);
+  const historicalPacketChars = jsonLength(packet);
   const sourceDiagnostics = collectSourceDiagnostics(report, reportRows);
   const observations = reportRows.flatMap((row) => (Array.isArray(row.observations) && row.observations.length ? row.observations : [row]).map((observation) => ({
     ...observation,
@@ -159,7 +160,26 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
   })));
   const uniqueTasks = aggregateCalendarLeads(observations);
   const proposed = selectCalendarPacket({ report: { ...report, candidates: uniqueTasks }, maxCandidates: 100, maxChars: 24000 });
-  const compactChars = jsonLength({ candidates: proposed.candidates, candidateDictionary: proposed.candidateDictionary, observationDictionary: proposed.observationDictionary });
+  const restored = decodeCalendarPacket(proposed);
+  const candidateKey = (candidate) => candidate.identity?.key || JSON.stringify([titleIdentity(candidate.title), candidate.date, (candidate.observations || []).map((item) => item.sourceId).sort()]);
+  const expectedByKey = new Map(uniqueTasks.map((candidate) => [candidateKey(candidate), candidate]));
+  const expectedRestored = proposed.candidates.map((candidate) => {
+    const expected = expectedByKey.get(candidateKey(candidate));
+    if (!expected) throw new Error(`calendar packet candidate cannot be matched to its source task: ${candidate.title}`);
+    return {
+      title: expected.title,
+      date: expected.date ?? null,
+      dateConflictStatus: expected.dateConflict ? "conflict" : expected.dateConflictUncertain ? "uncertain" : "none",
+      identityStatus: expected.identityStatus || expected.identity?.status || "needs_verification",
+      identity: { key: expected.identity?.key ?? null, registryIds: structuredClone(expected.identity?.registryIds || []), conflictProductIds: structuredClone(expected.identity?.conflictProductIds || []) },
+      knownTitle: Boolean(expected.knownTitle),
+      inBaseline: Boolean(expected.inBaseline),
+      crossSource: Boolean(expected.crossSource),
+      observations: (expected.observations || []).map(({ normalizedTitle, ...observation }) => observation),
+    };
+  });
+  if (!isDeepStrictEqual(restored, expectedRestored)) throw new Error("calendar packet failed lossless round-trip verification");
+  const compactChars = jsonLength(proposed);
   const visibleTasksNotPacket = Math.max(0, uniqueTasks.length - proposed.candidates.length);
 
   return {
@@ -196,8 +216,8 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       nameDiagnostics: packetLeadDiagnostics,
       platformCoverage: collectPlatformCoverage(packetRows, leadKey),
       kindCoverage: collectKindCoverage(packetRows, leadKey),
-      candidateJsonChars: packetCandidateChars,
-      charsPerLead: packetLeadDiagnostics.leadCount ? Math.round((packetCandidateChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
+      packetJsonChars: historicalPacketChars,
+      charsPerLead: packetLeadDiagnostics.leadCount ? Math.round((historicalPacketChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
     },
     proposed: {
       visibleRawRows: reportRows.length,
@@ -208,12 +228,14 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       visibleTasksNotPacket,
       capOmittedTasks: proposed.omissionTelemetry.packetCapOmittedTasks,
       budgetOmittedTasks: proposed.omissionTelemetry.budgetOmittedTasks,
+      omittedCandidates: proposed.omittedCandidates,
       reportStageOmittedCandidates: proposed.omissionTelemetry.reportStageOmittedCandidates,
       reportStageOmittedUnit: proposed.omissionTelemetry.reportStageOmittedUnit,
       linkOmitted: proposed.omissionTelemetry.linkOmitted,
       platformFinalTaskCounts: proposed.omissionTelemetry.platformFinalTaskCounts,
       calendarChars: jsonLength(proposed),
-      compactTaskChars: compactChars,
+      roundTripVerified: true,
+      restoredTasks: restored.length,
       charsPerTask: proposed.candidates.length ? Math.round((compactChars / proposed.candidates.length) * 100) / 100 : 0,
       overBudget: jsonLength(proposed) > 24000,
       discoveryPhases: { source: sourceDiagnostics.source, parser: sourceDiagnostics.parser },
@@ -223,7 +245,7 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       historicalPacketTasks: packetLeadDiagnostics.leadCount,
       proposedPacketTasks: proposed.candidates.length,
       taskGain: proposed.candidates.length - packetLeadDiagnostics.leadCount,
-      historicalCharsPerTask: packetLeadDiagnostics.leadCount ? Math.round((packetCandidateChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
+      historicalCharsPerTask: packetLeadDiagnostics.leadCount ? Math.round((historicalPacketChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
       proposedCharsPerTask: proposed.candidates.length ? Math.round((compactChars / proposed.candidates.length) * 100) / 100 : 0,
     },
     sourceDiagnostics,
