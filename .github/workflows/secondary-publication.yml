@@ -77,12 +77,18 @@ jobs:
           recover="$(node -p "Boolean(JSON.parse(require('fs').readFileSync('$request','utf8')).recoverFailedPublication)")"
           state_path="automation/status/$edition.json"
           git show "origin/automation/state:$state_path" > "$RUNNER_TEMP/state.json"
-          PACKET_SHA="$requested_sha" RECOVER="$recover" node -e '
+          EDITION="$edition" PACKET_SHA="$requested_sha" RECOVER="$recover" node -e '
             const fs = require("node:fs");
             const state = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/state.json", "utf8"));
+            const manifest = JSON.parse(fs.readFileSync("public/data/manifest.json", "utf8"));
             if (state.packet?.status !== "ready" || state.packet?.blobSha !== process.env.PACKET_SHA) throw new Error("secondary request is not bound to the current ready packet");
             if (process.env.RECOVER === "true") {
               if (state.editorial?.status !== "timed_out" || state.publication?.status !== "failed") throw new Error("failed-publication recovery requires timed_out + failed state");
+              if (manifest.editions.some((item) => item.id === process.env.EDITION)) throw new Error("failed-publication recovery is only for a missing Canonical edition");
+              const editionDate = process.env.EDITION.slice(0, 10);
+              if (manifest.editions.some((item) => String(item.date || item.id.slice(0, 10)) > editionDate)) {
+                throw new Error("historical missing edition cannot use direct recovery after later Canonical editions were published; preserving issue/latest identity is a blocker");
+              }
             } else if (state.editorial?.status !== "pending") throw new Error("secondary edition request requires pending editorial state");
           '
           git cat-file -e "$requested_sha^{blob}"

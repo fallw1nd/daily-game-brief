@@ -28,7 +28,9 @@
 
 ### C. Canonical 缺失且自动 fallback 已失败
 
-只在 state 明确为 `editorial:timed_out` + `publication:failed` 时使用 `user_authorized_failed_publication_recovery`。仍使用原 packet/window；不得通过新抓取事实“补造”旧期。
+`user_authorized_failed_publication_recovery` 只用于 state 明确为 `editorial:timed_out` + `publication:failed`、目标 Canonical 仍缺失，且 **尚未发布任何日期更晚的 Canonical edition** 的情况。此时仍使用原 packet/window，不能通过新抓取事实“补造”旧期。
+
+如果目标缺刊之后已经发布了更新期次，则直接恢复会重新分配 issueNumber 或把 `manifest.latest/latest.json` 回退到旧日期，属于生产身份破坏；“二次发布”必须把它标成 blocker，不能强行补成功，也不能重排已经公开的后续 issueNumber。只有另行设计并授权历史缺刊插入/编号迁移方案后才能处理。
 
 ### D. 编辑门槛
 
@@ -56,7 +58,7 @@
 - 必须绑定 durable state 当前 `packet.blobSha`；
 - compact request 只手工决定 `editorialInput.packages`；workflow 按上述 72 小时规则确定 `trackingQueue` 的 carry/close，再用正常 validator 校验完整输出；
 - workflow 将通过校验的完整 inbox 写入 `automation/editorial/<edition-id>`，随后 dispatch trusted publisher；
-- failed-publication recovery 只有显式 `recoverFailedPublication:true` 且 state 为 `timed_out + failed` 时可用。
+- failed-publication recovery 只有显式 `recoverFailedPublication:true`、state 为 `timed_out + failed`、Canonical 缺失且没有更晚 edition 已发布时可用；workflow 会硬性拒绝历史缺刊直接恢复。
 
 ### title_backfill request
 
@@ -78,7 +80,7 @@
 - `manifest/latest/search/locale` 与 archive 一致；
 - publisher、`npm run check`、Pages 均成功。
 
-若 packet 身份、revision 授权、主体身份、窗口归属或 registry 冲突无法证明，停止该项并报告 blocker；不得绕过安全边界。
+若 packet 身份、revision 授权、主体身份、窗口归属、历史缺刊编号安全或 registry 冲突无法证明，停止该项并报告 blocker；不得绕过安全边界。
 
 ## 6. 完成报告
 
