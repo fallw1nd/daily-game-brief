@@ -15,12 +15,14 @@ Use Conventional Commits. Update `docs/MAINTENANCE_LOG.md` only for persistent r
 - User-specified names take priority. Otherwise reuse `config/title-translations.json`, verified title hints, and official mainland Simplified Chinese terminology. Never machine-translate game names or invent identities. Naming/terminology lookups cannot add event facts.
 - Headlines name their confirmed game, company, or person. Archive and manifest share the period-prefixed `archiveTitle` and valid `leadEntryId`.
 - Every story/calendar item needs verified media or an explicit unavailable reason. Media provenance and file rules live in `docs/MEDIA_PIPELINE.md`.
+- When the user explicitly says “二次发布”, that phrase authorizes the complete manual operation defined in `docs/SECOND_PUBLISH.md`: recent-state audit, same-edition repair/backfill where eligible, verified title completion/backfill, stale-tracking cleanup, and final publication/deployment verification. It never authorizes changing issue/window identity or importing facts outside the original packet.
 
 ## Read when relevant
 
 - Editorial scheduling/publication: `docs/SCHEDULED_TASK_PROMPT.md`.
 - State, recovery, and publisher behavior: `docs/AUTOMATION_ARCHITECTURE.md`.
 - Canonical/evidence/naming/data: `docs/DATA_PIPELINE.md`.
+- Manual second-pass publication (“二次发布”): `docs/SECOND_PUBLISH.md`.
 - Showcase, calendar, media, source discovery: the matching focused document under `docs/`.
 - UI: `docs/VISUAL_GUIDELINES.md` and the relevant section of `docs/READING_SAMPLE.md`. The accepted ReadingApp is the default reference; use Phosphor icons, preserve keyboard access, reduced motion, AA contrast, and usable 390px layouts.
 
