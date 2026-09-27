@@ -228,34 +228,40 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
       let parserPagesFailed = 0;
       let sourceError;
       let parserError;
-      for (let page = 1; page <= (source.maxPages || 1); page++) {
-        pagesAttempted++;
-        const url = new URL(source.url);
-        if (page > 1) url.searchParams.set("page", String(page));
-        let body;
-        try {
-          body = await fetchReleaseSource({ ...source, url: url.href }, config, fetcher);
-          pagesSucceeded++;
-        } catch (error) {
-          pagesFailed++;
-          sourceError = String(error.message).slice(0, 150);
-          break;
+      try {
+        for (let page = 1; page <= (source.maxPages || 1); page++) {
+          const url = new URL(source.url);
+          if (url.protocol !== "https:") throw new Error("HTTPS required");
+          if (page > 1) url.searchParams.set("page", String(page));
+          let body;
+          pagesAttempted++;
+          try {
+            body = await fetchReleaseSource({ ...source, url: url.href }, config, fetcher);
+            pagesSucceeded++;
+          } catch (error) {
+            pagesFailed++;
+            sourceError = String(error?.message || error).slice(0, 150);
+            break;
+          }
+          let result;
+          try {
+            result = parseReleaseSource(body, source, editionDate);
+            parserPagesSucceeded++;
+          } catch (error) {
+            parserPagesFailed++;
+            parserError = String(error?.message || error).slice(0, 150);
+            break;
+          }
+          parsed.records.push(...result.records);
+          parsed.reviewLinks.push(...result.reviewLinks);
+          if (!result.records.length || result.records.some(r => r.date > window.endInclusive)) break;
         }
-        let result;
-        try {
-          result = parseReleaseSource(body, source, editionDate);
-          parserPagesSucceeded++;
-        } catch (error) {
-          parserPagesFailed++;
-          parserError = String(error.message).slice(0, 150);
-          break;
-        }
-        parsed.records.push(...result.records);
-        parsed.reviewLinks.push(...result.reviewLinks);
-        if (!result.records.length || result.records.some(r => r.date > window.endInclusive)) break;
+      } catch (error) {
+        // A malformed source or an unexpected per-source processing error must not reject the batch.
+        sourceError ||= String(error?.message || error).slice(0, 150);
       }
       const records = parsed.records.filter(r => within(r.date, window));
-      const sourceStatus = pagesFailed ? (pagesSucceeded ? "partial_failure" : "failed") : "success";
+      const sourceStatus = sourceError ? (pagesSucceeded ? "partial_failure" : "failed") : "success";
       const parserStatus = parserPagesFailed ? (parserPagesSucceeded ? "partial_failure" : "failed")
         : parserPagesSucceeded && (parsed.records.length || parsed.reviewLinks.length) ? "success" : "unknown";
       const failed = Boolean(sourceError || parserError);

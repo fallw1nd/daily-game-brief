@@ -45,6 +45,31 @@ describe("release discovery", () => {
     expect(report.coverage.map(r => r.status)).toEqual(["partial", "failed"]);
     expect(report.candidates[0].review).toBe("open_primary_source_before_publication");
   });
+  it("isolates invalid source URLs and still builds reports when every source fails", async () => {
+    let requests = 0;
+    const invalid = source("broken", { url: "not-a-url" });
+    const healthy = source("steam");
+    const report = await collectReleaseCalendar({ config: settings([invalid, healthy]), editionDate: "2026-09-08", fetcher: async () => {
+      requests++;
+      return new Response(row(1, "Surviving result", "Sep 10, 2026"));
+    } });
+
+    expect(requests).toBe(1);
+    expect(report.candidates.map(r => r.title)).toEqual(["Surviving result"]);
+    expect(report.coverage[0]).toMatchObject({
+      status: "failed", sourceStatus: "failed", parserStatus: "unknown",
+      pages: 0, pagesAttempted: 0, pagesSucceeded: 0, pagesFailed: 0,
+      parserPagesSucceeded: 0, parserPagesFailed: 0, error: "Invalid URL",
+    });
+    expect(report.coverage[1]).toMatchObject({ status: "partial", sourceStatus: "success", parserStatus: "success", pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0 });
+
+    const allFailed = await collectReleaseCalendar({ config: settings([invalid]), editionDate: "2026-09-08", fetcher: async () => {
+      throw new Error("invalid URL must not reach fetcher");
+    } });
+    expect(allFailed).toMatchObject({ editionDate: "2026-09-08", candidates: [], omittedCandidates: 0 });
+    expect(allFailed.coverage).toHaveLength(1);
+    expect(allFailed.coverage[0]).toMatchObject({ status: "failed", sourceStatus: "failed", parserStatus: "unknown", pagesAttempted: 0, pagesSucceeded: 0, pagesFailed: 0, error: "Invalid URL" });
+  });
   it("preserves conflicting dates when a multi-date group has no scalar date hint", async () => {
     const config = settings([source("steam"), source("calendar", { platform: "multiplatform" })]); config.maxCandidates = 3;
     const report = await collectReleaseCalendar({ config, editionDate: "2026-09-08", fetcher: async url => new Response(url.endsWith("steam") ? row(1, "Game", "Sep 9, 2026") + row(1, "Game", "Sep 10, 2026") + row(2, "PC only", "Sep 11, 2026") : '<h3>2026</h3><ul><li>Console (PS5) – September 12</li></ul>') });
