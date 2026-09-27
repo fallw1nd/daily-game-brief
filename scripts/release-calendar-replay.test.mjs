@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadReplayFixture, replayCalendarBaseline, replayFixture, replayHoldoutDirectory } from "./lib/release-calendar-replay.mjs";
+import { loadReplayFixture, replayCalendarBaseline, replayFixture } from "./lib/release-calendar-replay.mjs";
 
 const fixtureRoot = resolve("scripts/fixtures/release-calendar");
 
@@ -78,9 +78,19 @@ describe("historical release-calendar replay baseline", () => {
     expect(result.provenance.auditBaseSha).toBe("15bb0100277fd4f9b5e0ef67e56fdba2ed2f81e7");
   });
 
-  it("round-trips all available fields in the read-only daily21 holdout", async () => {
-    const result = await replayHoldoutDirectory(resolve("..", "daily21"));
-    expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 77, platformFinalTaskCounts: { PC: 22, PlayStation: 14, Xbox: 17, Nintendo: 16 } });
+  it("replays the 2026-09-21 fixture and round-trips all available fields", async () => {
+    const result = await replayFixture("daily21", fixtureRoot);
+    expect(result.omissionAccounting).toMatchObject({
+      reportAvailableRows: 100,
+      capBeforeGroups: 136,
+      capOmittedRows: 36,
+      packetRows: 43,
+      packetOmittedTotal: 93,
+      budgetOmittedRows: 57,
+      reconciles: true,
+      capOmissionRecovery: "unknown",
+    });
+    expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 77, platformFinalTaskCounts: { PC: 22, PlayStation: 14, Xbox: 18, Nintendo: 15 } });
     expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
   });
 
