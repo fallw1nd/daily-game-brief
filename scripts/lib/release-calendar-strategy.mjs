@@ -1,27 +1,48 @@
 const DAY_MS = 86400000;
 
 function validTime(value) {
-  const time = Date.parse(value || "");
+  if (typeof value !== "string" || !value.trim()) return null;
+  const time = Date.parse(value);
   return Number.isFinite(time) ? time : null;
 }
 
+const HEALTH_PHASES = new Set(["success", "failed", "partial_failure", "unknown"]);
+
+function validObservation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (!HEALTH_PHASES.has(value.fetchStatus) || !HEALTH_PHASES.has(value.parserStatus)) return null;
+  const usefulLeads = value.usefulLeads;
+  if (usefulLeads !== null && usefulLeads !== undefined
+    && (!Number.isInteger(usefulLeads) || usefulLeads < 0)) return null;
+  return { fetchStatus: value.fetchStatus, parserStatus: value.parserStatus, usefulLeads: usefulLeads ?? null };
+}
+
 function healthFor(ledger, sourceId, now) {
-  const source = ledger?.schemaVersion === 1 ? ledger.sources?.[sourceId] : null;
+  const sources = ledger?.schemaVersion === 1 && ledger.sources && typeof ledger.sources === "object" && !Array.isArray(ledger.sources)
+    ? ledger.sources : null;
+  const rawSource = sources?.[sourceId];
+  const source = rawSource && typeof rawSource === "object" && !Array.isArray(rawSource) ? rawSource : null;
   const recent = Array.isArray(source?.recent) ? source.recent : [];
   const lastTime = validTime(source?.lastObservedAt);
-  const fresh = lastTime !== null && now.getTime() - lastTime <= 14 * DAY_MS && lastTime <= now.getTime() + DAY_MS;
+  const nowTime = now instanceof Date ? now.getTime() : Number.NaN;
+  const fresh = lastTime !== null && Number.isFinite(nowTime) && lastTime <= nowTime && nowTime - lastTime <= 14 * DAY_MS;
   if (!fresh || recent.length === 0) return { class: "unknown", reason: !source ? "no_history" : "stale_or_invalid_history", observations: 0, usefulLeads: 0 };
-  const current = recent.slice(-5);
-  const knownFetch = current.filter((item) => item.fetchStatus && item.fetchStatus !== "unknown");
+  // Keep the bounded latest window before validation, so malformed trailing entries
+  // cannot make old observations look recent.
+  const current = recent.slice(-5).map(validObservation).filter(Boolean);
+  if (!current.length) return { class: "unknown", reason: "stale_or_invalid_history", observations: 0, usefulLeads: 0 };
+  const knownFetch = current.filter((item) => item.fetchStatus !== "unknown");
   const fetchRate = knownFetch.length ? knownFetch.filter((item) => item.fetchStatus === "success").length / knownFetch.length : null;
-  const knownParser = current.filter((item) => item.parserStatus && item.parserStatus !== "unknown");
+  const knownParser = current.filter((item) => item.parserStatus !== "unknown");
   const parserFailures = knownParser.filter((item) => item.parserStatus === "failed" || item.parserStatus === "partial_failure").length;
-  const usefulLeads = current.filter((item) => Number(item.usefulLeads) > 0).length;
-  const healthy = usefulLeads > 0 || (fetchRate !== null && fetchRate >= 0.8 && parserFailures === 0);
-  const degraded = (fetchRate !== null && fetchRate < 0.5) || parserFailures >= 2 || (current.length >= 2 && usefulLeads === 0);
+  const usefulLeads = current.filter((item) => item.usefulLeads !== null && item.usefulLeads > 0).length;
+  const lastTwo = recent.slice(-2).map(validObservation);
+  const repeatedKnownZeroLeads = lastTwo.length === 2 && lastTwo.every((item) => item.usefulLeads === 0);
+  const degraded = (fetchRate !== null && fetchRate < 0.5) || parserFailures >= 2 || repeatedKnownZeroLeads;
+  const healthy = !degraded && (usefulLeads > 0 || (fetchRate !== null && fetchRate >= 0.8 && parserFailures === 0));
   return {
     class: healthy ? "healthy" : degraded ? "degraded" : "unknown",
-    reason: healthy ? "recent_success_or_useful_lead" : degraded ? "repeated_failures_or_no_useful_leads" : "mixed_or_sparse_history",
+    reason: healthy ? "recent_success_or_useful_lead" : degraded ? repeatedKnownZeroLeads ? "repeated_known_zero_leads" : "repeated_failures" : "mixed_or_sparse_history",
     observations: current.length,
     fetchRate,
     parserFailures,
