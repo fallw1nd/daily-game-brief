@@ -11,6 +11,7 @@
 - [docs/MEDIA_PIPELINE.md](docs/MEDIA_PIPELINE.md)：新闻图与封面流程。
 - [docs/RELEASE_CALENDAR.md](docs/RELEASE_CALENDAR.md)：未来 15 天发售发现与核验。
 - [docs/SHOWCASE_RECOVERY.md](docs/SHOWCASE_RECOVERY.md)：发布会补齐的有界 continuation 规则。
+- [docs/SECOND_PUBLISH.md](docs/SECOND_PUBLISH.md)：用户触发“二次发布”时执行的近期审计、同期修订、译名补全、内容回填与完整验收契约。
 
 历史事故、一次性验收与已完成迁移只记录在 [docs/MAINTENANCE_LOG.md](docs/MAINTENANCE_LOG.md)，不作为生产指令。
 

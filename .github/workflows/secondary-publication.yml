@@ -1,0 +1,163 @@
+name: Secondary publication
+
+on:
+  push:
+    branches:
+      - "automation/secondary/**"
+    paths:
+      - "automation/secondary/*.json"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: secondary-publication-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout request branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve request
+        id: request
+        shell: bash
+        run: |
+          request_id="${GITHUB_REF_NAME#automation/secondary/}"
+          request_path="automation/secondary/$request_id.json"
+          if [ ! -f "$request_path" ]; then
+            echo "Secondary request does not match branch identity: $request_path"
+            exit 1
+          fi
+          cp "$request_path" "$RUNNER_TEMP/secondary-request.json"
+          kind="$(node -p "JSON.parse(require('fs').readFileSync('$RUNNER_TEMP/secondary-request.json','utf8')).kind || ''")"
+          if [ "$kind" != "edition" ] && [ "$kind" != "title_backfill" ]; then
+            echo "Unsupported secondary publication kind: $kind"
+            exit 1
+          fi
+          if [ "$kind" = "edition" ]; then
+            edition="$(node -p "JSON.parse(require('fs').readFileSync('$RUNNER_TEMP/secondary-request.json','utf8')).editionId || ''")"
+            if [ "$request_id" != "$edition" ] || ! [[ "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-daily$ ]]; then
+              echo "Edition request identity mismatch: $request_id / $edition"
+              exit 1
+            fi
+          fi
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch trusted production refs
+        shell: bash
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
+          git checkout --detach origin/main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Expand and validate edition request
+        if: steps.request.outputs.kind == 'edition'
+        id: edition
+        shell: bash
+        run: |
+          request="$RUNNER_TEMP/secondary-request.json"
+          edition="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).editionId")"
+          requested_sha="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).packetBlobSha")"
+          recover="$(node -p "Boolean(JSON.parse(require('fs').readFileSync('$request','utf8')).recoverFailedPublication)")"
+          state_path="automation/status/$edition.json"
+          git show "origin/automation/state:$state_path" > "$RUNNER_TEMP/state.json"
+          PACKET_SHA="$requested_sha" RECOVER="$recover" node -e '
+            const fs = require("node:fs");
+            const state = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/state.json", "utf8"));
+            if (state.packet?.status !== "ready" || state.packet?.blobSha !== process.env.PACKET_SHA) throw new Error("secondary request is not bound to the current ready packet");
+            if (process.env.RECOVER === "true") {
+              if (state.editorial?.status !== "timed_out" || state.publication?.status !== "failed") throw new Error("failed-publication recovery requires timed_out + failed state");
+            } else if (state.editorial?.status !== "pending") throw new Error("secondary edition request requires pending editorial state");
+          '
+          git cat-file -e "$requested_sha^{blob}"
+          git cat-file blob "$requested_sha" > "$RUNNER_TEMP/editorial-packet.json"
+          node scripts/expand-secondary-editorial.mjs "$request" "$RUNNER_TEMP/editorial-packet.json" "$RUNNER_TEMP/editorial-decisions.json"
+          EDITORIAL_BRANCH="automation/editorial/$edition" \
+          EDITORIAL_PACKET_PATH="$RUNNER_TEMP/editorial-packet.json" \
+          EDITORIAL_DECISION_PATH="$RUNNER_TEMP/editorial-decisions.json" \
+          EDITORIAL_VALIDATION_PATH="$RUNNER_TEMP/editorial-validation.json" \
+          node scripts/validate-editorial-submission.mjs
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
+          echo "recover=$recover" >> "$GITHUB_OUTPUT"
+
+      - name: Commit exact editorial inbox
+        if: steps.request.outputs.kind == 'edition'
+        shell: bash
+        run: |
+          edition="${{ steps.edition.outputs.edition }}"
+          target="automation/editorial/$edition"
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$target" >/dev/null 2>&1; then
+            git fetch origin "+refs/heads/$target:refs/remotes/origin/$target"
+          fi
+          git checkout -B "$target" origin/main
+          mkdir -p automation/inbox
+          cp "$RUNNER_TEMP/editorial-decisions.json" "automation/inbox/$edition.json"
+          git add "automation/inbox/$edition.json"
+          git commit -m "content(editorial): secondary publish $edition [skip ci]"
+          if git show-ref --verify --quiet "refs/remotes/origin/$target"; then
+            git push --force-with-lease="refs/heads/$target:$(git rev-parse "refs/remotes/origin/$target")" origin "HEAD:refs/heads/$target"
+          else
+            git push origin "HEAD:refs/heads/$target"
+          fi
+
+      - name: Dispatch trusted publisher
+        if: steps.request.outputs.kind == 'edition'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh workflow run publish-editorial-decision.yml --ref main \
+            -f edition_id="${{ steps.edition.outputs.edition }}" \
+            -f publication_mode=publish \
+            -f recover_failed_publication="${{ steps.edition.outputs.recover }}"
+
+      - name: Merge verified title patch and backfill
+        if: steps.request.outputs.kind == 'title_backfill'
+        shell: bash
+        run: |
+          git checkout -B secondary-title-backfill origin/main
+          node scripts/apply-secondary-title-patch.mjs "$RUNNER_TEMP/secondary-request.json"
+          npm run titles:backfill
+          npm run check
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No title backfill changes were required."
+            exit 0
+          fi
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add config/title-translations.json public/data
+          git commit -m "content(titles): secondary publication backfill"
+          git push origin HEAD:main
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### Secondary publication" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Request: ${{ steps.request.outputs.request_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Kind: ${{ steps.request.outputs.kind }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.request.outputs.kind }}" = "edition" ]; then
+            echo "- Edition: ${{ steps.edition.outputs.edition }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Failed-publication recovery: ${{ steps.edition.outputs.recover }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Trusted publisher dispatched after local evidence validation." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Title registry/backfill uses the existing title backfill command and full repository check." >> "$GITHUB_STEP_SUMMARY"
+          fi
