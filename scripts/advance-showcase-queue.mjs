@@ -83,7 +83,14 @@ for (const edition of editions) {
     if (!/^[\w-]+\.json$/.test(batch.name)) throw new Error("invalid batch filename");
     return [batch.name, await readFile(resolve(root, `automation/batches/${canonical.id}/${batch.name}`), "utf8")];
   })));
-  const result = advanceEditorialQueue({ queue, state, canonical, packets });
+  let result;
+  try {
+    result = advanceEditorialQueue({ queue, state, canonical, packets });
+  } catch (error) {
+    if (requestedEdition) throw error;
+    console.error(`${canonical.id}: queue advance skipped during global sweep: ${error.message}`);
+    continue;
+  }
   await writeFile(queuePath, JSON.stringify(result.queue, null, 2) + "\n");
   if (result.packet) {
     activations += 1;
