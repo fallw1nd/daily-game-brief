@@ -26,6 +26,11 @@ describe("PlayStation article date discovery leads", () => {
     expect(result.reviewLinks.every(link => link.review === "open_primary_source_before_publication")).toBe(true);
   });
 
+  it("does not treat a bare on-date phrase as a release lead", () => {
+    const result = parse(rss(article("Developer interview on September 22")));
+    expect(result.reviewLinks).toEqual([]);
+  });
+
   it("uses pubDate only to anchor a missing year and never scans article body or footer", () => {
     const result = parse(rss(article("A game release date is coming soon", { body: "<p>September 25, 2026</p><footer>out September 26</footer>" })));
     expect(result.reviewLinks[0]).toMatchObject({ dateHints: [], dateStatus: "no_date" });
@@ -71,6 +76,15 @@ describe("PlayStation article date discovery leads", () => {
     expect(byTitle.get("Game launches Sept 22-24")).toMatchObject({ dateHints: ["2026-09-22"], dateStatus: "ambiguous_multiple" });
     expect(byTitle.get("Game launches Sept 22 to Oct 1")).toMatchObject({ dateHints: ["2026-09-22"], dateStatus: "ambiguous_multiple" });
     expect(byTitle.get("Game launches Sept 22 and releases Oct 1")).toMatchObject({ dateHints: ["2026-09-22", "2026-10-01"], dateStatus: "ambiguous_multiple" });
+    const continuedDates = parse(rss(
+      article("Game launches September 22 and September 25"),
+      article("Game launches September 22 or September 25"),
+      article("Game launches September 22/September 25"),
+    )).reviewLinks;
+    for (const title of ["Game launches September 22 and September 25", "Game launches September 22 or September 25", "Game launches September 22/September 25"]) {
+      const continuedLink = continuedDates.find(link => link.title === title);
+      expect(continuedLink).toMatchObject({ dateHints: ["2026-09-22", "2026-09-25"], dateStatus: "ambiguous_multiple" });
+    }
     for (const title of ["Game launches September 24, 1999", "Game launches September 24, 2100", "Game launches September 24, 20270", "Game launches September 31"]) {
       expect(byTitle.get(title)).toMatchObject({ dateHints: [], dateStatus: "invalid_date" });
     }
@@ -89,9 +103,9 @@ describe("PlayStation article date discovery leads", () => {
   it("parses the reduced fixture excerpt from the real PS5 feed", async () => {
     const fixture = await readFile(new URL("./fixtures/ps5-article-leads.xml", import.meta.url), "utf8");
     const links = parse(fixture).reviewLinks;
-    expect(links).toHaveLength(4);
-    expect(links.filter(link => link.dateHints.length > 0)).toHaveLength(4);
-    expect(links.filter(link => link.dateStatus === "in_window")).toHaveLength(2);
+    expect(links).toHaveLength(3);
+    expect(links.filter(link => link.dateHints.length > 0)).toHaveLength(3);
+    expect(links.filter(link => link.dateStatus === "in_window")).toHaveLength(1);
     const silentHill = links.find(link => link.title.startsWith("Silent Hill"));
     expect(silentHill).toMatchObject({ dateHints: ["2026-09-24"], dateStatus: "in_window" });
     const moomin = links.find(link => link.title.startsWith("Moomintroll"));

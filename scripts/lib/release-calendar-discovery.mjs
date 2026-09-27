@@ -33,7 +33,7 @@ export function releaseWindow(date) {
 const within = (date, window) => date && date >= window.startInclusive && date <= window.endInclusive;
 const https = (value) => { try { const u = new URL(value); return u.protocol === "https:" ? u.href : null; } catch { return null; } };
 const articleMonth = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
-const articleDateLeadPattern = new RegExp(`\\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out|on)\\s+(?:on\\s+)?(${articleMonth})\\.?\\s*(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "gi");
+const articleDateLeadPattern = new RegExp(`\\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\\s+(?:on\\s+)?(${articleMonth})\\.?\\s*(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "gi");
 const articleDateLeadTestPattern = new RegExp(articleDateLeadPattern.source, "i");
 const articleNegationPattern = /\b(?:no longer|will not|won['’]?t|does not|doesn['’]?t|is not|isn['’]?t|never)\b[^.!?;]{0,48}\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\b/i;
 
@@ -52,6 +52,18 @@ function articleDateHints(text, referenceDate, window) {
     if (!date) { invalid = true; continue; }
     hints.push(date);
     if (new RegExp(`^\\s*(?:[\\u2013\\u2014-]|to)\\s*(?:${articleMonth}\\.?\\s*)?\\d{1,2}(?!\\d)`, "i").test(afterDate)) ambiguousRange = true;
+    const continuationPattern = new RegExp(`^\\s*(?:,?\\s*(?:and|or)\\s+|/\\s*)(?:(${articleMonth})\\.?\\s*)?(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "i");
+    let continuation = afterDate;
+    let continuationMatch;
+    while ((continuationMatch = continuation.match(continuationPattern))) {
+      ambiguousRange = true;
+      const continuationMonth = continuationMatch[1] || match[1];
+      const continuationYear = continuationMatch[3] || match[3];
+      const continuationDate = releaseDate(`${continuationMonth} ${continuationMatch[2]}${continuationYear ? `, ${continuationYear}` : ""}`, referenceDate);
+      if (continuationDate) hints.push(continuationDate);
+      else invalid = true;
+      continuation = continuation.slice(continuationMatch[0].length);
+    }
   }
   const dateHints = [...new Set(hints)];
   let dateStatus;
