@@ -17,9 +17,9 @@ Candidates and observations use named fields. Repeated values are shared only th
 
 | Edition | Historical packet tasks / chars | Current packet tasks / chars | Tasks gained | Historical / current chars per task | Unique tasks available | Omitted accounting: report + packet cap + byte budget | Final family task counts (PC / PS / Xbox / Nintendo) |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |
-| 2026-09-18 | 30 / 23,608 | 37 / 23,917 | +7 | 786.93 / 646.41 | 65 | 0 + 0 + 28 = 28 | 26 / 14 / 11 / 18 |
-| 2026-09-19 | 24 / 23,600 | 33 / 23,890 | +9 | 983.33 / 723.94 | 76 | 101 + 0 + 43 = 144 | 21 / 14 / 17 / 16 |
-| 2026-09-21 holdout | 24 / 23,621 | 33 / 23,943 | +9 | 984.21 / 725.55 | 74 | 36 + 0 + 41 = 77 | 22 / 14 / 17 / 16 |
+| 2026-09-18 | 30 / 23,608 | 37 / 23,898 | +7 | 786.93 / 645.89 | 65 | 0 + 0 + 28 = 28 | 25 / 14 / 11 / 19 |
+| 2026-09-19 | 24 / 23,600 | 33 / 23,974 | +9 | 983.33 / 726.48 | 76 | 101 + 0 + 43 = 144 | 20 / 14 / 19 / 15 |
+| 2026-09-21 holdout | 24 / 23,621 | 33 / 23,997 | +9 | 984.21 / 727.18 | 74 | 36 + 0 + 41 = 77 | 22 / 14 / 18 / 15 |
 
 Family counts include a multi-platform task once in every family it claims. The holdout and fixtures each round-trip every selected task. The earlier 2026-09-19 report-stage omission of 101 and daily21 omission of 36 retain unknown upstream units; this replay does not recover or claim to restore those entries. Daily18/19 fixture provenance records production commits `1b7ff947e94ccda1c0610917919e9cf44f416e3a` and `df6791cfb4d0486329ae38064b9b1ba5b2cc45bf`, respectively.
 

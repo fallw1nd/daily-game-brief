@@ -114,6 +114,26 @@ function isInWindowReviewLink(link, report) {
 function telemetryFor(report, reportCandidates, selectedByCap, selectedIndexes, visibleRawRows, links, chosenLinks) {
   const budgetOmittedTasks = selectedByCap.candidates.length - selectedIndexes.length;
   const sourceTelemetry = report?.omissionTelemetry || {};
+  const opportunityCounts = Object.fromEntries(CALENDAR_PLATFORM_FAMILIES.map((family) => [family, 0]));
+  const taskOpportunityCounts = Object.fromEntries(CALENDAR_PLATFORM_FAMILIES.map((family) => [family, 0]));
+  const linkOpportunityCounts = Object.fromEntries(CALENDAR_PLATFORM_FAMILIES.map((family) => [family, 0]));
+  for (const index of selectedIndexes) {
+    for (const family of leadPlatformFamilies(selectedByCap.candidates[index])) {
+      opportunityCounts[family]++;
+      taskOpportunityCounts[family]++;
+    }
+  }
+  for (const link of chosenLinks) {
+    const family = leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] })[0];
+    if (family && family !== "Unknown") {
+      opportunityCounts[family]++;
+      linkOpportunityCounts[family]++;
+    }
+  }
+  const representedTaskFamilies = new Set(selectedByCap.candidates.flatMap((lead) => leadPlatformFamilies(lead)));
+  const reportTaskFamilies = new Set(reportCandidates.flatMap((lead) => leadPlatformFamilies(lead)));
+  const representedLinkFamilies = new Set(links.filter((link) => isInWindowReviewLink(link, report))
+    .flatMap((link) => leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] })));
   return {
     visibleRawRows,
     uniqueTasks: Number(sourceTelemetry.uniqueTasks ?? reportCandidates.length),
@@ -123,6 +143,12 @@ function telemetryFor(report, reportCandidates, selectedByCap, selectedIndexes, 
     budgetOmittedTasks,
     linkOmitted: links.length - chosenLinks.length,
     platformFinalTaskCounts: familyCounts(selectedIndexes.map((index) => selectedByCap.candidates[index])),
+    platformFinalLinkCounts: linkOpportunityCounts,
+    platformFinalOpportunityCounts: opportunityCounts,
+    platformCapOmittedFamilies: CALENDAR_PLATFORM_FAMILIES.filter((family) => reportTaskFamilies.has(family) && !representedTaskFamilies.has(family)),
+    platformFloorOmittedFamilies: CALENDAR_PLATFORM_FAMILIES.filter((family) =>
+      (representedTaskFamilies.has(family) && taskOpportunityCounts[family] === 0)
+      || (representedLinkFamilies.has(family) && linkOpportunityCounts[family] === 0)),
     reportStageOmittedCandidates: Number(report?.omittedCandidates || 0),
     reportStageOmittedUnit: sourceTelemetry.legacyOmittedUnit || (sourceTelemetry.capOmittedTasks !== undefined ? "tasks" : "unknown_rows_or_groups"),
     legacyOmittedCandidates: Number(report?.omittedCandidates || 0),
@@ -130,7 +156,7 @@ function telemetryFor(report, reportCandidates, selectedByCap, selectedIndexes, 
   };
 }
 
-/** Select tasks and review links under fixed row/byte ceilings. */
+/** Select tasks and review links under fixed row/character ceilings. */
 export function selectCalendarPacket({ report, maxCandidates = 100, maxChars = 24000 }) {
   if (!Number.isInteger(maxCandidates) || maxCandidates < 0) throw new Error("maxCandidates must be a non-negative integer");
   if (!Number.isInteger(maxChars) || maxChars < 1) throw new Error("maxChars must be a positive integer");
@@ -180,17 +206,77 @@ export function selectCalendarPacket({ report, maxCandidates = 100, maxChars = 2
     return true;
   };
 
-  // Reserve the three console families and qualifying review entries before
-  // admitting PC rows, so one large PC record cannot consume their fit space.
-  for (const family of ["PlayStation", "Xbox", "Nintendo"]) {
-    const bySize = [...familyIndexes.get(family)].sort((a, b) => JSON.stringify(selectedByCap.candidates[a]).length - JSON.stringify(selectedByCap.candidates[b]).length);
-    for (const index of bySize) if (addTask(index)) break;
+  // Establish one deterministic opportunity per represented family before
+  // admitting any extra task or link. A dated PlayStation link is its own
+  // minimum opportunity, even when a PlayStation task is also available.
+  const taskItems = selectedByCap.candidates.map((lead, index) => ({
+    type: "task", index, families: leadPlatformFamilies(lead), cost: JSON.stringify(lead).length,
+  })).filter((item) => item.families.length);
+  const linkItems = priorityLinks.map(({ link, index }) => ({
+    type: "link", index,
+    families: leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] }).filter((family) => family !== "Unknown"),
+    cost: JSON.stringify(link).length,
+  })).filter((item) => item.families.length);
+  const floorItems = [...taskItems, ...linkItems]
+    .sort((a, b) => a.cost - b.cost || (a.type === b.type ? 0 : a.type === "task" ? -1 : 1) || a.index - b.index);
+  const familyBits = new Map(CALENDAR_PLATFORM_FAMILIES.map((family, index) => [family, 1 << index]));
+  const maskFor = (item) => item.families.reduce((mask, family) => mask | ((familyBits.get(family) || 0) << (item.type === "link" ? 4 : 0)), 0);
+  const representedTaskFamilies = new Set(taskItems.flatMap((item) => item.families));
+  const representedLinkFamilies = new Set(linkItems.flatMap((item) => item.families));
+  const requiredMask = [...representedTaskFamilies].reduce((mask, family) => mask | familyBits.get(family), 0)
+    | [...representedLinkFamilies].reduce((mask, family) => mask | (familyBits.get(family) << 4), 0);
+  const datedPlayStationLink = priorityLinks
+    .filter(({ link }) => leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] }).includes("PlayStation"))
+    .sort((a, b) => JSON.stringify(a.link).length - JSON.stringify(b.link).length || a.index - b.index)[0];
+  const mandatoryLinkIndexes = datedPlayStationLink ? [datedPlayStationLink.index] : [];
+  let floorStates = [{
+    mask: mandatoryLinkIndexes.length ? familyBits.get("PlayStation") << 4 : 0,
+    taskIndexes: [],
+    linkIndexes: mandatoryLinkIndexes,
+    cost: mandatoryLinkIndexes.length ? JSON.stringify(links[mandatoryLinkIndexes[0]]).length : 0,
+    mandatoryLink: mandatoryLinkIndexes.length > 0,
+  }, { mask: 0, taskIndexes: [], linkIndexes: [], cost: 0, mandatoryLink: false }];
+  const stateLimit = 64;
+  for (const item of floorItems) {
+    if (item.type === "link" && mandatoryLinkIndexes.includes(item.index)) continue;
+    const itemMask = maskFor(item);
+    const next = [...floorStates];
+    for (const state of floorStates) {
+      const mask = state.mask | itemMask;
+      if (mask === state.mask) continue;
+      next.push({
+        mask,
+        taskIndexes: item.type === "task" ? [...state.taskIndexes, item.index] : state.taskIndexes,
+        linkIndexes: item.type === "link" ? [...state.linkIndexes, item.index] : state.linkIndexes,
+        cost: state.cost + item.cost,
+        mandatoryLink: state.mandatoryLink,
+      });
+    }
+    const byMask = new Map();
+    for (const state of next) {
+      const bucket = byMask.get(state.mask) || [];
+      bucket.push(state);
+      bucket.sort((a, b) => Number(b.mandatoryLink) - Number(a.mandatoryLink) || a.cost - b.cost
+        || a.taskIndexes.join(",").localeCompare(b.taskIndexes.join(","))
+        || a.linkIndexes.join(",").localeCompare(b.linkIndexes.join(",")));
+      byMask.set(state.mask, bucket.slice(0, stateLimit));
+    }
+    floorStates = [...byMask.values()].flat();
   }
-  // Keep dated, explicitly platform-attributed review entries from being
-  // starved by game rows; direct platform metadata or source coverage qualifies.
-  for (const { index } of priorityLinks) addLink(index);
-  const pcBySize = [...familyIndexes.get("PC")].sort((a, b) => JSON.stringify(selectedByCap.candidates[a]).length - JSON.stringify(selectedByCap.candidates[b]).length);
-  for (const index of pcBySize) if (addTask(index)) break;
+  const maskBits = (mask) => (mask & requiredMask).toString(2).replace(/0/g, "").length;
+  const rankedFloorStates = floorStates
+    .sort((a, b) => maskBits(b.mask) - maskBits(a.mask) || Number(b.mandatoryLink) - Number(a.mandatoryLink) || b.mask - a.mask || a.cost - b.cost);
+  let floorState;
+  for (const state of rankedFloorStates) {
+    if (fits(state.taskIndexes, state.linkIndexes.map((index) => links[index]))) {
+      floorState = state;
+      break;
+    }
+  }
+  if (floorState) {
+    for (const index of floorState.taskIndexes) { chosenIndexes.push(index); chosenSet.add(index); }
+    for (const index of floorState.linkIndexes) { chosenLinks.push(links[index]); chosenLinkIndexes.add(index); }
+  }
 
   let progressed = true;
   while (progressed && chosenIndexes.length < maxCandidates) {

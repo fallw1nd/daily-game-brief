@@ -14,7 +14,7 @@ export function calendarPlatformFamily(platform) {
 
 export function leadPlatformFamilies(lead) {
   const observed = array(lead?.observations).flatMap((observation) => [
-    ...array(observation?.platforms), observation?.platform,
+    ...array(observation?.platforms), observation?.platform, observation?.platformFamily,
   ]);
   const values = [...array(lead?.platforms), ...array(lead?.platformHints), ...observed];
   return unique(values.map(calendarPlatformFamily).filter((family) => family !== "Unknown"));
