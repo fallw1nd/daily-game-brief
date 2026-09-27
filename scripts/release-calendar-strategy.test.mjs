@@ -107,6 +107,31 @@ describe("calendar fallback strategy", () => {
     expect(report.fallbackTelemetry.actualFallbackAttempts).toContain("playstation-ps5-rss");
   });
 
+  it.each([
+    ["zero followed by null", [{ fetchStatus: "success", parserStatus: "success", usefulLeads: 0 }, null]],
+    ["null followed by a useful lead", [null, { fetchStatus: "success", parserStatus: "success", usefulLeads: 1 }]],
+    ["zero with an invalid-status observation", [
+      { fetchStatus: "success", parserStatus: "success", usefulLeads: 1 },
+      { fetchStatus: "invalid", parserStatus: "success", usefulLeads: 0 },
+      { fetchStatus: "success", parserStatus: "success", usefulLeads: 0 },
+    ]],
+  ])("collects safely with mixed malformed recent health history: %s", async (_label, recent) => {
+    const seen = [];
+    const report = await collectReleaseCalendar({ config, editionDate, now,
+      previousHealth: { schemaVersion: 1, sources: {
+        "playstation-ps5-rss": { lastObservedAt: "2026-09-27T04:00:00.000Z", recent },
+      } },
+      fetcher: async url => { seen.push(url); return empty(); },
+    });
+    const baseAttempts = seen.filter(url => url.includes("base.example/"));
+    const fallbackAttempts = seen.filter(url => url.includes("fallback.example/"));
+    expect(report.fallbackTelemetry.baseAttempted).toHaveLength(6);
+    expect(baseAttempts).toHaveLength(6);
+    expect(fallbackAttempts.length).toBeLessThanOrEqual(2);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(report.fallbackTelemetry.actualFallbackAttempts).toContain("playstation-ps5-rss");
+  });
+
   it("classifies repeated known zero-lead observations as degraded even when fetch and parsing succeeded", () => {
     const recent = Array.from({ length: 5 }, () => ({ fetchStatus: "success", parserStatus: "success", usefulLeads: 0 }));
     const plan = planCalendarFallbacks({ baseSources: [{ id: "base", platform: "PlayStation" }],

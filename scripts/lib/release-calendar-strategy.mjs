@@ -37,7 +37,7 @@ function healthFor(ledger, sourceId, now) {
   const parserFailures = knownParser.filter((item) => item.parserStatus === "failed" || item.parserStatus === "partial_failure").length;
   const usefulLeads = current.filter((item) => item.usefulLeads !== null && item.usefulLeads > 0).length;
   const lastTwo = recent.slice(-2).map(validObservation);
-  const repeatedKnownZeroLeads = lastTwo.length === 2 && lastTwo.every((item) => item.usefulLeads === 0);
+  const repeatedKnownZeroLeads = lastTwo.length === 2 && lastTwo.every((item) => item !== null && item.usefulLeads === 0);
   const degraded = (fetchRate !== null && fetchRate < 0.5) || parserFailures >= 2 || repeatedKnownZeroLeads;
   const healthy = !degraded && (usefulLeads > 0 || (fetchRate !== null && fetchRate >= 0.8 && parserFailures === 0));
   return {
