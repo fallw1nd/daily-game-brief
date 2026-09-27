@@ -217,8 +217,22 @@ export function selectCalendarPacket({ report, maxCandidates = 100, maxChars = 2
     families: leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] }).filter((family) => family !== "Unknown"),
     cost: JSON.stringify(link).length,
   })).filter((item) => item.families.length);
-  const floorItems = [...taskItems, ...linkItems]
-    .sort((a, b) => a.cost - b.cost || (a.type === b.type ? 0 : a.type === "task" ? -1 : 1) || a.index - b.index);
+  const itemOrder = (a, b) => a.cost - b.cost
+    || (a.type === b.type ? 0 : a.type === "task" ? -1 : 1)
+    || a.index - b.index;
+  // Keep a small, deterministic portfolio for each family and opportunity
+  // type. This preserves alternate representatives for nonlinear packet
+  // compression while preventing repeated same-family candidates from
+  // multiplying the search space. Multi-family candidates are retained when
+  // they rank among the representatives for any family they cover.
+  const representativeItems = new Set();
+  for (const family of CALENDAR_PLATFORM_FAMILIES) {
+    for (const items of [taskItems, linkItems]) {
+      for (const item of items.filter((candidate) => candidate.families.includes(family))
+        .sort(itemOrder).slice(0, 4)) representativeItems.add(item);
+    }
+  }
+  const floorItems = [...representativeItems].sort(itemOrder);
   const familyBits = new Map(CALENDAR_PLATFORM_FAMILIES.map((family, index) => [family, 1 << index]));
   const maskFor = (item) => item.families.reduce((mask, family) => mask | ((familyBits.get(family) || 0) << (item.type === "link" ? 4 : 0)), 0);
   const representedTaskFamilies = new Set(taskItems.flatMap((item) => item.families));
@@ -229,14 +243,20 @@ export function selectCalendarPacket({ report, maxCandidates = 100, maxChars = 2
     .filter(({ link }) => leadPlatformFamilies({ platforms: [reviewLinkPlatform(link, report)] }).includes("PlayStation"))
     .sort((a, b) => JSON.stringify(a.link).length - JSON.stringify(b.link).length || a.index - b.index)[0];
   const mandatoryLinkIndexes = datedPlayStationLink ? [datedPlayStationLink.index] : [];
-  let floorStates = [{
-    mask: mandatoryLinkIndexes.length ? familyBits.get("PlayStation") << 4 : 0,
-    taskIndexes: [],
-    linkIndexes: mandatoryLinkIndexes,
-    cost: mandatoryLinkIndexes.length ? JSON.stringify(links[mandatoryLinkIndexes[0]]).length : 0,
-    mandatoryLink: mandatoryLinkIndexes.length > 0,
-  }, { mask: 0, taskIndexes: [], linkIndexes: [], cost: 0, mandatoryLink: false }];
-  const stateLimit = 64;
+  let floorStates = [
+    {
+      mask: mandatoryLinkIndexes.length ? familyBits.get("PlayStation") << 4 : 0,
+      taskIndexes: [],
+      linkIndexes: mandatoryLinkIndexes,
+      cost: mandatoryLinkIndexes.length ? JSON.stringify(links[mandatoryLinkIndexes[0]]).length : 0,
+      mandatoryLink: mandatoryLinkIndexes.length > 0,
+    },
+    { mask: 0, taskIndexes: [], linkIndexes: [], cost: 0, mandatoryLink: false },
+  ];
+  const stateLimit = 4;
+  const stateOrder = (a, b) => Number(b.mandatoryLink) - Number(a.mandatoryLink) || a.cost - b.cost
+    || a.taskIndexes.join(",").localeCompare(b.taskIndexes.join(","))
+    || a.linkIndexes.join(",").localeCompare(b.linkIndexes.join(","));
   for (const item of floorItems) {
     if (item.type === "link" && mandatoryLinkIndexes.includes(item.index)) continue;
     const itemMask = maskFor(item);
@@ -256,16 +276,16 @@ export function selectCalendarPacket({ report, maxCandidates = 100, maxChars = 2
     for (const state of next) {
       const bucket = byMask.get(state.mask) || [];
       bucket.push(state);
-      bucket.sort((a, b) => Number(b.mandatoryLink) - Number(a.mandatoryLink) || a.cost - b.cost
-        || a.taskIndexes.join(",").localeCompare(b.taskIndexes.join(","))
-        || a.linkIndexes.join(",").localeCompare(b.linkIndexes.join(",")));
-      byMask.set(state.mask, bucket.slice(0, stateLimit));
+      bucket.sort(stateOrder);
+      if (bucket.length > stateLimit) bucket.length = stateLimit;
+      byMask.set(state.mask, bucket);
     }
     floorStates = [...byMask.values()].flat();
   }
   const maskBits = (mask) => (mask & requiredMask).toString(2).replace(/0/g, "").length;
   const rankedFloorStates = floorStates
-    .sort((a, b) => maskBits(b.mask) - maskBits(a.mask) || Number(b.mandatoryLink) - Number(a.mandatoryLink) || b.mask - a.mask || a.cost - b.cost);
+    .sort((a, b) => maskBits(b.mask) - maskBits(a.mask) || Number(b.mandatoryLink) - Number(a.mandatoryLink) || b.mask - a.mask || a.cost - b.cost)
+    .slice(0, 64);
   let floorState;
   for (const state of rankedFloorStates) {
     if (fits(state.taskIndexes, state.linkIndexes.map((index) => links[index]))) {

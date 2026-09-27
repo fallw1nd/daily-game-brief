@@ -161,6 +161,29 @@ describe("release-calendar packet selection", () => {
     expect(packet.omissionTelemetry.platformFloorOmittedFamilies).toEqual([]);
     expect(JSON.stringify(packet).length).toBeLessThanOrEqual(5000);
   });
+  it("bounds floor search while retaining four-family opportunities at production scale", () => {
+    const families = ["PC", "PlayStation", "Xbox", "Nintendo"];
+    const candidates = aggregateCalendarLeads(Array.from({ length: 100 }, (_, index) => ({
+      title: "Cost probe " + index,
+      date: "2026-10-02",
+      url: "https://example.com/" + index,
+      platforms: [families[index % families.length]],
+      sourceId: "source" + index % families.length,
+    })));
+    const reviewLinks = Array.from({ length: 8 }, (_, index) => ({
+      title: "Dated lead " + index,
+      url: "https://example.com/story/" + index,
+      sourcePlatform: families[index % families.length],
+      dateStatus: "in_window",
+    }));
+    const packet = selectCalendarPacket({ report: { candidates, reviewLinks } });
+
+    for (const family of families) expect(packet.omissionTelemetry.platformFinalTaskCounts[family]).toBeGreaterThan(0);
+    expect(packet.omissionTelemetry.platformFinalLinkCounts).toMatchObject({ PC: 1, PlayStation: 1, Xbox: 1, Nintendo: 1 });
+    expect(packet.reviewLinks).toHaveLength(4);
+    expect(JSON.stringify(packet).length).toBeLessThanOrEqual(24000);
+  });
+
   it("keeps material date conflicts ahead of popularity tie-breakers", () => {
     const leads = [
       { title: "Popular", date: "2026-09-10", knownTitle: true, crossSource: true, priority: 3 },
