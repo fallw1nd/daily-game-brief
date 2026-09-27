@@ -55,9 +55,10 @@ function firstPresent(...values) {
 
 function pageMetrics(entry) {
   const pages = entry.pages && typeof entry.pages === "object" ? entry.pages : {};
+  const legacyPages = integerOrNull(entry.pages);
   return {
     attempted: integerOrNull(firstPresent(entry.pagesAttempted, pages.attempted, pages.attempts)),
-    succeeded: integerOrNull(firstPresent(entry.pagesSucceeded, pages.succeeded, pages.success)),
+    succeeded: integerOrNull(firstPresent(entry.pagesSucceeded, pages.succeeded, pages.success, legacyPages)),
     failed: integerOrNull(firstPresent(entry.pagesFailed, pages.failed, pages.failure)),
   };
 }
@@ -91,6 +92,7 @@ function sourceEntryFromReport(entry, report) {
   const pages = pageMetrics(entry);
   const fetchStatus = phase(fetchValue);
   const parserStatus = phase(parserValue);
+  const parsedCount = integerOrNull(firstPresent(entry.parsedCount, entry.parsed, entry.parsedRecords));
   const inWindowCandidates = integerOrNull(firstPresent(entry.inWindowCandidates, entry.inWindow, entry.inWindowCount));
   const usefulLeads = integerOrNull(firstPresent(entry.usefulLeads, entry.usefulLeadCount, entry.nonVerifiedLeads));
   return {
@@ -102,6 +104,7 @@ function sourceEntryFromReport(entry, report) {
     fetchStatus,
     parserStatus,
     pages,
+    parsedCount,
     inWindowCandidates,
     usefulLeads,
     outcome: state.outcome,
@@ -139,7 +142,7 @@ function mergeObservation(previous, current) {
     key,
     current.pages[key] !== null && current.pages[key] !== undefined ? current.pages[key] : previous.pages[key] ?? null,
   ]));
-  for (const key of ["platform", "family", "fetchStatus", "parserStatus", "inWindowCandidates", "usefulLeads", "outcome", "empty", "changed", "partialFailure", "durationMs"]) {
+  for (const key of ["platform", "family", "fetchStatus", "parserStatus", "parsedCount", "inWindowCandidates", "usefulLeads", "outcome", "empty", "changed", "partialFailure", "durationMs"]) {
     if (current[key] === null || current[key] === "unknown") merged[key] = previous[key] ?? current[key];
   }
   return merged;
@@ -157,6 +160,7 @@ function sourceRecord(sourceId, observations, metadata = {}) {
     lastFetchStatus: latest?.fetchStatus ?? "unknown",
     lastParserStatus: latest?.parserStatus ?? "unknown",
     lastOutcome: latest?.outcome ?? "unknown",
+    lastParsedCount: latest?.parsedCount ?? null,
     lastInWindowCandidates: latest?.inWindowCandidates ?? null,
     lastUsefulLeads: latest?.usefulLeads ?? null,
     recent,
@@ -170,7 +174,7 @@ function validObservation(value, sourceId) {
   if (["attempted", "succeeded", "failed"].some((key) => value.pages[key] !== null && (!Number.isInteger(value.pages[key]) || value.pages[key] < 0))) return false;
   if (value.editionDate !== null && dateOrNull(value.editionDate) !== value.editionDate) return false;
   if (value.fetchedAt !== null && isoOrNull(value.fetchedAt) !== value.fetchedAt) return false;
-  return ["inWindowCandidates", "usefulLeads", "durationMs"].every((key) => value[key] === null || numberOrNull(value[key]) === value[key]);
+  return ["parsedCount", "inWindowCandidates", "usefulLeads", "durationMs"].every((key) => value[key] === null || value[key] === undefined || numberOrNull(value[key]) === value[key]);
 }
 
 function readPrevious(previous) {
@@ -280,6 +284,7 @@ export function sourceHealthSummary(ledger, { platform = null, family = null } =
         emptyOrChangedRecent: count((item) => item.outcome === "empty_or_changed" || item.empty === true || item.changed === true),
         partialFailuresRecent: count((item) => item.partialFailure === true || item.outcome === "partial_failure"),
         averageDurationMsRecent: durations.length ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length) : null,
+        lastParsedCount: source.lastParsedCount,
         lastInWindowCandidates: source.lastInWindowCandidates,
         lastUsefulLeads: source.lastUsefulLeads,
       };

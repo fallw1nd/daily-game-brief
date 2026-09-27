@@ -104,6 +104,18 @@ function articleReleaseType(text) {
   return "unknown";
 }
 
+export function usefulCalendarLeadCount(records, reviewLinks, window = null) {
+  const names = new Set(records
+    .filter(record => !window || within(record.date, window))
+    .filter(record => clean(record.title))
+    .map(record => titleIdentity(record.title))
+    .filter(Boolean));
+  const urls = new Set(reviewLinks
+    .filter(link => link.dateStatus === "in_window" && https(link.url))
+    .map(link => new URL(link.url).href));
+  return names.size + urls.size;
+}
+
 export function parseReleaseSource(html, source, editionDate) {
   const document = dom(html, ["xbox", "articles"].includes(source.adapter));
   const doc = document.window.document;
@@ -207,22 +219,55 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
   // Two requests at a time, fixed source count; an outage is diagnostic, never a news publication blocker.
   for (let i = 0; i < config.sources.length; i += 2) {
     const batch = await Promise.all(config.sources.slice(i, i + 2).map(async source => {
-      try {
-        const parsed = { records: [], reviewLinks: [] };
-        let pages = 0;
-        let pageError;
-        for (let page = 1; page <= (source.maxPages || 1); page++) {
-          const url = new URL(source.url);
-          if (page > 1) url.searchParams.set("page", String(page));
-          let result;
-          try { result = parseReleaseSource(await fetchReleaseSource({ ...source, url: url.href }, config, fetcher), source, editionDate); }
-          catch (error) { pageError = String(error.message).slice(0, 150); break; }
-          parsed.records.push(...result.records); parsed.reviewLinks.push(...result.reviewLinks); pages++;
-          if (!result.records.length || result.records.some(r => r.date > window.endInclusive)) break;
+      const startedAt = Date.now();
+      const parsed = { records: [], reviewLinks: [] };
+      let pagesAttempted = 0;
+      let pagesSucceeded = 0;
+      let pagesFailed = 0;
+      let parserPagesSucceeded = 0;
+      let parserPagesFailed = 0;
+      let sourceError;
+      let parserError;
+      for (let page = 1; page <= (source.maxPages || 1); page++) {
+        pagesAttempted++;
+        const url = new URL(source.url);
+        if (page > 1) url.searchParams.set("page", String(page));
+        let body;
+        try {
+          body = await fetchReleaseSource({ ...source, url: url.href }, config, fetcher);
+          pagesSucceeded++;
+        } catch (error) {
+          pagesFailed++;
+          sourceError = String(error.message).slice(0, 150);
+          break;
         }
-        const records = parsed.records.filter(r => within(r.date, window));
-        return { source, ...parsed, records, pages, parsedCount: parsed.records.length, status: pageError ? (parsed.records.length ? "partial_failure" : "failed") : parsed.records.length || parsed.reviewLinks.length ? "partial" : "empty_or_changed", ...(pageError ? { error: pageError } : {}) };
-      } catch (error) { return { source, records: [], reviewLinks: [], parsedCount: 0, status: "failed", error: String(error.message).slice(0, 150) }; }
+        let result;
+        try {
+          result = parseReleaseSource(body, source, editionDate);
+          parserPagesSucceeded++;
+        } catch (error) {
+          parserPagesFailed++;
+          parserError = String(error.message).slice(0, 150);
+          break;
+        }
+        parsed.records.push(...result.records);
+        parsed.reviewLinks.push(...result.reviewLinks);
+        if (!result.records.length || result.records.some(r => r.date > window.endInclusive)) break;
+      }
+      const records = parsed.records.filter(r => within(r.date, window));
+      const sourceStatus = pagesFailed ? (pagesSucceeded ? "partial_failure" : "failed") : "success";
+      const parserStatus = parserPagesFailed ? (parserPagesSucceeded ? "partial_failure" : "failed")
+        : parserPagesSucceeded && (parsed.records.length || parsed.reviewLinks.length) ? "success" : "unknown";
+      const failed = Boolean(sourceError || parserError);
+      const hasParsedRows = parsed.records.length > 0 || parsed.reviewLinks.length > 0;
+      const status = failed ? (hasParsedRows ? "partial_failure" : "failed") : hasParsedRows ? "partial" : "empty_or_changed";
+      return {
+        source, ...parsed, records, parsedCount: parsed.records.length, status, sourceStatus, parserStatus,
+        parserPagesSucceeded, parserPagesFailed, pagesAttempted, pagesSucceeded, pagesFailed,
+        usefulLeads: usefulCalendarLeadCount(records, parsed.reviewLinks, window),
+        durationMs: Date.now() - startedAt,
+        ...(sourceError || parserError ? { error: sourceError || parserError } : {}),
+      };
     }));
     results.push(...batch);
   }
@@ -232,7 +277,17 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
   // Allocate across families before filling by priority so PC volume cannot evict console leads.
   const selected = []; const buckets = [...new Set(ranked.map(r => r.family))].map(family => ranked.filter(r => r.family === family));
   while (selected.length < config.maxCandidates && buckets.some(b => b.length)) for (const bucket of buckets) if (bucket.length && selected.length < config.maxCandidates) selected.push(bucket.shift());
-  const coverage = results.map(r => ({ sourceId: r.source.id, url: r.source.url, platform: r.source.platform, status: r.status, pages: r.pages || 0, parsedCount: r.parsedCount, inWindow: r.records.length, reviewLinks: r.reviewLinks.length, ...(r.error ? { error: r.error } : {}) }));
+  const coverage = results.map(r => ({
+    sourceId: r.source.id, url: r.source.url, platform: r.source.platform, family: r.source.family,
+    status: r.status, sourceStatus: r.sourceStatus, parserStatus: r.parserStatus,
+    parserPagesSucceeded: r.parserPagesSucceeded, parserPagesFailed: r.parserPagesFailed,
+    pages: r.parserPagesSucceeded, pagesAttempted: r.pagesAttempted, pagesSucceeded: r.pagesSucceeded, pagesFailed: r.pagesFailed,
+    parsedCount: r.parsedCount, inWindow: r.records.length, usefulLeads: r.usefulLeads,
+    durationMs: r.durationMs, reviewLinks: r.reviewLinks.length,
+    ...(r.status === "empty_or_changed" ? { empty: true } : {}),
+    ...(r.status === "partial_failure" ? { partialFailure: true } : {}),
+    ...(r.error ? { error: r.error } : {}),
+  }));
   return { editionDate, window, fetchedAt: now.toISOString(), coverage, candidates: selected.map(r => ({ ...r, review: "open_primary_source_before_publication" })), reviewLinks: results.flatMap(r => r.reviewLinks), omittedCandidates: ranked.length - selected.length, coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.", requiredChecks: ["Open primary pages for missing known titles and cross-source leads first.", "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.", "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.", "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."] };
 }
 

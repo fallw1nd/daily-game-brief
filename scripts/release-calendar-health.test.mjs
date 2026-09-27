@@ -43,14 +43,32 @@ describe("release calendar source health ledger", () => {
   it("records independent page phases and partial failures", () => {
     const ledger = updateCalendarHealth(undefined, report({
       sourceStatus: "partial_failure", parserStatus: "success",
-      pagesAttempted: 3, pagesSucceeded: 2, pagesFailed: 1,
+      pagesAttempted: 3, pagesSucceeded: 2, pagesFailed: 1, pages: 2, parsedCount: 4,
       inWindow: 1, usefulLeads: 1, partialFailure: true, durationMs: 800,
     }));
     expect(ledger.sources.steam.recent[0]).toMatchObject({
       fetchStatus: "partial_failure", parserStatus: "success",
-      pages: { attempted: 3, succeeded: 2, failed: 1 },
+      pages: { attempted: 3, succeeded: 2, failed: 1 }, parsedCount: 4,
       partialFailure: true, inWindowCandidates: 1, usefulLeads: 1, durationMs: 800,
     });
+  });
+
+  it("retains measured legacy page counts without inferring phase health", () => {
+    const ledger = updateCalendarHealth(undefined, {
+      editionDate: "2026-09-20", fetchedAt: "2026-09-20T04:00:00.000Z",
+      coverage: [{ sourceId: "steam", status: "partial", pages: 2, parsedCount: 3, inWindow: 1 }],
+    });
+    expect(ledger.sources.steam.recent[0]).toMatchObject({
+      fetchStatus: "unknown", parserStatus: "unknown", pages: { attempted: null, succeeded: 2, failed: null }, parsedCount: 3,
+    });
+  });
+
+  it("reads ledgers created before parsedCount was added", () => {
+    const previous = updateCalendarHealth(undefined, report({ sourceStatus: "success", parserStatus: "success", pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0 }));
+    delete previous.sources.steam.recent[0].parsedCount;
+    const next = updateCalendarHealth(previous, report({ sourceStatus: "failed", parserStatus: "unknown", outcome: "failed" }, { editionDate: "2026-09-21", fetchedAt: "2026-09-21T04:00:00.000Z" }));
+    expect(next.diagnostics).toEqual([]);
+    expect(next.sources.steam.recent).toHaveLength(2);
   });
 
   it("distinguishes HTTP success with an empty or changed parser result", () => {

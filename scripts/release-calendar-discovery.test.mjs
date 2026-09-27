@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { releaseDate, releaseWindow, parseReleaseSource, collectReleaseCalendar, boundCalendarReport, fetchReleaseSource } from "./lib/release-calendar-discovery.mjs";
+import { releaseDate, releaseWindow, parseReleaseSource, collectReleaseCalendar, boundCalendarReport, fetchReleaseSource, usefulCalendarLeadCount } from "./lib/release-calendar-discovery.mjs";
 const source = (adapter, extra = {}) => ({ id: adapter, family: adapter, adapter, platform: "PC", kind: "primary", priority: 2, url: "https://example.com/" + adapter, ...extra });
 const row = (id, title, date) => `<a class="tab_item" data-ds-appid="${id}"><span class="tab_item_name">${title}</span><span class="release_date">${date}</span></a>`;
 const settings = (sources) => ({ sources, timeoutMs: 1000, maxResponseBytes: 20000, maxCandidates: 100 });
@@ -59,7 +59,8 @@ describe("release discovery", () => {
   });
   it("reports parser drift and rejects oversized responses", async () => {
     const report = await collectReleaseCalendar({ config: settings([source("steam")]), editionDate: "2026-09-08", fetcher: async () => new Response("<h1>Challenge</h1>") });
-    expect(report.coverage[0].status).toBe("empty_or_changed");
+    expect(report.coverage[0]).toMatchObject({ status: "empty_or_changed", sourceStatus: "success", parserStatus: "unknown", pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0, pages: 1, parsedCount: 0, inWindow: 0, usefulLeads: 0, empty: true });
+    expect(report.coverage[0].changed).toBeUndefined();
     await expect(fetchReleaseSource(source("steam"), { timeoutMs: 1000, maxResponseBytes: 5 }, async () => new Response("too much data"))).rejects.toThrow("response too large");
   });
 });
@@ -70,7 +71,40 @@ it("retains earlier pages when a later storefront request fails", async () => {
     return new Response(row(1, "Surviving result", "Sep 10, 2026"));
   } });
   expect(report.candidates).toHaveLength(1);
-  expect(report.coverage[0].status).toBe("partial_failure");
+  expect(report.coverage[0]).toMatchObject({ status: "partial_failure", sourceStatus: "partial_failure", parserStatus: "success", pagesAttempted: 2, pagesSucceeded: 1, pagesFailed: 1, pages: 1, parsedCount: 1, inWindow: 1 });
+});
+
+it("keeps transport success separate from parser failure", async () => {
+  const report = await collectReleaseCalendar({
+    config: settings([source("nintendo")]), editionDate: "2026-09-08",
+    fetcher: async () => new Response('<script id="__NEXT_DATA__">{not-json}</script>'),
+  });
+  expect(report.coverage[0]).toMatchObject({ status: "failed", sourceStatus: "success", parserStatus: "failed", pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0, pages: 0, parsedCount: 0 });
+});
+
+it("marks a parser failure on a later page as partial while retaining earlier parsed rows", async () => {
+  const good = { name: "Known Game", releaseDate: "2026-09-10T00:00:00Z", urlKey: "known-game", nsuid: "123" };
+  const report = await collectReleaseCalendar({
+    config: settings([source("nintendo", { maxPages: 2 })]), editionDate: "2026-09-08",
+    fetcher: async url => url.includes("page=2")
+      ? new Response('<script id="__NEXT_DATA__">{bad}</script>')
+      : new Response('<script id="__NEXT_DATA__">' + JSON.stringify(good) + '</script>'),
+  });
+  expect(report.candidates).toHaveLength(1);
+  expect(report.coverage[0]).toMatchObject({ sourceStatus: "success", parserStatus: "partial_failure", parserPagesSucceeded: 1, parserPagesFailed: 1, pagesAttempted: 2, pagesSucceeded: 2, pagesFailed: 0, pages: 1, parsedCount: 1, inWindow: 1, usefulLeads: 1 });
+});
+
+it("counts useful leads by normalized title and eligible review URL", () => {
+  expect(usefulCalendarLeadCount([
+    { title: "Game Alpha", date: "2026-09-10", url: "https://one.example/1" },
+    { title: "game alpha", date: "2026-09-11", url: "https://two.example/2" },
+    { title: "Other", date: null, url: "https://one.example/3" },
+  ], [
+    { dateStatus: "in_window", url: "https://one.example/review" },
+    { dateStatus: "in_window", url: "https://one.example/review" },
+    { dateStatus: "out_of_window", url: "https://one.example/old" },
+    { url: "https://one.example/undated" },
+  ], releaseWindow("2026-09-08"))).toBe(2);
 });
 
 it("prioritizes a known title without claiming other games are unimportant", async () => {

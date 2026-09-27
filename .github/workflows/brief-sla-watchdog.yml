@@ -98,6 +98,7 @@ jobs:
           mkdir -p artifacts
           git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state || true
           git show "origin/automation/state:automation/ledger/events.json" > artifacts/event-ledger-previous.json 2>/dev/null || true
+          git show "origin/automation/state:automation/health/release-calendar.json" > artifacts/release-calendar-health-previous.json 2>/dev/null || true
           edition="${{ steps.edition.outputs.edition }}"
           packet_sha="$(git show "origin/automation/state:automation/status/$edition.json" 2>/dev/null | node -e 'let text=""; process.stdin.on("data", value => text += value).on("end", () => { try { process.stdout.write(JSON.parse(text).packet.blobSha || ""); } catch {} });')"
           if [[ "$packet_sha" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$packet_sha^{blob}"; then
@@ -147,8 +148,10 @@ jobs:
         run: |
           packet="$RUNNER_TEMP/editorial-packet.json"
           ledger="$RUNNER_TEMP/event-ledger.json"
+          calendar_report="$RUNNER_TEMP/release-calendar-discovery.json"
           cp artifacts/editorial-packet.json "$packet"
           cp artifacts/event-ledger.json "$ledger"
+          cp artifacts/release-calendar-discovery.json "$calendar_report"
           cp artifacts/title-lookup-cache.json "$RUNNER_TEMP/title-lookups.json"
           cp -R artifacts/editorial-batches "$RUNNER_TEMP/sla-editorial-batches"
           edition_id="${{ steps.edition.outputs.edition }}"
@@ -158,7 +161,8 @@ jobs:
             state_dir="$RUNNER_TEMP/sla-packet-state-$attempt"
             git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
             git worktree add --detach "$state_dir" origin/automation/state
-            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger"
+            mkdir -p "$state_dir/automation/packets" "$state_dir/automation/ledger" "$state_dir/automation/health"
+            node scripts/update-release-calendar-health.mjs --previous="$state_dir/automation/health/release-calendar.json" --report="$calendar_report" --output="$state_dir/automation/health/release-calendar.json"
             cp "$packet" "$state_dir/automation/packets/$edition_id.json"
             cp "$packet" "$state_dir/automation/packets/latest-$period.json"
             cp "$ledger" "$state_dir/automation/ledger/events.json"
@@ -173,7 +177,7 @@ jobs:
               --run-id="${{ github.run_id }}"
             git -C "$state_dir" config user.name "daily-game-brief[bot]"
             git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
-            git -C "$state_dir" add automation/packets automation/batches automation/ledger/events.json automation/ledger/title-lookups.json "automation/status/$edition_id.json"
+            git -C "$state_dir" add automation/packets automation/batches automation/ledger/events.json automation/ledger/title-lookups.json automation/health/release-calendar.json "automation/status/$edition_id.json"
             if git -C "$state_dir" diff --cached --quiet; then
               success=true
             else
@@ -369,6 +373,9 @@ jobs:
             artifacts/news-shadow-report.json
             artifacts/news-evidence.json
             artifacts/event-ledger.json
+            artifacts/release-calendar-discovery.json
+            artifacts/release-calendar-packet.json
+            artifacts/release-calendar-health.json
             artifacts/editorial-packet.json
             artifacts/news-coverage-audit.json
           if-no-files-found: warn
