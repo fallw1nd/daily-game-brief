@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const workflowUrl = new URL("../.github/workflows/secondary-publication.yml", import.meta.url);
+const workflowPath = resolve(process.cwd(), ".github/workflows/secondary-publication.yml");
 
 async function readWorkflow() {
-  return readFile(workflowUrl, "utf8");
+  return readFile(workflowPath, "utf8");
 }
 
 describe("secondary title backfill deployment", () => {
