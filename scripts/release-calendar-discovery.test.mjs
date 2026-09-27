@@ -78,7 +78,8 @@ describe("release discovery", () => {
     expect(conflicting.dates).toEqual(["2026-09-09", "2026-09-10"]);
     expect(conflicting.date).toBeNull();
     expect(report.omittedCandidates).toBe(0);
-    const bounded = boundCalendarReport(report, JSON.stringify(report).length - 1);
+    const completePacket = boundCalendarReport(report);
+    const bounded = boundCalendarReport(report, JSON.stringify(completePacket).length - 1);
     expect(bounded.candidates).toHaveLength(2);
     expect(bounded.omittedCandidates).toBe(1);
   });
@@ -137,4 +138,11 @@ it("prioritizes a known title without claiming other games are unimportant", asy
   const report = await collectReleaseCalendar({ config, editionDate: "2026-09-08", titleRegistry: { translations: { known: { titleEnAliases: ["Known Game"] } } }, fetcher: async () => new Response(row(1, "First by date", "Sep 9, 2026") + row(2, "Known Game", "Sep 22, 2026")) });
   expect(report.candidates[0].title).toBe("Known Game");
   expect(report.omittedCandidates).toBe(1);
+  expect(report.coverage[0]).toMatchObject({
+    sourceStatus: "success", parserStatus: "success", parserPagesSucceeded: 1, parserPagesFailed: 0,
+    pages: 1, pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0, usefulLeads: 2,
+  });
+  expect(report.omissionTelemetry).toEqual({
+    visibleRawRows: 2, uniqueTasks: 2, dedupeReduction: 0, capOmittedTasks: 1, legacyOmittedUnit: "tasks",
+  });
 });

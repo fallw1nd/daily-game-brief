@@ -1,5 +1,7 @@
 import { JSDOM, VirtualConsole } from "jsdom";
 import { aggregateCalendarLeads, dedupeCalendarObservations } from "./release-calendar-identity.mjs";
+import { selectCalendarLeads } from "./release-calendar-selection.mjs";
+import { selectCalendarPacket } from "./release-calendar-packet.mjs";
 
 const DAY = 86400000;
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -279,10 +281,7 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
   }
   const all = results.flatMap(r => r.records);
   const grouped = aggregateCalendarLeads(all, { baseline, titleRegistry });
-  const ranked = grouped.sort((a, b) => (Number(b.knownTitle) * 4 + Number(b.crossSource) * 3 + b.priority + Number(!b.inBaseline)) - (Number(a.knownTitle) * 4 + Number(a.crossSource) * 3 + a.priority + Number(!a.inBaseline)) || (a.date || "9999-99-99").localeCompare(b.date || "9999-99-99") || a.title.localeCompare(b.title));
-  // Allocate across families before filling by priority so PC volume cannot evict console leads.
-  const selected = []; const buckets = [...new Set(ranked.map(r => r.family))].map(family => ranked.filter(r => r.family === family));
-  while (selected.length < config.maxCandidates && buckets.some(b => b.length)) for (const bucket of buckets) if (bucket.length && selected.length < config.maxCandidates) selected.push(bucket.shift());
+  const selection = selectCalendarLeads(grouped, config.maxCandidates);
   const coverage = results.map(r => ({
     sourceId: r.source.id, url: r.source.url, platform: r.source.platform, family: r.source.family,
     status: r.status, sourceStatus: r.sourceStatus, parserStatus: r.parserStatus,
@@ -294,13 +293,31 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
     ...(r.status === "partial_failure" ? { partialFailure: true } : {}),
     ...(r.error ? { error: r.error } : {}),
   }));
-  return { editionDate, window, fetchedAt: now.toISOString(), coverage, candidates: selected.map(r => ({ ...r, review: "open_primary_source_before_publication" })), reviewLinks: results.flatMap(r => r.reviewLinks), omittedCandidates: ranked.length - selected.length, coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.", requiredChecks: ["Open primary pages for missing known titles and cross-source leads first.", "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.", "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.", "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."] };
+  return {
+    editionDate,
+    window,
+    fetchedAt: now.toISOString(),
+    coverage,
+    candidates: selection.candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
+    reviewLinks: results.flatMap(r => r.reviewLinks),
+    omittedCandidates: selection.capOmittedTasks,
+    omissionTelemetry: {
+      visibleRawRows: all.length,
+      uniqueTasks: grouped.length,
+      dedupeReduction: Math.max(0, all.length - grouped.length),
+      capOmittedTasks: selection.capOmittedTasks,
+      legacyOmittedUnit: "tasks",
+    },
+    coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.",
+    requiredChecks: [
+      "Open primary pages for missing known titles and cross-source leads first.",
+      "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.",
+      "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.",
+      "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions.",
+    ],
+  };
 }
 
 export function boundCalendarReport(report, maxChars = 24000) {
-  const bounded = { ...report, candidates: [...report.candidates], reviewLinks: [...report.reviewLinks] };
-  while (JSON.stringify(bounded).length > maxChars && bounded.candidates.length) { bounded.candidates.pop(); bounded.omittedCandidates++; }
-  while (JSON.stringify(bounded).length > maxChars && bounded.reviewLinks.length) bounded.reviewLinks.pop();
-  if (JSON.stringify(bounded).length > maxChars) throw new Error("calendar diagnostics exceed budget");
-  return bounded;
+  return selectCalendarPacket({ report, maxCandidates: 100, maxChars });
 }

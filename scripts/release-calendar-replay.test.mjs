@@ -21,6 +21,16 @@ describe("historical release-calendar replay baseline", () => {
     });
     expect(result.packet.nameDiagnostics.leadCount).toBe(30);
     expect(result.packet.kindCoverage).toMatchObject({ primary: { rows: 30 }, discovery: { rows: 14 } });
+    expect(result.proposed).toMatchObject({
+      visibleRawRows: 82,
+      uniqueTasks: 65,
+      dedupeReduction: 17,
+      packetTasks: 65,
+      visibleTasksNotPacket: 0,
+      budgetOmittedTasks: 0,
+      overBudget: false,
+    });
+    expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
     expect(result.sourceDiagnostics.source).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.parser).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.reportedInWindowRows).toBe(82);
@@ -43,6 +53,19 @@ describe("historical release-calendar replay baseline", () => {
     });
     expect(result.packet.nameDiagnostics.leadCount).toBe(24);
     expect(result.packet.kindCoverage).toMatchObject({ primary: { rows: 32 }, discovery: { rows: 11 } });
+    expect(result.proposed).toMatchObject({
+      visibleRawRows: 100,
+      uniqueTasks: 76,
+      dedupeReduction: 24,
+      packetTasks: 76,
+      visibleTasksNotPacket: 0,
+      budgetOmittedTasks: 0,
+      reportStageOmittedCandidates: 101,
+      reportStageOmittedUnit: "unknown_rows_or_groups",
+      overBudget: false,
+    });
+    expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
+    expect(result.omissionAccounting.capOmittedUnit).toBe("unknown_rows_or_groups");
     expect(result.sourceDiagnostics.source).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.parser).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.reportedInWindowRows).toBe(253);

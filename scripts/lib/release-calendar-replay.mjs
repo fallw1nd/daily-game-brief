@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { titleIdentity } from "./release-calendar-discovery.mjs";
+import { aggregateCalendarLeads } from "./release-calendar-identity.mjs";
+import { selectCalendarPacket } from "./release-calendar-packet.mjs";
 
 const DEFAULT_FIXTURE_ROOT = resolve("scripts/fixtures/release-calendar");
 const FAILED_STATUSES = new Set(["failed", "partial_failure"]);
@@ -145,10 +147,20 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
 
   const reportAvailableRows = reportRows.length;
   const capBeforeGroups = reportAvailableRows + capOmittedRows;
-  const budgetOmittedRows = packetOmittedTotal - capOmittedRows;
+  const budgetOmittedRows = Math.max(0, reportAvailableRows - packetRows.length);
+  const numericReconciliation = reportAvailableRows + capOmittedRows === packetRows.length + packetOmittedTotal;
   const packetLeadDiagnostics = collectNameDiagnostics(packetRows, leadKey);
   const packetCandidateChars = candidateChars(packetRows);
   const sourceDiagnostics = collectSourceDiagnostics(report, reportRows);
+  const observations = reportRows.flatMap((row) => (Array.isArray(row.observations) && row.observations.length ? row.observations : [row]).map((observation) => ({
+    ...observation,
+    knownTitle: observation.knownTitle ?? row.knownTitle,
+    inBaseline: observation.inBaseline ?? row.inBaseline,
+  })));
+  const uniqueTasks = aggregateCalendarLeads(observations);
+  const proposed = selectCalendarPacket({ report: { ...report, candidates: uniqueTasks }, maxCandidates: 100, maxChars: 24000 });
+  const compactChars = jsonLength({ candidates: proposed.candidates, candidateDictionary: proposed.candidateDictionary, observationDictionary: proposed.observationDictionary });
+  const visibleTasksNotPacket = Math.max(0, uniqueTasks.length - proposed.candidates.length);
 
   return {
     editionDate: report.editionDate,
@@ -157,10 +169,15 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       reportAvailableRows,
       capBeforeGroups,
       capOmittedRows,
+      capOmittedUnit: report?.omissionTelemetry?.legacyOmittedUnit || "unknown_rows_or_groups",
+      capBeforeUnit: report?.omissionTelemetry?.legacyOmittedUnit || "unknown_rows_or_groups",
       packetRows: packetRows.length,
       packetOmittedTotal,
+      packetOmittedUnit: report?.omissionTelemetry?.legacyOmittedUnit || "unknown_rows_or_groups",
       budgetOmittedRows,
-      reconciles: packetRows.length + packetOmittedTotal === capBeforeGroups,
+      reconciles: numericReconciliation,
+      reconcilesNumerically: numericReconciliation,
+      reconciliationUnit: report?.omissionTelemetry?.legacyOmittedUnit || "unknown_rows_or_groups",
       capOmissionRecovery: "unknown",
     },
     report: {
@@ -182,13 +199,56 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       candidateJsonChars: packetCandidateChars,
       charsPerLead: packetLeadDiagnostics.leadCount ? Math.round((packetCandidateChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
     },
+    proposed: {
+      visibleRawRows: reportRows.length,
+      uniqueTasks: uniqueTasks.length,
+      dedupeReduction: Math.max(0, reportRows.length - uniqueTasks.length),
+      duplicateRatio: reportRows.length ? Math.round((Math.max(0, reportRows.length - uniqueTasks.length) / reportRows.length) * 10000) / 10000 : 0,
+      packetTasks: proposed.candidates.length,
+      visibleTasksNotPacket,
+      capOmittedTasks: proposed.omissionTelemetry.packetCapOmittedTasks,
+      budgetOmittedTasks: proposed.omissionTelemetry.budgetOmittedTasks,
+      reportStageOmittedCandidates: proposed.omissionTelemetry.reportStageOmittedCandidates,
+      reportStageOmittedUnit: proposed.omissionTelemetry.reportStageOmittedUnit,
+      linkOmitted: proposed.omissionTelemetry.linkOmitted,
+      platformFinalTaskCounts: proposed.omissionTelemetry.platformFinalTaskCounts,
+      calendarChars: jsonLength(proposed),
+      compactTaskChars: compactChars,
+      charsPerTask: proposed.candidates.length ? Math.round((compactChars / proposed.candidates.length) * 100) / 100 : 0,
+      overBudget: jsonLength(proposed) > 24000,
+      discoveryPhases: { source: sourceDiagnostics.source, parser: sourceDiagnostics.parser },
+    },
+    comparison: {
+      historicalPacketRows: packetRows.length,
+      historicalPacketTasks: packetLeadDiagnostics.leadCount,
+      proposedPacketTasks: proposed.candidates.length,
+      taskGain: proposed.candidates.length - packetLeadDiagnostics.leadCount,
+      historicalCharsPerTask: packetLeadDiagnostics.leadCount ? Math.round((packetCandidateChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
+      proposedCharsPerTask: proposed.candidates.length ? Math.round((compactChars / proposed.candidates.length) * 100) / 100 : 0,
+    },
     sourceDiagnostics,
   };
 }
 
+const jsonLength = (value) => JSON.stringify(value).length;
+
 export async function replayFixture(edition, fixtureRoot = DEFAULT_FIXTURE_ROOT, options) {
   const fixture = await loadReplayFixture(edition, fixtureRoot);
   return { ...replayCalendarBaseline(fixture, options), provenance: fixture.provenance };
+}
+
+export async function replayHoldoutDirectory(directory, options) {
+  const root = resolve(directory);
+  const [reportText, editorialText] = await Promise.all([
+    readFile(resolve(root, "release-calendar-discovery.json"), "utf8"),
+    readFile(resolve(root, "editorial-packet.json"), "utf8"),
+  ]);
+  const report = JSON.parse(reportText);
+  const editorial = JSON.parse(editorialText);
+  const packet = editorial?.editorialInput?.upcomingDiscovery;
+  if (!packet || !Array.isArray(packet.candidates)) throw new Error("holdout editorial packet has no calendar discovery candidates");
+  const result = replayCalendarBaseline({ report, packet }, options);
+  return { ...result, provenance: null, holdout: { directory: root, source: "read-only local artifact", rawHtmlAvailable: false } };
 }
 
 export { DEFAULT_FIXTURE_ROOT };

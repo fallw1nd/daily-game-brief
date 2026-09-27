@@ -55,7 +55,8 @@ if (evidence.window.period === "daily") {
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   calendarDiscovery = boundCalendarReport(report);
   console.log("Calendar coverage: " + JSON.stringify(report.coverage));
-  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarDiscovery.candidates.length} candidate rows in packet; ${calendarDiscovery.omittedCandidates} omitted by limits. Discovery requires primary-source verification.\n`);
+  const calendarMetrics = calendarDiscovery.omissionTelemetry;
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarMetrics.visibleRawRows} visible report rows → ${calendarMetrics.uniqueTasks} unique tasks (${calendarMetrics.dedupeReduction} duplicate rows removed); ${calendarDiscovery.candidates.length} tasks in packet. Omitted: ${calendarMetrics.capOmittedTasks} at candidate cap, ${calendarMetrics.budgetOmittedTasks} at byte budget, ${calendarMetrics.linkOmitted} review links at byte budget. Final family task counts: ${JSON.stringify(calendarMetrics.platformFinalTaskCounts)}. Calendar packet ${JSON.stringify(calendarDiscovery).length}/24000 chars; discovery requires primary-source verification.\n`);
 }
 const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length : 0;
 let showcaseReport = { events: [], announcements: [], coverage: [] };
@@ -119,7 +120,7 @@ const instructions = [
   "archiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。",
   "早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。",
   "upcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。",
-  "upcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。"
+  "upcomingDiscovery 仅是线索。优先核查日期冲突、基线相关项，再用 knownTitle/crossSource 作有限排序提示；采用前打开来源详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。candidate.metadata 按 candidateDictionary.fields 的位置读取；observations 按 observationDictionary.fields 读取。candidateDictionary.stringFields/arrayFields 及 observationDictionary.stringFields/arrayFields 分别说明对应位置的字符串或数组引用，引用值都指向 observationDictionary.strings，-1 表示缺失。所有观察及来源链接均保留。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或任一遗漏计数大于0时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。"
 ].join("\n");
 const packet = {
   schemaVersion: 3,
