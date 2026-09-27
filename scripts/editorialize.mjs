@@ -5,7 +5,7 @@ import { buildEditorialInput, editorialSchema } from "./lib/editorial-contract.m
 import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calendar-discovery.mjs";
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
 import { gitBlobSha } from "./lib/edition-state.mjs";
-import { persistCalendarHealth } from "./lib/release-calendar-health-io.mjs";
+import { persistCalendarHealth, readOptionalJson } from "./lib/release-calendar-health-io.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
@@ -44,7 +44,8 @@ if (evidence.window.period === "daily") {
     report = JSON.parse(await readFile(reportPath, "utf8"));
     if (report.editionDate !== editionDate) throw new Error("release calendar discovery belongs to a different edition date");
   } else {
-    report = await collectReleaseCalendar({ config, editionDate, baseline: calendarBaseline.items, titleRegistry });
+    const previousHealth = await readOptionalJson(process.env.RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH || "artifacts/release-calendar-health-previous.json", { allowMalformed: true });
+    report = await collectReleaseCalendar({ config, editionDate, baseline: calendarBaseline.items, titleRegistry, previousHealth });
     await persistCalendarHealth({
       previousPath: process.env.RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH || "artifacts/release-calendar-health-previous.json",
       outputPath: process.env.RELEASE_CALENDAR_HEALTH_PATH || "artifacts/release-calendar-health.json",

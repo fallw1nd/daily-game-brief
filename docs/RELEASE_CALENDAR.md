@@ -17,6 +17,10 @@ Discovery never writes `public/data` directly.
 
 Current source families include Steam upcoming/date listings, Nintendo coming-soon data, Xbox Wire release roundups, PlayStation Blog leads, and an independent cross-platform calendar. Configuration lives in `config/release-calendar-sources.json`.
 
+The six base sources are still checked every Daily across the full 15-day range. Two configured, one-page official RSS fallbacks (PlayStation's PS5 category and Xbox News) are considered only when that platform's base sources fail, are partial/empty/parser-unknown, or produce no useful lead. The fallback set is closed; discovery does not search for more publishers. Base requests remain capped at nine (Steam calendar four pages, five other base pages); selected fallbacks add at most two requests, with no more than two requests in flight.
+
+The calendar-only health ledger affects fallback probes. Recent successful sources with useful leads rank first; missing, malformed, or older-than-14-day history gets a safe limited probe. Repeatedly failing or unhelpful fallback history is retried every third edition, and immediately when the matching base source has a hard fetch/parser failure, so history cannot disable it permanently. Health never suppresses a base source. Fallback output remains review links and is excluded from candidate aggregation; RSS publication dates are not treated as release dates. Health persists only sources actually attempted. Telemetry records the four platform gaps, each fallback's trigger/skip reason, and actual attempts. A fetch success or zero parsed rows does not establish coverage.
+
 A discovery page is not proof of a release fact. Before adoption verify:
 
 - exact game identity;

@@ -66,4 +66,38 @@ describe("calendar packet integration", () => {
     await exec(process.execPath, ["--import", pathToFileURL(preload).href, "scripts/editorialize.mjs"], { cwd: resolve("."), env });
     expect(JSON.parse(await readFile(healthPath, "utf8"))).toEqual({ sentinel: true });
   }, 20000);
+
+  it("loads the previous calendar ledger on editorialize's direct discovery path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "calendar-packet-health-strategy-"));
+    const evidencePath = join(root, "evidence.json");
+    const packetPath = join(root, "packet.json");
+    const reportPath = join(root, "report.json");
+    const healthPath = join(root, "health.json");
+    const previousPath = join(root, "previous.json");
+    const preload = join(root, "feeds.mjs");
+    const recent = [1, 2, 3].map(() => ({
+      editionDate: "2026-09-19", fetchedAt: "2026-09-19T04:00:00.000Z", sourceId: "playstation-ps5-rss",
+      platform: "PlayStation", family: "playstation", fetchStatus: "failed", parserStatus: "failed",
+      pages: { attempted: 1, succeeded: 0, failed: 1 }, parsedCount: 0, inWindowCandidates: 0,
+      usefulLeads: 0, outcome: "failed", empty: null, changed: null, partialFailure: false, durationMs: 5,
+    }));
+    await writeFile(evidencePath, JSON.stringify({ window: expectedEditorialWindow("2026-09-20-daily"), packages: [] }));
+    await writeFile(previousPath, JSON.stringify({ schemaVersion: 1, updatedAt: "2026-09-19T04:00:00.000Z", sources: {
+      "playstation-ps5-rss": { sourceId: "playstation-ps5-rss", lastObservedAt: "2026-09-19T04:00:00.000Z", recent },
+    } }));
+    await writeFile(preload, 'globalThis.fetch = async url => new Response(String(url).includes("news.xbox.com") ? "<rss><channel></channel></rss>" : "<html></html>");');
+    await exec(process.execPath, ["--import", pathToFileURL(preload).href, "scripts/editorialize.mjs"], {
+      cwd: resolve("."), env: {
+        ...process.env, NEWS_EVIDENCE_PATH: evidencePath, EDITORIAL_PACKET_PATH: packetPath,
+        RELEASE_CALENDAR_REPORT_PATH: reportPath, RELEASE_CALENDAR_HEALTH_PATH: healthPath,
+        RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH: previousPath,
+        EVENT_LEDGER_PATH: join(root, "absent.json"), TITLE_HINTS_PATH: join(root, "absent-hints.json"),
+      },
+    });
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    const ledger = JSON.parse(await readFile(healthPath, "utf8"));
+    expect(report.fallbackTelemetry.fallbackDecisions.find(item => item.sourceId === "playstation-ps5-rss")).toMatchObject({ attempted: false, reason: "degraded_history_low_frequency_skip" });
+    expect(report.fallbackTelemetry.actualFallbackAttempts).toEqual(["xbox-official-rss"]);
+    expect(ledger.sources["xbox-official-rss"].recent).toHaveLength(1);
+  }, 20000);
 });

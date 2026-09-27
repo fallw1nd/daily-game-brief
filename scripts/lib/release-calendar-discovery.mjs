@@ -2,6 +2,7 @@ import { JSDOM, VirtualConsole } from "jsdom";
 import { aggregateCalendarLeads, dedupeCalendarObservations } from "./release-calendar-identity.mjs";
 import { selectCalendarLeads } from "./release-calendar-selection.mjs";
 import { selectCalendarPacket } from "./release-calendar-packet.mjs";
+import { planCalendarFallbacks } from "./release-calendar-strategy.mjs";
 
 const DAY = 86400000;
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -215,12 +216,7 @@ export async function fetchReleaseSource(source, config, fetcher = fetch) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function collectReleaseCalendar({ config, editionDate, baseline = [], titleRegistry = {}, fetcher = fetch, now = new Date() }) {
-  const window = releaseWindow(editionDate);
-  const results = [];
-  // Two requests at a time, fixed source count; an outage is diagnostic, never a news publication blocker.
-  for (let i = 0; i < config.sources.length; i += 2) {
-    const batch = await Promise.all(config.sources.slice(i, i + 2).map(async source => {
+async function collectSource(source, config, editionDate, window, fetcher) {
       const startedAt = Date.now();
       const parsed = { records: [], reviewLinks: [] };
       let pagesAttempted = 0;
@@ -263,6 +259,17 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
         sourceError ||= String(error?.message || error).slice(0, 150);
       }
       const records = parsed.records.filter(r => within(r.date, window));
+      const reviewLinks = source.kind === "fallback"
+        ? [...parsed.reviewLinks, ...records.map(record => ({
+          title: record.title,
+          url: record.url,
+          sourceId: source.id,
+          dateHints: record.date ? [record.date] : [],
+          dateStatus: record.date ? "in_window" : "no_date",
+          platformHints: [source.platform === "PlayStation" ? "PS5" : source.platform],
+          review: "open_primary_source_before_publication",
+        }))]
+        : parsed.reviewLinks;
       const sourceStatus = sourceError ? (pagesSucceeded ? "partial_failure" : "failed") : "success";
       const parserStatus = parserPagesFailed ? (parserPagesSucceeded ? "partial_failure" : "failed")
         : parserPagesSucceeded && (parsed.records.length || parsed.reviewLinks.length) ? "success" : "unknown";
@@ -270,25 +277,42 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
       const hasParsedRows = parsed.records.length > 0 || parsed.reviewLinks.length > 0;
       const status = failed ? (hasParsedRows ? "partial_failure" : "failed") : hasParsedRows ? "partial" : "empty_or_changed";
       return {
-        source, ...parsed, records, parsedCount: parsed.records.length, status, sourceStatus, parserStatus,
+        source, ...parsed, reviewLinks, records, parsedCount: parsed.records.length, status, sourceStatus, parserStatus,
         parserPagesSucceeded, parserPagesFailed, pagesAttempted, pagesSucceeded, pagesFailed,
         usefulLeads: usefulCalendarLeadCount(records, parsed.reviewLinks, window),
         durationMs: Date.now() - startedAt,
         ...(sourceError || parserError ? { error: sourceError || parserError } : {}),
       };
-    }));
+}
+
+export async function collectReleaseCalendar({ config, editionDate, baseline = [], titleRegistry = {}, fetcher = fetch, now = new Date(), previousHealth = undefined }) {
+  const window = releaseWindow(editionDate);
+  const baseSources = config.sources;
+  const results = [];
+  // Six configured base sources are always rechecked, two at a time, over the full date window.
+  for (let i = 0; i < baseSources.length; i += 2) {
+    results.push(...await Promise.all(baseSources.slice(i, i + 2).map(source => collectSource(source, config, editionDate, window, fetcher))));
+  }
+  const strategy = planCalendarFallbacks({ baseSources, fallbackSources: (config.fallbackSources || []).slice(0, 2), baseResults: results, ledger: previousHealth, editionDate, now });
+  const selectedFallbacks = strategy.fallbackDecisions.filter((decision) => decision.attempted).map((decision) => config.fallbackSources.find(source => source.id === decision.sourceId));
+  for (let i = 0; i < selectedFallbacks.length; i += 2) {
+    const batch = await Promise.all(selectedFallbacks.slice(i, i + 2).map(source => collectSource({ ...source, maxPages: 1 }, config, editionDate, window, fetcher)));
     results.push(...batch);
   }
-  const all = results.flatMap(r => r.records);
+  const roleById = new Map([...baseSources.map(source => [source.id, "base"]), ...(config.fallbackSources || []).map(source => [source.id, "fallback"])]);
+  const all = results.filter(r => roleById.get(r.source.id) !== "fallback").flatMap(r => r.records);
   const grouped = aggregateCalendarLeads(all, { baseline, titleRegistry });
   const selection = selectCalendarLeads(grouped, config.maxCandidates);
+  const decisionById = new Map(strategy.fallbackDecisions.map(decision => [decision.sourceId, decision]));
   const coverage = results.map(r => ({
     sourceId: r.source.id, url: r.source.url, platform: r.source.platform, family: r.source.family,
+    role: roleById.get(r.source.id) || "base",
     status: r.status, sourceStatus: r.sourceStatus, parserStatus: r.parserStatus,
     parserPagesSucceeded: r.parserPagesSucceeded, parserPagesFailed: r.parserPagesFailed,
     pages: r.parserPagesSucceeded, pagesAttempted: r.pagesAttempted, pagesSucceeded: r.pagesSucceeded, pagesFailed: r.pagesFailed,
     parsedCount: r.parsedCount, inWindow: r.records.length, usefulLeads: r.usefulLeads,
     durationMs: r.durationMs, reviewLinks: r.reviewLinks.length,
+    ...(decisionById.has(r.source.id) ? { triggerReason: decisionById.get(r.source.id).reason, healthClass: decisionById.get(r.source.id).health.class } : {}),
     ...(r.status === "empty_or_changed" ? { empty: true } : {}),
     ...(r.status === "partial_failure" ? { partialFailure: true } : {}),
     ...(r.error ? { error: r.error } : {}),
@@ -298,6 +322,13 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
     window,
     fetchedAt: now.toISOString(),
     coverage,
+    fallbackTelemetry: {
+      baseAttempted: baseSources.map(source => source.id),
+      fallbackDecisions: strategy.fallbackDecisions,
+      actualFallbackAttempts: results.filter(r => roleById.get(r.source.id) === "fallback").map(r => r.source.id),
+      platformGaps: strategy.platformGaps,
+      maxAdditionalRequests: Math.min(2, (config.fallbackSources || []).length),
+    },
     candidates: selection.candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
     reviewLinks: results.flatMap(r => r.reviewLinks),
     omittedCandidates: selection.capOmittedTasks,

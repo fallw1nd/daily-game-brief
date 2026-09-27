@@ -35,6 +35,7 @@ describe("release discovery", () => {
     const result = parseReleaseSource(xml, source("xbox"), "2026-09-08");
     expect(result.records).toHaveLength(1);
     expect(result.records[0].date).toBe("2026-09-10");
+    expect(result.reviewLinks).toMatchObject([{ url: "https://example.com/news", published: "2026-09-04" }]);
   });
   it("keeps healthy source candidates during outages, filters boundaries, and marks partial coverage", async () => {
     const report = await collectReleaseCalendar({ config: settings([source("steam"), source("nintendo")]), editionDate: "2026-09-08", fetcher: async url => {
