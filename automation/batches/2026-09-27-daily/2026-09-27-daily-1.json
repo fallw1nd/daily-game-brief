@@ -1,0 +1,1538 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-27T08:03:24.235Z",
+  "finalizedAt": "2026-09-27T08:03:24.235Z",
+  "coverageThrough": "2026-09-27 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-27-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-27 12:00",
+      "windowStart": "2026-09-26 10:10",
+      "windowEnd": "2026-09-27 10:10"
+    },
+    "adjacentEdition": "2026-09-26-daily",
+    "packages": [
+      {
+        "eventKey": "e351a5e52534b7a34c0c",
+        "eventKind": "update",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Marvel's Wolverine Dev Adds Option to Turn Off Controversial Scent Trails and More in New Update",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/marvels-wolverine-dev-adds-option-to-turn-off-controversial-scent-trails-and-more-in-new-update",
+            "publishedAt": "2026-09-26T06:42:12.157Z",
+            "canonicalUrl": "https://www.ign.com/articles/marvels-wolverine-dev-adds-option-to-turn-off-controversial-scent-trails-and-more-in-new-update",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/marvels-wolverine-scent-trail-toggle-1790404061181.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Insomniac Games has published a new Marvel&#x27;s Wolverine update that adds an option to turn off those controversial scent trails for collectibles.\nMarvel&#x27;s Wolverine Dev Adds Option to Turn Off Controversial Scent Trails and More in New Update\nThe Sony developer made good on its promise to investigate a proper on/off option when version 1.001.006 launched just hours ago. Its patch notes reveal more targeted changes as the studio works out the remaining kinks that have emerged in the days since Marvel&#x27;s Wolverine launched for PlayStation 5.\nThere are three new toggle settings that players can now use to customize their gameplay experience: one for Whiskey Bottle scent trails, one for Material Crate Audio Clues, and one for Nightmare Door Roots. Those first two proved to be an especially hot topic online, with players criticizing in-game hints as one of a few examples of a game many feel is too &#x27;hand-holdy.&#x27; Adding the option to completely turn these guides off should quiet those concerns, with a toggle for Nightmare Door Roots adding even more freedom for players to tailor their Marvel&#x27;s Wolverine experience to their liking.\nThe new toggles are pretty straightforward. If players find the wavy visuals to be a bit too distracting, they can simply turn them off. As noted in the in-game settings, using Wolverine&#x27;s Crate Finder and Whiskey Finder Adaptations will override any flipped toggles.\nAnother squashed bug outlined in the patch notes involves some strange bathroom signs. Players feared the signs suggested Insomniac had used generative AI in Marvel&#x27;s Wolverine before the studio stepped in to deny the accusations with an explanation . They won&#x27;t be an eyesore going forward.\nInstead of fans spending their time talking about the new Wolverine game&#x27;s mutant-filled story or its bloody action, the conversation surrounding the launch of the new PS5 exclusive mostly revolved around things like scent trails for collectibles, a motorcycle chase sequence , and &#x27;fart gas.&#x27; Although the new update can make it more difficult to search for and find Whiskey Bottles and Material Crates, story-driven scent trails and senses – like the one that allows Logan to track Jean in The One That Got Away mission – will remain regardless of toggled settings.\nMarvel&#x27;s Wolverine launched for PS5 September 15, 2026. In the wake of controversy surrounding certain mechanics and features, Insomniac said it would keep its ear to the ground when it came to community feedback . It&#x27;s a message studio director of community and marketing James Stevenson repeated following the new update."
+          }
+        ]
+      },
+      {
+        "eventKey": "2b2c222bdbccbd1dfe1e",
+        "eventKind": "announcement",
+        "subjectKey": "minecraft live september 2026 everything",
+        "subject": {
+          "kind": "game",
+          "key": "minecraft live september 2026 everything"
+        },
+        "publishability": "direct",
+        "headline": "Minecraft LIVE September 2026 — Everything Announced",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/minecraft-live-september-2026-everything-announced",
+            "publishedAt": "2026-09-26T14:59:57.761Z",
+            "canonicalUrl": "https://www.ign.com/articles/minecraft-live-september-2026-everything-announced",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/minecraftlive-blogroll-1790444094396.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Minecraft LIVE wrapped up with a number of big announcements for the game. We&#x27;ve got everything you need to know right here.\nMinecraft LIVE September 2026 — Everything Announced\nMinecraft LIVE September 2026 featured a number of big announcements for the game, which we&#x27;ve rounded up below.\nThe headline announcement was confirmation that the Sift is coming to Minecraft Java and Bedrock Edition in 2027. It&#x27;s the first new dimension for Minecraft in 14 years. Elsewhere, Mojang confirmed that Ice Caves are the next game drop, and Sound Effects Packs for Minecraft Marketplace are coming later this year. We also got an update on Minecraft World, which is getting a hotel and a rollercoaster.\nAlas, there was no announcement of an End update, as some fans had speculated might have been on the way. I guess those Enderman teases in the Minecraft LIVE trailer weren&#x27;t teases after all!\nMinecraft LIVE is over, and we have a clearer idea of what&#x27;s coming to Minecraft for the rest of this year and even 2027. Let us know what you thought of all the announcements in the comments!\nMinecraft LIVE&#x27;s big final announcement is that the Sift is coming to Minecraft Java and Bedrock Edition in 2027. The Sift is Minecraft&#x27;s first new dimension in over 14 years, and joins the Overworld, The Nether, and The End as Minecraft’s official fourth dimension.\nToday at Minecraft LIVE: Dungeons II, our first new dimension in more than 14 years, new ways for creators to build, Minecraft on Nintendo Switch 2, and more. More than 300,000 people play Minecraft for the first time on an average day. After 17+ years and 425M+ copies sold, I… pic.twitter.com/fdhkwuh258\nIce Caves are the next Minecraft game drop\nThe Sift, Ice Balls, and much more."
+          }
+        ]
+      },
+      {
+        "eventKey": "edaf1d341cd2d0d73a0c",
+        "eventKind": "announcement",
+        "subjectKey": "world s first official minecraft hotel",
+        "subject": {
+          "kind": "game",
+          "key": "world s first official minecraft hotel"
+        },
+        "publishability": "direct",
+        "headline": "World's First Official Minecraft Hotel Revealed for 2027, First Ever Minecraft Rollercoaster Named",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/worlds-first-official-minecraft-hotel-revealed-for-2027-first-ever-minecraft-rollercoaster-named",
+            "publishedAt": "2026-09-26T17:30:14.845Z",
+            "canonicalUrl": "https://www.ign.com/articles/worlds-first-official-minecraft-hotel-revealed-for-2027-first-ever-minecraft-rollercoaster-named",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/htkjbgrxuaaoaiy-1790443786886.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Minecraft World got two announcements at Minecraft LIVE today: the world’s first official Minecraft hotel, and the name of the first ever Minecraft rollercoaster.\nWorld&#x27;s First Official Minecraft Hotel Revealed for 2027, First Ever Minecraft Rollercoaster Named\nMinecraft World Hotel and the Escape the Nether rollercoaster are confirmed for the Minecraft experience at Chessington World of Adventures Resort, and are set to open their doors at some point next year, Merlin Entertainments and Mojang Studios announced.\nCheck out all the new Minecraft World images and photos in the slideshow below.\nConcept art already released for Minecraft World features wooden houses, Creepers, TNT blocks, and even a Nether dining area. Expect interactive adventures, blockbuilt playscapes, and themed retail.\nFor more, check out everything announced at Minecraft LIVE ."
+          }
+        ]
+      },
+      {
+        "eventKey": "cb91b2050cd3c9bad4f9",
+        "eventKind": "result",
+        "subjectKey": "ぷよぷよ",
+        "subject": {
+          "kind": "game",
+          "key": "ぷよぷよ"
+        },
+        "publishability": "direct",
+        "headline": "「第20回アジア競技大会」の「ぷよぷよeスポーツ」部門で“11歳”の栗原悠輝選手が優勝。アジア大会史上最年少の金メダルと快挙。6歳でプレゼントしてもらった『ぷよぷよ』をきっかけにハマり、過去の大会でも優勝",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260926g",
+            "publishedAt": "2026-09-26T04:48:16+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260926g",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/image01.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "6歳のクリスマスにプレゼントしてもらった『ぷよぷよ』をきっかけにハマり、過去の大会でも『ぷよぷよ』で優勝。勝者の貫禄を見せる\n「第20回アジア競技大会」の「ぷよぷよeスポーツ」部門で“11歳”の栗原悠輝選手が優勝。アジア大会史上最年少の金メダルと快挙。6歳でプレゼントしてもらった『ぷよぷよ』をきっかけにハマり、過去の大会でも優勝\n9月26日、愛知・名古屋で開催中の「第20回アジア競技大会」の「ぷよぷよeスポーツ」部門で 栗原悠輝選手 が優勝し、金メダルを獲得した。11歳で金メダル獲得という異例の戦績である。\n戦績としては、GigaCrystaぷよぷよグランプリのファイナルで優勝しているほか、全国都道府県対抗eスポーツ選手権では、2025年大会（SHIGA）のぷよぷよ部門オープン参加の部、2024年大会（SAGA）のぷよぷよ部門小学生の部で、いずれも優勝を果たしている。\n公益財団法人日本オリンピック委員会の 公式サイト によると、栗原選手が『ぷよぷよ』をはじめたきっかけは、6歳のクリスマスだという。\n家庭用ゲーム機で遊べる『ぷよぷよテトリス２』をプレゼントしてもらったことで、ゼリー状のキャラクターを連ねて次々と消していく「連鎖」にハマり、没頭するようになったとのこと。\nなお、「ぷよぷよeスポーツ」は、セガが展開する対戦アクションパズルゲーム 『Puyo Puyo Champions』 の名称で、前回大会（杭州大会）につづき、今大会でも正式なメダル種目として採用されている。\n栗原選手は小学5年生だ。5選手で争われたグループステージA組では、初戦のフィリピン戦、続くカザフスタン戦を連勝し、3戦目の韓国戦を3-1で制して首位通過を決めていた。TBSの公式YouTubeチャンネルにてダイジェスト映像が確認できる。\n映像では、画面いっぱいの「ぷよ」を12連鎖させて一気に勝負を決めた栗原選手の勇姿が見られる。\n栗原選手は準々決勝でシンガポールの選手を5-0で下し、準決勝進出を決めた。この時点で銅メダル以上を確定させていたが、そこからさらに勝ち上がり、決勝でも勝利して金メダルを手にした。"
+          }
+        ]
+      },
+      {
+        "eventKey": "b0c905ac9b01bb4f85c4",
+        "eventKind": "announcement",
+        "subjectKey": "マイクラ",
+        "subject": {
+          "kind": "game",
+          "key": "マイクラ"
+        },
+        "publishability": "direct",
+        "headline": "『マイクラ』のテーマパーク「Minecraft World」のジェットコースター「ESCAPE THE NETHER」の映像がお披露目。パークに併設される「Minecraft Hotel」も発表",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260927c",
+            "publishedAt": "2026-09-26T17:48:15+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260927c",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/6716a1edf342b2953bcb4ce037cf31e3-1024x576.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ネザーゲートをくぐり抜けるようなイメージ画像も。「Minecraft World」は2027年にイギリス・ロンドンでオープン\n『マイクラ』のテーマパーク「Minecraft World」のジェットコースター「ESCAPE THE NETHER」の映像がお披露目。パークに併設される「Minecraft Hotel」も発表\n配信では、世界初の『マイクラ』ジェットコースター「ESCAPE THE NETHER」のイメージ映像がお披露目された。屋内外を駆け抜ける構成となっており、ネザーゲートをくぐり抜けるようなイメージ画像も映されている。\n日本時間の9月27日、「 Minecraft LIVE &#8211; 2026年9月 」にて『マインクラフト』のテーマパーク、 「Minecraft World」 の開発中の映像が公開された。あわせてパークに併設されるホテル 「Minecraft Hotel」 も発表となった。\n本テーマパークは2027年にイギリス・ロンドンにてオープン予定の施設。Mojang Studiosとマーリン・エンターテインメンツが協力して制作が進められている。\n「Minecraft World」は、2024年に発表され、2026年3月に配信された「マインクラフトライブ」にて詳細が公開された、同作初となるテーマパーク。本施設では史上初の「マインクラフトローラーコースター」や、世界最大のマインクラフトショップ、ゲームをテーマにしたフード、モブたちに会えるスポットなどが計画されている。"
+          },
+          {
+            "sourceIndex": 1,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260927b",
+            "publishedAt": "2026-09-26T17:17:59+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260927b",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/WS000763-1.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "天井のつららは適当にたいまつを置くと落下してくるので注意。氷はサクサク掘れるので鉱石を見つけやすいそう\n『マイクラ』新たな洞窟バイオーム「氷の洞窟」が発表。ほのかに光るクリスタルが幻想的だが、天井のつららと新たな敵「フローズンゾンビ」に注意\n関連記事 『マイクラ』新たなディメンション「ザ・シフト」が追加。「ネザー」「ジ・エンド」に続く14年ぶりの新たな世界\n関連記事 『マイクラ』のテーマパーク「Minecraft World」のジェットコースター「ESCAPE THE NETHER」の映像がお披露目。パークに併設される「Minecraft Hotel」も発表\n日本時間の9月27日、「 Minecraft LIVE &#8211; 2026年9月 」にて新たな洞窟バイオーム 「氷の洞窟」 が発表された。\nオーバーワールドにまもなく Ice Caves (氷の洞窟) が登場！ 冷たいバイオームの地下を探索して氷の洞窟を発見しましょう❄️ 美しさに満ちた豊かな鉱石の宝庫であると同時に Frozen Zombie (フローズンゾンビ) のような特有の危険も潜んでいます🥶 彼らを倒して Ice Ball (アイスボール)… pic.twitter.com/Te9aeRN1I7\n氷の洞窟には「氷のクリスタル」が生成され、これがほのかに光る光源となる。氷の洞窟のビジュアル面のコンセプトは“光と影の相互作用”だといい、このブロックが光の要素の役割を持っているとのことだ。\n「氷のクリスタル」はプレイヤーが設置することも上に乗ることも可能で、これを使った建築の様子も映された。"
+          }
+        ]
+      },
+      {
+        "eventKey": "97d328edb18ebd662bbb",
+        "eventKind": "dlc",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "After Warcraft 3's first new campaign in 23 years, let's normalize releasing new DLC for ancient RTS games",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/rts/after-warcraft-3s-first-new-campaign-in-23-years-lets-normalize-releasing-new-dlc-for-ancient-rts-games/",
+            "publishedAt": "2026-09-26T14:17:56Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/rts/after-warcraft-3s-first-new-campaign-in-23-years-lets-normalize-releasing-new-dlc-for-ancient-rts-games/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/SCNkfSVXbzaAAYK7Liot2Y-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Age of Empires and Blizzard's RTS offer a playbook for how to keep the nostalgia fires burning.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nYour newsletter sign-up was successful\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nSign up to our new Switch 2 newsletter, where we bring you the latest talking points on Nintendo's new console each week, bring you up to date on the news, and recommend what games to play.\nSubscribe for a weekly digest of the movie and TV news that matters, direct to your inbox. From first-look trailers, interviews, reviews and explainers, we've got you covered.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-27T16:02:49+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "73bd17c02a2162f054c7",
+        "eventKind": "launch",
+        "subjectKey": "best open world rpgs nobody played at",
+        "subject": {
+          "kind": "game",
+          "key": "best open world rpgs nobody played at"
+        },
+        "publishability": "direct",
+        "headline": "Best Open-World RPGs Nobody Played At Launch",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/best-open-world-rpg-games-nobody-played-at-launch/",
+            "publishedAt": "2026-09-27T00:45:13Z",
+            "canonicalUrl": "https://gamerant.com/best-open-world-rpg-games-nobody-played-at-launch/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/09/best-open-world-rpgs-that-nobody-played-at-first.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Even without earning themselves instant recognition, some of the greatest open-world RPGs of all time finally got the love they deserved years later.\n6 Best Open-World RPGs That Nobody Played At First\nModern open-world RPGs are easily among the most popular releases today, often amassing hundreds of thousands of players from day one and selling over a million copies within their first few weeks. With the industry more widely covered than ever, great open-world RPGs going largely unnoticed are rare nowadays, but even strong games can still struggle to find their audience . Naturally, it’s especially risky for completely new franchises from new developers, which may need more time to gain recognition.\nThis selection is all about great open-world RPGs, many of which were praised immediately but reached limited audiences or suffered disappointing sales at launch. There can be many reasons for that, which we’ll explore case by case. Some of the titles below only became more visible and widely recommended years later thanks to word of mouth, ports to new platforms, discounts, sequels, or players simply looking back and realizing what they had missed. Let’s take a look at open-world RPGs that only found real traction or cult status years after their launch .\nClick on the game with the higher OpenCritic rating.\nOne of the cleanest modern examples, even Pillars of Eternity 2: Deadfire’s developers don’t understand why nobody played the sequel. Despite excellent reviews and being a direct follow-up to an already established CRPG from a prominent developer, Deadfire sold notably worse than the original and fell far short of expectations, with early numbers reportedly almost six times lower. Its poor performance left Obsidian unsure whether the series could continue at all. The studio eventually returned to the world of Eora with the first-person RPG Avowed .\nThe decade's top RPGs are all can't-miss video games. No matter which you play, you're in for an unforgettable experience that few games can match.\nWhile it’s hard to say that Pillars of Eternity 2: Deadfire became extremely popular or iconic after the dust settled, it remains one of the finest modern open-world CRPGs and is almost incapable of disappointing fans of the genre. From a vast archipelago to explore to strong writing, deep character building, and complex party relationships, Deadfire delivers everything you might crave from an old-school CRPG made by a team of Obsidian’s caliber.\nLike Deadfire , Xenoblade Chronicles X wasn’t the start of a new series, but instead launched as a standalone spinoff to the already acclaimed and popular original game. While Xenoblade Chronicles X wasn’t a downright commercial flop, it was trapped for almost a decade as a Wii U exclusive – one of the least successful consoles in history. As a result, the game simply couldn’t reach the full audience that may have been interested in trying this unique open-world RPG, reportedly selling fewer than a million copies during its first year.\nPillars Of Eternity 2: Deadfire"
+          }
+        ]
+      },
+      {
+        "eventKey": "658fbd7ac6dfa602b9b3",
+        "eventKind": "release-date",
+        "subjectKey": "hsr 4 6",
+        "subject": {
+          "kind": "game",
+          "key": "hsr 4 6"
+        },
+        "publishability": "direct",
+        "headline": "HSR 4.6 Release Date Countdown & Maintenance Time (Honkai Star Rail 4.6)",
+        "tier": "B",
+        "score": 90,
+        "timeRelation": "window",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "gamerant",
+            "label": "GameRant Gaming",
+            "url": "https://gamerant.com/honkai-star-rail-hsr-4-6-release-date-time-countdown-maintenance-ends-when-come-out/",
+            "publishedAt": "2026-09-27T01:00:52Z",
+            "canonicalUrl": "https://gamerant.com/honkai-star-rail-hsr-4-6-release-date-time-countdown-maintenance-ends-when-come-out/",
+            "imageUrl": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2026/09/honkai-star-rail-hsr-4-6-release-date-time-countdown-maintenance-ends-when-come-out-mortenax-blade-pearl-banner-release-date.jpg?w=1600&h=900&fit=crop",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Pearl is an Elation-healer unit that will complete Elation teams in HSR 4.6, but the rerun of Mortenax Blade may shake your will to pull for Pearl.\nHonkai: Star Rail 4.6 will come out on September 27, 2026, at 11:00 PM ET (UTC-4) . The version features the debut of Pearl, an Ice-Elation character who will be a healer that completes Elation teams in HSR . Alongside her banner, there will also be a rerun of Evanescia and Mortenax Blade.\nPearl Banner Release Date In HSR (Honkai Star Rail)\nPearl Release Date In HSR 4.6: September 27, 2026 – November 10, 2026 (Phase 1 &2)\nHSR Banner Guide (Current Banner, Next Banner, And Past Banners)\nPearl's banner in HSR 4.6 lasts for the entire version, so the 4-star rate-up remains the same for both reruns. Here are all the featured character banners in HSR 4.6:\nHSR 4.6 Maintenance Ends & Start Time (Honkai Star Rail 4.6)\nA five-hour maintenance time means you can expect the following for HSR 4.6 maintenance start and end times:\nHSR 4.6 Maintenance Time Countdown\nHonkai Star Rail 4.6 Release Date & Maintenance End Time (Pearl Release Date)\nMortenax Blade is an amazing support/sub-DPS in Honkai: Star Rail, so he fits in a ton of teams."
+          }
+        ]
+      },
+      {
+        "eventKey": "4dcc177cc456761bd1fc",
+        "eventKind": "review-score",
+        "subjectKey": "皇牌空战8",
+        "subject": {
+          "kind": "game",
+          "key": "皇牌空战8"
+        },
+        "publishability": "direct",
+        "headline": "《皇牌空战8》评分解禁 单人战役IGN给出9分好评",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "3dmgame",
+            "label": "3DM游戏新闻",
+            "url": "https://www.3dmgame.com/news/202609/3954646.html",
+            "publishedAt": "2026-09-26T12:57:55.000Z",
+            "canonicalUrl": "https://www.3dmgame.com/news/202609/3954646.html",
+            "imageUrl": null,
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "《皇牌空战8》媒体评分解禁，IGN给本作的单人战役给出9分好评，尚未加入多人模式评分，主要是因为IGN评测作者体验在线多人模式时间太短，无法给出相应评价。GameSpot给出整体8分好评。MTC\n《皇牌空战8》评分解禁 单人战役IGN给出9分好评、GameSpot整体8分\n《皇牌空战8》媒体评分解禁，IGN给本作的单人战役给出9分好评，尚未加入多人模式评分，主要是因为IGN评测作者体验在线多人模式时间太短，无法给出相应评价。GameSpot给出整体8分好评。MTC PS5版本收录53家媒体评分，当前均分87分。\n《皇牌空战8：希孚之翼》是Project Aces一次令人惊叹的成就。游戏将惊艳的画面与音效设计融为一体（说真的，万代南梦宫，求求你们把这张原声带卖出来吧），同时还通过驾驶舱外的剧情片段以及不断穿插其中的无线电通讯，塑造出了一批鲜活且令人难忘的角色。更令人意外的是，这还是一个极具情感冲击力、能够引发共鸣的故事，与我们所处的时代有着紧密联系;与此同时，游戏还带来了系列迄今为止最出色的空战体验，以及最优秀的关卡设计之一。\n即使多人模式更偏向于那些财力雄厚的玩家，《皇牌空战8》的单人冒险也绝对值回票价。剧情本可以更加深刻——更具内省性——但即便如此，它依然引人入胜。虽然游戏中存在一些节奏问题，例如一些填充任务和略显不平衡的剧情推进，但大部分内容都非常出色，完美融合了系列标志性的戏剧性情节、动人的音乐和惊险刺激的空战。《皇牌空战8：希孚之翼》承接了《皇牌空战7》的剧情，再次证明该系列已经重回巅峰。\n自从最后一次离开驾驶舱以来，我一直无法停止回想这段旅程。我知道，《希孚之翼》以及它所讲述的故事，会在很长一段时间里留在我的记忆中。也许现在，我们所能做的，就是期待一个没有国家与战争的世界，一个我们可以自由翱翔于天空、为自己而飞的世界。而就像《希孚之翼》所展现的那样，只要我们相信这样的世界存在，或许终有一天，我们真的能够让它成为现实。"
+          }
+        ]
+      },
+      {
+        "eventKey": "8d2dbb70f1c9e1358be0",
+        "eventKind": "other",
+        "subjectKey": "denshattack",
+        "subject": {
+          "kind": "game",
+          "key": "denshattack"
+        },
+        "publishability": "direct",
+        "headline": "「スペインゲーム祭」の内容をお届け。『Denshattack!』に続く期待のスペイン産ゲーム展示から、小高和剛氏のスピーチまで",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/games-from-spain-20260926-470099/",
+            "publishedAt": "2026-09-26T02:22:58+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/games-from-spain-20260926-470099/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/00_header-1.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "スペインのゲームメーカーが日本や世界のパブリッシャーと交流する機会を設ける「スペインゲーム祭」の模様をお伝えしたい。\n「スペインゲーム祭」の内容をお届け。『Denshattack!』に続く期待のスペイン産ゲーム展示から、小高和剛氏のスピーチまで\n『Denshattack!』の成功とこれから注目のスペイン産ゲーム\nガルシア氏は、2025年のスペインゲーム祭で紹介された『Denshattack!（電車アタック）』が2026年に発売され、30万人のプレイヤーを獲得するヒット作となったことにも言及。同作はSteamで「圧倒的に好評」のステータスを獲得しているほか、 PC版のメタスコアが2026年9月11日時点で88点を獲得 していることなどを紹介した。『Denshattack!』は、近年において目覚ましい成果を残すスペインのゲームといえるかもしれない。\nスペイン貿易投資庁およびスペイン大使館の主催する招待制イベント「スペインゲーム祭」が、9月16日に東京・神田明神ホールで開催された。スペインゲーム祭はスペインのゲームメーカーが日本や世界のパブリッシャーと交流する機会を設けるビジネスネットワーキングイベントだ。ビジネス向けのイベントと聞くと堅苦しく感じられるかもしれないが、スペイン料理が振る舞われたり、スペインの名産ワインを飲むことができたりと、リラックスした雰囲気で行われるのが恒例のイベントとなっている。\n本イベントには9月17日から開催されていた東京ゲームショウ2026（TGS2026）に「Games from Spain」として出展した企業や団体が多数参加した。本稿では、スペインによる「東京ゲームショウの前夜祭」というべき盛り上がりを見せたイベントの模様をお伝えしたい。"
+          }
+        ]
+      },
+      {
+        "eventKey": "a3d29b14f1ad1b898837",
+        "eventKind": "other",
+        "subjectKey": "バイオハザード レクイエム",
+        "subject": {
+          "kind": "game",
+          "key": "バイオハザード レクイエム"
+        },
+        "publishability": "direct",
+        "headline": "『バイオハザード レクイエム』のクリア率が「やたら高くてすごい」と話題、約73％。『RE:4』や『ヴィレッジ』より一回り高い",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260926-470180/",
+            "publishedAt": "2026-09-26T08:47:24+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260926-470180/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260926-470180-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『バイオハザード レクイエム』のクリア率が非常に高いことが報告され、SNSで話題となっている。\n『バイオハザード レクイエム』のクリア率が「やたら高くてすごい」と話題、約73％。『RE:4』や『ヴィレッジ』より一回り高い\n海外のゲームインフルエンサーが「『 バイオハザード レクイエム 』のクリア率が非常に高い」と報告し、SNSで話題となっている。クリア実績/トロフィーの取得率から推定すると、非常に多くのプレイヤーがゲームクリアまで遊んでいるようだ。\n『バイオハザード レクイエム』は、『バイオハザード』シリーズの最新作だ。対応プラットフォームはPC（Steam/Epic Gamesストア）/PS5/Nintendo Switch 2/XBOX Series X|S。主人公はFBI職員グレース・アッシュクロフトと、対バイオテロ組織「DSO」に所属するエージェントのレオン・S・ケネディの二人である。グレース編では逃げ隠れを主体としたサバイバルホラーが展開され、一方のレオン編は戦闘に重点が置かれており、アグレッシブにクリーチャーと戦っていく。\n今年の2月27日にリリースされた同作はユーザーから高い評価を受け、Steamユーザーレビューでは本稿執筆時点で約10万8000件中95％が好評とする「圧倒的に好評」ステータスを獲得。カプコンより、シリーズ史上最速で販売本数800万本を突破したことが伝えられるなど、もともと人気の高い『バイオハザード』シリーズでも際立ったヒットを見せている。\nそんな本作の“クリア実績”の取得率が目立って高いと報告され、話題となっている。今回報告して注目を集めたのは、カナダのゲームインフルエンサーのZenkai Goose氏だ。同氏は9月25日、Xにて「Steamでの『バイオハザード レクイエム』のクリア実績の取得率が72％もある」とポスト。これはAAAゲームの平均的なクリア率よりずっと高いとした。Goose氏のポストには同作への称賛のリプライなどが相次ぎ、本稿執筆時点で2万4000いいねを超えるバイラル化を果たしている。\nこのクリア率を他の作品と比較すると、たとえば『バイオハザード RE:4』のクリア実績に相当する「悪夢の終わり」の取得率は60.4％。『バイオハザード ヴィレッジ』のクリア実績「新米パパ」の取得率は58.3％だ。また発売時期の近いカプコンの作品で言うと、『プラグマタ』のクリア実績「二人の約束」の取得率は42.1％となっている。いずれも高評価を得た人気作ながら、そのなかでも『バイオハザード レクイエム』のクリア率は特に高いことが分かる。\nちなみにPS4/PS5におけるトロフィー情報集積コミュニティサイトPSNProfilesでも、『 レクイエム 』の「新米エージェント」は69.3％、PS5版『 RE:4 』の「悪夢の終わり」は54.7％、PS5版『 ヴィレッジ 』の「新米パパ」は39.6％、『 プラグマタ 』の「二人の約束」は51.9％となっている。『レクイエム』のクリア率は、Steamだけに限らず高い傾向にあるようだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "6fc798ee4de938ec5627",
+        "eventKind": "other",
+        "subjectKey": "マインクラフト",
+        "subject": {
+          "kind": "game",
+          "key": "マインクラフト"
+        },
+        "publishability": "direct",
+        "headline": "『マインクラフト』本編に第4次元「シフト」実装決定、14年以上ぶり。冬アプデでは“氷の洞窟”が来る。新情報続々「マインクラフト ライブ」まとめ",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260927-470213/",
+            "publishedAt": "2026-09-26T19:13:51+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260927-470213/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470213-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Mojang Studiosは9月27日、「Minecraft LIVE（マインクラフト ライブ）」を放送した。\n『マインクラフト』本編に第4次元「シフト」実装決定、14年以上ぶり。冬アプデでは“氷の洞窟”が来る。新情報続々「マインクラフト ライブ」まとめ\nMojang Studiosは9月27日、「 Minecraft LIVE（マインクラフト ライブ） 」を放送した。この中では、『Minecraft（マインクラフト）』や『Minecraft Dungeons II（マインクラフト ダンジョンズ 2）』の新情報が公開された。\n「マインクラフト ライブ」は『マインクラフト』の最新情報をお披露目する毎年恒例のライブイベント。毎年春と秋に計2回開催されるのが通例だが、今年は5月にも「TwitchCon」の会場からの生放送も実施。本稿では、今年3回目となる「マインクラフト ライブ」の放送内で発表された最新情報をまとめてお伝えする。なお、それぞれの名称の公式日本語訳については未定であるため留意されたい。\n「Escape the Nether」と名づけられたジェットコースターは屋内と屋外を走行。上下左右に揺れ動きながら、『マインクラフト』の世界を駆け抜ける。さらにパーク内には、「Minecraft World Hotel」という宿泊施設も建設されるとのこと。現時点ではコンセプトアートが公開されたのみだが、まさに『マインクラフト』づくしのホテルとなりそうだ。\n2日後の9月29日に発売を控える『マインクラフト ダンジョンズ 2』のゲームプレイやストーリーが紹介された。本作は2020年5月に発売された『マインクラフト ダンジョンズ』の続編にあたるアクションRPG。ソロプレイのほか、最大4人での協力プレイに対応している。プレイヤーは本作で、邪悪な村人たちや、彼らを率いる「邪悪なる村人の最高評議会」と呼ばれる3人組と敵対することになる。\n『マインクラフト ダンジョンズ 2』で初登場となる新ディメンション「シフト」が、『マインクラフト』のJava版およびBedrock版にも来年登場することが発表された。「オーバーワールド」「ネザー」「ジ・エンド」に続く4番目のディメンションであり、本作においてディメンションが追加されるのは実に14年以上ぶりとなる。\n公開されたティザー映像では、シフトに生息しているとみられる、耳の生えた新たな動物モブについてもお披露目された。なお『マインクラフト ダンジョンズ 2』の「シフト」については、さまざまな場所に出現した謎の亀裂「Rift」を通り抜けることで訪れることができるというゲーム内の設定が明かされているが、本編ではどのようにシフトへと入ることができるのだろうか。先に『マインクラフト ダンジョンズ 2』を遊んで、考察してみてほしい。\nイギリス・ロンドンにて2027年開園予定のテーマパーク「Minecraft World」の続報が発表された。パークが位置する「Chessington World of Adventures Resort」内ではすでに工事が始まっている様子であり、計画の一部が紹介された。"
+          }
+        ]
+      },
+      {
+        "eventKey": "e47847aaf8bc4fb1f876",
+        "eventKind": "other",
+        "subjectKey": "ロマンシング サガ3 デスティニーユナイテッド",
+        "subject": {
+          "kind": "game",
+          "key": "ロマンシング サガ3 デスティニーユナイテッド"
+        },
+        "publishability": "direct",
+        "headline": "『ロマンシング サガ3 デスティニーユナイテッド』先行プレイ感想。3Dの「ゆきだるま」に感動し「オーガ」の独自モデルに驚く、古さと新しさが融合するロマンシング体験",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/reportjp/rs3-20260926-470130/",
+            "publishedAt": "2026-09-26T02:36:08+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/reportjp/rs3-20260926-470130/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/rs3-20260926-470130-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『ロマンシングサ・ガ3』のリメイク作品『ロマンシング サガ3 デスティニーユナイテッド』。このたび東京ゲームショウ2026にて、作品の一部を試遊する機会に恵まれた。\n『ロマンシング サガ3 デスティニーユナイテッド』先行プレイ感想。3Dの「ゆきだるま」に感動し「オーガ」の独自モデルに驚く、古さと新しさが融合するロマンシング体験\n好評を獲得した『ロマンシングサ・ガ2』のリメイクに続く作品として、現在注目を浴びている『ロマンシングサ・ガ3』のリメイク作品『ロマンシング サガ3 デスティニーユナイテッド』。このたび東京ゲームショウ2026にて、作品の一部を試遊する機会に恵まれた。その模様をお届けしよう。なお、筆者が選んだ難易度は「ノーマル」である。通常のRPGに慣れている人向けの難易度だ。\n『ロマンシング サガ3 デスティニーユナイテッド』は『ロマンシングサ・ガ3』のリメイク作品。発売日は2027年2月16日。対応プラットフォームはPC（Steam/Microsoft Store）/Nintendo Switch 2/Nintendo Switch/PS5/XBOX Series X|S。\n昔を思い出しながらプレイを開始する筆者。まず目に飛び込んでくるのは、美麗な3Dモデルで描かれた「ミューズ」、「シャール」そして、主人公一行だ。本作は『ロマンシングサ・ガ2』のリメイク作品『ロマンシング サガ2 リベンジオブザセブン』と同様に、キャラクターデザインを3D描画に合わせてアレンジしている。全体的にキャッチーな印象を受けるが、細かい部分に原作のキャラクターデザインを彷彿とさせる意匠が散りばめられていることが確認できる。個人的には3D化したことで、会話中の立ち位置であったり、表情がしっかりと描写されているのが嬉しい。\nというのも、『ロマンシングサ・ガ3』というゲームはRPGではあるが、ストーリーの内容は曖昧である。よって、物語に没入するというより、ゲームシステムの試行錯誤が筆者にとって『ロマンシングサ・ガ3』の面白さだった。今回リメイクされるにあたり、「ストーリーの筋書き」が比較的鮮明になったことも含め、キャラクターの個性がより際立ち、面白さの観点がプラスされたように感じるのだ。\nそのまま魔王殿へ向かう筆者。思い出の地が3Dになっていてニンマリだ。画面上部のミニマップに簡単な誘導案内が表示されており、どこに向かえば良いか分かりやすくなっている。フリーシナリオを採用しているがゆえ、自由度に混乱しないための配慮だろう。戦闘に備えてパーティメンバーを確認すべくメニュー画面を覗けば、『ロマンシング サガ2 リベンジオブザセブン』のシステムを踏襲していることがよく分かる。これは実際の戦闘でも同じだ。\n巣の最奥にたどり着き、「悪竜グゥエイン戦」が始まった。フルボイスで会話が発生していることに感慨を覚えつつ、攻撃を仕掛けていく。前作に引き続き「閃き」が発生しやすい技には電球マークがついており、これを活用してワンチャンスを狙いながら戦略的に事を運ぶ……はずだったのだが、閃く技があまりにも強すぎた。「乱れ雪月花」「無双三段」「ファイナルレター」「龍神烈火拳」。すべて最強クラスの技である。ロマンシングすぎる。防御型の陣形を使っているのもあって攻守は完璧。最強クラスの技が繋がる連携技の火力が凄まじく、強敵相手にゴリ押しで終わってしまった。なんとも奇妙な面持ちをしながら筆者の試遊体験は終了した。\nプレイヤーは8人の主人公から1人を選択し、世界各地を旅しながら仲間を集め、世界崩壊を阻止するべく奮闘する。本作はフリーシナリオを特徴としており、ボスを倒す順番や、イベントをこなす順番によって、展開する物語の内容が細かく変化していく。"
+          }
+        ]
+      },
+      {
+        "eventKey": "cf35dca3ff7bbbb4136a",
+        "eventKind": "other",
+        "subjectKey": "英雄立志伝 三国志",
+        "subject": {
+          "kind": "game",
+          "key": "英雄立志伝 三国志"
+        },
+        "publishability": "direct",
+        "headline": "1300人の武将で天下統一を目指せる三国志シム『英雄立志伝：三国志』、正式リリースで日本語対応し盛況博す。史実から民間伝承までてんこ盛り、“卑弥呼でも遊べる”天下統一ライフ",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260926-470141/",
+            "publishedAt": "2026-09-26T03:39:28+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260926-470141/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260926-470141-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "NPC EntertainmentとFree Wingは9月23日、『英雄立志伝：三国志』を正式リリースした。多くのプレイヤーを集める盛況となっている。\n1300人の武将で天下統一を目指せる三国志シム『英雄立志伝：三国志』、正式リリースで日本語対応し盛況博す。史実から民間伝承までてんこ盛り、“卑弥呼でも遊べる”天下統一ライフ\nパブリッシャーのNPC EntertainmentとデベロッパーのFree Wingは9月23日、『 英雄立志伝：三国志（Heroes&#8217; Vow: Three Kingdoms） 』を正式リリースした。対応プラットフォームはPC（Steam）で、ゲーム内は日本語表示に対応している。本作は多くのプレイヤーを集める盛況となっている。\n本作は三国志を題材とした歴史シミュレーションゲームだ。プレイヤーは一人の武将となってプレイし、主君に仕えて任務をこなしたり、自ら君主となって天下統一を目指したりと、自由に目標を立てて遊ぶことになる。\nプレイ可能な武将も多数存在し、公式説明によると合計で約1300人が収録。三国志演義に登場する数々の武将はもちろん、呂布の武芸の師匠とされる李彦など、中国の民間伝承で知られる人物も多数登場している。また卑弥呼率いる邪馬台国も登場しており、日本の九州から覇を唱えることも可能となっている。\nそんな『英雄立志伝：三国志』が9月23日に正式リリースされた。これまでは中国語のみの対応だったところ、バージョン1.0では日本語を含む多言語に対応。また武将のCGがリメイクされたほか、新たに交易システムが追加されるなど、多くの要素が刷新された。こうしたアップデートを受けて本作は盛況を見せており、同時接続プレイヤー数は直近のピーク時で約6300人を記録する賑わいとなっている（ SteamDB ）。\n『英雄立志伝：三国志（Heroes&#8217; Vow: Three Kingdoms）』はPC（ Steam ）向けに配信中だ。ゲーム内は日本語表示に対応している。また現在リリース記念セールが開催されており、10月1日まで定価の10％オフとなる税込2070円で購入可能。\n本作ではプレイ可能なシナリオとして、のべ19本が収録されている。史実シナリオとしては184年の黄巾の乱から249年の高平陵の変まで16本が存在。さらに仮想の展開が設定されたifシナリオが2つあり、そして全武将が一度に登場する特殊なシナリオが1つ用意されている。ゲーム中には特定の条件を満たすことで発生する歴史イベントが多数存在し、それぞれの年代で起きた出来事を体験可能だ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "42e6abee1ef8ed2b5de0",
+        "eventKind": "update",
+        "subjectKey": "delta force celebrates its second anniversary with new",
+        "subject": {
+          "kind": "game",
+          "key": "delta force celebrates its second anniversary with new"
+        },
+        "publishability": "direct",
+        "headline": "Delta Force Celebrates Its Second Anniversary with New Season Reorientation",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/delta-force-celebrates-its-second-anniversary-with-new-season-reorientation",
+            "publishedAt": "2026-09-26T09:30:00.000Z",
+            "canonicalUrl": "https://www.ign.com/articles/delta-force-celebrates-its-second-anniversary-with-new-season-reorientation",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/24/anniversary-key-visual-1790261161812.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Delta Force Celebrates Its Second Anniversary with New Season Reorientation\nGameplay tweaks, new maps, modes and even more content are coming to Delta Force\nDelta Force’s mission has always been to incorporate player feedback to create the best experience possible for its players. As Delta Force players prepare for the free-to-play first-person tactical shooter’s second anniversary, the developers at Team Jade have been hard at work, listening to two years of player feedback as the game has evolved since its initial PC launch, since coming to mobile and Xbox Series X|S.\nBut Team Jade also has big plans for the game&#x27;s future content, which includes anniversary rewards, a suite of new gameplay experiences, and quality-of-life improvements. Delta Force is getting a serious – and seriously major – upgrade. The roadmap is evidence of how Delta Force uses community feedback to expand the range of ways players can play, all while improving the overall experience. Team Jade has listened to players, and has crafted a season that’s focused on reducing friction and giving players more time to do what’s most important: playing the game.\nIn early 2027, players will get to explore Siege: Valkyrie, a new Operations map powered by Unreal Engine 5 technology. That’s right, Unreal Engine 5 features are being implemented in Delta Force. Siege: Valkyrie takes players to a city under siege. The grand new map is divided by a giant city wall, which gives players two distinct areas. The inner city is extravagant and wealthy, full of opulent high-rise buildings, but rife with danger. The outer city, conversely, finds people struggling for survival and resources against the backdrop of fallen buildings. Each of the areas has its own rules, risks and rewards. Will you decide to extract safely with what you’ve found, or will you take a risk and move deeper into the city in pursuit of a huge payout? The choice is yours.\nFor the first time in Delta Force A big shakeup: for the first time, players from different difficulty tiers will enter the same match. In Siege: Valkyrie, there’s a new high-stakes Operations experience where nothing is what it seems, and nothing is predictable.\nOperations isn’t alone in getting a big Unreal Engine 5 upgrade. Warfare will be receiving UE5 features, and The Mog, a map that launched with Season Reorientation, is the first map to support them. And yes, even more Warfare Maps are coming, with the next scheduled to arrive in November, and further maps and gameplay modes are planned throughout 2027.\nSpeaking of new gameplay modes, Detonation, a new bomb-defusal mode, is entering beta on September 27th. That beta will be for PC and mobile players worldwide, with consoles getting access later in the year. Detonation pits two battling teams against one another in a race for control. Those on the attacking team have to break through enemy defences to plant a bomb. Conversely, defenders battle to hold their ground, and prevent the bomb being planted. If the attacking team does manage to plant the bomb, the defenders must sprint to defuse it before it’s too late. Each round of Detonation finds players making unique tactical decisions as teams fight for all-valuable positioning, and seek to exploit an opening that could turn the tides of battle.\nLet’s get into everything that’ll be coming to your fingertips in the near future."
+          }
+        ]
+      },
+      {
+        "eventKey": "ef77086b05e820a74a0a",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Minecraft Confirms Ice Caves as Next Game Drop, Adds Frozen Zombies, Ice Balls, and More",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/minecraft-confirms-ice-caves-as-next-game-drop-adds-frozen-zombies-ice-balls-and-more",
+            "publishedAt": "2026-09-26T17:32:00.612Z",
+            "canonicalUrl": "https://www.ign.com/articles/minecraft-confirms-ice-caves-as-next-game-drop-adds-frozen-zombies-ice-balls-and-more",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/800-800-1790443907943.jpg?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Mojang has teased Minecraft’s next game drop, giving fans a sneak peek at some of its features.\nMinecraft Confirms Ice Caves as Next Game Drop, Adds Frozen Zombies, Ice Balls, and More\nAs revealed at Minecraft LIVE, Ice Caves are coming to the game, adding a new and rare underground extension of cold biomes with glowing ice crystals and environmental variety. Ice Caves include a new hostile mob, the frozen zombie, which can apply freezing effects and throw damaging ice balls. The ice balls can also be used as weapons or to craft potions, adding strategic options for combat scenarios.\nMojang said Ice Caves add a whole new layer of variety to cold biomes, making exploring underground even more interesting, thanks to the increased environmental diversity. “Though they may be beautiful, these caves are far from safe,” the developer said.\nIce crystals can be found in ice caves and can be placed both vertically and horizontally, providing lots of potential for decoration and building. They can even be used as a light source. The Frozen Zombie, meanwhile, applies a stacking freezing effect with its melee attacks. If you take enough hits, you&#x27;ll freeze. It also throws ice balls at you, which apply knockback and deal damage. Normal zombies can convert into Frozen when exposed to powder snow. Players can already convert Husks into Zombies, and now Zombies into Frozen, opening the door for advanced mob farms.\nFrozen drop ice balls on death, allowing players to use them as well, but they can also be crafted and used to brew a new potion. As a weapon, ice balls deal damage and apply knockback, and as a potion it can freeze players.\nFor more, check out everything announced at Minecraft LIVE ."
+          }
+        ]
+      },
+      {
+        "eventKey": "f9288311d3f4e0f0ef76",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Minecraft Is Getting Its First New Dimension in Over 14 Years",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/minecraft-is-getting-its-first-new-dimension-in-over-14-years",
+            "publishedAt": "2026-09-26T17:28:19.004Z",
+            "canonicalUrl": "https://www.ign.com/articles/minecraft-is-getting-its-first-new-dimension-in-over-14-years",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/screenshot-2026-09-26-182752-1790443689989.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Minecraft developer Mojang has announced that the Sift is coming to Java and Bedrock Edition in 2027 — the game&#x27;s first new dimension in over 14 years.\nMinecraft Is Getting Its First New Dimension in Over 14 Years\nAs revealed at Minecraft LIVE September 2026, the Sift, which had been announced for upcoming dungeon crawler Minecraft Dungeons 2, is also coming to Minecraft Java and Bedrock Edition next year. It joins the Overworld, The Nether, and The End as Minecraft’s official fourth dimension.\nToday at Minecraft LIVE: Dungeons II, our first new dimension in more than 14 years, new ways for creators to build, Minecraft on Nintendo Switch 2, and more. More than 300,000 people play Minecraft for the first time on an average day. After 17+ years and 425M+ copies sold, I… pic.twitter.com/fdhkwuh258\nMojang said next to nothing about the Sift in terms of how it will work in vanilla during Minecraft LIVE, and only teased how it will look during the stream. Here&#x27;s Mojang&#x27;s official blurb on the Sift, which briefly touched on the new mob which we can see in the image above.\nPerhaps we should look to the Sift in Minecraft Dungeons 2 to get a sense of what to expect. In the dungeon crawler, the Sift is described as \"beautiful, vibrant, and teeming with souls.\" It features new biomes such as the Meadow and the Carapace.\nFor more, check out everything announced at Minecraft LIVE .\nWesley is Director, News at IGN. Find him on Twitter at @wyp100. You can reach Wesley at wesley_yinpoole@ign.com or confidentially at wyp100@proton.me.\nYou&#x27;ll Nether believe this."
+          }
+        ]
+      },
+      {
+        "eventKey": "e43cb2550f4612bae224",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "The Last of Us Gets Animated Background on PS5 as Naughty Dog Teases Announcements for TLOU Day 2026",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/the-last-of-us-gets-animated-background-on-ps5-as-naughty-dog-teases-announcements-for-tlou-day-2026",
+            "publishedAt": "2026-09-26T18:29:29.046Z",
+            "canonicalUrl": "https://www.ign.com/articles/the-last-of-us-gets-animated-background-on-ps5-as-naughty-dog-teases-announcements-for-tlou-day-2026",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/the-last-of-us-background-ps5-1790446863917.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Naughty Dog has released a free background on PlayStation 5 as it prepares to celebrate The Last of Us Day 2026.\nThe Last of Us Gets Animated Background on PS5 as Naughty Dog Teases Announcements for TLOU Day 2026\nThe studio behind Sony&#x27;s exclusive post-apocalyptic video game franchise took to social media to tease some of what it has planned for this year&#x27;s festivities. While September 26 is technically the day it&#x27;s chosen to serve as its Cordyceps-breakout holiday, Naughty Dog won&#x27;t share any The Last of Us announcements with fans until Monday the 28th, but that doesn&#x27;t mean there&#x27;s nothing to fawn over today.\nPS5 owners can now head to their consoles to download a special The Last of Us-themed background for PlayStation&#x27;s Welcome Hub landing page. It&#x27;s a free option featuring both the younger and older versions of Ellie from both mainline games, with no download required to enjoy it. Although it&#x27;s far from the kind of dynamic themes or wallpapers fans have begged Sony to bring back, the animated background does add some flavor for fans still hoping to see the series get a proper return in games.\nWe&#x27;ll be celebrating #TLOUDay on Monday, but we do have a fun surprise for you today. 🧡🩵 For the first time ever, a The Last of Us-themed background is being added to the PlayStation Welcome Hub. Log in to your PlayStation account and download it to see how our team has… pic.twitter.com/aK6F85FM2I\nThose who want to spice up their PS5 backgrounds need only to navigate to the Welcome Hub, select the Change Background button in the top corner of the screen, and then select The Last of Us background in the Games tab. It&#x27;s nothing much, but we&#x27;ll only have to wait a few more days to hear more about The Last of Us Day celebration.\nIn a separate post , Naughty Dog promised September 28 will bring even more reveals for the franchise. While it doesn&#x27;t sound like something like The Last of Us Part 3 will be discussed, the team did promise to share a \"partnership announcement, a very cool collaboration, digital surprises, and more.\" There will also be a No Return charity stream on Twitch.\nAnother surprise announced today was the news that The Last of Us Season 3 on HBO has picked up some new and familiar faces : John Goodman, Laura Bailey, and Ian Alexander. Goodman, a series newcomer and award-winning actor, will play a new character named Joey. Bailey, who played Abby in The Last of Us Part 2 and a nurse in The Last of Us Season 1, will play a Seraphite leader named Elizabeth, while Alexander will play a currently unnamed character after first appearing as Lev in the second game."
+          }
+        ]
+      },
+      {
+        "eventKey": "c5920d124108846c9bec",
+        "eventKind": "other",
+        "subjectKey": "the-legend-of-zelda-ocarina-of-time",
+        "subject": {
+          "kind": "game",
+          "key": "the-legend-of-zelda-ocarina-of-time"
+        },
+        "publishability": "direct",
+        "headline": "The Legend of Zelda: Ocarina of Time Remake Extended Clip Reveals Closer Look at Ganondorf",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "ign",
+            "label": "IGN Games",
+            "url": "https://www.ign.com/articles/the-legend-of-zelda-ocarina-of-time-remake-extended-clip-reveals-closer-look-at-ganondorf",
+            "publishedAt": "2026-09-26T17:24:54.808Z",
+            "canonicalUrl": "https://www.ign.com/articles/the-legend-of-zelda-ocarina-of-time-remake-extended-clip-reveals-closer-look-at-ganondorf",
+            "imageUrl": "https://assets-prd.ignimgs.com/2026/09/26/the-legend-of-zelda-ocarina-of-time-remake-ganondorf-1790443083896.png?width=1280&format=jpg&auto=webp&quality=80",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Nintendo has published a short clip that shows a closer look at Ganondorf in The Legend of Zelda: Ocarina of Time remake.\nThe Legend of Zelda: Ocarina of Time Remake Extended Clip Reveals Closer Look at Ganondorf\nNintendo has published a short clip that shows a closer look at Ganondorf in The Legend of Zelda: Ocarina of Time remake .\nThose who have the Nintendo Today! app downloaded on their mobile devices were treated to more footage from the upcoming reimagining yesterday. The video in question is, crushingly, only 16 seconds long, but it reveals an extended look at how The Legend of Zelda: Ocarina of Time remake is reincarnating one of video games&#x27; most iconic villains for Nintendo Switch 2.\n\"A man from the Gerudo, a tribe in which men are said to be born only once in a hundred years,\" official text shared by Nintendo said. \"He harbors a grand ambition to obtain the Triforce, a sacred relic rumored to grant the wish of any individual who touches it.\"\nGANONDORF IN THE NEW SNEAK PEAK FOR OCARINA OF TIME??? holy shit he&#x27;s so cool pic.twitter.com/Q85Im9XA6Y\nWe first saw how Ganondorf would fit into the remake&#x27;s divisive art style when Nintendo unveiled gameplay during its dedicated Direct earlier this month. The new footage expands on the updated dream sequence shown previously, showing the evildoer riding on horseback as voiceover says, \"And now… An evil has appeared, yearning after that power.\"\nWhile technically a scene players have already been looking at for decades, The Legend of Zelda: Ocarina of Time remake will alter the moment with more than just shiny new graphics, even if the changes are small. As highlighted in the Nintendo Today! post, while the extended clip shows that the Switch 2 version of the scene is running in slow motion, the original Nintendo 64 and 3DS remake versions show Ganondorf moving like normal.\nAgain, it&#x27;s an extremely small change, but it&#x27;s also yet another sign that the November reimagining will come with a few tweaks to a classic that fans may want to prepare themselves for. It all arrives as fans continue to be torn about some of the promised tweaks, just as a dedicated jump button, while Nintendo chose to intentionally retain the loading screens from the original experience ."
+          }
+        ]
+      },
+      {
+        "eventKey": "dae3f9721d2a88752b51",
+        "eventKind": "other",
+        "subjectKey": "synduality echo of ada",
+        "subject": {
+          "kind": "game",
+          "key": "synduality echo of ada"
+        },
+        "publishability": "direct",
+        "headline": "バンナムのメカPvPvE脱出シューター『SYNDUALITY Echo of Ada』、来年サービス終了へ。“オフラインのPvE版”として生まれ変わる",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260926-470195/",
+            "publishedAt": "2026-09-26T13:54:22+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260926-470195/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2025/11/ps-plus-20251127-367231-header2.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "バンダイナムコエンターテインメントは9月26日、『SYNDUALITY Echo of Ada』のオンラインサービスを2027年5月以降に終了し、オフライン版に移行すると告知した。\nバンナムのメカPvPvE脱出シューター『SYNDUALITY Echo of Ada』、来年サービス終了へ。“オフラインのPvE版”として生まれ変わる\nバンダイナムコエンターテインメントは9月26日、『 SYNDUALITY Echo of Ada 』のオンラインサービスを2027年5月以降に終了し、オフライン版に移行すると告知した。\n『SYNDUALITY Echo of Ada』は、二足歩行メカPvPvEシューターだ。舞台となる世界では、青い猛毒の雨が何週間も地上に降り続けるという災厄によって世界人口の92％が喪失。人類は地下に都市国家アメイジアを建設していた。しかし原因不明の事故でアメイジアは崩壊。プレイヤーは、地上に存在するAO結晶やさまざまな物資を集める「ドリフター」となり、AI搭載ヒューマノイドのメイガスとともに地上を探索する日々を送ることとなる。\n【大切なお知らせ】 『SYNDUALITY Echo of Ada』は、2027年5月以降に現行のオンラインサービスを終了し、オフライン版へ移行することを決定いたしました。 今後のスケジュール及び有償通貨の取り扱いや詳細につきましては、公式サイトをご確認ください。 ▼詳細はこちら https://t.co/qwk7Ftz1n4 …\nコンセプトは一定の評価を受けつつも評価面での苦戦も垣間見えた『SYNDUALITY Echo of Ada』。PvPvE作品としてのオンラインサービスは終了を迎えるものの、オフライン版が開発され、“PvEエクストラクションシューター”としてプレイ可能な状態が維持されるかたちだ。オンライン要素については、今のうちに遊び納めしておくのもいいかもしれない。\n『 SYNDUALITY Echo of Ada 』はPS5/Xbox Series X|S/PC（Steam）向けに発売中。\nバンナムのメカPvPvE脱出シューター『SYNDUALITY Echo of Ada』、来年サービス終了へ。&ldquo;オフラインのPvE版&rdquo;として生まれ変わる\n本作にてプレイヤーは、クレイドルコフィンと呼ばれる二足歩行メカに搭乗して地上に繰り出す。基本的にはドリフター復興協会や政府からの依頼を受けつつ、地上に存在するアイテムを収集し、持ち帰ることが目的となる。地上にはかつて人類が生活などをしていた跡があり、多くのロケーションが存在。エンダーズという異形や、盗賊団といった敵NPCと戦うことになる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "9408e67a4089df7a15ab",
+        "eventKind": "other",
+        "subjectKey": "otterly lost",
+        "subject": {
+          "kind": "game",
+          "key": "otterly lost"
+        },
+        "publishability": "direct",
+        "headline": "ラッコ冒険オープンワールド『Otterly Lost』ラッコがかわいすぎて“好評率100%”スタート。遠くの故郷を目指しつつ、動物たちをお手伝い",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/otterly-lost-20260926-470150/",
+            "publishedAt": "2026-09-26T06:25:11+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/otterly-lost-20260926-470150/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/otterly-lost-20260926-470150-header.jpeg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Soulworks Interactiveは9月24日、『Otterly Lost』を配信した。本作はラッコになって自然豊かな世界を冒険し、故郷に帰ることを目指す、物語主導のアドベンチャーゲームだ。\nラッコ冒険オープンワールド『Otterly Lost』ラッコがかわいすぎて“好評率100%”スタート。遠くの故郷を目指しつつ、動物たちをお手伝い\nデベロッパーのSoulworks Interactiveは9月24日、オープンワールド・アドベンチャーゲーム『 Otterly Lost 』を配信した。対応プラットフォームはPC（Steam）。本作は、さっそく高い評価を獲得して人気となっている。\n『Otterly Lost』の主人公は、オットーという名の好奇心旺盛なラッコだ。仲間たちと暮らしていた彼は、ある日謎の地震に突然見舞われ、川下の見知らぬ地域へとひとり流されてしまう。そこで出会った動物たちによると、この世界では自然界のバランスが崩れ、不穏な状況にあるという。そこでオットーは、調和を取り戻すことを目指しながら、故郷へ帰る道を探すことにする。\n『Otterly Lost』は、PC（ Steam ）向けに配信中だ。現在ローンチセールが実施されており、10月1日までは10%オフの1709円（税込）にて購入可能となっている。\n本作は、ラッコになって自然豊かな世界を冒険し、故郷に帰ることを目指す、物語主導のアドベンチャーゲームだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "80981592eae617526fc0",
+        "eventKind": "other",
+        "subjectKey": "ワイルドアームズ",
+        "subject": {
+          "kind": "game",
+          "key": "ワイルドアームズ"
+        },
+        "publishability": "direct",
+        "headline": "『ワイルドアームズ』の精神的続編『アームドファンタジア』に暗雲か。海外パブリッシャー505 Gamesの親会社が決算報告で開発中止と報告",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/89101",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/89101",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/89101/ogp_nGaQ.png?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "海外パブリッシャー505 Gamesの親会社の決算報告から、同グループとの契約下での『アームドファンタジア』の開発が中止となっていたことが判明。\n『ワイルドアームズ』の精神的続編『アームドファンタジア』に暗雲か。海外パブリッシャー505 Gamesの親会社が決算報告で開発中止と報告\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年09月27日16時〜2026年09月27日17時\n基本無料のオープンワールドRPG『アニモ』配信中！かわいい生き物アニモたちと冒険に出かけよう。\n『ミステリーの歩き方2』人気観光地“鎌蔵”で事件が発生！ 過去視の能力を使って、人魚伝説のミステリーに挑め。"
+          }
+        ]
+      },
+      {
+        "eventKey": "cd8dd402e4ab79d89130",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Microsoft CEO says &#8216;streamlining&#8217; of Xbox business is &#8216;great to see&#8217;",
+        "tier": "B",
+        "score": 84,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": null,
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "vgc",
+            "label": "VGC News",
+            "url": "https://www.videogameschronicle.com/news/microsoft-ceo-says-streamlining-of-xbox-business-is-great-to-see/",
+            "publishedAt": "2026-09-26T12:07:20+00:00",
+            "canonicalUrl": null,
+            "imageUrl": "https://www.videogameschronicle.com/files/2026/06/Screenshot-2026-06-15-132750.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Executive says he’s feeling good about Xbox’s remaining studios and IPs…\nMicrosoft CEO says &#8216;streamlining&#8217; of Xbox business is &#8216;great to see&#8217;\nExecutive says he&#8217;s feeling good about Xbox&#8217;s remaining studios and IPs\nMicrosoft CEO Satya Nadella has said he feels “fantastic” about Xbox’s remaining roster of studios and IPs and called recent “streamlining” of the business “great to see”.\nCommenting on the state of the Xbox business in a Sources Podcast episode, Nadella reiterated new Xbox CEO Asha Sharma ’s objective to return the gaming business to growth by focusing on its biggest games and exploring new business models .\n“There&#8217;s some amount of streamlining the team is doing, and Asha is doing, which is great to see. And then we have to invent the right sustainable business model that allows us to deliver gaming to more and more people.”\nHe continued: “That has always been the goal, which is we want to be a great publisher and a great platform provider for games across both PCs and Xboxes. And so that is sort of our goal.\n“And I think Asha and team have said that Xbox is going to get back to growth this next fiscal year, and that&#8217;s the plan they&#8217;re executing on. And in that process, do a bang-up job of producing some great games.”\nNadella&#8217;s comments follow widespread layoffs and cuts\n“If I look at the studios, the IP portfolio we have, and our ability to then take that and produce great games going forward, I feel fantastic,” Nadella said."
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 61462,
+      "estimatedInputTokens": 14845,
+      "activeTrackingItems": 0,
+      "candidateItems": 24,
+      "includedItems": 24,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": []
+    },
+    "titleHints": [
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Nivalis Nights",
+        "subjectKey": "Nivalis Nights",
+        "titleKey": "nivalis-nights",
+        "titleZhCn": "尼瓦利斯之夜",
+        "suggestedStatus": "official_simplified",
+        "reason": "",
+        "sources": [
+          {
+            "label": "store.steampowered.com",
+            "url": "https://store.steampowered.com/app/1488490/__Nivalis_Nights/?l=schinese",
+            "hostname": "store.steampowered.com",
+            "family": "steam",
+            "kind": "official_simplified",
+            "pageTitle": "Steam 上的 《尼瓦利斯之夜》 Nivalis Nights",
+            "excerpt": "Steam 上的 《尼瓦利斯之夜》 Nivalis Nights 登录 商店 主页 探索队列 愿望单 点数商店 新闻 排行榜 社区 主页 讨论 创意工坊 市场 实况直播 关于 客服 更改语言 获取 Steam 手机应用 查看桌面版网站 © Valve Corporation。保留所有权利。所有商标均为其在美国及其它国家/地区的各自持有者所有。 隐私政策 &nbsp;| &nbsp; 法律信息 &nbsp;| &nbsp; 无障碍 &nbsp;| &nbsp; Steam 订户协议 &nbsp;| &nbsp; 退款 &nbsp;| &nbsp; Cookie 商店 主页 探索队列 愿望单 点数商店 新闻 排行榜 社区 主页 讨论 创"
+          }
+        ]
+      },
+      {
+        "autoAdoptable": true,
+        "subjectType": "game",
+        "titleEn": "Gothic II Complete Classic",
+        "subjectKey": "Gothic II Complete Classic",
+        "titleKey": "gothic-ii-complete-classic",
+        "titleZhCn": "哥特王朝2完整经典版",
+        "suggestedStatus": "common_translation",
+        "reason": "",
+        "sources": [
+          {
+            "label": "www.3dmgame.com",
+            "url": "https://www.3dmgame.com/news/202310/3878863.html",
+            "hostname": "www.3dmgame.com",
+            "family": "3dm",
+            "kind": "media",
+            "pageTitle": "《哥特王朝2》NS移植版下月推出 将包含资料片_3DM单机",
+            "excerpt": "》NS移植版下月推出 将包含资料片 时间： 2023-10-06 02:55:10 来源： 3DM编译 作者： landother 编辑： landother THQ Nordic 宣布将于下个月推出《 哥特王朝2 》Switch移植版。 该移植版名为“Gothic II Complete Classic”（哥特王朝2完整经典版），继上个月推出《哥特王朝》2001 Switch移植版后，将于11月底推出。 与上一款游戏一样，移植版将提供视觉和性能调整，以及手柄支持。Switch版的《哥特王朝2》还将包括“乌鸦之夜”扩展包，该DLC带来了新的武器，任务和敌人，以及全新的探索区域。 这两款《哥特王朝》移植版很可能会促成《哥特王朝3》也推"
+          },
+          {
+            "label": "3g.ali213.net",
+            "url": "https://3g.ali213.net/news/html/786439.html",
+            "hostname": "3g.ali213.net",
+            "family": "ali213",
+            "kind": "media",
+            "pageTitle": "NS移植版《哥特王朝2》将于11月底推出 包含DLC！_游侠网",
+            "excerpt": "下载 热门搜索： NS移植版《哥特王朝2》将于11月底推出 包含DLC！ 2023-10-06 18:53:16 编辑：GWL 0 近日，THQ Nordic公布将于11月推出经典老游戏《哥特王朝2》的NS移植版。 该移植版名为&ldquo;Gothic II Complete Classic&rdquo;（哥特王朝2完整经典版），继上个月推出《哥特王朝》2001 Switch移植版后，将于11月底推出。 与上一款游戏一样，移植版将提供视觉和性能调整，以及手柄支持。Switch版的《哥特王朝2》还将包括&ldquo;乌鸦之夜&rdquo;扩展包，该DLC带来了新的武器，任务和敌人，以及全新的 探索 区域。 这两款《哥特王朝》移植版很"
+          }
+        ]
+      }
+    ]
+  },
+  "continuation": {
+    "index": 1,
+    "scope": "news",
+    "preservePublished": true
+  }
+}
