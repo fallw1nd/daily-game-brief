@@ -12,9 +12,9 @@ describe("media publication workflow", () => {
     expect(workflow).not.toContain("gh pr create");
     expect(workflow).toContain("Acknowledge nonblocking media lane");
     expect(workflow).toContain('"$edition" media-status');
-    expect(workflow).toContain('status = unresolved === 0 ? "available" : applied > 0 ? "partial" : "unavailable"');
-    expect(workflow).toContain('console.log(`${status}|applied-${applied}-unresolved-${unresolved}`)');
-    expect(workflow).not.toContain('process.stdout.write(`${status}|applied-${applied}-unresolved-${unresolved}`)');
+    expect(workflow).toContain('edition_path="public/data/archive/${edition:0:4}/${edition:5:2}/$edition.json"');
+    expect(workflow).toContain('node scripts/media-status.mjs "$edition_path"');
+    expect(workflow).not.toContain('status = unresolved === 0 ? "available" : applied > 0 ? "partial" : "unavailable"');
     expect(workflow).not.toContain("automation/media-");
   });
 
