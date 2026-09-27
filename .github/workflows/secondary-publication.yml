@@ -143,6 +143,7 @@ jobs:
 
       - name: Merge verified title patch and backfill
         if: steps.request.outputs.kind == 'title_backfill'
+        id: titles
         shell: bash
         run: |
           git checkout -B secondary-title-backfill origin/main
@@ -151,6 +152,7 @@ jobs:
           npm run check
           if git diff --quiet && git diff --cached --quiet; then
             echo "No title backfill changes were required."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "daily-game-brief[bot]"
@@ -158,6 +160,14 @@ jobs:
           git add config/title-translations.json public/data
           git commit -m "content(titles): secondary publication backfill"
           git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy title backfill
+        if: steps.request.outputs.kind == 'title_backfill' && steps.titles.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh workflow run deploy.yml --ref main
 
       - name: Summary
         if: always()
@@ -171,5 +181,6 @@ jobs:
             echo "- Failed-publication recovery: ${{ steps.edition.outputs.recover }}" >> "$GITHUB_STEP_SUMMARY"
             echo "- Trusted publisher dispatched after local evidence validation." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- Title registry/backfill uses the existing title backfill command and full repository check." >> "$GITHUB_STEP_SUMMARY"
+            echo "- Title registry/backfill uses the existing title backfill command and full repository check."
+            echo "- Title backfill changed production data: ${{ steps.titles.outputs.changed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
           fi
