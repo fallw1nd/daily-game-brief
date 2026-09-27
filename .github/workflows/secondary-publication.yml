@@ -89,7 +89,13 @@ jobs:
               if (manifest.editions.some((item) => String(item.date || item.id.slice(0, 10)) > editionDate)) {
                 throw new Error("historical missing edition cannot use direct recovery after later Canonical editions were published; preserving issue/latest identity is a blocker");
               }
-            } else if (state.editorial?.status !== "pending") throw new Error("secondary edition request requires pending editorial state");
+            } else {
+              const retryOpenRevision = state.revisionRequest?.status === "open"
+                && state.publication?.status === "failed"
+                && ["submitted", "valid", "invalid"].includes(state.editorial?.status)
+                && state.editorial?.packetBlobSha === process.env.PACKET_SHA;
+              if (state.editorial?.status !== "pending" && !retryOpenRevision) throw new Error("secondary edition request requires pending editorial state or a failed open revision bound to the same packet");
+            }
           '
           git cat-file -e "$requested_sha^{blob}"
           git cat-file blob "$requested_sha" > "$RUNNER_TEMP/editorial-packet.json"
