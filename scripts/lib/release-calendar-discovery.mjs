@@ -13,8 +13,10 @@ export function releaseDate(raw, referenceDate) {
   const exact = value.match(/^(\d{4}-\d{2}-\d{2})(?:T|$)/);
   if (exact) iso = exact[1];
   else {
-    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(20\d{2}))?\b/i);
+    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s*(\d{1,2})(?:,?\s*(20\d{2})(?!\d))?\b/i);
     if (!match) return null;
+    const matchEnd = (match.index || 0) + match[0].length;
+    if (!match[3] && /^\s*,?\s*\d{4,}/.test(value.slice(matchEnd))) return null;
     const month = months.indexOf(match[1].slice(0, 3).toLowerCase()) + 1;
     let year = Number(match[3] || referenceDate.slice(0, 4));
     if (!match[3] && referenceDate.slice(5, 7) === "12" && month === 1) year++;
@@ -30,6 +32,65 @@ export function releaseWindow(date) {
 }
 const within = (date, window) => date && date >= window.startInclusive && date <= window.endInclusive;
 const https = (value) => { try { const u = new URL(value); return u.protocol === "https:" ? u.href : null; } catch { return null; } };
+const articleMonth = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
+const articleDateLeadPattern = new RegExp(`\\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out|on)\\s+(?:on\\s+)?(${articleMonth})\\.?\\s*(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "gi");
+const articleDateLeadTestPattern = new RegExp(articleDateLeadPattern.source, "i");
+const articleNegationPattern = /\b(?:no longer|will not|won['’]?t|does not|doesn['’]?t|is not|isn['’]?t|never)\b[^.!?;]{0,48}\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\b/i;
+
+function articleDateHints(text, referenceDate, window) {
+  const hints = [];
+  let invalid = false;
+  let ambiguousRange = false;
+  const negated = articleNegationPattern.test(text);
+  for (const match of text.matchAll(articleDateLeadPattern)) {
+    // Use the full original match's end offset; reconstructed date strings shift this boundary for compact dates like Sept22.
+    const matchEnd = (match.index || 0) + match[0].length;
+    const afterDate = text.slice(matchEnd);
+    if (/^\s*,?\s*\d{4,}/.test(afterDate)) { invalid = true; continue; }
+    const dateText = `${match[1]} ${match[2]}${match[3] ? `, ${match[3]}` : ""}`;
+    const date = releaseDate(dateText, referenceDate);
+    if (!date) { invalid = true; continue; }
+    hints.push(date);
+    if (new RegExp(`^\\s*(?:[\\u2013\\u2014-]|to)\\s*(?:${articleMonth}\\.?\\s*)?\\d{1,2}(?!\\d)`, "i").test(afterDate)) ambiguousRange = true;
+  }
+  const dateHints = [...new Set(hints)];
+  let dateStatus;
+  if (invalid && !dateHints.length) dateStatus = "invalid_date";
+  else if (negated && dateHints.length) dateStatus = "ambiguous_negated";
+  else if (ambiguousRange || dateHints.length > 1) dateStatus = "ambiguous_multiple";
+  else if (!dateHints.length) dateStatus = "no_date";
+  else if (within(dateHints[0], window)) dateStatus = "in_window";
+  else if (dateHints[0] < window.startInclusive) dateStatus = "expired";
+  else dateStatus = "outside_window";
+  return { dateHints, dateStatus, ...(negated ? { negated: true, ambiguous: true } : {}) };
+}
+
+function articlePlatformHints(text) {
+  const hints = [];
+  if (/\bPS5\b|PlayStation\s*5/i.test(text)) hints.push("PS5");
+  if (/\bPS4\b|PlayStation\s*4/i.test(text)) hints.push("PS4");
+  if (/PlayStation\s*VR2|\bPS VR2\b/i.test(text)) hints.push("PS VR2");
+  if (/\bPlayStation\b/i.test(text) && !hints.length) hints.push("PlayStation");
+  return hints;
+}
+
+function articleReleaseType(text) {
+  const cues = [
+    ["warbond", /\bwarbond\b/gi],
+    ["early_access", /\bearly access\b/gi],
+    ["demo", /\b(?:demo|trial)\b/gi],
+    ["update", /\b(?:update|patch|season)\b/gi],
+  ];
+  const markers = cues.flatMap(([type, pattern]) => [...text.matchAll(pattern)].map(match => ({ type, index: match.index || 0 })));
+  const uniqueTypes = [...new Set(markers.map(({ type }) => type))];
+  const dateLead = articleDateLeadPattern.exec(text);
+  articleDateLeadPattern.lastIndex = 0;
+  const dateEnd = dateLead ? (dateLead.index || 0) + dateLead[0].length : -1;
+  if (uniqueTypes.length > 1 || (dateEnd >= 0 && markers.some(({ index }) => index > dateEnd))) return "mixed";
+  if (uniqueTypes.length === 1) return uniqueTypes[0];
+  if (/\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\b/i.test(text)) return "game_launch";
+  return "unknown";
+}
 
 export function parseReleaseSource(html, source, editionDate) {
   const document = dom(html, ["xbox", "articles"].includes(source.adapter));
@@ -76,7 +137,8 @@ export function parseReleaseSource(html, source, editionDate) {
         }
       }
     } else {
-      for (const item of [...doc.querySelectorAll("item")].slice(0, 15)) {
+      const articleLinks = [];
+      for (const [articleIndex, item] of [...doc.querySelectorAll("item")].slice(0, 15).entries()) {
         const published = new Date(item.querySelector("pubDate")?.textContent || "");
         if (!Number.isFinite(published.getTime())) continue;
         const reference = published.toISOString().slice(0, 10);
@@ -92,8 +154,20 @@ export function parseReleaseSource(html, source, editionDate) {
             if (match) add(match[1], releaseDate(match[2], reference), link.href, ["Xbox"], { announcementUrl: url, dateText: match[2] });
           }
         }
-        if (url && /launch|releas|coming|next week|out |arriv/i.test(title)) reviewLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id });
+        if (source.adapter === "articles" && url && (/\b(?:launch(?:es|ed|ing)?|releas(?:es|ed|ing)?|coming|next week|out|arriv(?:e|es|ed|ing)?|warbond|early access|demo|update|patch|season)\b/i.test(title) || articleDateLeadTestPattern.test(title))) {
+          // Article title dates are review leads only. Article body/footer dates are intentionally not scanned.
+          const dateInfo = articleDateHints(title, reference, releaseWindow(editionDate));
+          const platformHints = articlePlatformHints(`${title} ${[...item.querySelectorAll("category")].map(node => node.textContent).join(" ")}`);
+          const releaseTypeHint = articleReleaseType(title);
+          const priority = dateInfo.dateStatus === "in_window" ? 0 : dateInfo.dateStatus === "ambiguous_multiple" || dateInfo.dateStatus === "ambiguous_negated" ? 1 : dateInfo.dateStatus === "outside_window" || dateInfo.dateStatus === "expired" ? 2 : 3;
+          articleLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id, dateHints: dateInfo.dateHints, dateStatus: dateInfo.dateStatus, ...(dateInfo.negated ? { negated: true, ambiguous: true } : {}), platformHints, releaseTypeHint, review: "open_primary_source_before_publication", _articleIndex: articleIndex, _priority: priority });
+        }
+        if (source.adapter !== "articles" && url && /launch|releas|coming|next week|out |arriv/i.test(title)) reviewLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id });
         page.window.close();
+      }
+      if (source.adapter === "articles") {
+        articleLinks.sort((a, b) => a._priority - b._priority || a._articleIndex - b._articleIndex);
+        reviewLinks.push(...articleLinks.map(({ _articleIndex, _priority, ...link }) => link));
       }
     }
   } finally { document.window.close(); }
