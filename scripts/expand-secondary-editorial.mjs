@@ -1,10 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-function blankTrackingDecision(item, { close = false, staleHours = 72 } = {}) {
+function blankDecision(eventKey, { decision, tracking, reason }) {
   return {
-    eventKey: item.eventKey,
-    decision: close ? "exclude" : "needs_review",
+    eventKey,
+    decision,
     section: null,
     titleKey: null,
     titleZhCn: null,
@@ -15,11 +15,9 @@ function blankTrackingDecision(item, { close = false, staleHours = 72 } = {}) {
     factStatus: null,
     timeStatus: null,
     entryFlags: [],
-    tracking: !close,
+    tracking,
     verification: "",
-    reason: close
-      ? `连续超过${staleHours}小时没有新的已打开证据，二次发布关闭陈旧跟踪；如后续出现新证据，发现层仍可重新进入候选。`
-      : "本次二次发布没有新的已打开证据，保留既有跟踪状态等待后续事实增量。",
+    reason,
     beijingTime: null,
     timeNote: null,
     platforms: [],
@@ -30,22 +28,57 @@ function blankTrackingDecision(item, { close = false, staleHours = 72 } = {}) {
   };
 }
 
+function blankTrackingDecision(item, { close = false, staleHours = 72 } = {}) {
+  return blankDecision(item.eventKey, {
+    decision: close ? "exclude" : "needs_review",
+    tracking: !close,
+    reason: close
+      ? `连续超过${staleHours}小时没有新的已打开证据，二次发布关闭陈旧跟踪；如后续出现新证据，发现层仍可重新进入候选。`
+      : "本次二次发布没有新的已打开证据，保留既有跟踪状态等待后续事实增量。",
+  });
+}
+
+function blankPackageExclusion(item) {
+  const needsIdentity = item?.publishability && item.publishability !== "direct";
+  return blankDecision(item.eventKey, {
+    decision: "exclude",
+    tracking: false,
+    reason: needsIdentity
+      ? "packet 标记 requires_subject_identity，二次发布不得从标题推断或自造规范主体身份。"
+      : "二次发布人工复核后不收录：本条未达到本期正式稿的信息增量与编辑优先级，且不存在需要继续跟踪的实质阻塞。",
+  });
+}
+
 export function expandSecondaryEditorial(request, packet) {
   if (request?.schemaVersion !== 1 || request?.kind !== "edition") throw new Error("secondary edition request must use schemaVersion=1 and kind=edition");
   const input = packet?.editorialInput;
   if (!input?.window?.id || request.editionId !== input.window.id) throw new Error("secondary request edition does not match packet");
   if (!/^[0-9a-f]{40}$/u.test(String(request.packetBlobSha || ""))) throw new Error("secondary request requires packetBlobSha");
   if (!Array.isArray(request.decisions)) throw new Error("secondary request decisions must be an array");
+  if (request.excludePackageKeys !== undefined && !Array.isArray(request.excludePackageKeys)) throw new Error("excludePackageKeys must be an array");
 
-  const packageKeys = (input.packages || []).map((item) => item.eventKey);
+  const packages = input.packages || [];
+  const packageKeys = packages.map((item) => item.eventKey);
   const packageSet = new Set(packageKeys);
-  const seen = new Set();
+  const manual = new Map();
   for (const decision of request.decisions) {
     if (!packageSet.has(decision?.eventKey)) throw new Error(`secondary request contains non-package decision: ${decision?.eventKey || "missing"}`);
-    if (seen.has(decision.eventKey)) throw new Error(`secondary request duplicates package decision: ${decision.eventKey}`);
-    seen.add(decision.eventKey);
+    if (manual.has(decision.eventKey)) throw new Error(`secondary request duplicates package decision: ${decision.eventKey}`);
+    manual.set(decision.eventKey, decision);
   }
-  for (const key of packageKeys) if (!seen.has(key)) throw new Error(`secondary request is missing package decision: ${key}`);
+
+  const excluded = new Set();
+  for (const key of request.excludePackageKeys || []) {
+    if (!packageSet.has(key)) throw new Error(`secondary request contains non-package exclusion: ${key}`);
+    if (manual.has(key)) throw new Error(`secondary request both authors and excludes package: ${key}`);
+    if (excluded.has(key)) throw new Error(`secondary request duplicates package exclusion: ${key}`);
+    excluded.add(key);
+  }
+
+  for (const key of packageKeys) {
+    if (!manual.has(key) && !excluded.has(key)) throw new Error(`secondary request is missing package decision: ${key}`);
+  }
+  const packageDecisions = packages.map((item) => manual.get(item.eventKey) || blankPackageExclusion(item));
 
   const trackingPolicy = request.trackingPolicy || "carry";
   if (!new Set(["carry", "close_stale"]).has(trackingPolicy)) throw new Error("trackingPolicy must be carry or close_stale");
@@ -63,6 +96,7 @@ export function expandSecondaryEditorial(request, packet) {
   const {
     kind,
     schemaVersion,
+    excludePackageKeys: _excludePackageKeys,
     trackingPolicy: _trackingPolicy,
     staleTrackingHours: _staleTrackingHours,
     recoverFailedPublication: _recoverFailedPublication,
@@ -71,7 +105,7 @@ export function expandSecondaryEditorial(request, packet) {
   return {
     ...editorial,
     contractVersion: 2,
-    decisions: [...request.decisions, ...trackingDecisions],
+    decisions: [...packageDecisions, ...trackingDecisions],
   };
 }
 
@@ -84,7 +118,7 @@ async function main() {
   ]);
   const output = expandSecondaryEditorial(request, packet);
   await writeFile(outputPath, JSON.stringify(output, null, 2) + "\n");
-  console.log(`Expanded secondary editorial ${output.editionId}: packages=${request.decisions.length}, tracking=${output.decisions.length - request.decisions.length}.`);
+  console.log(`Expanded secondary editorial ${output.editionId}: packages=${packet.editorialInput.packages.length}, tracking=${output.decisions.length - packet.editorialInput.packages.length}.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
