@@ -117,16 +117,9 @@ jobs:
           if [ -z "$edition" ]; then
             edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
           fi
-          if [ "${{ steps.publication.outcome }}" = "success" ] && [ -f artifacts/media-audit.json ]; then
-            IFS='|' read -r status reason < <(EDITION_ID="$edition" node -e '
-              const fs = require("fs");
-              const audit = JSON.parse(fs.readFileSync("artifacts/media-audit.json", "utf8"));
-              const results = (audit.editions.find((item) => item.id === process.env.EDITION_ID)?.results || []);
-              const unresolved = results.filter((item) => item.status !== "applied").length;
-              const applied = results.filter((item) => item.status === "applied").length;
-              const status = unresolved === 0 ? "available" : applied > 0 ? "partial" : "unavailable";
-              console.log(`${status}|applied-${applied}-unresolved-${unresolved}`);
-            ')
+          edition_path="public/data/archive/${edition:0:4}/${edition:5:2}/$edition.json"
+          if [ "${{ steps.publication.outcome }}" = "success" ] && [ -f "$edition_path" ]; then
+            IFS='|' read -r status reason < <(node scripts/media-status.mjs "$edition_path")
           else
             status="unavailable"
             reason="media-workflow-failed"
