@@ -659,6 +659,15 @@
 - **Close when:** 完整 `npm run check` 通过，PR 合并 main，Pages 成功；实际启用 Scheduled Task prompt 同步为精简 bootstrap 且保持原 10:20/11:20 schedule 与 enabled 状态不变。
 - **2026-09-22 closeout:** PR #161 合并为 `ae4fc34`。Verify [35756273011](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756273011) 通过：83 个测试文件 / 418 项测试、43 期 Canonical 校验、英文基础设施校验和生产构建全部成功；合并后 Pages [35756425578](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756425578) 成功。实际启用任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 已改为精简 bootstrap，仍为 `enabled=true`，Asia/Shanghai 10:20/11:20 两次调用；旧 PM 与一次性历史任务继续保持 disabled。关闭条件全部满足。
 
+## MNT-20260930-02 — Daily degraded fallback 将 discovery 自动写入 Canonical 日历
+
+- **Discovered:** 2026-09-30
+- **Priority / status:** P0 / in_progress.
+- **Evidence:** `scripts/lib/degraded-decision.mjs` treated `knownTitle` or `crossSource` plus an official-looking domain and one unique date as sufficient to publish a calendar item. The source aggregator can combine platform observations while the selected official detail supports only one store/platform: the Sep 29 RetroSpace candidate had PC and Xbox in its merged platform list but only Steam as the stored source; MXGP26 had Xbox and PC in its merged list while the Xbox detail supported only Series X|S.
+- **Risk:** A Daily outage fallback can bypass final official detail verification and publish unsupported platform, product, date, region, or release-type claims to Canonical. This is distinct from calendar-disappeared: existing verified baseline entries must remain and expire through the publisher's rolling 15-day filter.
+- **Bounded resolution:** Remove degraded calendar auto-adoption. Daily degraded output keeps `upcoming:[]`, `removeUpcomingIds:[]`, and `upcomingMode:"inherit_and_patch"`; it preserves the verified Canonical baseline while the publisher naturally removes out-of-window items. State that calendar-only final official detail verification is deferred. Do not treat known-title hints as evidence or add automatic-verification fields. Preserve historical AM/PM behavior and all news fallback gates.
+- **Close when:** tests prove plausible official-looking, conflicting, and spoofed candidates cannot enter Canonical; the real publisher integration preserves in-window verified baseline entries, naturally expires old ones, and still publishes eligible fallback news; all relevant Vitest suites and full `npm run check` pass on the final implementation. No deployment or natural-run claim is made by this local change.
+
 
 ## MNT-20260930-01 — Calendar discovery duplicates and packet omission
 

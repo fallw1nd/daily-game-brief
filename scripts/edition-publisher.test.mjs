@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEdition } from "./lib/edition-publisher.mjs";
+import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 
 const packet = {
   editorialInput: {
@@ -69,6 +70,42 @@ const latest = {
 const manifest = { schemaVersion: 1, updatedAt: "2026-08-26 17:04", latest: "2026-08-26-pm", editions: [{ id: "2026-08-26-pm", issueNumber: 12 }] };
 
 describe("idempotent edition publisher", () => {
+  it("publishes degraded Daily news while retaining and naturally expiring the verified calendar baseline", () => {
+    const dailyPacket = structuredClone(packet);
+    dailyPacket.editorialInput.window = {
+      id: "2026-09-20-daily", period: "daily", plannedAt: "2026-09-20 12:00",
+      windowStart: "2026-09-19 10:10", windowEnd: "2026-09-20 10:10",
+    };
+    Object.assign(dailyPacket.editorialInput.packages[0], {
+      tier: "A", timeRelation: "window", eventKind: "announcement", subjectKey: "Example Game",
+      publishability: "direct", headline: "Example Game announced",
+      sources: [{ sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher", label: "Publisher",
+        url: "https://publisher.example/news", publishedAt: "2026-09-20T01:00:00Z", evidenceText: "Publisher announced Example Game." }],
+    });
+    dailyPacket.editorialInput.upcomingDiscovery = {
+      window: { startInclusive: "2026-09-21", endInclusive: "2026-10-05" },
+      candidates: [{ title: "Auto Adopt Game", date: "2026-09-29", url: "https://store.steampowered.com/app/1/",
+        platforms: ["PC", "Xbox Series X|S"], sourceId: "steam", kind: "primary", knownTitle: true, crossSource: true }],
+    };
+    const current = {
+      id: "2026-09-19-daily", issueNumber: 40, entries: [], upcoming: [
+        { id: "verified-in-window", date: "09.22", title: { title_key: "verified-in-window", title_en: "Verified In Window", title_zh_status: "unavailable" },
+          platforms: ["PC"], region: "全球", releaseType: "正式发售", source: { label: "Publisher", url: "https://publisher.example/release", kind: "primary" }, note: "" },
+        { id: "verified-expired", date: "09.19", title: { title_key: "verified-expired", title_en: "Verified Expired", title_zh_status: "unavailable" },
+          platforms: ["PC"], region: "全球", releaseType: "正式发售", source: { label: "Publisher", url: "https://publisher.example/old", kind: "primary" }, note: "" },
+      ],
+    };
+    const dailyManifest = { schemaVersion: 1, updatedAt: "2026-09-19 12:00", latest: current.id, editions: [{ id: current.id, issueNumber: 40 }] };
+    const degraded = buildDegradedDecision(dailyPacket);
+    const result = buildEdition({
+      packet: dailyPacket, editorial: degraded, latest: current, manifest: dailyManifest,
+      now: new Date("2026-09-20T04:00:00Z"),
+    });
+    expect(degraded).toMatchObject({ upcomingMode: "inherit_and_patch", removeUpcomingIds: [], upcoming: [] });
+    expect(result.edition.entries[0].headline).toContain("Example Game announced");
+    expect(result.edition.upcoming.map(item => item.id)).toEqual(["verified-in-window"]);
+  });
+
   it("rejects an archive title that exceeds the limit after adding its confirmed subject", () => {
     const draft = structuredClone(editorial);
     draft.archiveTitle = "早报｜" + "公告".repeat(15);
