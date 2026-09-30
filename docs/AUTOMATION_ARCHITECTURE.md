@@ -34,6 +34,8 @@ ChatGPT owns editorial judgment inside a finalized packet: include/exclude/revie
 
 Each edition has `automation/status/<edition-id>.json` with independent lanes for packet, editorial, publication, deployment, English, and media.
 
+These durable files, plus existing authorized batch/queue files, live on Git branch `automation/state`. Fetch them with GitHub ref `automation/state`; the branch name is not part of the file path. Contracts, focused documentation, and Canonical data are read from `main`. A missing file or `404` on one ref is not evidence about another ref. Resolve packet contents only by the exact Git blob SHA acknowledged in state; mutable latest pointers are convenience views, not substitutes.
+
 - packet: `pending → ready | failed`
 - editorial: `pending → submitted → valid | invalid`, or GitHub-owned `timed_out`
 - publication: `pending → committed | failed`
