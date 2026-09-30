@@ -20,6 +20,20 @@ const asCount = (value, label) => {
   return count;
 };
 
+function platformValues(row) {
+  const values = Array.isArray(row.platforms) ? row.platforms : [];
+  const observationValues = (Array.isArray(row.observations) ? row.observations : []).flatMap((observation) => [
+    ...(Array.isArray(observation.platforms) ? observation.platforms : []),
+    ...(Array.isArray(observation.platform) ? observation.platform : observation.platform ? [observation.platform] : []),
+    ...(observation.platformFamily ? [observation.platformFamily] : []),
+  ]);
+  return [...new Set([
+    ...values,
+    ...observationValues,
+    ...(row.platformFamily ? [row.platformFamily] : []),
+  ].map((platform) => String(platform || "").trim()).filter(Boolean))];
+}
+
 const platformFamily = (platform) => {
   if (/^pc$/i.test(platform)) return "PC";
   if (/^(ps|playstation)/i.test(platform)) return "PlayStation";
@@ -51,7 +65,7 @@ function collectPlatformCoverage(rows, leadKey) {
   for (const [index, row] of rows.entries()) {
     const lead = leadKey(row, index);
     if (!lead) throw new Error(`candidate ${index} has no normalized lead name`);
-    const values = [...new Set((Array.isArray(row.platforms) ? row.platforms : []).map((platform) => String(platform || "").trim()).filter(Boolean))];
+    const values = platformValues(row);
     if (!values.length) unknownPlatformRows++;
     for (const platform of values) {
       const leads = platforms.get(platform) || new Set();
@@ -127,6 +141,36 @@ function collectSourceDiagnostics(report, rows) {
   };
 }
 
+function candidateKey(candidate) {
+  return candidate.identity?.key || JSON.stringify([titleIdentity(candidate.title), candidate.date, (candidate.observations || []).map((item) => item.sourceId).sort()]);
+}
+
+function expectedPacketCandidate(candidate) {
+  return {
+    title: candidate.title,
+    date: candidate.date ?? null,
+    dateConflictStatus: candidate.dateConflict ? "conflict" : candidate.dateConflictUncertain ? "uncertain" : "none",
+    identityStatus: candidate.identityStatus || candidate.identity?.status || "needs_verification",
+    identity: { key: candidate.identity?.key ?? null, registryIds: structuredClone(candidate.identity?.registryIds || []), conflictProductIds: structuredClone(candidate.identity?.conflictProductIds || []) },
+    knownTitle: Boolean(candidate.knownTitle),
+    inBaseline: Boolean(candidate.inBaseline),
+    crossSource: Boolean(candidate.crossSource),
+    observations: (candidate.observations || []).map(({ normalizedTitle, ...observation }) => observation),
+  };
+}
+
+function verifyPacketRoundTrip(packet, sourceTasks, message = "calendar packet failed lossless round-trip verification") {
+  const restored = decodeCalendarPacket(packet);
+  const sourceByKey = new Map(sourceTasks.map((candidate) => [candidateKey(candidate), candidate]));
+  const expected = packet.candidates.map((candidate) => {
+    const source = sourceByKey.get(candidateKey(candidate));
+    if (!source) throw new Error(`calendar packet candidate cannot be matched to its source task: ${candidate.title}`);
+    return expectedPacketCandidate(source);
+  });
+  if (!isDeepStrictEqual(restored, expected)) throw new Error(message);
+  return restored;
+}
+
 
 
 export async function loadReplayFixture(edition, fixtureRoot = DEFAULT_FIXTURE_ROOT) {
@@ -141,44 +185,53 @@ export async function loadReplayFixture(edition, fixtureRoot = DEFAULT_FIXTURE_R
 
 export function replayCalendarBaseline({ report, packet }, { leadKey = (candidate) => titleIdentity(candidate.title) } = {}) {
   const reportRows = asRows(report?.candidates, "report.candidates");
-  const packetRows = asRows(packet?.candidates, "packet.candidates");
+  asRows(packet?.candidates, "packet.candidates");
   const capOmittedRows = asCount(report?.omittedCandidates, "report.omittedCandidates");
   const packetOmittedTotal = asCount(packet?.omittedCandidates, "packet.omittedCandidates");
   if (packetOmittedTotal < capOmittedRows) throw new Error("packet omittedCandidates cannot be below report cap omission");
 
   const reportAvailableRows = reportRows.length;
   const capBeforeGroups = reportAvailableRows + capOmittedRows;
+  const decodedPacketRows = decodeCalendarPacket(packet);
+  const packetRows = asRows(decodedPacketRows, "decoded packet candidates");
   const budgetOmittedRows = Math.max(0, reportAvailableRows - packetRows.length);
   const numericReconciliation = reportAvailableRows + capOmittedRows === packetRows.length + packetOmittedTotal;
   const packetLeadDiagnostics = collectNameDiagnostics(packetRows, leadKey);
   const historicalPacketChars = jsonLength(packet);
   const sourceDiagnostics = collectSourceDiagnostics(report, reportRows);
-  const observations = reportRows.flatMap((row) => (Array.isArray(row.observations) && row.observations.length ? row.observations : [row]).map((observation) => ({
+  const hasAggregateObservations = reportRows.some((row) => Array.isArray(row.observations));
+  if (hasAggregateObservations && reportRows.some((row) => !Array.isArray(row.observations) || row.observations.length === 0)) {
+    throw new Error("aggregate report candidates must each contain at least one observation");
+  }
+  const aggregateReport = hasAggregateObservations;
+  const observations = aggregateReport
+    ? reportRows.flatMap((row) => row.observations)
+    : reportRows.map((row) => ({ ...row }));
+  const uniqueTasks = aggregateReport ? reportRows : aggregateCalendarLeads(observations.map((observation, index) => ({
     ...observation,
-    knownTitle: observation.knownTitle ?? row.knownTitle,
-    inBaseline: observation.inBaseline ?? row.inBaseline,
+    knownTitle: observation.knownTitle ?? reportRows[index]?.knownTitle,
+    inBaseline: observation.inBaseline ?? reportRows[index]?.inBaseline,
   })));
-  const uniqueTasks = aggregateCalendarLeads(observations);
-  const proposed = selectCalendarPacket({ report: { ...report, candidates: uniqueTasks }, maxCandidates: 100, maxChars: 24000 });
-  const restored = decodeCalendarPacket(proposed);
-  const candidateKey = (candidate) => candidate.identity?.key || JSON.stringify([titleIdentity(candidate.title), candidate.date, (candidate.observations || []).map((item) => item.sourceId).sort()]);
-  const expectedByKey = new Map(uniqueTasks.map((candidate) => [candidateKey(candidate), candidate]));
-  const expectedRestored = proposed.candidates.map((candidate) => {
-    const expected = expectedByKey.get(candidateKey(candidate));
-    if (!expected) throw new Error(`calendar packet candidate cannot be matched to its source task: ${candidate.title}`);
-    return {
-      title: expected.title,
-      date: expected.date ?? null,
-      dateConflictStatus: expected.dateConflict ? "conflict" : expected.dateConflictUncertain ? "uncertain" : "none",
-      identityStatus: expected.identityStatus || expected.identity?.status || "needs_verification",
-      identity: { key: expected.identity?.key ?? null, registryIds: structuredClone(expected.identity?.registryIds || []), conflictProductIds: structuredClone(expected.identity?.conflictProductIds || []) },
-      knownTitle: Boolean(expected.knownTitle),
-      inBaseline: Boolean(expected.inBaseline),
-      crossSource: Boolean(expected.crossSource),
-      observations: (expected.observations || []).map(({ normalizedTitle, ...observation }) => observation),
-    };
-  });
-  if (!isDeepStrictEqual(restored, expectedRestored)) throw new Error("calendar packet failed lossless round-trip verification");
+  const visibleRawRows = observations.length;
+  const dedupeReduction = Math.max(0, visibleRawRows - uniqueTasks.length);
+  const sourceTelemetry = report?.omissionTelemetry || {};
+  const telemetryCount = (value) => value === null || value === undefined || value === "" ? null
+    : Number.isInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+  const reportTelemetry = {
+    visibleRawRows: telemetryCount(sourceTelemetry.visibleRawRows),
+    uniqueTasks: telemetryCount(sourceTelemetry.uniqueTasks),
+    dedupeReduction: telemetryCount(sourceTelemetry.dedupeReduction),
+  };
+  const selectionReport = aggregateReport
+    ? {
+      ...report,
+      candidates: uniqueTasks,
+      omissionTelemetry: { ...sourceTelemetry, visibleRawRows, uniqueTasks: uniqueTasks.length, dedupeReduction },
+    }
+    : { ...report, candidates: uniqueTasks };
+  if (aggregateReport) verifyPacketRoundTrip(packet, uniqueTasks, "historical calendar packet does not preserve its selected source observations");
+  const proposed = selectCalendarPacket({ report: selectionReport, maxCandidates: 100, maxChars: 24000 });
+  const restored = verifyPacketRoundTrip(proposed, uniqueTasks);
   const compactChars = jsonLength(proposed);
   const visibleTasksNotPacket = Math.max(0, uniqueTasks.length - proposed.candidates.length);
 
@@ -187,6 +240,10 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
     window: report.window,
     omissionAccounting: {
       reportAvailableRows,
+      reportObservationRows: visibleRawRows,
+      reportUniqueTasks: uniqueTasks.length,
+      reportDedupeReduction: dedupeReduction,
+      reportTelemetry,
       capBeforeGroups,
       capOmittedRows,
       capOmittedUnit: report?.omissionTelemetry?.legacyOmittedUnit || "unknown_rows_or_groups",
@@ -205,12 +262,13 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       capBeforeGroups,
       capOmittedRows,
       nameDiagnostics: collectNameDiagnostics(reportRows, leadKey),
-      platformCoverage: collectPlatformCoverage(reportRows, leadKey),
+      platformCoverage: collectPlatformCoverage(uniqueTasks, leadKey),
       kindCoverage: collectKindCoverage(reportRows, leadKey),
       sourceDiagnostics,
     },
     packet: {
       rows: packetRows.length,
+      observationRows: packetRows.reduce((total, row) => total + (row.observations?.length || 0), 0),
       budgetOmittedRows,
       omittedCandidatesTotal: packetOmittedTotal,
       nameDiagnostics: packetLeadDiagnostics,
@@ -218,12 +276,13 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       kindCoverage: collectKindCoverage(packetRows, leadKey),
       packetJsonChars: historicalPacketChars,
       charsPerLead: packetLeadDiagnostics.leadCount ? Math.round((historicalPacketChars / packetLeadDiagnostics.leadCount) * 100) / 100 : 0,
+      roundTripVerified: aggregateReport ? true : null,
     },
     proposed: {
-      visibleRawRows: reportRows.length,
+      visibleRawRows,
       uniqueTasks: uniqueTasks.length,
-      dedupeReduction: Math.max(0, reportRows.length - uniqueTasks.length),
-      duplicateRatio: reportRows.length ? Math.round((Math.max(0, reportRows.length - uniqueTasks.length) / reportRows.length) * 10000) / 10000 : 0,
+      dedupeReduction,
+      duplicateRatio: visibleRawRows ? Math.round((dedupeReduction / visibleRawRows) * 10000) / 10000 : 0,
       packetTasks: proposed.candidates.length,
       visibleTasksNotPacket,
       capOmittedTasks: proposed.omissionTelemetry.packetCapOmittedTasks,
@@ -236,6 +295,7 @@ export function replayCalendarBaseline({ report, packet }, { leadKey = (candidat
       calendarChars: jsonLength(proposed),
       roundTripVerified: true,
       restoredTasks: restored.length,
+      selectedObservationCount: restored.reduce((total, row) => total + (row.observations?.length || 0), 0),
       charsPerTask: proposed.candidates.length ? Math.round((compactChars / proposed.candidates.length) * 100) / 100 : 0,
       overBudget: jsonLength(proposed) > 24000,
       discoveryPhases: { source: sourceDiagnostics.source, parser: sourceDiagnostics.parser },
