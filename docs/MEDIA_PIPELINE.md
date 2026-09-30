@@ -4,6 +4,8 @@ Media enrichment runs after Canonical publication and is nonblocking. It opens t
 
 Current recovery schedule is 11:10 `Asia/Shanghai`; exact-edition enrichment is also dispatched immediately after Canonical publication. Production timing belongs in `docs/SCHEDULED_TASK_PROMPT.md`, not historical migration notes.
 
+Cover identity is confirmed from the opened page's product title metadata against the record's exact English/Chinese title and registered aliases. URLs, descriptions, and partial title matches do not establish product identity. Existing covers are left alone during normal runs; for a bounded repair, run `node scripts/enrich-media.mjs --apply --edition=2026-09-29-daily --revalidate-cover-id=upcoming-end-of-abyss`. This reopens only that cover's source page in the selected edition. A confirmed product mismatch removes that one bad cover and resolves it from that record's configured sources; a fetch failure or indeterminate page title retains the current cover. The media workflow's manual dispatch accepts the same optional `edition_id` and `record_id` pair. Omitting `record_id` keeps the normal media flow.
+
 ## Required state
 
 New v2 news/calendar items need either:

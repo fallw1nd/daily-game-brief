@@ -1,7 +1,10 @@
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { getRegisteredTitleTranslation } from "./lib/title-translations.mjs";
+import { identifyProductTitle } from "./lib/media-product-identity.mjs";
 
 const DATA_ROOT = resolve("public/data");
 const PUBLIC_ROOT = resolve("public");
@@ -76,19 +79,45 @@ function extractMeta(html, pageUrl) {
   const rawImage = psnImage?.replaceAll("\\/", "/") ||
     values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
-  if (!rawImage) return null;
-  const imageUrl = new URL(rawImage, pageUrl).href;
-  if (/logo|avatar|favicon|icon[-_.]/i.test(imageUrl)) return null;
+  const imageUrl = rawImage ? new URL(rawImage, pageUrl).href : null;
+  const usableImageUrl = imageUrl && !/logo|avatar|favicon|icon[-_.]/i.test(imageUrl) ? imageUrl : null;
   const titleTag = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
   ?.replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
             .trim() || "";
+  const steamTitle = html.match(/<div\b[^>]*class=["'][^"']*\bapphub_AppName\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]
+    ?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "";
+  const documentTitle = decodeEntities(titleTag);
+  const openGraphTitle = values.get("og:title") || "";
+  const twitterTitle = values.get("twitter:title") || "";
   return {
-    imageUrl,
+    imageUrl: usableImageUrl,
     alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
-    pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+    pageTitle: openGraphTitle || twitterTitle || documentTitle,
+    productTitleMetadata: {
+      steamAppName: decodeEntities(steamTitle),
+      openGraphTitle,
+      twitterTitle,
+      documentTitle,
+    },
     description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
   };
+}
+
+function titleIdentityRecord(record) {
+  const registered = getRegisteredTitleTranslation(record.title?.title_key, record.title?.title_en);
+  return { ...record, titleAliases: registered?.titleEnAliases || [] };
+}
+
+async function openSourcePage(source, fetchPage = fetchLimited) {
+  const result = await fetchPage(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
+  if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
+  return { ...result, meta: extractMeta(result.bytes.toString("utf8"), result.url) };
+}
+
+async function inspectCoverIdentity(source, record, fetchPage = fetchLimited) {
+  const { meta, url } = await openSourcePage(source, fetchPage);
+  return identifyProductTitle(titleIdentityRecord(record), meta.productTitleMetadata, url);
 }
 
 const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
@@ -306,8 +335,9 @@ const youtubeImageCandidates = (videoId) => [
   `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
 ];
 
-async function discoverFromSource(source, record) {
+async function discoverFromSource(source, record, { fetchPage = fetchLimited, kind = "editorial" } = {}) {
   if (source.imageUrl) {
+    if (kind === "cover") throw new Error("cover image URL has no opened product page to confirm game identity");
     return {
       imageUrl: source.imageUrl,
       alt: source.alt || "",
@@ -316,13 +346,21 @@ async function discoverFromSource(source, record) {
   }
   const videoId = source.kind === "primary" && youtubeVideoId(source.url);
   if (videoId) {
+    if (kind === "cover") throw new Error("cover video page has no product-title metadata to confirm game identity");
     const [imageUrl, ...fallbackImageUrls] = youtubeImageCandidates(videoId);
     return { imageUrl, fallbackImageUrls, alt: "", pageUrl: source.url };
   }
-  const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
-  if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
-  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
-  if (!meta) throw new Error("no usable social image metadata");
+  const result = await openSourcePage(source, fetchPage);
+  const { meta } = result;
+  if (!meta.imageUrl) throw new Error("no usable social image metadata");
+  if (kind === "cover") {
+    const identity = identifyProductTitle(titleIdentityRecord(record), meta.productTitleMetadata, result.url);
+    if (identity.status !== "match") {
+      throw new Error(identity.status === "mismatch"
+        ? `opened product title does not match this game: ${identity.pageTitle}`
+        : "opened page has no definitive product title for this game");
+    }
+  }
   if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
     throw new Error("searched page did not confirm the requested subject");
   }
@@ -358,12 +396,12 @@ async function encodeUnderLimit(bytes, kind) {
   throw new Error("could not encode below 500 KB");
 }
 
-async function downloadCandidate(candidate, kind) {
+async function downloadCandidate(candidate, kind, fetchImage = fetchLimited) {
   const urls = [candidate.imageUrl, ...(candidate.fallbackImageUrls || [])];
   let lastError;
   for (const url of urls) {
     try {
-      const result = await fetchLimited(url, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
+      const result = await fetchImage(url, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
       if (!result.contentType.startsWith("image/")) throw new Error(`not an image (${result.contentType})`);
       candidate.imageUrl = url;
       return await encodeUnderLimit(result.bytes, kind);
@@ -374,19 +412,19 @@ async function downloadCandidate(candidate, kind) {
   throw lastError || new Error("no image candidate succeeded");
 }
 
-function mediaPath(edition, record, kind) {
+function mediaPath(edition, record, kind, publicRoot = PUBLIC_ROOT) {
   const slug = record.id.replace(/[^a-zA-Z0-9_-]+/g, "-");
   const relative = `media/briefs/${edition.date.slice(0, 4)}/${edition.date.slice(5, 7)}/${edition.id}/${slug}-${kind}.jpg`;
-  return { relative, absolute: resolve(PUBLIC_ROOT, relative) };
+  return { relative, absolute: resolve(publicRoot, relative) };
 }
 
-async function resolveRecord(edition, record, kind, sourceList, apply) {
+async function resolveRecord(edition, record, kind, sourceList, apply, dependencies = {}) {
   const attempts = [];
   let reviewCandidate = null;
   for (const source of sourceList) {
     try {
-      const candidate = await discoverFromSource(source, record);
-      const encoded = await downloadCandidate(candidate, kind);
+      const candidate = await discoverFromSource(source, record, { fetchPage: dependencies.fetchPage, kind });
+      const encoded = await downloadCandidate(candidate, kind, dependencies.fetchImage);
       const eligible = kind === "editorial"
       ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
       : eligibleCover(source);
@@ -411,7 +449,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         continue;
       }
       if (!apply) return { status: "candidate", ...result };
-      const target = mediaPath(edition, record, kind);
+      const target = mediaPath(edition, record, kind, dependencies.publicRoot);
       await mkdir(dirname(target.absolute), { recursive: true });
       await writeFile(target.absolute, encoded.output);
       const title = displayTitle(record);
@@ -438,7 +476,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
 }
 
 async function resolveWithWebFallback(edition, record, kind, sources, options) {
-  const initial = await resolveRecord(edition, record, kind, sources, options.apply);
+  const initial = await resolveRecord(edition, record, kind, sources, options.apply, options);
   if (!DEEPSEEK_API_KEY || initial.status === "applied" || initial.eligible === true) {
     return initial;
   }
@@ -461,7 +499,7 @@ async function resolveWithWebFallback(edition, record, kind, sources, options) {
   }
   if (!webSources.length) return initial;
 
-  const searched = await resolveRecord(edition, record, kind, webSources, options.apply);
+  const searched = await resolveRecord(edition, record, kind, webSources, options.apply, options);
   if (searched.status === "applied" || searched.eligible === true) return searched;
   return {
     ...(initial.status === "candidate" ? initial : searched),
@@ -471,13 +509,59 @@ async function resolveWithWebFallback(edition, record, kind, sources, options) {
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + "\n");
 
+async function revalidateExistingCover(edition, item, sources, options) {
+  const oldCover = item.cover;
+  if (!oldCover?.sourceUrl) {
+    return { status: "preserved", recordId: item.id, kind: "cover", error: "existing cover has no source page to revalidate" };
+  }
+
+  let identity;
+  try {
+    identity = await inspectCoverIdentity({ url: oldCover.sourceUrl }, item, options.fetchPage);
+  } catch (error) {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: `could not verify existing cover identity; retained it: ${error.message}` };
+  }
+  if (identity.status === "match") {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, note: "existing cover page title still confirms this game" };
+  }
+  if (identity.status === "unknown") {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: "existing cover page has no definitive product title; retained the verified cover" };
+  }
+
+  const mismatchNote = `原封面来源页面商品标题“${identity.pageTitle}”与“${displayTitle(item)}”不符。`;
+  if (!options.apply) {
+    return { status: "candidate", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: `${mismatchNote} Use --apply to replace this cover.` };
+  }
+
+  delete item.cover;
+  item.cover_status = "unavailable";
+  item.coverNote = `${mismatchNote} 已移除错误封面，正在核验本条记录的其他来源。`;
+  const result = await resolveWithWebFallback(edition, item, "cover", sources, options);
+  if (result.status === "applied") {
+    item.cover = result.asset;
+    item.cover_status = "verified";
+    delete item.coverNote;
+  } else {
+    item.cover_status = "unavailable";
+    item.coverNote = `${mismatchNote} 未能从本条记录的可用来源取得已核验封面。`;
+  }
+  return { ...result, identityMismatch: identity.pageTitle, previousSource: oldCover.sourceUrl };
+}
+
 async function processEdition(manifestItem, options) {
-  const path = resolve(DATA_ROOT, manifestItem.path);
+  const path = resolve(options.dataRoot || DATA_ROOT, manifestItem.path);
   const edition = await readJson(path);
+  if (options.revalidateCoverId && !(edition.upcoming || []).some((item) => item.id === options.revalidateCoverId)) {
+    throw new Error(`upcoming record ${options.revalidateCoverId} not found in edition ${manifestItem.id}`);
+  }
+  if (options.recordId && ![...(edition.entries || []), ...(edition.upcoming || [])].some((item) => item.id === options.recordId)) {
+    throw new Error(`record ${options.recordId} not found in edition ${manifestItem.id}`);
+  }
   let changed = false;
   const results = [];
 
   await mapLimit(edition.entries, 4, async (entry) => {
+    if (options.recordId && entry.id !== options.recordId) return;
     if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) return;
     const sources = [...(entry.sources || [])]
       .filter((source) => source.url?.startsWith("https://"))
@@ -493,7 +577,7 @@ async function processEdition(manifestItem, options) {
   });
 
   await mapLimit(edition.upcoming || [], 4, async (item) => {
-    if (item.cover?.kind === "cover" && !item.cover.placeholder) return;
+    if (options.recordId && item.id !== options.recordId) return;
     const catalogSources =
       options.catalog?.games?.[item.title?.title_key]?.mediaSources || [];
     const candidates = [
@@ -503,6 +587,13 @@ async function processEdition(manifestItem, options) {
     ]
       .filter((source) => source?.url?.startsWith("https://"))
       .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
+    if (options.revalidateCoverId === item.id) {
+      const result = await revalidateExistingCover(edition, item, candidates, options);
+      results.push(result);
+      if (options.apply && result.status !== "preserved") changed = true;
+      return;
+    }
+    if (item.cover?.kind === "cover" && !item.cover.placeholder) return;
     const result = await resolveWithWebFallback(edition, item, "cover", candidates, options);
     results.push(result);
     if (result.status === "applied") {
@@ -525,6 +616,11 @@ async function main() {
   options.catalog = await readJson(resolve("config/media-catalog.json"));
   options.sourcePolicy = await readJson(resolve("config/media-sources.json"));
   const editionArg = argValue("--edition");
+  const revalidateCoverId = argValue("--revalidate-cover-id");
+  if (revalidateCoverId && !editionArg) throw new Error("--revalidate-cover-id requires --edition=<edition-id>");
+  if (revalidateCoverId && !/^[a-zA-Z0-9_-]+$/.test(revalidateCoverId)) throw new Error("invalid --revalidate-cover-id");
+  options.revalidateCoverId = revalidateCoverId;
+  options.recordId = revalidateCoverId;
   let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
   if (!items.length) throw new Error("no matching edition found");
@@ -547,7 +643,11 @@ async function main() {
   console.log(`Report: ${REPORT_PATH}`);
 }
 
-main().catch((error) => {
-  console.error(error.stack || error.message);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error.stack || error.message);
+    process.exit(1);
+  });
+}
+
+export { discoverFromSource, processEdition, resolveRecord };
