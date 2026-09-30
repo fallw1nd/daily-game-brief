@@ -115,13 +115,15 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P2
 - **Area:** title localization / text transformation
-- **Status:** in_progress.
+- **Status:** resolved.
 - **Evidence:** 原实现对任意文本全局执行 `localized.split(english).join(chinese)`，普通词可误替换、无词边界会命中子串或续作前缀；真实扫描48期归档的1018条文案后，重复运行仍改变7个字段，因为 `Crescent Tower: RISING`、`BALL x PIT`、`B.L.U.E. NOVA` 都是其中文译名中的英文部分。
 - **Risk:** silent text corruption；越大的 title registry 风险越高，而且可能波及历史 backfill。
 - **Proposed resolution:** 优先改为每条 entry 的结构化 `mentionedTitles` / 受限 alias 集，只替换该条已知出现的作品；若暂不改 schema，至少增加语境边界、书名号/明确 title mention 检查和高风险短词 deny/explicit opt-in。
 - **Close when:** 加入普通词冲突测试；不会把非作品语境的 `Control` 等普通词替换；已确认多作品摘要（例如 FOUNTAINS + DLC）仍能正确本地化。
 - **Resolution:** 全部本地化路径使用单轮最长别名扫描，Latin字母/数字/组合音标边界保护子串和续作后缀，中文紧邻仍可匹配；普通单词只在明确书名号或结构化主体上下文启用。未知数字/罗马数字续作、副标题和同alias多译名保守不替换；译名中已有完整英文别名时跳过，保证幂等。未修改历史文件或公开schema。
 - **Verification:** 指定 Vitest 命令通过：3个测试文件、26项测试。新增私有注册表边界/歧义测试、生产注册表译名幂等测试、headline主体与未知 `Diablo VI` 续作/副标题测试，以及含主标题/DLC的媒体alt回归；未运行 backfill，未修改历史文件。
+
+- **2026-09-30 closeout:** [PR #178](https://github.com/fallw1nd/daily-game-brief/pull/178) merged as `d54ce4045ab3758ee6c3e02df3c0c13d54688d57`. Independent focused verification passed 26 tests; complete `npm run check` passed 97 files / 534 tests, 48 Canonical archives, locale validation and build. Read-only replay of the same 1,018 fields across 48 archives found 7 further changes with the old algorithm, 0 with the revised algorithm, and 0 second-pass changes. [Verify 36664651137](https://github.com/fallw1nd/daily-game-brief/actions/runs/36664651137) and [Pages 36664826008](https://github.com/fallw1nd/daily-game-brief/actions/runs/36664826008) both succeeded. No public data, historical copy, schema, registry, issue/window or Scheduled Task configuration changed; backfill was not executed. Existing malformed historical copy remains subject to explicit revision authorization. The stated prevention and regression close criteria are satisfied.
 
 ### MNT-20260828-07 — Evidence 日志中的 `ready` 与实际可发布条件语义不一致
 
