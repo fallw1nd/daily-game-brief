@@ -122,7 +122,7 @@ function editionFixture(oldSourceUrl = wrongSteamUrl) {
     date: "2026-09-29",
     entries: [],
     upcoming: [{
-    ...game,
+      ...game,
       platforms: ["Xbox"],
       source: { label: "Xbox Store", url: correctStoreUrl, kind: "primary" },
       mediaSources: [{ label: "Xbox Store", url: correctStoreUrl, kind: "primary" }],
@@ -239,5 +239,125 @@ describe("bounded single-record cover revalidation", () => {
     expect(saved.upcoming[0].cover_status).toBe("unavailable");
     expect(saved.upcoming[0].coverNote).toContain("Lethal Company");
     expect(saved.upcoming[1]).toEqual(edition.upcoming[1]);
+  });
+});
+
+describe("persisted unavailable media reasons", () => {
+  it("persists stable story and cover failure notes, is idempotent, and stays within record scope", async () => {
+    const root = await temporaryRoot();
+    const storyUrl = "https://news.example/story";
+    const verifiedStory = {
+      id: "story-with-verified-image",
+      headline: "Verified story",
+      images: [{ url: "media/verified.jpg", kind: "editorial", sourceUrl: "https://news.example/verified" }],
+      image_status: "verified",
+    };
+    const verifiedCover = {
+      id: "upcoming-verified-game",
+      title: { title_key: "verified-game", title_en: "Verified Game" },
+      cover_status: "verified",
+      cover: { url: "media/verified-cover.jpg", sourceUrl: "https://store.example/verified", kind: "cover" },
+    };
+    const outsideRecord = { id: "upcoming-outside-scope", cover_status: "unavailable", coverNote: "existing note" };
+    const edition = {
+      id: "2026-09-29-daily",
+      date: "2026-09-29",
+      entries: [
+        { id: "story-failure", headline: "A game update", sources: [{ label: "News page", url: storyUrl, kind: "secondary" }] },
+        verifiedStory,
+      ],
+      upcoming: [
+        {
+          ...game,
+          platforms: ["Xbox"],
+          source: { label: "Xbox Store", url: correctStoreUrl, kind: "primary" },
+          mediaSources: [{ label: "Xbox Store", url: correctStoreUrl, kind: "primary" }],
+        },
+        verifiedCover,
+        outsideRecord,
+      ],
+    };
+    await writeFile(join(root, "edition.json"), JSON.stringify(edition));
+    const pageWithoutImage = Buffer.from("<html><head><title>Story</title></head><body>News</body></html>");
+    const png = await sharp({ create: { width: 400, height: 600, channels: 3, background: "#765432" } }).png().toBuffer();
+    const options = {
+      apply: true,
+      dataRoot: join(root, "data"),
+      publicRoot: join(root, "public"),
+      catalog: { games: {} },
+      sourcePolicy: {},
+      fetchPage: fixtureFetchPage(new Map([
+        [storyUrl, pageWithoutImage],
+        [correctStoreUrl, htmlFixture({ productTitle: "Another Product | Xbox", steamAppName: "" })],
+      ])),
+      fetchImage: async (url) => ({ bytes: png, contentType: "image/png", url }),
+    };
+    const manifestItem = { id: edition.id, path: "../edition.json" };
+
+    const storyFirst = await processEdition(manifestItem, { ...options, recordId: "story-failure" });
+    expect(storyFirst.changed).toBe(true);
+    expect(storyFirst.results[0].status).toBe("unavailable");
+    const afterStory = JSON.parse(await readFile(join(root, "edition.json"), "utf8"));
+    expect(afterStory.entries[0]).toMatchObject({
+      image_status: "unavailable",
+      imageNote: "未能取得已核验配图：来源页面没有可用图片。",
+    });
+    expect(afterStory.entries[0].imageNote).not.toContain("交给异步媒体流程补全");
+
+    const storyAgain = await processEdition(manifestItem, { ...options, recordId: "story-failure" });
+    expect(storyAgain.changed).toBe(false);
+    expect(storyAgain.results[0].status).toBe("unavailable");
+
+    const coverFirst = await processEdition(manifestItem, { ...options, recordId: game.id });
+    expect(coverFirst.changed).toBe(true);
+    expect(coverFirst.results[0].status).toBe("unavailable");
+    const afterCover = JSON.parse(await readFile(join(root, "edition.json"), "utf8"));
+    expect(afterCover.upcoming[0]).toMatchObject({
+      cover_status: "unavailable",
+      coverNote: "未能取得已核验封面：来源页面商品身份与记录不符。",
+    });
+    expect(afterCover.upcoming[0].coverNote).not.toContain("Lethal Company");
+
+    const coverAgain = await processEdition(manifestItem, { ...options, recordId: game.id });
+    expect(coverAgain.changed).toBe(false);
+    expect(coverAgain.results[0].status).toBe("unavailable");
+    const final = JSON.parse(await readFile(join(root, "edition.json"), "utf8"));
+    expect(final.entries[1]).toEqual(verifiedStory);
+    expect(final.upcoming[1]).toEqual(verifiedCover);
+    expect(final.upcoming[2]).toEqual(outsideRecord);
+  });
+
+  it("does not turn a review candidate into an unavailable note", async () => {
+    const root = await temporaryRoot();
+    const edition = {
+      id: "2026-09-29-daily",
+      date: "2026-09-29",
+      entries: [{
+        id: "story-candidate",
+        headline: "A game update",
+        sources: [{ label: "Unreviewed source", url: "https://news.example/candidate", kind: "discovery" }],
+      }],
+      upcoming: [],
+    };
+    await writeFile(join(root, "edition.json"), JSON.stringify(edition));
+    const png = await sharp({ create: { width: 640, height: 360, channels: 3, background: "#123456" } }).png().toBuffer();
+    const result = await processEdition({ id: edition.id, path: "../edition.json" }, {
+      apply: true,
+      recordId: "story-candidate",
+      dataRoot: join(root, "data"),
+      publicRoot: join(root, "public"),
+      catalog: { games: {} },
+      sourcePolicy: {},
+      fetchPage: fixtureFetchPage(new Map([[
+        "https://news.example/candidate",
+        htmlFixture({ productTitle: "A game update" }),
+      ]])),
+      fetchImage: async (url) => ({ bytes: png, contentType: "image/png", url }),
+    });
+
+    expect(result.results[0].status).toBe("candidate");
+    expect(result.changed).toBe(false);
+    const saved = JSON.parse(await readFile(join(root, "edition.json"), "utf8"));
+    expect(saved.entries[0]).toEqual(edition.entries[0]);
   });
 });

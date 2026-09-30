@@ -506,6 +506,52 @@ async function resolveWithWebFallback(edition, record, kind, sources, options) {
     attempts: [...(initial.attempts || []), ...(searched.attempts || [])],
   };
 }
+
+function unavailableMediaNote(kind, result) {
+  const errors = (result.attempts || []).map((attempt) => String(attempt.error || ""));
+  const categories = new Set();
+  for (const error of errors) {
+    if (/product title does not match|does not match this game/i.test(error)) {
+      categories.add("来源页面商品身份与记录不符");
+    } else if (/no definitive product title|no opened product page to confirm game identity|no product-title metadata/i.test(error)) {
+      categories.add("来源页面缺少可核验的商品标题");
+    } else if (/no usable social image metadata/i.test(error)) {
+      categories.add("来源页面没有可用图片");
+    } else if (/did not confirm the requested subject|candidate did not pass relevance/i.test(error)) {
+      categories.add("来源页面未能确认对应的消息主题");
+    } else if (/no image candidate succeeded|not an image|dimensions are too small|not sufficiently landscape|could not encode/i.test(error)) {
+      categories.add("图片文件无法读取或处理");
+    } else {
+      // Do not persist raw exceptions: fetch errors can contain URLs, query values, or credentials.
+      categories.add("来源页面无法访问或读取");
+    }
+  }
+  if (!categories.size) categories.add("没有可尝试的媒体来源");
+  const stableOrder = [
+    "来源页面商品身份与记录不符",
+    "来源页面缺少可核验的商品标题",
+    "来源页面没有可用图片",
+    "来源页面未能确认对应的消息主题",
+    "图片文件无法读取或处理",
+    "来源页面无法访问或读取",
+    "没有可尝试的媒体来源",
+  ];
+  const reasons = stableOrder.filter((reason) => categories.has(reason));
+  const mediaName = kind === "cover" ? "封面" : "配图";
+  return `未能取得已核验${mediaName}：${reasons.join("；")}。`;
+}
+
+function setUnavailableMedia(item, kind, result) {
+  if (result.status !== "unavailable") return false;
+  const statusKey = kind === "cover" ? "cover_status" : "image_status";
+  const noteKey = kind === "cover" ? "coverNote" : "imageNote";
+  const note = unavailableMediaNote(kind, result);
+  const changed = item[statusKey] !== "unavailable" || item[noteKey] !== note;
+  item[statusKey] = "unavailable";
+  item[noteKey] = note;
+  return changed;
+}
+
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + "\n");
 
@@ -573,6 +619,8 @@ async function processEdition(manifestItem, options) {
       entry.image_status = "verified";
       delete entry.imageNote;
       changed = true;
+    } else if (options.apply && setUnavailableMedia(entry, "editorial", result)) {
+      changed = true;
     }
   });
 
@@ -600,6 +648,8 @@ async function processEdition(manifestItem, options) {
       item.cover = result.asset;
       item.cover_status = "verified";
       delete item.coverNote;
+      changed = true;
+    } else if (options.apply && setUnavailableMedia(item, "cover", result)) {
       changed = true;
     }
   });
