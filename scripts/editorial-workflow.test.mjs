@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const workflow = (await readFile(".github/workflows/news-discovery-shadow.yml", "utf8")).replace(/\r\n/g, "\n");
 const editorialize = await readFile("scripts/editorialize.mjs", "utf8");
+const slaWorkflow = (await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8")).replace(/\r\n/g, "\n");
 
 describe("final editorial packet workflow", () => {
   it("collects once at the Daily 10:10 Beijing evidence cutoff", () => {
@@ -68,5 +69,25 @@ describe("final editorial packet workflow", () => {
     expect(editorialize).toContain("nextBatch = queue.batches.find");
     expect(workflow).toContain('cp "$RUNNER_TEMP/editorial-batches/"*.json "$state_dir/automation/batches/$edition_id/"');
     expect(workflow).toContain("artifacts/editorial-batches/");
+  });
+
+  it("restores, uploads, and merges calendar health from the newest automation state on every retry", () => {
+    expect(workflow).toContain("automation/health/release-calendar.json > artifacts/release-calendar-health-previous.json");
+    expect(workflow).toContain("artifacts/release-calendar-health.json");
+    expect(workflow).toContain('cp artifacts/release-calendar-discovery.json "$calendar_report"');
+    const retry = workflow.slice(workflow.indexOf('for attempt in 1 2 3; do'));
+    expect(retry.indexOf("git fetch origin +refs/heads/automation/state")).toBeLessThan(retry.indexOf("node scripts/update-release-calendar-health.mjs"));
+    expect(retry).toContain('--previous="$state_dir/automation/health/release-calendar.json"');
+    expect(retry).toContain('automation/health/release-calendar.json "automation/status/$edition_id.json"');
+  });
+
+  it("records calendar health only when SLA actually rebuilds the immutable packet", () => {
+    const recovery = slaWorkflow.slice(slaWorkflow.indexOf("- name: Rebuild a missing, stale, or invalid packet"), slaWorkflow.indexOf("- name: Resolve usable packet"));
+    const preserve = slaWorkflow.slice(slaWorkflow.indexOf("- name: Preserve recovered packet and acknowledgement"), slaWorkflow.indexOf("- name: Resolve usable packet"));
+    expect(slaWorkflow).toContain('automation/health/release-calendar.json" > artifacts/release-calendar-health-previous.json');
+    expect(recovery).toContain("node scripts/discover-release-calendar.mjs");
+    expect(preserve).toContain("if: steps.recovery.outputs.available == 'true'");
+    expect(preserve).toContain("node scripts/update-release-calendar-health.mjs");
+    expect(preserve).toContain('--previous="$state_dir/automation/health/release-calendar.json"');
   });
 });

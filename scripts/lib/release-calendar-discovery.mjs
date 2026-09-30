@@ -1,4 +1,8 @@
 import { JSDOM, VirtualConsole } from "jsdom";
+import { aggregateCalendarLeads, dedupeCalendarObservations } from "./release-calendar-identity.mjs";
+import { selectCalendarLeads } from "./release-calendar-selection.mjs";
+import { selectCalendarPacket } from "./release-calendar-packet.mjs";
+import { planCalendarFallbacks } from "./release-calendar-strategy.mjs";
 
 const DAY = 86400000;
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -12,8 +16,10 @@ export function releaseDate(raw, referenceDate) {
   const exact = value.match(/^(\d{4}-\d{2}-\d{2})(?:T|$)/);
   if (exact) iso = exact[1];
   else {
-    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(20\d{2}))?\b/i);
+    const match = value.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s*(\d{1,2})(?:,?\s*(20\d{2})(?!\d))?\b/i);
     if (!match) return null;
+    const matchEnd = (match.index || 0) + match[0].length;
+    if (!match[3] && /^\s*,?\s*\d{4,}/.test(value.slice(matchEnd))) return null;
     const month = months.indexOf(match[1].slice(0, 3).toLowerCase()) + 1;
     let year = Number(match[3] || referenceDate.slice(0, 4));
     if (!match[3] && referenceDate.slice(5, 7) === "12" && month === 1) year++;
@@ -29,6 +35,89 @@ export function releaseWindow(date) {
 }
 const within = (date, window) => date && date >= window.startInclusive && date <= window.endInclusive;
 const https = (value) => { try { const u = new URL(value); return u.protocol === "https:" ? u.href : null; } catch { return null; } };
+const articleMonth = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
+const articleDateLeadPattern = new RegExp(`\\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\\s+(?:on\\s+)?(${articleMonth})\\.?\\s*(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "gi");
+const articleDateLeadTestPattern = new RegExp(articleDateLeadPattern.source, "i");
+const articleNegationPattern = /\b(?:no longer|will not|won['’]?t|does not|doesn['’]?t|is not|isn['’]?t|never)\b[^.!?;]{0,48}\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\b/i;
+
+function articleDateHints(text, referenceDate, window) {
+  const hints = [];
+  let invalid = false;
+  let ambiguousRange = false;
+  const negated = articleNegationPattern.test(text);
+  for (const match of text.matchAll(articleDateLeadPattern)) {
+    // Use the full original match's end offset; reconstructed date strings shift this boundary for compact dates like Sept22.
+    const matchEnd = (match.index || 0) + match[0].length;
+    const afterDate = text.slice(matchEnd);
+    if (/^\s*,?\s*\d{4,}/.test(afterDate)) { invalid = true; continue; }
+    const dateText = `${match[1]} ${match[2]}${match[3] ? `, ${match[3]}` : ""}`;
+    const date = releaseDate(dateText, referenceDate);
+    if (!date) { invalid = true; continue; }
+    hints.push(date);
+    if (new RegExp(`^\\s*(?:[\\u2013\\u2014-]|to)\\s*(?:${articleMonth}\\.?\\s*)?\\d{1,2}(?!\\d)`, "i").test(afterDate)) ambiguousRange = true;
+    const continuationPattern = new RegExp(`^\\s*(?:,?\\s*(?:and|or)\\s+|/\\s*)(?:(${articleMonth})\\.?\\s*)?(\\d{1,2})(?:,?\\s*(20\\d{2})(?!\\d))?\\b`, "i");
+    let continuation = afterDate;
+    let continuationMatch;
+    while ((continuationMatch = continuation.match(continuationPattern))) {
+      ambiguousRange = true;
+      const continuationMonth = continuationMatch[1] || match[1];
+      const continuationYear = continuationMatch[3] || match[3];
+      const continuationDate = releaseDate(`${continuationMonth} ${continuationMatch[2]}${continuationYear ? `, ${continuationYear}` : ""}`, referenceDate);
+      if (continuationDate) hints.push(continuationDate);
+      else invalid = true;
+      continuation = continuation.slice(continuationMatch[0].length);
+    }
+  }
+  const dateHints = [...new Set(hints)];
+  let dateStatus;
+  if (invalid && !dateHints.length) dateStatus = "invalid_date";
+  else if (negated && dateHints.length) dateStatus = "ambiguous_negated";
+  else if (ambiguousRange || dateHints.length > 1) dateStatus = "ambiguous_multiple";
+  else if (!dateHints.length) dateStatus = "no_date";
+  else if (within(dateHints[0], window)) dateStatus = "in_window";
+  else if (dateHints[0] < window.startInclusive) dateStatus = "expired";
+  else dateStatus = "outside_window";
+  return { dateHints, dateStatus, ...(negated ? { negated: true, ambiguous: true } : {}) };
+}
+
+function articlePlatformHints(text) {
+  const hints = [];
+  if (/\bPS5\b|PlayStation\s*5/i.test(text)) hints.push("PS5");
+  if (/\bPS4\b|PlayStation\s*4/i.test(text)) hints.push("PS4");
+  if (/PlayStation\s*VR2|\bPS VR2\b/i.test(text)) hints.push("PS VR2");
+  if (/\bPlayStation\b/i.test(text) && !hints.length) hints.push("PlayStation");
+  return hints;
+}
+
+function articleReleaseType(text) {
+  const cues = [
+    ["warbond", /\bwarbond\b/gi],
+    ["early_access", /\bearly access\b/gi],
+    ["demo", /\b(?:demo|trial)\b/gi],
+    ["update", /\b(?:update|patch|season)\b/gi],
+  ];
+  const markers = cues.flatMap(([type, pattern]) => [...text.matchAll(pattern)].map(match => ({ type, index: match.index || 0 })));
+  const uniqueTypes = [...new Set(markers.map(({ type }) => type))];
+  const dateLead = articleDateLeadPattern.exec(text);
+  articleDateLeadPattern.lastIndex = 0;
+  const dateEnd = dateLead ? (dateLead.index || 0) + dateLead[0].length : -1;
+  if (uniqueTypes.length > 1 || (dateEnd >= 0 && markers.some(({ index }) => index > dateEnd))) return "mixed";
+  if (uniqueTypes.length === 1) return uniqueTypes[0];
+  if (/\b(?:launch(?:es|ed|ing)?|release(?:s|d|ing)?|arriv(?:e|es|ed|ing)?|out)\b/i.test(text)) return "game_launch";
+  return "unknown";
+}
+
+export function usefulCalendarLeadCount(records, reviewLinks, window = null) {
+  const names = new Set(records
+    .filter(record => !window || within(record.date, window))
+    .filter(record => clean(record.title))
+    .map(record => titleIdentity(record.title))
+    .filter(Boolean));
+  const urls = new Set(reviewLinks
+    .filter(link => link.dateStatus === "in_window" && https(link.url))
+    .map(link => new URL(link.url).href));
+  return names.size + urls.size;
+}
 
 export function parseReleaseSource(html, source, editionDate) {
   const document = dom(html, ["xbox", "articles"].includes(source.adapter));
@@ -53,7 +142,7 @@ export function parseReleaseSource(html, source, editionDate) {
       const data = JSON.parse(doc.querySelector("#__NEXT_DATA__")?.textContent || "null");
       const walk = (v) => {
         if (!v || typeof v !== "object") return;
-        if (v.name && v.releaseDate && v.urlKey && v.nsuid) add(v.name, releaseDate(v.releaseDate, editionDate), `https://www.nintendo.com/us/store/products/${v.urlKey}/`, [v.platform?.label || "Nintendo Switch"], { productId: `nintendo:${v.nsuid}` });
+        if (v.name && v.releaseDate && v.urlKey && v.nsuid) add(v.name, releaseDate(v.releaseDate, editionDate), `https://www.nintendo.com/us/store/products/${v.urlKey}/`, [clean(v.platform?.label) || "unknown"], { productId: `nintendo:${v.nsuid}`, platformFamily: "Nintendo" });
         for (const x of Object.values(v)) walk(x);
       };
       walk(data);
@@ -75,7 +164,8 @@ export function parseReleaseSource(html, source, editionDate) {
         }
       }
     } else {
-      for (const item of [...doc.querySelectorAll("item")].slice(0, 15)) {
+      const articleLinks = [];
+      for (const [articleIndex, item] of [...doc.querySelectorAll("item")].slice(0, 15).entries()) {
         const published = new Date(item.querySelector("pubDate")?.textContent || "");
         if (!Number.isFinite(published.getTime())) continue;
         const reference = published.toISOString().slice(0, 10);
@@ -91,12 +181,24 @@ export function parseReleaseSource(html, source, editionDate) {
             if (match) add(match[1], releaseDate(match[2], reference), link.href, ["Xbox"], { announcementUrl: url, dateText: match[2] });
           }
         }
-        if (url && /launch|releas|coming|next week|out |arriv/i.test(title)) reviewLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id });
+        if (source.adapter === "articles" && url && (/\b(?:launch(?:es|ed|ing)?|releas(?:es|ed|ing)?|coming|next week|out|arriv(?:e|es|ed|ing)?|warbond|early access|demo|update|patch|season)\b/i.test(title) || articleDateLeadTestPattern.test(title))) {
+          // Article title dates are review leads only. Article body/footer dates are intentionally not scanned.
+          const dateInfo = articleDateHints(title, reference, releaseWindow(editionDate));
+          const platformHints = articlePlatformHints(`${title} ${[...item.querySelectorAll("category")].map(node => node.textContent).join(" ")}`);
+          const releaseTypeHint = articleReleaseType(title);
+          const priority = dateInfo.dateStatus === "in_window" ? 0 : dateInfo.dateStatus === "ambiguous_multiple" || dateInfo.dateStatus === "ambiguous_negated" ? 1 : dateInfo.dateStatus === "outside_window" || dateInfo.dateStatus === "expired" ? 2 : 3;
+          articleLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id, dateHints: dateInfo.dateHints, dateStatus: dateInfo.dateStatus, ...(dateInfo.negated ? { negated: true, ambiguous: true } : {}), platformHints, releaseTypeHint, review: "open_primary_source_before_publication", _articleIndex: articleIndex, _priority: priority });
+        }
+        if (source.adapter !== "articles" && url && /launch|releas|coming|next week|out |arriv/i.test(title)) reviewLinks.push({ title: title.slice(0, 180), url, published: reference, sourceId: source.id });
         page.window.close();
+      }
+      if (source.adapter === "articles") {
+        articleLinks.sort((a, b) => a._priority - b._priority || a._articleIndex - b._articleIndex);
+        reviewLinks.push(...articleLinks.map(({ _articleIndex, _priority, ...link }) => link));
       }
     }
   } finally { document.window.close(); }
-  const unique = [...new Map(records.map(r => [`${r.productId || titleIdentity(r.title)}|${r.platforms.join(",")}|${r.date}`, r])).values()];
+  const unique = dedupeCalendarObservations(records);
   return { records: unique, reviewLinks: reviewLinks.slice(0, 8) };
 }
 
@@ -114,58 +216,139 @@ export async function fetchReleaseSource(source, config, fetcher = fetch) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function collectReleaseCalendar({ config, editionDate, baseline = [], titleRegistry = {}, fetcher = fetch, now = new Date() }) {
-  const window = releaseWindow(editionDate);
-  const known = new Set(Object.entries(titleRegistry.translations || {}).flatMap(([key, v]) => [key, v.titleZhCn, ...(v.titleEnAliases || [])]).filter(Boolean).map(titleIdentity));
-  const baselineNames = new Set(baseline.flatMap(v => [v.title?.title_en, v.title?.title_zh_cn]).filter(Boolean).map(titleIdentity));
-  const results = [];
-  // Two requests at a time, fixed source count; an outage is diagnostic, never a news publication blocker.
-  for (let i = 0; i < config.sources.length; i += 2) {
-    const batch = await Promise.all(config.sources.slice(i, i + 2).map(async source => {
+async function collectSource(source, config, editionDate, window, fetcher) {
+      const startedAt = Date.now();
+      const parsed = { records: [], reviewLinks: [] };
+      let pagesAttempted = 0;
+      let pagesSucceeded = 0;
+      let pagesFailed = 0;
+      let parserPagesSucceeded = 0;
+      let parserPagesFailed = 0;
+      let sourceError;
+      let parserError;
       try {
-        const parsed = { records: [], reviewLinks: [] };
-        let pages = 0;
-        let pageError;
         for (let page = 1; page <= (source.maxPages || 1); page++) {
           const url = new URL(source.url);
+          if (url.protocol !== "https:") throw new Error("HTTPS required");
           if (page > 1) url.searchParams.set("page", String(page));
+          let body;
+          pagesAttempted++;
+          try {
+            body = await fetchReleaseSource({ ...source, url: url.href }, config, fetcher);
+            pagesSucceeded++;
+          } catch (error) {
+            pagesFailed++;
+            sourceError = String(error?.message || error).slice(0, 150);
+            break;
+          }
           let result;
-          try { result = parseReleaseSource(await fetchReleaseSource({ ...source, url: url.href }, config, fetcher), source, editionDate); }
-          catch (error) { pageError = String(error.message).slice(0, 150); break; }
-          parsed.records.push(...result.records); parsed.reviewLinks.push(...result.reviewLinks); pages++;
+          try {
+            result = parseReleaseSource(body, source, editionDate);
+            parserPagesSucceeded++;
+          } catch (error) {
+            parserPagesFailed++;
+            parserError = String(error?.message || error).slice(0, 150);
+            break;
+          }
+          parsed.records.push(...result.records);
+          parsed.reviewLinks.push(...result.reviewLinks);
           if (!result.records.length || result.records.some(r => r.date > window.endInclusive)) break;
         }
-        const records = parsed.records.filter(r => within(r.date, window));
-        return { source, ...parsed, records, pages, parsedCount: parsed.records.length, status: pageError ? (parsed.records.length ? "partial_failure" : "failed") : parsed.records.length || parsed.reviewLinks.length ? "partial" : "empty_or_changed", ...(pageError ? { error: pageError } : {}) };
-      } catch (error) { return { source, records: [], reviewLinks: [], parsedCount: 0, status: "failed", error: String(error.message).slice(0, 150) }; }
-    }));
+      } catch (error) {
+        // A malformed source or an unexpected per-source processing error must not reject the batch.
+        sourceError ||= String(error?.message || error).slice(0, 150);
+      }
+      const records = parsed.records.filter(r => within(r.date, window));
+      const reviewLinks = source.kind === "fallback"
+        ? [...parsed.reviewLinks, ...records.map(record => ({
+          title: record.title,
+          url: record.url,
+          sourceId: source.id,
+          dateHints: record.date ? [record.date] : [],
+          dateStatus: record.date ? "in_window" : "no_date",
+          platformHints: [source.platform === "PlayStation" ? "PS5" : source.platform],
+          review: "open_primary_source_before_publication",
+        }))]
+        : parsed.reviewLinks;
+      const sourceStatus = sourceError ? (pagesSucceeded ? "partial_failure" : "failed") : "success";
+      const parserStatus = parserPagesFailed ? (parserPagesSucceeded ? "partial_failure" : "failed")
+        : parserPagesSucceeded && (parsed.records.length || parsed.reviewLinks.length) ? "success" : "unknown";
+      const failed = Boolean(sourceError || parserError);
+      const hasParsedRows = parsed.records.length > 0 || parsed.reviewLinks.length > 0;
+      const status = failed ? (hasParsedRows ? "partial_failure" : "failed") : hasParsedRows ? "partial" : "empty_or_changed";
+      return {
+        source, ...parsed, reviewLinks, records, parsedCount: parsed.records.length, status, sourceStatus, parserStatus,
+        parserPagesSucceeded, parserPagesFailed, pagesAttempted, pagesSucceeded, pagesFailed,
+        usefulLeads: usefulCalendarLeadCount(records, parsed.reviewLinks, window),
+        durationMs: Date.now() - startedAt,
+        ...(sourceError || parserError ? { error: sourceError || parserError } : {}),
+      };
+}
+
+export async function collectReleaseCalendar({ config, editionDate, baseline = [], titleRegistry = {}, fetcher = fetch, now = new Date(), previousHealth = undefined }) {
+  const window = releaseWindow(editionDate);
+  const baseSources = config.sources;
+  const results = [];
+  // Six configured base sources are always rechecked, two at a time, over the full date window.
+  for (let i = 0; i < baseSources.length; i += 2) {
+    results.push(...await Promise.all(baseSources.slice(i, i + 2).map(source => collectSource(source, config, editionDate, window, fetcher))));
+  }
+  const strategy = planCalendarFallbacks({ baseSources, fallbackSources: (config.fallbackSources || []).slice(0, 2), baseResults: results, ledger: previousHealth, editionDate, now });
+  const selectedFallbacks = strategy.fallbackDecisions.filter((decision) => decision.attempted).map((decision) => config.fallbackSources.find(source => source.id === decision.sourceId));
+  for (let i = 0; i < selectedFallbacks.length; i += 2) {
+    const batch = await Promise.all(selectedFallbacks.slice(i, i + 2).map(source => collectSource({ ...source, maxPages: 1 }, config, editionDate, window, fetcher)));
     results.push(...batch);
   }
-  const all = results.flatMap(r => r.records);
-  const groups = new Map();
-  for (const record of all) {
-    const key = `${record.productId || titleIdentity(record.title)}|${record.platforms.join(",")}|${record.region}`;
-    const previous = groups.get(key);
-    if (previous) {
-      previous.sources = [...new Set([...previous.sources, record.sourceId])];
-      previous.dates = [...new Set([...previous.dates, record.date])];
-      previous.priority = Math.max(previous.priority, record.priority);
-    } else groups.set(key, { ...record, sources: [record.sourceId], dates: [record.date], knownTitle: known.has(titleIdentity(record.title)), inBaseline: baselineNames.has(titleIdentity(record.title)) });
-  }
-  const crossSource = new Map();
-  for (const r of all) { const key = titleIdentity(r.title); const families = crossSource.get(key) || new Set(); families.add(r.family); crossSource.set(key, families); }
-  const ranked = [...groups.values()].sort((a, b) => (Number(b.knownTitle) * 4 + Number(crossSource.get(titleIdentity(b.title)).size > 1) * 3 + b.priority + Number(!b.inBaseline)) - (Number(a.knownTitle) * 4 + Number(crossSource.get(titleIdentity(a.title)).size > 1) * 3 + a.priority + Number(!a.inBaseline)) || a.date.localeCompare(b.date));
-  // Allocate across families before filling by priority so PC volume cannot evict console leads.
-  const selected = []; const buckets = [...new Set(ranked.map(r => r.family))].map(family => ranked.filter(r => r.family === family));
-  while (selected.length < config.maxCandidates && buckets.some(b => b.length)) for (const bucket of buckets) if (bucket.length && selected.length < config.maxCandidates) selected.push(bucket.shift());
-  const coverage = results.map(r => ({ sourceId: r.source.id, url: r.source.url, platform: r.source.platform, status: r.status, pages: r.pages || 0, parsedCount: r.parsedCount, inWindow: r.records.length, reviewLinks: r.reviewLinks.length, ...(r.error ? { error: r.error } : {}) }));
-  return { editionDate, window, fetchedAt: now.toISOString(), coverage, candidates: selected.map(r => ({ ...r, crossSource: crossSource.get(titleIdentity(r.title)).size > 1, review: "open_primary_source_before_publication" })), reviewLinks: results.flatMap(r => r.reviewLinks), omittedCandidates: ranked.length - selected.length, coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.", requiredChecks: ["Open primary pages for missing known titles and cross-source leads first.", "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.", "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.", "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."] };
+  const roleById = new Map([...baseSources.map(source => [source.id, "base"]), ...(config.fallbackSources || []).map(source => [source.id, "fallback"])]);
+  const all = results.filter(r => roleById.get(r.source.id) !== "fallback").flatMap(r => r.records);
+  const grouped = aggregateCalendarLeads(all, { baseline, titleRegistry });
+  const selection = selectCalendarLeads(grouped, config.maxCandidates);
+  const decisionById = new Map(strategy.fallbackDecisions.map(decision => [decision.sourceId, decision]));
+  const coverage = results.map(r => ({
+    sourceId: r.source.id, url: r.source.url, platform: r.source.platform, family: r.source.family,
+    role: roleById.get(r.source.id) || "base",
+    status: r.status, sourceStatus: r.sourceStatus, parserStatus: r.parserStatus,
+    parserPagesSucceeded: r.parserPagesSucceeded, parserPagesFailed: r.parserPagesFailed,
+    pages: r.parserPagesSucceeded, pagesAttempted: r.pagesAttempted, pagesSucceeded: r.pagesSucceeded, pagesFailed: r.pagesFailed,
+    parsedCount: r.parsedCount, inWindow: r.records.length, usefulLeads: r.usefulLeads,
+    durationMs: r.durationMs, reviewLinks: r.reviewLinks.length,
+    ...(decisionById.has(r.source.id) ? { triggerReason: decisionById.get(r.source.id).reason, healthClass: decisionById.get(r.source.id).health.class } : {}),
+    ...(r.status === "empty_or_changed" ? { empty: true } : {}),
+    ...(r.status === "partial_failure" ? { partialFailure: true } : {}),
+    ...(r.error ? { error: r.error } : {}),
+  }));
+  return {
+    editionDate,
+    window,
+    fetchedAt: now.toISOString(),
+    coverage,
+    fallbackTelemetry: {
+      baseAttempted: baseSources.map(source => source.id),
+      fallbackDecisions: strategy.fallbackDecisions,
+      actualFallbackAttempts: results.filter(r => roleById.get(r.source.id) === "fallback").map(r => r.source.id),
+      platformGaps: strategy.platformGaps,
+      maxAdditionalRequests: Math.min(2, (config.fallbackSources || []).length),
+    },
+    candidates: selection.candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
+    reviewLinks: results.flatMap(r => r.reviewLinks),
+    omittedCandidates: selection.capOmittedTasks,
+    omissionTelemetry: {
+      visibleRawRows: all.length,
+      uniqueTasks: grouped.length,
+      dedupeReduction: Math.max(0, all.length - grouped.length),
+      capOmittedTasks: selection.capOmittedTasks,
+      legacyOmittedUnit: "tasks",
+    },
+    coverageNote: "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.",
+    requiredChecks: [
+      "Open primary pages for missing known titles and cross-source leads first.",
+      "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.",
+      "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.",
+      "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions.",
+    ],
+  };
 }
 
 export function boundCalendarReport(report, maxChars = 24000) {
-  const bounded = { ...report, candidates: [...report.candidates], reviewLinks: [...report.reviewLinks] };
-  while (JSON.stringify(bounded).length > maxChars && bounded.candidates.length) { bounded.candidates.pop(); bounded.omittedCandidates++; }
-  while (JSON.stringify(bounded).length > maxChars && bounded.reviewLinks.length) bounded.reviewLinks.pop();
-  if (JSON.stringify(bounded).length > maxChars) throw new Error("calendar diagnostics exceed budget");
-  return bounded;
+  return selectCalendarPacket({ report, maxCandidates: 100, maxChars });
 }
