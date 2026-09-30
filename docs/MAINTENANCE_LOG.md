@@ -659,6 +659,16 @@
 - **Close when:** 完整 `npm run check` 通过，PR 合并 main，Pages 成功；实际启用 Scheduled Task prompt 同步为精简 bootstrap 且保持原 10:20/11:20 schedule 与 enabled 状态不变。
 - **2026-09-22 closeout:** PR #161 合并为 `ae4fc34`。Verify [35756273011](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756273011) 通过：83 个测试文件 / 418 项测试、43 期 Canonical 校验、英文基础设施校验和生产构建全部成功；合并后 Pages [35756425578](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756425578) 成功。实际启用任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 已改为精简 bootstrap，仍为 `enabled=true`，Asia/Shanghai 10:20/11:20 两次调用；旧 PM 与一次性历史任务继续保持 disabled。关闭条件全部满足。
 
+## MNT-20260930-03 — Cover source page can verify the wrong game through a misleading URL slug
+
+- **Discovered:** 2026-09-30
+- **Priority / status:** P1 / in_progress.
+- **Evidence:** The current `upcoming-end-of-abyss` cover was marked verified from Steam app 1966720 using an `End_of_Abyss` URL slug, but the opened Steam product is Lethal Company; the existing local image visibly contains the Lethal Company logo. Existing cover processing skips verified covers; the old web-search gate also accepted titles found in page descriptions or URL text, and non-search/catalog pages bypassed subject matching.
+- **Risk:** A URL slug, description mention, or unverified catalog source can attach artwork for a different product to a release-calendar record. Revalidating every historical cover on normal runs would add requests and disturb previously verified editorial media.
+- **Bounded resolution:** Require opened cover-page product title metadata to exactly match the record title or registered title alias for every HTML source. Keep existing covers untouched by default. Add a manual exact-edition/single-record revalidation path: only a confirmed product-title mismatch removes that record's cover and retries its ordinary sources; fetch failures or ambiguous pages retain it. Do not scan or rewrite the archive, edit data/media manually, or alter editorial image behavior.
+- **Implementation batch:** Offline resolver and workflow tests pass (2 Vitest files / 13 tests), including Steam app-name priority, 200 interstitial/error pages, metadata conflicts, and bounded replacement; `git diff --check` is clean. This records implementation evidence only, pending the primary review/replay.
+- **Close when:** Offline fixed-page fixtures exercise the real resolver and single-record recovery path; relevant Vitest suites pass; the primary reviewer completes full checks/review/replay. This implementation batch does not claim acceptance or deployment.
+
 ## MNT-20260930-02 — Daily degraded fallback 将 discovery 自动写入 Canonical 日历
 
 - **Discovered:** 2026-09-30
