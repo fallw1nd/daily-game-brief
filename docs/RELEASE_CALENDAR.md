@@ -11,6 +11,8 @@ The Daily packet includes a rolling future-15-day release calendar. Discovery is
 5. Open official developer/publisher/platform pages before adoption.
 6. Submit only verified additions/changes through Daily `upcomingMode:"inherit_and_patch"`.
 
+If Daily enters the degraded publication fallback, calendar discovery remains review-only. The fallback emits an empty `upcoming` patch with `removeUpcomingIds:[]` and `upcomingMode:"inherit_and_patch"`; it preserves the verified Canonical baseline and the publisher naturally removes entries outside the rolling 15-day window. Calendar-only final official detail verification is deferred, and known-title hints or cross-source discovery matches are not evidence.
+
 Discovery never writes `public/data` directly.
 
 ## Discovery sources

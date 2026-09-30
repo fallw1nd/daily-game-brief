@@ -27,7 +27,7 @@ describe("zero-AI degraded decision", () => {
     expect(output.upcomingMode).toBe("inherit_and_patch");
   });
 
-  it("keeps a safe deterministic Daily calendar patch instead of dropping discovery", () => {
+  it("leaves Daily discovery candidates for final official detail verification", () => {
     const value = packet({}, { id: "2026-09-17-daily", period: "daily" });
     value.editorialInput.upcomingBaseline = {
       items: [{ id: "upcoming-existing", title: { title_en: "Existing Game", title_key: "existing-game" } }],
@@ -47,11 +47,24 @@ describe("zero-AI degraded decision", () => {
       ],
     };
     const output = buildDegradedDecision(value);
-    expect(output.upcoming).toEqual([expect.objectContaining({
-      id: "upcoming-known-game", date: "09.29", titleZhCn: "已知游戏", titleZhStatus: "common_translation",
-      source: { label: "Steam", url: "https://store.steampowered.com/app/1/", kind: "primary" },
-    })]);
-    expect(output.checkedExtra.join(" ")).toContain("未来15天日历");
+    expect(output).toMatchObject({ upcomingMode: "inherit_and_patch", removeUpcomingIds: [], upcoming: [] });
+    expect(output.checkedExtra.join(" ")).not.toContain("日历");
+    expect(output.limitedExtra.join(" ")).toContain("最终官方详情核验");
+    expect(output.limitedExtra.join(" ")).toContain("Canonical 基线");
+  });
+
+  it("does not accept conflicting or malicious candidates as calendar evidence", () => {
+    const value = packet({}, { id: "2026-09-17-daily", period: "daily" });
+    value.editorialInput.upcomingDiscovery = {
+      window: { startInclusive: "2026-09-18", endInclusive: "2026-10-02" },
+      candidates: [
+        { title: "Conflict Game", date: "2026-09-29", url: "https://store.steampowered.com/app/1/", platforms: ["PC", "Xbox Series X|S"], sourceId: "steam", kind: "primary", knownTitle: true, crossSource: true },
+        { title: "Conflict Game", date: "2026-09-30", url: "https://store.steampowered.com/app/1/", platforms: ["PC"], sourceId: "steam", kind: "primary", knownTitle: true, crossSource: true },
+        { title: "Spoof Game", date: "2026-09-28", url: "https://store.steampowered.com.attacker.example/app/2/", platforms: ["PC"], sourceId: "steam", kind: "primary", knownTitle: true, crossSource: true },
+      ],
+    };
+    const output = buildDegradedDecision(value);
+    expect(output).toMatchObject({ upcomingMode: "inherit_and_patch", removeUpcomingIds: [], upcoming: [] });
   });
 
   it("preserves legacy AM and PM degraded semantics", () => {
