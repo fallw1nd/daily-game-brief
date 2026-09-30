@@ -44,6 +44,25 @@ describe("generated editorial alt synchronization", () => {
     expect(record.images[0].alt).toBe("永泉传说：《永泉传说》9月17日登陆主机，同日推出“破碎之形”DLC相关配图");
   });
 
+  it("localizes the structured subject prefix while preserving secondary-name localization", () => {
+    const record = {
+      id: "2026-08-28-am-releases-3",
+      title: {
+        title_key: "fountains",
+        title_en: "FOUNTAINS",
+        title_zh_cn: "永泉传说",
+        title_zh_status: "official_simplified",
+      },
+      headline: "《永泉传说》推出“破碎之形”DLC",
+      images: [{
+        kind: "editorial",
+        alt: "FOUNTAINS：《FOUNTAINS》推出“Shattered Shape”DLC相关配图",
+      }],
+    };
+    expect(refreshGeneratedEditorialAlts(record, localizeRegisteredTitles)).toBe(1);
+    expect(record.images[0].alt).toBe("永泉传说：《永泉传说》推出“破碎之形”DLC相关配图");
+  });
+
   it("does not overwrite source or manually authored descriptions", () => {
     const manualAlt = "Gravhounds四只生化改造犬在外星基地前集结";
     const record = {

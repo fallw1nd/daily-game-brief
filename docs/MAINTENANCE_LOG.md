@@ -115,13 +115,13 @@
 - **Discovered:** 2026-08-28
 - **Priority:** P2
 - **Area:** title localization / text transformation
-- **Status:** open
-- **Evidence:** 当前 `scripts/lib/title-translations.mjs` 会遍历全部 `titleEnAliases`，按长度排序后对任意正文执行 `localized.split(english).join(chinese)`。随着 registry 增长，如果未来加入 `Control`、`Inside`、`Journey` 等同时是普通英文词的作品名，可能替换非作品语境文本。
+- **Status:** in_progress.
+- **Evidence:** 原实现对任意文本全局执行 `localized.split(english).join(chinese)`，普通词可误替换、无词边界会命中子串或续作前缀；真实扫描48期归档的1018条文案后，重复运行仍改变7个字段，因为 `Crescent Tower: RISING`、`BALL x PIT`、`B.L.U.E. NOVA` 都是其中文译名中的英文部分。
 - **Risk:** silent text corruption；越大的 title registry 风险越高，而且可能波及历史 backfill。
 - **Proposed resolution:** 优先改为每条 entry 的结构化 `mentionedTitles` / 受限 alias 集，只替换该条已知出现的作品；若暂不改 schema，至少增加语境边界、书名号/明确 title mention 检查和高风险短词 deny/explicit opt-in。
 - **Close when:** 加入普通词冲突测试；不会把非作品语境的 `Control` 等普通词替换；已确认多作品摘要（例如 FOUNTAINS + DLC）仍能正确本地化。
-- **Resolution:** pending.
-- **Verification:** pending.
+- **Resolution:** 全部本地化路径使用单轮最长别名扫描，Latin字母/数字/组合音标边界保护子串和续作后缀，中文紧邻仍可匹配；普通单词只在明确书名号或结构化主体上下文启用。未知数字/罗马数字续作、副标题和同alias多译名保守不替换；译名中已有完整英文别名时跳过，保证幂等。未修改历史文件或公开schema。
+- **Verification:** 指定 Vitest 命令通过：3个测试文件、26项测试。新增私有注册表边界/歧义测试、生产注册表译名幂等测试、headline主体与未知 `Diablo VI` 续作/副标题测试，以及含主标题/DLC的媒体alt回归；未运行 backfill，未修改历史文件。
 
 ### MNT-20260828-07 — Evidence 日志中的 `ready` 与实际可发布条件语义不一致
 
