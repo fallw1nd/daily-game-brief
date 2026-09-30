@@ -1,6 +1,6 @@
 # Release calendar offline replay
 
-Replay the three immutable report/packet samples and an optional read-only holdout. No source fetch or discovery run occurs.
+Replay the immutable report/packet samples and an optional read-only holdout. The default command selects daily18 and daily19; pass all three edition names to include daily21. No source fetch or discovery run occurs.
 
 ```text
 node scripts/replay-release-calendar.mjs
@@ -16,7 +16,7 @@ Before reporting proposed packet metrics, replay aggregates the real saved repor
 
 Candidates and observations use named fields. Repeated values are shared only through human-readable per-source defaults and an explicit shared URL list; singleton `dates: [date]` and `platforms: [platform]` values are expanded by the decoder. The packet remains within 100 candidates and 24,000 serialized JSON characters. Character counts below include the complete calendar packet, its coverage and metadata, shared defaults, URL list, candidates, review links, and telemetry. Per-task characters divide that complete packet size by its unique task count.
 
-| Edition | Historical packet tasks / chars | Current packet tasks / chars | Tasks gained | Historical / current chars per task | Unique tasks available | Omitted accounting: report + packet cap + byte budget | Final family task counts (PC / PS / Xbox / Nintendo) |
+| Edition | Historical packet tasks / chars | Current packet tasks / chars | Tasks gained | Historical / current chars per task | Unique tasks available | Omitted accounting: report + packet cap + character budget | Final family task counts (PC / PS / Xbox / Nintendo) |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |
 | 2026-09-18 | 30 / 23,608 | 37 / 23,898 | +7 | 786.93 / 645.89 | 65 | 0 + 0 + 28 = 28 | 25 / 14 / 11 / 19 |
 | 2026-09-19 | 24 / 23,600 | 33 / 23,974 | +9 | 983.33 / 726.48 | 76 | 101 + 0 + 43 = 144 | 20 / 14 / 19 / 15 |
@@ -35,7 +35,7 @@ Family counts include a multi-platform task once in every family it claims. All 
 The daily21 read-only source files have SHA-256 `3eeea773d47ba2d90e40485f35362ed359e92e855c2a3c086c25ebf9568dbb78` (`release-calendar-discovery.json`) and `ecbfe47ba7cb25280e94ea07bb32c0ec8d5dc0005b3d1b4b0b9975937c90a58c` (`editorial-packet.json`). The fixture provenance records these hashes and the packet JSON pointer used for extraction. Unknown provenance fields are omitted.
 ## Omission and evidence limits
 
-The new packet's `omittedCandidates` is the report-stage total plus packet-cap omissions plus byte-budget omissions. `omissionTelemetry.capOmittedTasks` describes upstream report omissions; it is not added a second time. The report's historical omitted-unit labels remain unchanged (`unknown_rows_or_groups` where the saved source did not establish a unit).
+The new packet's `omittedCandidates` is the report-stage total plus packet-cap omissions plus character-budget omissions. `omissionTelemetry.capOmittedTasks` describes upstream report omissions; it is not added a second time. The report's historical omitted-unit labels remain unchanged (`unknown_rows_or_groups` where the saved source did not establish a unit).
 
 `reportedInWindowRows` sums the saved `coverage[].inWindow` values. These are source-internal deduplicated rows, not raw HTML counts. Platform family metrics count each normalized task once per claimed family. The old coverage status field cannot distinguish fetch failures from parser failures; where `sourceStatus` and `parserStatus` are absent, replay labels each phase unknown.
 

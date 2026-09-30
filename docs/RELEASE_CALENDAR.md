@@ -6,8 +6,8 @@ The Daily packet includes a rolling future-15-day release calendar. Discovery is
 
 1. Build the next 15 Beijing-date days.
 2. Query the configured cross-platform discovery sources.
-3. Normalize title/platform/date identities and surface conflicts.
-4. Prioritize known titles, cross-source leads, missing-baseline items, and platform coverage gaps.
+3. Merge editorial identities while retaining every source observation, platform, product, region and date conflict.
+4. Prioritize date conflicts and uncertain conflicts, reserve platform opportunities, then use known-title and cross-source hints. Baseline membership is not proof of a detected change.
 5. Open official developer/publisher/platform pages before adoption.
 6. Submit only verified additions/changes through Daily `upcomingMode:"inherit_and_patch"`.
 
@@ -38,6 +38,16 @@ The collector rechecks the full future-15-day range every Daily rather than only
 Network/parser outcomes distinguish success, partial coverage, empty/changed pages, and failure. Candidate and character limits are observable; omitted candidates stay visible in telemetry. Source failure does not block news packet generation.
 
 The packet's `upcomingBaseline.refreshRange` is calendar-only authority. Calendar research cannot alter news candidates/facts/tracking. Verified existing Canonical calendar entries remain the baseline unless supported evidence changes or removes them.
+
+## Packet and operational verification
+
+The packet has at most 100 editorial tasks and 24,000 serialized JSON characters, within the unchanged 120,000-character editorial input budget. Named observations share source defaults and repeated URLs; offline replay expands them and verifies selected observations without loss. Unknown Nintendo device information remains unknown while its Nintendo discovery family can receive a selection opportunity. The bounded platform representative search is deterministic, not mathematically optimal.
+
+PlayStation Blog titles with explicit launch/out dates support Sep, Sept and September as discovery leads only. Conflicting, negated and multiple dates remain review work. Official details still establish identity, date, platform, region and release type before publication.
+
+GitHub performs fetching, parsing, deduplication, ranking, calendar health and packet generation. The existing Scheduled Task performs final official verification, ambiguity resolution and Canonical patches; no task or invocation time is added. Calendar health keeps at most 30 observations per source, separating fetch and parser outcomes. Report reuse does not fetch again or add a duplicate observation.
+
+See [offline replay](RELEASE_CALENDAR_REPLAY.md) for measured packet gains and provenance. These samples do not establish live discovery recall or recovery of upstream-cap omissions. On the next natural Daily, inspect per-platform task/link counts, cap and character-budget omissions, actual fallback requests, parser failures and known-zero versus unknown health. Rolling tests cover expiry, the new tail day, advance/postponement, explicit cancellation, platform/type changes and retention after discovery failure.
 
 ## Media
 

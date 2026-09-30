@@ -657,3 +657,11 @@
 - **Close when:** 完整 `npm run check` 通过，PR 合并 main，Pages 成功；实际启用 Scheduled Task prompt 同步为精简 bootstrap 且保持原 10:20/11:20 schedule 与 enabled 状态不变。
 - **2026-09-22 closeout:** PR #161 合并为 `ae4fc34`。Verify [35756273011](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756273011) 通过：83 个测试文件 / 418 项测试、43 期 Canonical 校验、英文基础设施校验和生产构建全部成功；合并后 Pages [35756425578](https://github.com/fallw1nd/daily-game-brief/actions/runs/35756425578) 成功。实际启用任务 `6a86ccc265fc8191a6c72a6bab1cdcea` 已改为精简 bootstrap，仍为 `enabled=true`，Asia/Shanghai 10:20/11:20 两次调用；旧 PM 与一次性历史任务继续保持 disabled。关闭条件全部满足。
 
+
+## MNT-20260930-01 — Calendar discovery duplicates and packet omission
+
+- **Status:** Implemented and independently reviewed; awaiting CI, deployment and natural Daily observation. This is independent of the resolved calendar-disappeared incident.
+- **Evidence:** Fixed natural Daily artifacts from September 18, 19 and 21 contained 44/43/43 packet rows but only 30/24/24 normalized editorial tasks. Report-stage cap omissions on September 19/21 are 101/36 with unknown upstream units. Full provenance and limitations are in RELEASE_CALENDAR_REPLAY.md.
+- **Resolution:** Retain scoped source observations while merging identities; prioritize conflicts and platform opportunities; compact named packet fields; parse explicit PS article date leads; maintain a calendar-only health ledger and bounded official RSS fallback. Six base probes remain mandatory, with at most two extra one-page requests and concurrency two.
+- **Validation:** Fixed replay restores every selected observation, fits 37/33/33 tasks within the unchanged 24,000-character budget, and does not claim recovered upstream omissions or improved live recall. Rolling regressions cover expiry, advance, postponement, explicit cancellation and platform/type patches.
+- **Close when:** Full check and Verify pass, changes merge and Pages deploys, then a natural Daily confirms per-platform opportunities, separate cap/budget omissions, bounded fallback requests and usable primary-verification leads. Public schema/archive, issue/window and Scheduled Task count/times remain unchanged.
