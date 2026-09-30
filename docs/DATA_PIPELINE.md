@@ -51,6 +51,8 @@ Resolution order:
 
 Prefer official mainland Simplified Chinese names. A stable widely used name may use `common_translation`. Otherwise keep the original title with unavailable Chinese status. Never machine-translate or invent a title.
 
+Copy localization matches complete aliases at ASCII/Unicode Latin, combining-mark, and numeric boundaries, so adjacent Chinese text is allowed while longer Latin words and sequel numbers stay intact. Registered single-word aliases are localized only inside explicit `《...》` title markers; a confirmed structured subject may also localize its own single-word name in its headline, summary, and generated media alt. Unknown sequel suffixes and aliases with conflicting registered translations are left unchanged. Localization scans once and skips aliases already embedded in their full Chinese translation, so rerunning it is idempotent.
+
 Title/terminology research is naming evidence only. It cannot add event facts, times, platforms, release claims, source authority, tracking decisions, or candidates. For games with an official mainland channel, visible Chinese copy should use its official version/character/class/mode/mechanic terminology when available.
 
 ## Release calendar

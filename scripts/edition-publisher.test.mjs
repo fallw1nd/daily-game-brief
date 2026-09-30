@@ -195,6 +195,26 @@ describe("idempotent edition publisher", () => {
     expect(result.edition.archiveTitle).toBe("早报｜《神鬼寓言》正式公布");
   });
 
+  it("localizes the confirmed single-word subject and registered DLC without altering ordinary summary prose", () => {
+    const fountainsEditorial = {
+      ...editorial,
+      archiveTitle: "早报｜《Fountains》推出 Shattered Shape DLC",
+      decisions: [{
+        ...editorial.decisions[0],
+        titleKey: "fountains",
+        titleEn: "Fountains",
+        titleZhCn: "永泉传说",
+        titleZhStatus: "official_simplified",
+        headline: "《Fountains》推出 Shattered Shape DLC",
+        summary: "Ordinary fountains nearby were also mentioned.",
+      }],
+    };
+    const result = buildEdition({ packet, editorial: fountainsEditorial, latest, manifest, now: new Date("2026-08-27T02:12:00Z") });
+    expect(result.edition.entries[0].headline).toBe("《永泉传说》推出 破碎之形 DLC");
+    expect(result.edition.entries[0].summary).toBe("Ordinary 永泉传说 nearby were also mentioned.");
+    expect(result.edition.archiveTitle).toBe("早报｜《永泉传说》推出 破碎之形 DLC");
+  });
+
   it("returns without mutation when the edition already exists", () => {
     const result = buildEdition({
       packet, editorial, latest,

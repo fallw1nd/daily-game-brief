@@ -34,14 +34,14 @@ function backfillTitle(title, stats) {
 
 function localizeEntry(entry, stats) {
   let changed = backfillTitle(entry.title, stats);
-  const next = localizeRegisteredTitles(localizeHeadline(entry.headline, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn }));
+  const next = localizeRegisteredTitles(localizeHeadline(entry.headline, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn }), { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn });
   if (next !== entry.headline) {
     entry.headline = next;
     stats.headlines += 1;
     stats.headlineKeys.add(entry.title?.title_key || entry.id);
     changed = true;
   }
-  const nextSummary = localizeRegisteredTitles(entry.summary);
+  const nextSummary = localizeRegisteredTitles(entry.summary, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn });
   if (nextSummary !== entry.summary) {
     entry.summary = nextSummary;
     stats.summaries += 1;
@@ -62,7 +62,7 @@ function backfillDocument(file, stats) {
   for (const item of document.upcoming || []) changed = backfillTitle(item.title, stats) || changed;
   const lead = (document.entries || []).find((item) => item.id === document.leadEntryId);
   if (lead && document.archiveTitle) {
-    const next = localizeRegisteredTitles(localizeHeadline(document.archiveTitle, { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn }));
+    const next = localizeRegisteredTitles(localizeHeadline(document.archiveTitle, { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn }), { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn });
     if (next !== document.archiveTitle) { document.archiveTitle = next; stats.archiveTitles += 1; changed = true; }
   }
   if (changed) { fs.writeFileSync(file, `${JSON.stringify(document, null, 2)}\n`); stats.files += 1; }

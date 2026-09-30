@@ -9,7 +9,7 @@ export function refreshGeneratedEditorialAlts(record, localizeAlt) {
 
   for (const image of record.images || []) {
     if (image?.kind !== "editorial" || typeof image.alt !== "string") continue;
-    const localized = localizeAlt(image.alt);
+    const localized = localizeAlt(image.alt, { titleEn: record.title?.title_en, titleZhCn: record.title?.title_zh_cn });
     if (localized !== expected || image.alt === expected) continue;
     image.alt = expected;
     changed += 1;

@@ -243,14 +243,14 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     if (previous && packet.continuation?.preservePublished === true) {
       return { ...previous, showcaseRefs: mergeShowcaseRefs([...(previous.showcaseRefs || []), ...(showcaseRefs || [])]) };
     }
-    const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn })), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
+    const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
     return {
       id,
       section: decision.section,
       ...(showcaseRefs ? { showcaseRefs: mergeShowcaseRefs([...(previous?.showcaseRefs || []), ...showcaseRefs]), showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
       title,
       headline,
-      summary: localizeRegisteredTitles(decision.summary),
+      summary: localizeRegisteredTitles(decision.summary, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }),
       beijingTime: decision.beijingTime || window.windowEnd,
       ...(timeEvidenceAt ? { timeEvidenceAt } : {}),
       timeNote: decision.timeNote || "证据只支持日期或窗口归属，未反推未披露的具体时刻。",
@@ -309,7 +309,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
   const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
     ? latest.archiveTitle
-    : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn })), leadEntry.title, { archive: true });
+    : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }), { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }), leadEntry.title, { archive: true });
   if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error("normalized archiveTitle must contain 8–40 characters with the matching period prefix");
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
