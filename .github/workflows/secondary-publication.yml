@@ -74,15 +74,29 @@ jobs:
           request="$RUNNER_TEMP/secondary-request.json"
           edition="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).editionId")"
           requested_sha="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).packetBlobSha")"
-          recover="$(node -p "Boolean(JSON.parse(require('fs').readFileSync('$request','utf8')).recoverFailedPublication)")"
           state_path="automation/status/$edition.json"
           git show "origin/automation/state:$state_path" > "$RUNNER_TEMP/state.json"
-          EDITION="$edition" PACKET_SHA="$requested_sha" RECOVER="$recover" node -e '
+          historical_issue="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).historicalInsertion?.issueNumber || ''")"
+          historical_latest="$(node -p "JSON.parse(require('fs').readFileSync('$request','utf8')).historicalInsertion?.latestEditionId || ''")"
+          if [ -n "$historical_issue" ]; then
+            node --input-type=module -e '
+              import fs from "node:fs";
+              import { assertHistoricalInsertion } from "./scripts/lib/historical-insertion.mjs";
+              const request = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/secondary-request.json", "utf8"));
+              const state = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/state.json", "utf8"));
+              const manifest = JSON.parse(fs.readFileSync("public/data/manifest.json", "utf8"));
+              assertHistoricalInsertion({ manifest, state, editionId: request.editionId, insertion: request.historicalInsertion, packetBlobSha: request.packetBlobSha });
+            '
+          fi
+          recover="$(node -p "Boolean(JSON.parse(require('fs').readFileSync('$request','utf8')).recoverFailedPublication)")"
+          EDITION="$edition" PACKET_SHA="$requested_sha" RECOVER="$recover" HISTORICAL_ISSUE="$historical_issue" node -e '
             const fs = require("node:fs");
             const state = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/state.json", "utf8"));
             const manifest = JSON.parse(fs.readFileSync("public/data/manifest.json", "utf8"));
             if (state.packet?.status !== "ready" || state.packet?.blobSha !== process.env.PACKET_SHA) throw new Error("secondary request is not bound to the current ready packet");
-            if (process.env.RECOVER === "true") {
+            if (process.env.HISTORICAL_ISSUE) {
+              if (process.env.RECOVER === "true") throw new Error("historical insertion and direct recovery are mutually exclusive");
+            } else if (process.env.RECOVER === "true") {
               if (state.editorial?.status !== "timed_out" || state.publication?.status !== "failed") throw new Error("failed-publication recovery requires timed_out + failed state");
               if (manifest.editions.some((item) => item.id === process.env.EDITION)) throw new Error("failed-publication recovery is only for a missing Canonical edition");
               const editionDate = process.env.EDITION.slice(0, 10);
@@ -107,6 +121,8 @@ jobs:
           node scripts/validate-editorial-submission.mjs
           echo "edition=$edition" >> "$GITHUB_OUTPUT"
           echo "recover=$recover" >> "$GITHUB_OUTPUT"
+          echo "historical_issue=$historical_issue" >> "$GITHUB_OUTPUT"
+          echo "historical_latest=$historical_latest" >> "$GITHUB_OUTPUT"
 
       - name: Commit exact editorial inbox
         if: steps.request.outputs.kind == 'edition'
@@ -139,7 +155,9 @@ jobs:
           gh workflow run publish-editorial-decision.yml --ref main \
             -f edition_id="${{ steps.edition.outputs.edition }}" \
             -f publication_mode=publish \
-            -f recover_failed_publication="${{ steps.edition.outputs.recover }}"
+            -f recover_failed_publication="${{ steps.edition.outputs.recover }}" \
+            -f historical_insertion_issue="${{ steps.edition.outputs.historical_issue }}" \
+            -f historical_insertion_latest="${{ steps.edition.outputs.historical_latest }}"
 
       - name: Merge verified title patch and backfill
         if: steps.request.outputs.kind == 'title_backfill'

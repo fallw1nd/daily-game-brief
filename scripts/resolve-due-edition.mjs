@@ -19,7 +19,7 @@ function dailyLivenessWindow({ now, manifest, states }) {
   const published = new Set((manifest?.editions || []).map((item) => item.id));
   const lastDaily = [...(manifest?.editions || [])]
     .filter((item) => item.period === "daily")
-    .sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0) || String(a.date).localeCompare(String(b.date)))
+    .sort((a, b) => a.id.localeCompare(b.id))
     .at(-1);
   const lastDailyWindow = lastDaily
     ? plannedWindow("daily", new Date(`${lastDaily.date}T12:00:00+08:00`))
@@ -101,7 +101,7 @@ export function resolveDueEdition({ period, now = new Date(), manifest, states =
     };
   }
   const published = new Set((manifest?.editions || []).map((item) => item.id));
-  const lastPublished = [...(manifest?.editions || [])].sort((a, b) => (a.issueNumber || 0) - (b.issueNumber || 0)).at(-1);
+  const lastPublished = [...(manifest?.editions || [])].sort((a, b) => a.id.localeCompare(b.id)).at(-1);
   const startDate = lastPublished?.date || latestDue.id.slice(0, 10);
   const lastPublishedWindow = lastPublished
     ? plannedWindow(lastPublished.period, new Date(`${lastPublished.date}T12:00:00+08:00`))

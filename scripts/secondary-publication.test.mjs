@@ -80,6 +80,7 @@ describe("secondary publication", () => {
     expect(result).not.toHaveProperty("excludePackageKeys");
     expect(result).not.toHaveProperty("trackingPolicy");
     expect(result).not.toHaveProperty("recoverFailedPublication");
+    expect(expandSecondaryEditorial(request({ historicalInsertion: { issueNumber: 51, latestEditionId: "2026-10-01-daily" } }), packet)).not.toHaveProperty("historicalInsertion");
   });
 
   it("refuses missing, invented, duplicated, or conflicting package identities", () => {

@@ -1,3 +1,4 @@
+import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -179,7 +180,7 @@ export default function EnglishApp() {
     return () => controller.abort();
   }, []);
 
-  const archiveEditions = useMemo(() => [...(manifest?.editions ?? [])].reverse(), [manifest]);
+  const archiveEditions = useMemo(() => editionsNewestFirst(manifest?.editions ?? []), [manifest]);
   const englishArchiveTitles = useMemo(() => { const result = new Map<string, string>(); for (const item of localeIndex?.editions ?? []) if (item.status === "available") result.set(item.editionId, item.archiveTitle); return result; }, [localeIndex]);
   const archiveCounts = useMemo(() => { const counts = new Map<string, number>(); for (const entry of searchIndex?.entries ?? []) counts.set(entry.editionId, (counts.get(entry.editionId) ?? 0) + 1); return counts; }, [searchIndex]);
   const visibleArchiveEditions = archiveExpanded ? archiveEditions : archiveEditions.slice(0, 5);
@@ -201,7 +202,7 @@ export default function EnglishApp() {
   const focusEntries = uniqueEntries([...featured, ...(sectionsByKey.news ?? []), ...(sectionsByKey.releases ?? []), ...(sectionsByKey.industry ?? []), ...(sectionsByKey.reviews ?? []), ...edition.entries]).slice(0, 5);
   const directoryItems = [...visibleStorySections.map((section) => ({ number: section.number, label: section.label, count: section.entries.length, href: "#" + section.id })), ...(edition.upcoming.length > 0 ? [{ number: upcomingNumber, label: "Calendar", count: edition.upcoming.length, href: "#upcoming" }] : [])];
   const primaryLinks = [{ href: "#content", label: "Content", icon: NewspaperClipping }, ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "Calendar", icon: CalendarBlank }] : []), { href: "#archive", label: "Archive", icon: Archive }];
-  const englishEditionSequence = (manifest?.editions ?? []).filter((item) => englishArchiveTitles.has(item.id));
+  const englishEditionSequence = editionsNewestFirst(manifest?.editions ?? []).reverse().filter((item) => englishArchiveTitles.has(item.id));
   const englishEditionIndex = englishEditionSequence.findIndex((item) => item.id === edition.id);
   const previousEnglishEdition = englishEditionIndex > 0 ? englishEditionSequence[englishEditionIndex - 1] : undefined;
   const nextEnglishEdition = englishEditionIndex >= 0 && englishEditionIndex < englishEditionSequence.length - 1 ? englishEditionSequence[englishEditionIndex + 1] : undefined;

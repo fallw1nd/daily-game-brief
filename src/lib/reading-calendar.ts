@@ -31,7 +31,7 @@ export interface ReadingCalendar { items: UpcomingEntry[]; sourceId: string; sou
 
 export async function loadReadingCalendar(edition: BriefEdition, manifest: BriefManifest, english: boolean, signal?: AbortSignal): Promise<ReadingCalendar | undefined> {
   const earliest = Date.parse(edition.date + "T00:00:00Z") - 15 * day;
-  const candidates = manifest.editions.filter((item) => item.issueNumber < edition.issueNumber && Date.parse(item.date + "T00:00:00Z") >= earliest).sort((a, b) => b.issueNumber - a.issueNumber);
+  const candidates = manifest.editions.filter((item) => item.id < edition.id && Date.parse(item.date + "T00:00:00Z") >= earliest).sort((a, b) => b.id.localeCompare(a.id));
   for (const candidate of candidates) {
     let source = await loadArchivedEdition(candidate, signal);
     if (!source.upcoming.length) continue;

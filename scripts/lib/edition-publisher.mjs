@@ -1,3 +1,4 @@
+import { assertHistoricalIdentity } from "./historical-insertion.mjs";
 import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
 import { hasValidArchiveTitle } from "./archive-title.mjs";
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
@@ -175,10 +176,11 @@ function sectionCounters(entries, windowId) {
   return counters;
 }
 
-export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false }) {
+export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false, historicalInsertion = null }) {
   const input = packet.editorialInput;
   const window = input.window;
   if (editorial.editionId !== window.id) throw new Error("editorial editionId does not match packet window");
+  if (historicalInsertion) assertHistoricalIdentity({ manifest, editionId: window.id, insertion: historicalInsertion, allowExisting: true });
   const existingManifestItem = manifest.editions.find((item) => item.id === window.id);
   const decisionDigest = editorialDecisionDigest(editorial);
   const degradedEdition = latest.id === window.id && (
@@ -377,7 +379,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     manifest: {
       ...manifest,
       updatedAt: generatedAt,
-      latest: edition.id,
+      latest: historicalInsertion ? manifest.latest : edition.id,
       editions: existingManifestItem
         ? manifest.editions.map((item) => item.id === edition.id ? manifestItem : item)
         : [...manifest.editions, manifestItem],

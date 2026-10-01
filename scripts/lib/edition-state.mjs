@@ -205,18 +205,23 @@ export function applyEditionStateEvent(current, event, data = {}) {
     requirePacket(state, data.packetBlobSha);
     assertSha(data.submissionSha, "submissionSha");
     if (state.editorial.submissionSha === data.submissionSha && state.editorial.status !== "pending") return state;
+    const canReplaceHistoricalSubmission = state.publication.status === "failed"
+      && data.reason === "user_authorized_historical_missing_insertion"
+      && state.editorial.packetBlobSha === data.packetBlobSha
+      && state.transitions.some(item => item.event === "editorial-submitted"
+        && item.reason === data.reason && item.submissionSha === state.editorial.submissionSha);
     if (["submitted", "valid"].includes(state.editorial.status)) {
       const canReplaceRevisionSubmission = state.revisionRequest?.status === "open"
         && ["pending", "failed"].includes(state.publication.status)
         && state.editorial.packetBlobSha === data.packetBlobSha;
-      if (!canReplaceRevisionSubmission) throw new Error("editorial submission is already owned by the GitHub publication lane");
+      if (!canReplaceRevisionSubmission && !canReplaceHistoricalSubmission) throw new Error("editorial submission is already owned by the GitHub publication lane");
     }
     const recoverFailedPublication = state.editorial.status === "timed_out"
       && state.publication.status === "failed"
-      && data.reason === "user_authorized_failed_publication_recovery";
+      && ["user_authorized_failed_publication_recovery", "user_authorized_historical_missing_insertion"].includes(data.reason);
     if (state.editorial.status === "timed_out" && !recoverFailedPublication) throw new Error("timed-out editorial work is owned by the GitHub SLA lane");
     state.editorial = { status: "submitted", packetBlobSha: data.packetBlobSha, submissionSha: data.submissionSha, validationErrors: [], updatedAt: at };
-    return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha, ...(recoverFailedPublication ? { reason: data.reason } : {}) });
+    return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha, ...((recoverFailedPublication || canReplaceHistoricalSubmission) ? { reason: data.reason } : {}) });
   }
   if (event === "editorial-valid" || event === "editorial-invalid") {
     requirePacket(state, data.packetBlobSha);

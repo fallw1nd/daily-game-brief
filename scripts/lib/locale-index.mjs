@@ -119,7 +119,7 @@ export async function buildEnglishLocaleIndex({ write = true } = {}) {
       factsDigest: digest,
       status: "available",
     });
-    latestAvailableEditionId = item.id;
+    if (!latestAvailableEditionId || item.id > latestAvailableEditionId) latestAvailableEditionId = item.id;
   }
   const index = {
     schemaVersion: 1,

@@ -375,9 +375,9 @@ if (manifest) {
       }
     }
 
-    const latestItem = manifest.editions.at(-1);
+    const latestItem = [...manifest.editions].sort((a, b) => b.id.localeCompare(a.id))[0];
     if (manifest.latest !== latestItem.id) {
-      errors.push("manifest.json: latest must reference the final edition");
+      errors.push("manifest.json: latest must reference the chronologically latest edition");
     }
     const latestArchive = await readJson(latestItem.path);
     if (latest && JSON.stringify(latest) !== JSON.stringify(latestArchive)) {

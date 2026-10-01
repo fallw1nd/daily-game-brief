@@ -1,3 +1,4 @@
+import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -410,13 +411,14 @@ function App({ initialEdition = fallbackEdition, initialManifest = null, initial
   const featured = entriesForSection(edition.entries, "focus");
   const focusEntries = uniqueEntries([...featured, ...(sectionsByKey.news ?? []), ...(sectionsByKey.releases ?? []), ...(sectionsByKey.industry ?? []), ...(sectionsByKey.reviews ?? []), ...edition.entries]).slice(0, 5);
   const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
-  const manifestIndex = manifest?.editions.findIndex((item) => item.id === edition.id) ?? -1;
-  const previousManifestEdition = manifestIndex > 0 ? manifest?.editions[manifestIndex - 1] : undefined;
-  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1 ? manifest?.editions[manifestIndex + 1] : undefined;
+  const chronologicalEditions = editionsNewestFirst(manifest?.editions ?? []).reverse();
+  const manifestIndex = chronologicalEditions.findIndex((item) => item.id === edition.id) ?? -1;
+  const previousManifestEdition = manifestIndex > 0 ? chronologicalEditions[manifestIndex - 1] : undefined;
+  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1 ? chronologicalEditions[manifestIndex + 1] : undefined;
   const pageTitle = edition.archiveTitle?.trim() || manifestEdition?.archiveTitle?.trim() || `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
   const directoryItems = [...visibleStorySections.map((section) => ({ number: section.number, label: section.label, count: section.entries.length, href: "#" + section.id })), ...(edition.upcoming.length > 0 ? [{ number: upcomingNumber, label: "日历", count: edition.upcoming.length, href: "#upcoming" }] : [])];
   const primaryLinks = [{ href: "#content", label: "\u5185\u5bb9", icon: NewspaperClipping }, ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386", icon: CalendarBlank }] : []), { href: "#archive", label: "\u5f52\u6863", icon: Archive }];
-  const archiveEditions = useMemo(() => [...(manifest?.editions ?? [])].reverse(), [manifest]);
+  const archiveEditions = useMemo(() => editionsNewestFirst(manifest?.editions ?? []), [manifest]);
   const archiveCounts = useMemo(() => { const counts = new Map<string, number>(); for (const entry of searchIndex?.entries ?? []) counts.set(entry.editionId, (counts.get(entry.editionId) ?? 0) + 1); return counts; }, [searchIndex]);
   const visibleArchiveEditions = archiveExpanded ? archiveEditions : archiveEditions.slice(0, 5);
   const hiddenArchiveCount = Math.max(archiveEditions.length - 5, 0);

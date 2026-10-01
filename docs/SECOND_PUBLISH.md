@@ -30,7 +30,9 @@
 
 `user_authorized_failed_publication_recovery` 只用于 state 明确为 `editorial:timed_out` + `publication:failed`、目标 Canonical 仍缺失，且 **尚未发布任何日期更晚的 Canonical edition** 的情况。此时仍使用原 packet/window，不能通过新抓取事实“补造”旧期。
 
-如果目标缺刊之后已经发布了更新期次，则直接恢复会重新分配 issueNumber 或把 `manifest.latest/latest.json` 回退到旧日期，属于生产身份破坏；“二次发布”必须把它标成 blocker，不能强行补成功，也不能重排已经公开的后续 issueNumber。只有另行设计并授权历史缺刊插入/编号迁移方案后才能处理。
+如果目标缺刊之后已经发布了更新期次，则直接恢复会重新分配 issueNumber 或把 `manifest.latest/latest.json` 回退到旧日期，属于生产身份破坏；“二次发布”必须把它标成 blocker，不能强行补成功，也不能重排已经公开的后续 issueNumber。只有另行设计并授权历史缺刊插入方案后才能处理。
+
+已实现的显式历史补刊方案：用户授权追加下一个未占用编号，已有期次不重排；secondary request 增加 `historicalInsertion:{issueNumber,latestEditionId}`，不得同时使用 `recoverFailedPublication`。受信入口要求缺刊状态为 timed_out + failed、原 packet ready，并固定当前 latest 和下一个编号；任一身份变化即拒绝。publisher 追加 archive/manifest，但不写 latest.json、不改变既有 archive，不把旧稿反馈写回当前 ledger；日历只继承补刊日期之前的 Canonical 基线。manifest 保持编号分配顺序，归档展示、导航、英文 latest 与搜索按新闻日期排序。该流程仅响应另行授权的人工请求，不纳入定时编辑任务。
 
 ### D. 编辑门槛
 
