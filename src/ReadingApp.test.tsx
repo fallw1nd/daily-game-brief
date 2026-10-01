@@ -103,9 +103,24 @@ describe("reading sample", () => {
     render();
     const row = document.querySelector<HTMLAnchorElement>(".r-archive-list a")!;
     expect(row.querySelector("time")?.textContent).toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(row.querySelector("strong")?.textContent).toBe(manifest.editions.at(-1)?.archiveTitle);
+    expect(row.querySelector("strong")?.textContent).toBe(manifest.editions.find(item => item.id === manifest.latest)?.archiveTitle);
     expect(row.href).toContain("view=reading");
     expect(readingHref("2026-08-21-pm", "historical-anchor", true)).toBe("/daily-game-brief/?view=reading&edition=2026-08-21-pm&lang=en#historical-anchor");
+  });
+
+  it("keeps archive and pager chronological after a late supplement allocates a higher issue", () => {
+    const supplementId = "2026-09-28-daily";
+    const preceding = manifest.editions.find(item => item.id === "2026-09-27-daily")!;
+    const supplemented: BriefManifest = { ...manifest, editions: [
+      ...manifest.editions.filter(item => item.id !== supplementId),
+      { ...preceding, id: supplementId, date: "2026-09-28", issueNumber: Math.max(...manifest.editions.map(item => item.issueNumber)) + 1, archiveTitle: "日报｜历史补刊测试" },
+    ] };
+    document.body.innerHTML = renderToStaticMarkup(<ReadingApp initialEdition={{ ...edition, id: supplementId, date: "2026-09-28" }} initialManifest={supplemented} initialSearchIndex={search} />);
+    const first = document.querySelector(".r-archive-list a");
+    expect(first?.querySelector("strong")?.textContent).toBe(manifest.editions.find(item => item.id === manifest.latest)?.archiveTitle);
+    const pager = document.querySelector(".r-pager");
+    expect(pager?.querySelector('a[href*="edition=2026-09-27-daily"]')).not.toBeNull();
+    expect(pager?.querySelector('a[href*="edition=2026-09-29-daily"]')).not.toBeNull();
   });
 
   it("preserves the calendar for historical editions, including verified source links", () => {
@@ -284,3 +299,4 @@ it("keeps a readable calendar item and a stable cover slot after cover load fail
   expect(item.querySelector("h3")?.textContent).toBe(title);
   expect(item.querySelector(".r-calendar-date")).not.toBeNull();
 });
+
