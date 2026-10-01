@@ -56,3 +56,13 @@ it("selects the next Daily after the current date rather than after the highest 
   expect(result).toMatchObject({ livenessWake: true, window: { id: "2026-10-02-daily" } });
   expect(resolveDueEdition({ period: "daily", now: new Date("2026-10-02T03:00:00Z"), manifest: supplemented, purpose: "packet" }).window.id).toBe("2026-10-02-daily");
 });
+
+it("retries a failed validated historical supplement only under the same explicit authorization", () => {
+  let state = applyEditionStateEvent(failed(), "editorial-submitted", { packetBlobSha: sha, submissionSha: submission, reason: HISTORICAL_INSERTION_REASON });
+  state = applyEditionStateEvent(state, "editorial-valid", { packetBlobSha: sha, submissionSha: submission });
+  state = applyEditionStateEvent(state, "publication-failed", { error: "push raced" });
+  expect(() => applyEditionStateEvent(state, "editorial-submitted", { packetBlobSha: sha, submissionSha: "4".repeat(40) })).toThrow(/owned/);
+  state = applyEditionStateEvent(state, "editorial-submitted", { packetBlobSha: sha, submissionSha: "4".repeat(40), reason: HISTORICAL_INSERTION_REASON });
+  state = applyEditionStateEvent(state, "editorial-valid", { packetBlobSha: sha, submissionSha: "4".repeat(40) });
+  expect(() => assertHistoricalInsertion({ ...params(state), phase: "publication" })).not.toThrow();
+});
