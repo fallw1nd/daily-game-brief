@@ -671,7 +671,7 @@ async function main() {
   if (revalidateCoverId && !/^[a-zA-Z0-9_-]+$/.test(revalidateCoverId)) throw new Error("invalid --revalidate-cover-id");
   options.revalidateCoverId = revalidateCoverId;
   options.recordId = revalidateCoverId;
-  let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
+  let items = hasArg("--all") ? manifest.editions : manifest.editions.filter(item => item.id === manifest.latest);
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
   if (!items.length) throw new Error("no matching edition found");
 

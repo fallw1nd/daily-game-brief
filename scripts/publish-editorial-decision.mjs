@@ -1,3 +1,4 @@
+import { assertHistoricalInsertion } from "./lib/historical-insertion.mjs";
 import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -44,9 +45,8 @@ async function readOptionalJson(path) {
 }
 
 async function previousEnglishOverlay(manifest, editionId) {
-  const index = manifest.editions.findIndex((item) => item.id === editionId);
-  if (index <= 0) return null;
-  const previous = manifest.editions[index - 1];
+  const previous = manifest.editions.filter(item => item.id < editionId).sort((a, b) => b.id.localeCompare(a.id))[0];
+  if (!previous) return null;
   return readEnglishPresentation(previous.id);
 }
 
@@ -203,6 +203,14 @@ if (PUBLICATION_MODE === "locale-repair") {
   process.exit(0);
 }
 
+const historicalInsertion = process.env.HISTORICAL_INSERTION_ISSUE
+  ? { issueNumber: Number(process.env.HISTORICAL_INSERTION_ISSUE), latestEditionId: process.env.HISTORICAL_INSERTION_LATEST }
+  : null;
+if (historicalInsertion) {
+  const { stdout } = await run("git", ["show", `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`]);
+  assertHistoricalInsertion({ manifest, editionId: editorial.editionId, insertion: historicalInsertion,
+    state: JSON.parse(stdout), packetBlobSha: editorial.packetBlobSha, phase: "publication" });
+}
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 const continuationPacket = ["news", "showcase"].includes(packet.continuation?.scope);
@@ -236,22 +244,29 @@ if (historicalRevision) {
   publisherLatest = JSON.parse(await readFile(resolve("public/data", target.path), "utf8"));
 }
 if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
+  const preceding = historicalInsertion
+    ? manifest.editions.filter(item => item.id < editorial.editionId).sort((a, b) => b.id.localeCompare(a.id))
+    : null;
+  if (historicalInsertion) {
+    if (!preceding.length) throw new Error("historical insertion requires a preceding Canonical calendar baseline");
+    publisherLatest = JSON.parse(await readFile(resolve("public/data", preceding[0].path), "utf8"));
+  }
   const baseline = await loadCanonicalUpcomingBaseline({
-    latest,
-    manifest,
+    latest: publisherLatest,
+    manifest: historicalInsertion ? { ...manifest, editions: [...preceding].reverse() } : manifest,
     editionDate: editorial.editionId.slice(0, 10),
   });
-  publisherLatest = { ...latest, upcoming: baseline.items };
+  publisherLatest = { ...publisherLatest, upcoming: baseline.items };
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
-const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision });
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion });
 if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
     ? JSON.parse(await readFile(resolve("public/data", manifestItem.path), "utf8"))
     : null;
-  const feedbackEligible = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const feedbackEligible = !historicalInsertion && existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
   let localeStatus = "unchanged";
   if (feedbackEligible && editorial.locales?.en) {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
@@ -294,7 +309,7 @@ await mkdir(dirname(archiveFile), { recursive: true });
 const editionText = JSON.stringify(result.edition, null, 2) + "\n";
 await Promise.all([
   writeFile(archiveFile, editionText),
-  ...(historicalRevision ? [] : [writeFile("public/data/latest.json", editionText)]),
+  ...((historicalRevision || historicalInsertion) ? [] : [writeFile("public/data/latest.json", editionText)]),
   writeFile("public/data/manifest.json", JSON.stringify(result.manifest, null, 2) + "\n"),
 ]);
 await writeLocalePlan(result.edition, localePlan, { preservePublished: packet.continuation?.preservePublished === true });
@@ -310,7 +325,7 @@ await writePublicationResult({
   localeSummary: localePlan.summary,
   localeWarnings: localePlan.warnings,
   localeErrors: localePlan.errors || [],
-  feedbackEligible: true,
+  feedbackEligible: !historicalInsertion,
 });
 if (localePlan.status === "available") {
   console.log(`${result.status === "revised" ? "Revised" : "Built"} ${result.edition.id} issue ${result.edition.issueNumber}: bilingual publication ready.`);

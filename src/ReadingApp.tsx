@@ -1,3 +1,4 @@
+import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, ImageSquare, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
 import { loadArchivedEdition, loadBriefManifest, loadEnglishLocaleIndex, loadEnglishOverlay, loadLatestEdition, loadSearchIndex } from "./data/briefLoader";
@@ -209,7 +210,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const otherStories = edition?.entries.filter((entry) => entry.id !== lead?.id) ?? [];
   const sections = sectionOrder.map((key) => ({ key, entries: otherStories.filter((entry) => entry.section === key && !(entry.showcaseBrief && edition?.showcases?.some(showcase => showcase.entryIds.includes(entry.id)))) })).filter((section) => section.entries.length > 0);
   const results = useMemo(() => searchArchiveEntries(searchIndex?.entries ?? [], query), [query, searchIndex]);
-  const archives = [...(manifest?.editions ?? [])].reverse().filter((item) => !english || englishTitles[item.id]);
+  const archives = editionsNewestFirst(manifest?.editions ?? []).filter((item) => !english || englishTitles[item.id]);
   const position = archives.findIndex((item) => item.id === edition?.id);
   const previous = position >= 0 ? archives[position + 1] : undefined;
   const next = position > 0 ? archives[position - 1] : undefined;

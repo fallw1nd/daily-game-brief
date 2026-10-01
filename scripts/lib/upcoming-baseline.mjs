@@ -58,8 +58,8 @@ export async function loadCanonicalUpcomingBaseline({ latest, manifest, editionD
     };
   }
 
-  for (const item of [...(manifest?.editions || [])].reverse()) {
-    if (!item?.path || item.id === latest?.id) continue;
+  for (const item of [...(manifest?.editions || [])].sort((a, b) => b.id.localeCompare(a.id))) {
+    if (!item?.path || item.id === latest?.id || item.id.slice(0, 10) > editionDate) continue;
     try {
       const archived = JSON.parse(await readFile(resolve(dataRoot, item.path), "utf8"));
       const candidates = filterUpcomingWindow(archived?.upcoming, editionDate);

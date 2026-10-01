@@ -10,7 +10,7 @@ const localeIndex = await buildEnglishLocaleIndex({ write: false });
 const localeByEdition = new Map(localeIndex.editions.map((item) => [item.editionId, item]));
 const items = [];
 
-for (const manifestItem of [...manifest.editions].reverse()) {
+for (const manifestItem of [...manifest.editions].sort((a, b) => b.id.localeCompare(a.id))) {
   const edition = JSON.parse(await readFile(resolve(dataRoot, manifestItem.path), "utf8"));
   const localeState = localeByEdition.get(edition.id);
   let overlayByEntry = new Map();

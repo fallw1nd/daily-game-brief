@@ -213,7 +213,7 @@ export function applyEditionStateEvent(current, event, data = {}) {
     }
     const recoverFailedPublication = state.editorial.status === "timed_out"
       && state.publication.status === "failed"
-      && data.reason === "user_authorized_failed_publication_recovery";
+      && ["user_authorized_failed_publication_recovery", "user_authorized_historical_missing_insertion"].includes(data.reason);
     if (state.editorial.status === "timed_out" && !recoverFailedPublication) throw new Error("timed-out editorial work is owned by the GitHub SLA lane");
     state.editorial = { status: "submitted", packetBlobSha: data.packetBlobSha, submissionSha: data.submissionSha, validationErrors: [], updatedAt: at };
     return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha, ...(recoverFailedPublication ? { reason: data.reason } : {}) });
