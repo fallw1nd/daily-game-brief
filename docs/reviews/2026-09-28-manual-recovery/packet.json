@@ -1,0 +1,3860 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-09-28T08:38:42.565Z",
+  "finalizedAt": "2026-09-28T08:38:42.565Z",
+  "coverageThrough": "2026-09-28 10:10",
+  "mode": "chatgpt-handoff",
+  "instructions": "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。\n输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。\n从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。\n若 packet.continuation.scope=news，这是受信的同一期有界续接包：只处理本包 packages/trackingQueue，保留已发布正文、标题、头条和 issue/window，不提交 upcoming 变更，不添加 showcaseRefs、其他批次或窗口外事实。若 scope=showcase，严格按 scoped announcement/fact 身份补齐，不把普通新闻混入，也不因部分材料或 Highlights 声称完整。\nlane=interviews、features、industry、reviews、awards 可按文章/采访/评测/分析/奖项信息本身首次发布的时间准入，但必须有明确的信息增量（首次披露、独立采访、调查、技术/产业分析、正式评分或奖项变化）。普通观点、推荐、促销软文、无新增信息的旧闻复述仍应 exclude。不得把窗口外旧事件伪装成窗口内 breaking news；标题摘要须体现本次新增内容。\n证据门槛按最终 factStatus 判断，不按来源数量机械升级：official 要求已打开一手来源；单一已打开、注册为 media 的可信媒体，只要主体、窗口和核心事实清楚，就可以 media_report 发布，不得仅因“只有一家媒体”或 readiness=single-media 而 needs_review；可信媒体明确转述可识别的官方公告、采访或发言时，可以 media_relay_official，verification 写清转述链。multi_source_verified 才要求两家独立可靠来源。readiness 只描述证据组成，不是发布资格。未确认但具有新闻价值且来源边界清楚的内容可进 rumors，factStatus=unconfirmed、tracking=true，并在标题摘要保留不确定性；只有主体身份未解、来源互相冲突、固定窗口无法确认、动态聚合数据缺少所需快照等实质阻塞才使用 needs_review。A级也不豁免时间/来源要求。中英文新闻标题和archiveTitle须自带明确的游戏、公司或人物主语，离开上方主体栏仍能独立理解。中文直述具体事实，verification 说明证据边界，不用宣传套话。\n每个 include 决定必须填写完整 sharedFactFrame，作为两种语言共用的事实边界；subjectTitleKey/platforms 必须与最终 Canonical 决定一致，日期、时刻、数字、人物机构、版本专名只能来自所选证据，不得新增。\n中文游戏名依次查 config/title-translations.json、editorialInput.titleHints，仍缺才做 title-only open-web lookup。优先官方简中，其次已查证广泛使用的 common_translation；否则保留原名，titleZhCn=null、titleZhStatus=unavailable。禁止机翻/自造名称。有官方大陆简中渠道的游戏，版本、角色、职业、模式、机制等采用大陆官方术语。所有名称/术语查询仅规范名称，不得增加事件事实、时间、平台、发行信息、来源分类、tracking 或候选。\n默认尝试完整 locales.en：在相同 include/sharedFactFrame 内独立写自然英文，优先英文一手证据正式专名；只有中文证据也不得扩充事实。entries 按 include 顺序以 eventKey 对应，upcoming 仅按 upcomingId 对应本次 patch，继承项不重复。headline/summary/verification/timeNote 必须完整英文，无中文 fallback；sourceReport 完整英文或 null，其余显示字段按需提供英文。\n如果无法在事实边界内可靠完成完整英文稿，可以省略 locales.en；publisher 标记 unavailable，不能削弱中文 Canonical 来迁就英文。不要填写 factsDigest/canonicalCopyDigest/localeDigest 或猜最终 entryId，均由 trusted publisher 生成绑定。\narchiveTitle 对应 period：日报｜、早报｜、晚报｜；英文对应 Daily Brief |、Morning Brief |、Evening Brief |。Daily 窗口为前日10:10 exclusive 至当日10:10 inclusive，plannedAt=当日12:00；10:10—12:00 新事实属于下一期，历史迁移窗口以 packet 为准。\n早报 upcomingMode=replace 重建未来15天；晚报 inherit_and_patch。日报必须使用 upcomingMode=inherit_and_patch，不复制 upcomingBaseline.items；不要因为本次 packet 没有新的发售证据而提交空表覆盖历史。trusted publisher 继承 Canonical 基线并剔除当日及15天窗口外项。仅提交新增/变更 upcoming 或有证据支持延期取消的 removeUpcomingIds，必须有 HTTPS 来源。\nupcomingBaseline.refreshRange 是 packet-only 的唯一日历例外：每天核验完整 startInclusive—endInclusive，不把旧期次当作已完成核验。打开开发商/发行商公告或 PlayStation/Nintendo/Xbox/Steam 官方页面；新查事实仅用于日历，不得改变新闻 packages/trackingQueue 决定、正文、时间、factStatus、来源分类或 tracking。无可靠来源不填充，不因发现失败删除条目。\nupcomingDiscovery 仅是线索。优先 knownTitle、crossSource、inBaseline=false；采用前打开官方详情，核对完整游戏身份、日期、平台、地区和正式版/抢先体验/移植/DLC。日期冲突不可猜选，reviewLinks 是待阅读文章而非游戏项。对 PC/PlayStation/Xbox/Nintendo 分别检查完整15天；coverage 为 failed/empty_or_changed、列表不全或 omittedCandidates>0 时针对补查，并在 sourceReport 记录实际检查和缺口，不得声称全量覆盖。",
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contractVersion": {
+        "type": "integer",
+        "enum": [
+          2
+        ]
+      },
+      "packetBlobSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "editionId": {
+        "type": "string"
+      },
+      "archiveTitle": {
+        "type": "string"
+      },
+      "leadEventKey": {
+        "type": "string"
+      },
+      "decisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eventKey": {
+              "type": "string"
+            },
+            "existingEntryId": {
+              "type": "string"
+            },
+            "coveredFactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "include",
+                "exclude",
+                "needs_review"
+              ]
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "releases",
+                "reviews",
+                "news",
+                "industry",
+                "features",
+                "rumors",
+                "observations",
+                null
+              ]
+            },
+            "titleKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleZhStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable",
+                null
+              ]
+            },
+            "headline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "factStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "official",
+                "media_relay_official",
+                "media_report",
+                "multi_source_verified",
+                "unconfirmed",
+                null
+              ]
+            },
+            "timeStatus": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "verified",
+                "date_only",
+                "time_unverified",
+                "uncertain",
+                null
+              ]
+            },
+            "entryFlags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "supplement",
+                  "rumor",
+                  "time_uncertain",
+                  "platform_difference",
+                  "region_difference"
+                ]
+              }
+            },
+            "tracking": {
+              "type": "boolean"
+            },
+            "verification": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "beijingTime": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sourceIndexes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalSources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "secondary",
+                      "discovery"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "url",
+                  "kind"
+                ]
+              }
+            },
+            "sharedFactFrame": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "subjectTitleKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "times": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "peopleAndEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "versionsAndTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "subjectTitleKey",
+                "dates",
+                "times",
+                "numbers",
+                "platforms",
+                "peopleAndEntities",
+                "versionsAndTerms"
+              ]
+            }
+          },
+          "required": [
+            "eventKey",
+            "decision",
+            "section",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "headline",
+            "summary",
+            "factStatus",
+            "timeStatus",
+            "entryFlags",
+            "tracking",
+            "verification",
+            "reason",
+            "beijingTime",
+            "timeNote",
+            "platforms",
+            "region",
+            "releaseType",
+            "sourceIndexes",
+            "additionalSources"
+          ]
+        }
+      },
+      "upcomingMode": {
+        "type": "string",
+        "enum": [
+          "inherit_and_patch",
+          "replace"
+        ]
+      },
+      "removeUpcomingIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upcoming": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "titleKey": {
+              "type": "string"
+            },
+            "titleZhCn": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "titleEn": {
+              "type": "string"
+            },
+            "titleZhStatus": {
+              "type": "string",
+              "enum": [
+                "official_simplified",
+                "official_traditional",
+                "common_translation",
+                "unavailable"
+              ]
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "region": {
+              "type": "string"
+            },
+            "releaseType": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "primary",
+                    "secondary"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url",
+                "kind"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "titleKey",
+            "titleZhCn",
+            "titleEn",
+            "titleZhStatus",
+            "platforms",
+            "region",
+            "releaseType",
+            "source",
+            "note"
+          ]
+        }
+      },
+      "locales": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "en": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "type": "integer",
+                "enum": [
+                  1
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "en"
+                ]
+              },
+              "archiveTitle": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "eventKey": {
+                      "type": "string"
+                    },
+                    "headline": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "verification": {
+                      "type": "string"
+                    },
+                    "timeNote": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "sourceIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sourceIndex",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eventKey",
+                    "headline",
+                    "summary",
+                    "verification",
+                    "timeNote",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabels"
+                  ]
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "upcomingId": {
+                      "type": "string"
+                    },
+                    "regionLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "releaseTypeLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sourceLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "coverAlt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "upcomingId",
+                    "regionLabel",
+                    "releaseTypeLabel",
+                    "sourceLabel",
+                    "coverAlt"
+                  ]
+                }
+              },
+              "sourceReport": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "limited": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checked",
+                  "limited",
+                  "note"
+                ]
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "locale",
+              "archiveTitle",
+              "entries",
+              "upcoming",
+              "sourceReport"
+            ]
+          }
+        },
+        "required": [
+          "en"
+        ]
+      },
+      "checkedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limitedExtra": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "editorialNote": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "contractVersion",
+      "packetBlobSha",
+      "editionId",
+      "archiveTitle",
+      "leadEventKey",
+      "decisions",
+      "upcomingMode",
+      "removeUpcomingIds",
+      "upcoming",
+      "checkedExtra",
+      "limitedExtra",
+      "editorialNote"
+    ]
+  },
+  "editorialInput": {
+    "schemaVersion": 2,
+    "window": {
+      "id": "2026-09-28-daily",
+      "period": "daily",
+      "plannedAt": "2026-09-28 12:00",
+      "windowStart": "2026-09-27 10:10",
+      "windowEnd": "2026-09-28 10:10"
+    },
+    "adjacentEdition": "2026-09-27-daily",
+    "packages": [
+      {
+        "eventKey": "80981592eae617526fc0",
+        "eventKind": "other",
+        "subjectKey": "ワイルドアームズ",
+        "subject": {
+          "kind": "game",
+          "key": "ワイルドアームズ"
+        },
+        "publishability": "direct",
+        "headline": "『ワイルドアームズ』の精神的続編『アームドファンタジア』に暗雲か。海外パブリッシャー505 Gamesの親会社が決算報告で開発中止と報告",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-25T07:41:43.050Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-25-daily",
+            "2026-09-26-daily",
+            "2026-09-27-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "tracking",
+          "lastDecision": "needs_review",
+          "lastDecisionReason": "《Armed Fantasia》开发中止及505 Games相关财报信息具有较高新闻价值，但本 packet 未给出媒体页面可验证的发布时间，timeRelation=unknown；底层 Digital Bros 财报一手证据也未打开。固定窗口归属无法证明，保留跟踪等待时间或一手证据补齐。",
+          "tracking": {
+            "active": true,
+            "openedAt": "2026-09-27T11:26:20Z",
+            "updatedAt": "2026-09-27T11:26:20Z",
+            "editionId": "2026-09-27-daily",
+            "reason": "《Armed Fantasia》开发中止及505 Games相关财报信息具有较高新闻价值，但本 packet 未给出媒体页面可验证的发布时间，timeRelation=unknown；底层 Digital Bros 财报一手证据也未打开。固定窗口归属无法证明，保留跟踪等待时间或一手证据补齐。"
+          }
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/89101",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/89101",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/89101/ogp_nGaQ.png?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "海外パブリッシャー505 Gamesの親会社の決算報告から、同グループとの契約下での『アームドファンタジア』の開発が中止となっていたことが判明。\n『ワイルドアームズ』の精神的続編『アームドファンタジア』に暗雲か。海外パブリッシャー505 Gamesの親会社が決算報告で開発中止と報告\n本記事はアフィリエイトプログラムによる収益を得ている場合があります\n集計期間 : 2026年09月28日16時〜2026年09月28日17時\nゼルダの伝説 時のオカリナ -Switch2 【パッケージ版早期購入特典】オリジナルアートカードセット/オリジナルステッカー 同梱\n『まどドラ』1.5周年キャンペーン開催、暁美ほむら(ワルプルギスの廻天)登場！最大150連無料ガチャも開催！"
+          }
+        ]
+      },
+      {
+        "eventKey": "99cf306b6b9d29f056d2",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "News and events",
+        "tier": "B",
+        "score": 115,
+        "timeRelation": "unknown",
+        "readiness": "primary-only",
+        "ledger": {
+          "firstSeenAt": "2026-08-27T05:06:50.183Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-09-daily",
+            "2026-09-10-daily",
+            "2026-09-11-daily",
+            "2026-09-12-daily",
+            "2026-09-13-daily",
+            "2026-09-14-daily",
+            "2026-09-15-daily",
+            "2026-09-16-daily",
+            "2026-09-17-daily",
+            "2026-09-18-daily",
+            "2026-09-19-daily",
+            "2026-09-20-daily",
+            "2026-09-21-daily",
+            "2026-09-22-daily",
+            "2026-09-23-daily",
+            "2026-09-24-daily",
+            "2026-09-25-daily",
+            "2026-09-26-daily",
+            "2026-09-27-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "packet 标记 requires_subject_identity，二次发布不得从标题推断或自造规范主体身份。",
+          "tracking": {
+            "active": false,
+            "openedAt": "2026-09-09T19:02:50+08:00",
+            "updatedAt": "2026-09-22T12:27:03+09:00",
+            "editionId": "2026-09-22-daily",
+            "reason": "该来源是 Nintendo 新闻聚合页，packet 未解析出可独立判断的单一事件、主体身份或窗口内发布时间。",
+            "closedAt": "2026-09-22T12:27:03+09:00"
+          }
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "primary",
+            "independenceKey": "nintendo",
+            "label": "Nintendo News",
+            "url": "https://www.nintendo.com/us/whatsnew/",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.nintendo.com/us/whatsnew/",
+            "imageUrl": "https://assets.nintendo.com/image/upload/v1643742733/ncom/global/social-share.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Your first stop for Nintendo news and announcements. See what’s new in the world of Nintendo, from site updates to game launches, deals, and more.\nThis year, Nintendo Switch™ 2 players gain access to boosted performance and Nintendo Switch 2-exclusive motion controlled mini-games—making this the most immersive and technically capable NBA 2K Nintendo title yet. NBA 2K27 can now be played at a s…\nStep into The Grounds*, a social football playground where the streets meet the stadium. From Kickabouts and 1v1s to teaming up with friends in Clubs, connect in-game with renowned football mentors, improve your abilities, and express yourself on an…\nFire Emblem Heroes celebrates the upcoming release of Fire Emblem: Fortune’s Weave with new characters, events, and goodies\nNintendo Direct reveals Metroid Ravenous, Kirby and the World Beyond, and more games for Nintendo Switch 2 and Nintendo Switch\nMario Kart World adds SNES courses and Knockout Tour routes in a free update\nGet exclusive digital cards and more from The Legend of Zelda in the Nintendo Today! app\nNintendo and Laced Records - The Legend of Zelda: Breath of the Wild vinyl soundtrack collection available today!\nMaximize your game with NBA 2K27 on the Nintendo Switch 2 system!\nWelcome to The World’s Game in EA SPORTS FC 27\nTry the latest Game Trial, Prince of Persia The Lost Crown"
+          }
+        ]
+      },
+      {
+        "eventKey": "5c76ceb511b1ba661ebb",
+        "eventKind": "announcement",
+        "subjectKey": "we were here tomorrow",
+        "subject": {
+          "kind": "game",
+          "key": "we were here tomorrow"
+        },
+        "publishability": "direct",
+        "headline": "『We Were Here Tomorrow』は10月20日発売。体当たり戦車バトルアクション『SLAM TANK』発表。アパレル関係者も唸る本格ドレス作りシム『Dressmaker』が大人気。今週の見逃せないゲーム記事7選",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260927-470250/",
+            "publishedAt": "2026-09-27T06:48:24+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260927-470250/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470250-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "今週のAUTOMATONにて反響の大きかったゲーム紹介系記事を中心に、7本の記事をピックアップ。今週は『We Were Here Tomorrow』のほか、『ドーンゲイザー』や『キャラ屋』などが話題となった。\n『We Were Here Tomorrow』は10月20日発売。体当たり戦車バトルアクション『SLAM TANK』発表。アパレル関係者も唸る本格ドレス作りシム『Dressmaker』が大人気。今週の見逃せないゲーム記事7選\nオンライン2人協力プレイ専用パズルアドベンチャー『We Were Here』シリーズの最新作。本作ではレトロフューチャーの世界観にて、各プレイヤーが異なる能力を持つゲームプレイが展開される。Steam/PS5/XBOX Series X|S向けにリリースされ、クロスプレイにも対応予定だ。 （ 記事リンク ）\n今週のAUTOMATONにて反響の大きかったゲーム紹介系記事を中心に、7本の記事をピックアップ。第101回目です。\n戦車を操縦してロボットなどと戦うゲーム。しかし戦闘においては砲撃をしないことが特徴。代わりに砲身を回転させたり、体当たりしたりして“肉弾戦”で攻撃をおこなっていく。そのほか空中に射出されて大ジャンプするような場面や、トリック（技）を決めるような場面なども存在しているようだ。 （ 記事リンク ）\n人間と擬人化動物の住民が共生する都市で生活する、基本プレイ無料のオンラインマルチプレイゲーム。プレイヤーは人間としてこの街を訪れ、生活を始めるにあたっては動物とルームシェアをする。また人間でありつつも、プレイ中に“不思議なドリンク”を手に入れると動物に変身することもできるそうだ。 （ 記事リンク ）"
+          }
+        ]
+      },
+      {
+        "eventKey": "3fd2585bbbadc8b2560a",
+        "eventKind": "announcement",
+        "subjectKey": "seikyu let 8217 s go",
+        "subject": {
+          "kind": "game",
+          "key": "seikyu let 8217 s go"
+        },
+        "publishability": "direct",
+        "headline": "Steam最大4人協力キャンピングカー自由旅ゲーム『Seikyu: Let&#8217;s Go!』発表。のんびり寄り道＆キャンプ三昧ドライブ、人気妖怪スローライフ『清宮物語』開発元の新作",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260928-470288/",
+            "publishedAt": "2026-09-28T01:14:09+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260928-470288/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260928-470288-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ACE Entertainmentは9月28日、最大4人協力プレイ対応のキャンピングカー旅ゲーム『Seikyu: Let&#039;s Go!』を発表した。\nSteam最大4人協力キャンピングカー自由旅ゲーム『Seikyu: Let&#8217;s Go!』発表。のんびり寄り道＆キャンプ三昧ドライブ、人気妖怪スローライフ『清宮物語』開発元の新作\nACE Entertainmentは9月28日、最大4人協力プレイ対応のキャンピングカー旅ゲーム『Seikyu: Let's Go!』を発表した。\nデベロッパーのACE Entertainmentは9月28日、『 Seikyu: Let&#8217;s Go! 』を発表した。対応プラットフォームはPC（Steam）で、日本語表示にも対応予定。\n『Seikyu: Let&#8217;s Go!』は、最大4人協力プレイ対応のキャンピングカー旅ゲームだ。開発を手がけるACE Entertainmentは妖怪島スローライフゲーム『清宮物語』の開発元であり、本作でも清宮島が舞台となる。プレイヤーは遠方からキャンピングカー旅に訪れた妖怪たちとなり、手作りのキャンピングカーで清宮島の秘境をドライブで巡ることになる。\n『Seikyu: Let&#8217;s Go!』については、開発チームが2025年に杭州から上海のゲームイベントへ向かった際の約4時間のドライブが原点になっているという。仲間と道中を楽しんだ経験から、「友達と旅する楽しさをゲームにしたい」というアイデアが生まれ、わずか1か月で開発が進められ今回発表に至ったそうだ。人間が妖怪の住む島を訪れて生活するスローライフゲームであった『清宮物語』から打って変わって、妖怪たちのキャンピングカー旅ゲームとなる『Seikyu: Let&#8217;s Go!』。のんびりと楽しめる作風は健在のようで、続報にも注目したい。\n『Seikyu: Let&#8217;s Go!』はPC（ Steam ）向けに開発中。\n本作では協力プレイで自由なキャンピングカーの旅が繰り広げられるようで、運転役、ナビ役、写真撮影やキャンプ設営などの役割分担はプレイヤー次第。ゲーム内ボイスチャットにも対応しており、距離に応じて声の大きさが変化するといった没入感のある仕組みになっているそうだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "69065c105100e78d5337",
+        "eventKind": "announcement",
+        "subjectKey": "shared custody",
+        "subject": {
+          "kind": "game",
+          "key": "shared custody"
+        },
+        "publishability": "direct",
+        "headline": "最大4人協力・悪魔の子守り『Shared Custody』発表。「地獄の跡取り」を抱っこで護送、ドーナツから “生け贄”まで捧げる魔界ベビーシッター",
+        "tier": "B",
+        "score": 113,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260928-470280/",
+            "publishedAt": "2026-09-28T00:57:18+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260928-470280/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260928-470280-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "EAT PANTは9月26日、『Shared Custody』を発表した。\n最大4人協力・悪魔の子守り『Shared Custody』発表。「地獄の跡取り」を抱っこで護送、ドーナツから “生け贄”まで捧げる魔界ベビーシッター\nデベロッパーのEAT PANTは9月26日、『 Shared Custody 』を発表した。対応プラットフォームはPC（Steam）。ストアページによると、ゲーム内は日本語表示に対応予定だ。\n『Shared Custody』は、1～4人で遊べる協力型アクション・アドベンチャーゲームだ。プレイヤーが操作するのは、地獄の玉座を継ぐ存在「Sprog」の一時的な法的後見人となった悪魔たち。危険に満ちた世界を進みながら、Sprogを「Unholy Gates」まで無事に送り届けることが目的となる。\nまた、『Teeto』では分割画面での協力プレイを採用しており、EAT PANTは自分たち自身が一緒に遊べるゲームを好むことから、開発当初から協力プレイを取り入れていたと説明している。『Shared Custody』ではそうした協力プレイをさらに前面に押し出し、最大4人でひとりのSprogを世話しながら危険地帯を進むゲームとなる。Sprogの要求に付き合いながら無事に「Unholy Gates」へたどり着けるのか、“悪魔の子守り”がどのような協力プレイを生み出すのか注目したい。\n『Shared Custody』はPC（ Steam ）向けに配信予定。ストアページによると、ゲーム内は日本語表示に対応予定だ。\n本作では、Sprogのさまざまな要求に応えながら先へ進んでいく。Sprogは特定のプレイヤーに抱っこされたがったり、自分を楽しませるよう求めたりするほか、ときには“生け贄”まで欲しがるという。そのため基本的には機嫌を損ねないよう、その都度望みをかなえていくことになる。トレイラーでは椅子に座ったSprogを撫でるほか、ドーナツや「CHEAP WHISKY」と書かれた酒瓶を手にする場面も確認できる。"
+          }
+        ]
+      },
+      {
+        "eventKey": "532674a9d0d66e3747cf",
+        "eventKind": "announcement",
+        "subjectKey": "サクラ大戦",
+        "subject": {
+          "kind": "game",
+          "key": "サクラ大戦"
+        },
+        "publishability": "direct",
+        "headline": "「サクラ大戦」シリーズの30周年を記念する特別仕様の懐中時計が発表に。9月29日に予約受付開始",
+        "tier": "B",
+        "score": 109,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T09:38:59.148Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "4gamer",
+            "label": "4Gamer News Topics",
+            "url": "https://www.4gamer.net/games/035/G003591/20260927002/",
+            "publishedAt": "2026-09-27T08:13:06.000Z",
+            "canonicalUrl": "https://www.4gamer.net/games/035/G003591/20260927002/",
+            "imageUrl": "https://www.4gamer.net/games/035/G003591/20260927002/SS/001.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "「サクラ大戦」シリーズの30周年を記念する特別仕様の懐中時計が発表された。蓋部分に施された「光武」の立体彫刻や，光武の操縦席をイメージした文字盤など，重厚感のあるデザインだ。予約受付の開始は2026…\n「サクラ大戦」シリーズの30周年を記念する特別仕様の懐中時計が発表に。9月29日に予約受付開始\nAccess Accepted第873回：PC Gaming Show Tokyo Directで見た，気になるインディーゲーム5選\n【今週のモチベ】「ACE COMBAT 8: WINGS OF THEVE」や「Minecraft Dungeons II」が発売される 2026年9月28日〜10月4日\n4Gamerの1週間を振り返る「Weekly 4Gamer」，2026年9月21日〜9月27日\n週刊Steam広場 第173号：仕立て屋シム「Dressmaker」や「Graveyard Keeper 2」が発売に"
+          }
+        ]
+      },
+      {
+        "eventKey": "7a91ea731078e35a7101",
+        "eventKind": "dlc",
+        "subjectKey": "テニスの王子様",
+        "subject": {
+          "kind": "game",
+          "key": "テニスの王子様"
+        },
+        "publishability": "direct",
+        "headline": "『テニスの王子様』“学プリ”と“ドキサバ”の追加DLCのPVが公開。配信時期や詳細などを確認できる",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260928k",
+            "publishedAt": "2026-09-28T01:12:07+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260928k",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/53a392dbfa98a996fee8102da8414333-910x1024.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "完全新規シナリオに描き下ろしスチルを収録、詳細PVを公開。人気マンガ『テニスの王子様』を題材にした恋愛シミュレーションゲーム\n『テニスの王子様』“学プリ”と“ドキサバ”の追加DLCのPVが公開。配信時期や詳細などを確認できる\nコナミより発売されている『 テニスの王子様 も～っと 学園祭の王子様 ♡-40 and more&#8230; 』および 『テニスの王子様 ぎゅ～っと！ ドキドキサバイバル Tie break ♡ game 』の追加DLCのPVが公開された。\n本作は人気マンガ『 テニスの王子様 』を題材にした恋愛シミュレーションゲームだ。両作とも約20年前に発売されたもののリマスター版となっている。\n『 学園祭の王子様 』にて配信される「 越前リョーガ 」DLCは 10月15日 に、『 ドキドキサバイバル 』にて配信される「 財前光 」DLCは 11月13日 のリリースを予定している。本DLCは完全新規シナリオとなり、描き下ろしスチルも収録される。\nまた、 コナミスタイル にて、DLC購入者限定で「 離れていても会いに行くセット 」、「 四天宝寺より愛を込めてセット 」の発売も決定。アクスタやクリアカードのほか、越前リョーガと財前光の手書きメッセージ入りポストカードが封入されている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "0ac68d48b11d4949cd8b",
+        "eventKind": "announcement",
+        "subjectKey": "鵺の陰陽師",
+        "subject": {
+          "kind": "game",
+          "key": "鵺の陰陽師"
+        },
+        "publishability": "direct",
+        "headline": "『鵺の陰陽師』キャラクター人気投票の結果が発表。「名前のあるキャラ部門」1位は周防七咲、2位は狂骨で、上位キャラの“バニー衣装”描き下ろしイラストがお披露目",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260928j",
+            "publishedAt": "2026-09-28T01:11:50+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260928j",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/66143f9b313a0c19a6bd6ba5fba1529d.png",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "上位キャラの“バニー衣装”描き下ろしイラストがお披露目。それぞれ趣の異なるこだわりを感じる。イラストは3周年グッズやノベルティに展開予定\n『鵺の陰陽師』キャラクター人気投票の結果が発表。「名前のあるキャラ部門」1位は周防七咲、2位は狂骨で、上位キャラの“バニー衣装”描き下ろしイラストがお披露目\n9月28日、週刊少年ジャンプで連載中のマンガ作品『 鵺の陰陽師 』のキャラクター人気投票の結果が 発表 された。\n『 #鵺の陰陽師 』 キャラクター人気投票‼ 📢結果発表📢 たくさんの投稿ありがとうございました‼ 人気投票サイトにて全順位が大公開中！ 下記のURLからチェック✅ 🔽人気投票サイト🔽 https://t.co/U1LawUmLl0 pic.twitter.com/tLtc8Wt5cc\n『鵺の陰陽師』は週刊少年ジャンプで連載中の、川江康太氏による現代陰陽師マンガだ。幼い頃から「幻妖」と呼ばれる存在が見えていた少年・夜島学郎が、入学した高校で幻妖の女性「鵺」（ぬえ）と出会うところから物語は始まる。学園を舞台に、学郎は個性豊かな仲間たちとともに成長しながら悪しき幻妖と対峙していく。\n投票は連載3周年を記念した企画として5月18日に始まったもので、「名前のあるキャラ部門」と「名前のないキャラ部門」の2部門が設けられていた。\n9月28日発売の週刊少年ジャンプ44号では、「名前のあるキャラ部門」の上位10名と「名前のないキャラ部門」上位1名には、作者の川江康太氏による“バニー衣装”のイラストが描き下ろされた。このイラストは3周年記念グッズやノベルティに展開される予定だという。"
+          }
+        ]
+      },
+      {
+        "eventKey": "fb0a5d7195516926d719",
+        "eventKind": "announcement",
+        "subjectKey": "wonderpaws",
+        "subject": {
+          "kind": "game",
+          "key": "wonderpaws"
+        },
+        "publishability": "direct",
+        "headline": "【基本プレイ無料】いろんな動物たちが住む大都会で自由に過ごすゲーム『WonderPaws』発表。犬や猫、カエルなどの住民たちと仲良くなって都会暮らしを満喫しよう",
+        "tier": "B",
+        "score": 107,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-25T07:41:43.050Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-26-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "denfaminicogamer",
+            "label": "電ファミニコゲーマー News",
+            "url": "https://news.denfaminicogamer.jp/news/260928g",
+            "publishedAt": "2026-09-28T02:08:29+00:00",
+            "canonicalUrl": "https://news.denfaminicogamer.jp/news/260928g",
+            "imageUrl": "https://news.denfaminicogamer.jp/wp-content/uploads/2026/09/6d58f877a83b152a3c3b13756107b189.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "いろんな仕事や趣味を楽しみ、住民たちと仲良くなって都会暮らしを満喫しよう。自分も動物になって友だちにお世話してもらうことも\n【基本プレイ無料】いろんな動物たちが住む大都会で自由に過ごすゲーム『WonderPaws』発表。犬や猫、カエルなどの住民たちと仲良くなって都会暮らしを満喫しよう\n『AFK アリーナ』『AFK：ジャーニー』などで知られるLilith Gamesは9月24日、 『WonderPaws』 を発表し、PVを公開した。\nWelcome to WonderPaws, a bustling metropolis built by animals! The possibilities are endless, and your adventure starts right now! WonderPaws, a cozy Paw City life sim, pre-registration is now open. See you in the city! pic.twitter.com/nfjXllnOvj\n『WonderPaws』はLilith Games傘下の開発スタジオ「Cat Paw Latte」が開発する新作タイトルだ。\n（画像は YouTube「」WonderPaws Official Reveal Trailer | Welcome to Paw City, Where Wonder Begins より）\n『WonderPaws』はPC、モバイル向けに基本プレイ無料形式で配信予定。公式サイトにて事前登録も受付中だ。\nLilithGamesが都市型ライフシミュレーション『WonderPaws』初公開PVをリリース！PC・モバイル向け事前登録も開始\n『Rise of Kingdoms ―万国覚醒―』や、『AFKアリーナ』『AFK：ジャーニー』をはじめとする「AFK」シリーズ、『モンスターサバイバル』などを手がけるLilith Games。多彩なゲームを世界に届けてきた同社から、動物たちとの暮らしを楽しむ新作『WonderPaws』が登場します。\n本作は動物たちが暮らす街で自由に暮らしていく、基本プレイ無料の都市型ライフシミュレーションゲームだ。対応プラットフォームはPCとモバイルで、 公式サイト にて事前登録も受け付けている。"
+          }
+        ]
+      },
+      {
+        "eventKey": "b832974a56154922501d",
+        "eventKind": "cancel",
+        "subjectKey": "latest xbox layoffs reportedly devastated age of empires developer and",
+        "subject": {
+          "kind": "game",
+          "key": "latest xbox layoffs reportedly devastated age of empires developer and"
+        },
+        "publishability": "direct",
+        "headline": "Latest Xbox layoffs reportedly devastated Age of Empires developer and canceled its next game",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/gaming-industry/latest-xbox-layoffs-reportedly-devastated-age-of-empires-developer-and-canceled-its-next-game/",
+            "publishedAt": "2026-09-27T16:14:26Z",
+            "canonicalUrl": "https://www.pcgamer.com/gaming-industry/latest-xbox-layoffs-reportedly-devastated-age-of-empires-developer-and-canceled-its-next-game/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/Q2HxaETVRSGNPXwWUWd8K4-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Microsoft continues to slash and burn the legacies under its banner.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nSign up to our new Switch 2 newsletter, where we bring you the latest talking points on Nintendo's new console each week, bring you up to date on the news, and recommend what games to play.\nLatest Xbox layoffs reportedly devastated Age of Empires developer and canceled its next game\nThe latest stage of Xbox's delicately named \" reset \" arrived last Tuesday &mdash;but its impact on World's Edge Studio, the developer now behind the Age of Empires series, was only briefly mentioned in Xbox CCO Matt Booty's announcement. On sites like resetera and LinkedIn, former employees of the RTS developer have shared that it was hit especially hard.\n\"What a morning,\" said former World's Edge creative director Adam Isgreen on resetera , posting under the verified account name Tempus Chaoti. \"FYI World's Edge was not spared completely&mdash;just under half the studio was let go&mdash;myself included. Been fun, y'all!\" This is in addition to the studio now answering to Activision alongside Sea of Thieves developer Rare.\nWhile layoffs are always devastating to the affected workers, this latest round of calls from Xbox is especially baffling , and Microsoft's track record of destruction goes far beyond the games industry , it's still alarming how little regard for this medium's history has been shown in this \"reset.\" This situation with World's Edge Studio echoes the company's treatment of id Software and countless other teams earlier this year.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "21b29241666b58a5b8d1",
+        "eventKind": "cancel",
+        "subjectKey": "the spiritual successor to classic jrpg wild arms has seemingly been",
+        "subject": {
+          "kind": "game",
+          "key": "the spiritual successor to classic jrpg wild arms has seemingly been"
+        },
+        "publishability": "direct",
+        "headline": "The spiritual successor to classic JRPG Wild Arms has seemingly been cancelled, four years after its Kickstarter raised nearly $3 million",
+        "tier": "B",
+        "score": 105,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/rpg/the-spiritual-successor-to-classic-jrpg-wild-arms-has-seemingly-been-cancelled-four-years-after-its-kickstarter-raised-nearly-usd3-million/",
+            "publishedAt": "2026-09-27T12:38:05Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/rpg/the-spiritual-successor-to-classic-jrpg-wild-arms-has-seemingly-been-cancelled-four-years-after-its-kickstarter-raised-nearly-usd3-million/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/uxrE6B9h2SHN92CXhMJ9En-1536-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The developers of Armed Fantasia had completed a vertical slice as of March this year.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nKeep up to date with the most important stories and the best deals, as picked by the PC Gamer team.\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "07168938b69fda682463",
+        "eventKind": "company",
+        "subjectKey": "这款动作射击游戏逆龄增长 腾讯",
+        "subject": {
+          "kind": "entity",
+          "key": "这款动作射击游戏逆龄增长 腾讯"
+        },
+        "publishability": "direct",
+        "headline": "这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？",
+        "tier": "B",
+        "score": 92,
+        "timeRelation": "unknown",
+        "readiness": "discovery-only",
+        "ledger": {
+          "firstSeenAt": "2026-09-18T02:21:08.349Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-18-daily",
+            "2026-09-19-daily",
+            "2026-09-20-daily",
+            "2026-09-21-daily",
+            "2026-09-10-daily",
+            "2026-09-22-daily",
+            "2026-09-23-daily",
+            "2026-09-24-daily",
+            "2026-09-25-daily",
+            "2026-09-26-daily",
+            "2026-09-27-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": "excluded",
+          "lastDecision": "exclude",
+          "lastDecisionReason": "二次发布人工复核后不收录：本条未达到本期正式稿的信息增量与编辑优先级，且不存在需要继续跟踪的实质阻塞。",
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "discovery",
+            "independenceKey": "36kr",
+            "label": "36氪游戏圈大事件",
+            "url": "https://www.36kr.com/p/3986762458266627",
+            "publishedAt": "2026-09-28T16:38:11+08:00",
+            "canonicalUrl": "https://36kr.com/p/3986762458266627",
+            "imageUrl": "https://img.36krcdn.com/hsossms/20260917/v2_7febcf6da9d542a2b81a53e02f7c1b11@000000@ai_oswg631076oswg2848oswg1600_img_000~tplv-1marlgjv7f-ai-v3:600:400:600:400:q70.jpg",
+            "declaredLanguage": "zh-CN",
+            "detectedLanguage": "zh-CN",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "拆解《Warframe》长青逆增长的运营策略\n这款动作射击游戏逆龄增长？腾讯收购后月均用户数创纪录，最高+50%，怎么做到的？\n一款已经积累8500万+全球用户的游戏，如今仍在突破用户规模上限。但深挖这个长线运营的成功案例，了解其“背景故事”后会发现，《Warframe》（星际战甲）最值得研究的地方还不仅仅如此。\n2025年，腾讯国际市场收入首次突破100亿美元，同比增长33%——在全年业绩演示中，腾讯首次点名Digital Extremes旗下《Warframe》，将其近年的在线表现与国际游戏业务增长联系起来。\n在2026年第二季度的业绩演示上，《Warframe》再次被点名，其中提到其总流水和平均日活跃用户都创下了历史新高。\n作为腾讯海外重要的长青标杆，《Warframe》至今依然保持着持续增长的用户规模与活跃的产品生态，甚至成为大盘业务增长的新变量。 这种“逆龄”表现的背后，似乎有着与大部分F2P游戏不一样的运营逻辑和成长路径。"
+          }
+        ]
+      },
+      {
+        "eventKey": "aab27a7332a960d45406",
+        "eventKind": "other",
+        "subjectKey": "みすずの国",
+        "subject": {
+          "kind": "game",
+          "key": "みすずの国"
+        },
+        "publishability": "direct",
+        "headline": "「人間ではなくなった」少女の居場所はどこにあるのか？天狗の国を舞台にマイノリティの痛みと生きることを描く和風学園ファンタジー『みすずの国』を今こそ遊んでみよう",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/special-column/20260927-470243/",
+            "publishedAt": "2026-09-27T05:48:39+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/special-column/20260927-470243/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470243-image2.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『みすずの国』は困難を乗り越え、以前の自分を取り戻すことだけを描いたわけではない。「思い通りにならなかった境遇の先にも人生が続いていく」ことも描かれた作品だ。\n「人間ではなくなった」少女の居場所はどこにあるのか？天狗の国を舞台にマイノリティの痛みと生きることを描く和風学園ファンタジー『みすずの国』を今こそ遊んでみよう\n連載第10回となる本稿では、Kazuki氏による同人サークル「STUDIO・HOMMAGE（スタジオ・おま～じゅ）」が手がけた『みすずの国』を紹介する。Kazuki氏は『雪子の国』『ハルカの国』などを制作してきたクリエイターで、アニプレックスのノベルゲームブランド「ANIPLEX.EXE」では 『たねつみの歌』 の企画・シナリオを担当している。\nKazuki氏が長年作り上げてきた「国シリーズ」は、「もしも日本の領土に、天狗の国があったなら」というIFの世界観を出発点に、文化・地理・歴史・法律まで作り込んだ架空の日本を舞台とする連作ビジュアルノベル。『みすずの国』『キリンの国』『雪子の国』『ハルカの国』と異なる人物の物語に焦点を当てながら、一つの国の趨勢を浮かび上がらせていくのが特徴だ。\n『みすずの国』は「国シリーズ」の処女作として2014年に公開されたフリーゲームで、 第10回ふりーむ！ゲームコンテスト ではノベルゲーム部門の金賞を受賞した（なお、『キリンの国』は最優秀賞を受賞）。2025年4月にリメイク版がSteamで発売され、ビジュアルとサウンドが一新されたほか、シナリオにも細かな加筆が施されている。選択肢のない一本道のノベルゲームで、プレイ時間は約2～3時間と比較的短い作品だ。\nまた「国シリーズ」は各タイトルで一人の主人公の物語を完結させながら、背後では一つの国の歴史も進んでいくのも特徴。例えば『みすずの国』『キリンの国』と『雪子の国』では描かれる時代に約15年の隔たりがあり、作品をまたぐことである時代には当たり前だったことが別の時代には変化している。シリーズを読み進めるほどに世界自体への理解が深まっていく骨太な構造が魅力だ。\nリメイク版『みすずの国』は、PC（ Steam ）向けに配信中。\nSteamでは日々数多くのゲームがリリースされている一方で、個人や少人数チームによる国産タイトルには大作の話題に隠れながらも、独創的なアイデアや強いこだわりを持つ作品が少なくない。本連載「見逃してない？ 国産Steamタイトル発掘録」では、同人・インディーゲームを中心に、国産Steamタイトルを毎回1本ずつピックアップして魅力を伝えていきたい。"
+          }
+        ]
+      },
+      {
+        "eventKey": "08595e2a9ffe476239a6",
+        "eventKind": "other",
+        "subjectKey": "ファイアーエムブレム 万紫千紅",
+        "subject": {
+          "kind": "game",
+          "key": "ファイアーエムブレム 万紫千紅"
+        },
+        "publishability": "direct",
+        "headline": "『ファイアーエムブレム 万紫千紅』のボリュームが凄すぎて、「クリア時間集計サイト」も困惑。その規模、サブクエ込みで「100時間」級か",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260927-470237/",
+            "publishedAt": "2026-09-27T04:45:17+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260927-470237/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470237-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『ファイアーエムブレム 万紫千紅』のボリュームがユーザーにインパクトを与えているようで、ゲームクリア時間集積サイトにもまだ十分に情報が集まっていないようだ。\n『ファイアーエムブレム 万紫千紅』のボリュームが凄すぎて、「クリア時間集計サイト」も困惑。その規模、サブクエ込みで「100時間」級か\n任天堂は9月17日、『 ファイアーエムブレム 万紫千紅 』をNintendo Switch 2向けに発売した。本作はリリースから10日ほど経過したが、そのボリュームも相まって、各ゲームのクリア時間を集積するサイトHowLongToBeatに情報が集まらず、取り扱いに困っているようだ。 なお本稿では『ファイアーエムブレム 万紫千紅』の内容について触れているため留意されたい。\n『ファイアーエムブレム 万紫千紅』は、『ファイアーエムブレム』シリーズの最新作となるシミュレーションRPGだ。本作に登場するダグザ帝国は、魔神バロールの復活によって終焉を迎えようとしていた。プレイヤーは救世主として、そんな世界の存亡をかけた戦いに挑む。バロールに対抗するためには、過去に戻り、カイ、ディートリヒ、セオドラ、レダの4人の物語を辿っていく必要がある。過去のダグザ帝国で繰り広げられる大剣闘祭に集まった4人の運命を変え、世界を救うのだ。\nそんな『ファイアーエムブレム 万紫千紅』について、ボリュームの多さが各所にインパクトを与えているようだ。たとえば海外掲示板Redditでは、リリースから4日後の9月21日に「すでにこのゲームに何時間費やした？」とのタイトルでスレッドが建てられている。コメントには週末をまるまる捧げてもクリアまで至らないことや、30時間かけてようやく一人分の第一章をクリアしたとする報告などが寄せられている。 SNS 上でも同様に本作のボリュームがてんこ盛りであることに言及する投稿が散見される。\nリリースから10日程度という点には留意したいが、『 ファイアーエムブレム 万紫千紅 』の項目を見るとクリア報告はわずか4件。とはいえ、本作と同日にリリースされた『 空の軌跡 the 2nd 』でもクリア報告の数は6件と大差ないように見える。ただHow Long To Beatで集計されている個別のプレイ状況を見ると、『ファイアーエムブレム 万紫千紅』は約350人、『空の軌跡 the 2nd』では約80人となっており、プレイ人数に対するクリア者の割合で言えば、7倍近いクリア率の差が生まれている格好だ。\nちなみに『空の軌跡 the 2nd』では、メインクエストとサブクエストのクリア込みで約70時間。『ファイアーエムブレム 万紫千紅』では約96時間とされている。『空の軌跡 the 2nd』もなかなかにボリュームがある作品ながら、『ファイアーエムブレム 万紫千紅』ではそれを超える物量であることがうかがえる。\nまた『ファイアーエムブレム』シリーズ過去作では『 ファイアーエムブレム エンゲージ 』が約62時間という平均クリア時間になっている。「担当する学級」としてルートの選択があった『 ファイアーエムブレム 風花雪月 』でも約75時間であり、シリーズ作品と比べても圧巻のボリュームとなっているわけだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "eec33940ef521b30f168",
+        "eventKind": "other",
+        "subjectKey": "ファイアーエムブレム 万紫千紅",
+        "subject": {
+          "kind": "game",
+          "key": "ファイアーエムブレム 万紫千紅"
+        },
+        "publishability": "direct",
+        "headline": "『ファイアーエムブレム 万紫千紅』はとにかく「カオス」で感想言うの難しすぎる。『神貌（かんばく）のクリファ』にチャレンジ精神を感じるが作業感強め。今週のゲーミング",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T09:38:59.148Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/now-gaming/20260927-470270/",
+            "publishedAt": "2026-09-27T08:59:32+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/now-gaming/20260927-470270/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470270-005.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Now Gamingは毎週日曜日、各ライターがその週にプレイしたゲームについて、ゆるく書きちらすコーナーです。563回目です。\n『ファイアーエムブレム 万紫千紅』はとにかく「カオス」で感想言うの難しすぎる。『神貌（かんばく）のクリファ』にチャレンジ精神を感じるが作業感強め。今週のゲーミング\n『 ファイアーエムブレム 万紫千紅 』をプレイしています。20時間ほど遊びましたが、ゲーム内容も含めて混沌としたゲームだなと……。RPGもSRPGもストラテジーもダンジョン探索もリソース管理も入ってて、かつ各ルートが存在。なんかもう、カオスです。明確にシリーズとしては贅沢に作られていて。モデルもアニメーションも含めて演出まるっとAAAゲームだと感じます。全部がリッチになっている。で、ボリューム感を出すために入れた要素が多すぎて、カオス。\n『ファイアーエムブレム 万紫千紅』のボリュームが凄すぎて、「クリア時間集計サイト」も困惑。その規模、サブクエ込みで「100時間」級か\nNow Gamingは毎週日曜日、各ライターがその週にプレイしたゲームについて、ゆるく書きちらすコーナーです。563回目です。暑さ寒さも彼岸まで。\n対応プラットフォーム：PC（ Steam ）/ Nintendo Switch / PS5/PS4 / XBOX Series X|S/XBOX One / iOS / Android\n今週は、法術対戦パズルゲーム『 五行の旅 』をプレイ。『キャンドルちゃん』や『疲弊した人』を手がけたスタジオの新作です。中国の「五行思想」を題材にした作品で、火・水・木・土・金という5つの元素を使いターン制にて戦う。画面下に各プレイヤーのパズルフィールドがあり、同じ元素を3つ以上横に揃えることで効果を発動。2列のフィールドの上段では攻撃、下段だと防御や回復になる。また、同じ元素を2つ揃えることで、別の元素に合成可能。規定の手数の中で元素を上下左右に入れ替えながら、相手のHPをゼロにすることを目指す。"
+          }
+        ]
+      },
+      {
+        "eventKey": "3ca92fdcc5dd45e982e2",
+        "eventKind": "other",
+        "subjectKey": "悪魔城ドラキュラ",
+        "subject": {
+          "kind": "game",
+          "key": "悪魔城ドラキュラ"
+        },
+        "publishability": "direct",
+        "headline": "『悪魔城ドラキュラ』シリーズ初期8作おまとめ作品『Castlevania Anniversary Collection』が80％オフで660円。『メトロ エクソダス』は90％オフでわずか358円。今週の高割引率PCゲーム",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260927-470261/",
+            "publishedAt": "2026-09-27T07:59:25+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260927-470261/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470261-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "本稿ではSteamにてこの1週間でセールが開始されたタイトルのうち、特に割引率の高いゲームに焦点を当てて紹介する。\n『悪魔城ドラキュラ』シリーズ初期8作おまとめ作品『Castlevania Anniversary Collection』が80％オフで660円。『メトロ エクソダス』は90％オフでわずか358円。今週の高割引率PCゲーム\n『 Castlevania Anniversary Collection 』 ・ホラーアクションゲーム『悪魔城ドラキュラ』シリーズの初期8タイトルをまとめて収録した作品。『VAMPIRE KILLER』が初移植され、各タイトルにはどこでもセーブできるクイックセーブ機能が搭載。また、各タイトルのデータやキャラクターのラフイラスト、企画書などの開発資料を閲覧できる「ボーナスブック」も収録されている。 税込660円/80％オフ（ ストアページ ）\nPCゲーマーにはおなじみのSteamでは、日々多数のゲームにおいてセールが実施されている。そこで本記事では、この1週間（9月20日〜26日）にセールが開始された作品の中から、注目作をいくつか紹介する。\n本記事ではセール中の作品の中でも、特に割引率の高いお買い得なゲームに焦点を当てている。また記事の最後では、今週発売されローンチセール中の新作も一部紹介。基本的には、ある程度レビュー評価の高いタイトルを優先してピックアップしている。\n『 Disneyland Adventures 』 ・ディズニーランドを舞台にしたアドベンチャーゲーム。ソロプレイおよびローカル2人協力プレイに対応。ディズニーランド園内を探索する中では、ミッキーマウスやピーターパン、白雪姫などディスニーのキャラクターたちに出会ったり、隠れミッキーを探したりなどでき、また各作品をモチーフにしたものを含む計18種類のアトラクションもよういされている。 税込475円/75％オフ（ ストアページ ）"
+          }
+        ]
+      },
+      {
+        "eventKey": "3bdfb8de160b38ab5ab2",
+        "eventKind": "other",
+        "subjectKey": "鬼武者 way of the sword",
+        "subject": {
+          "kind": "game",
+          "key": "鬼武者 way of the sword"
+        },
+        "publishability": "direct",
+        "headline": "『鬼武者 Way of the Sword』を遊んで、時代劇が“翻訳”される瞬間を目撃した。「世界のミフネ」を通して紡ぐ、“あなただけの殺陣アクションドラマ”があった",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/impressionjp/20260927-470200/",
+            "publishedAt": "2026-09-27T04:02:48+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/impressionjp/20260927-470200/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260927-470200-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "時代劇が地上波のゴールデンタイムから去り、15年ほど経つのだそうだ。本作には、そんな時代劇から受け継がれている何かを感じる。\n『鬼武者 Way of the Sword』を遊んで、時代劇が“翻訳”される瞬間を目撃した。「世界のミフネ」を通して紡ぐ、“あなただけの殺陣アクションドラマ”があった\nそんな時代劇に対する懐かしい感覚を、私は『 鬼武者 Way of the Sword 』に感じた。 2026年9月4日に発売された『鬼武者 Way of the Sword』（以下、鬼武者）は国内外を問わず評価されていると聞く。\n『鬼武者』の主人公・武蔵は、物語の序盤、正直かなり“脳筋”なキャラクターとして登場する。理屈よりも先に刀が出る、力こそ正義といった佇まいだ。 しかし物語が進むにつれて、彼は静御前や阿国、小野篁（たかむら）といった人物と心を通わせ、時に泥だらけになりながら、誰かのために強くなろうと変わっていく。よくあると言えばよくある成長譚かもしれない。\n本作『鬼武者』も異界から現れた幻魔によって、簡単に人の命が奪われる。 武蔵は人としての強さを否定され、眼の前で散っていく命に苦悩する。そこにはまさに多くの時代劇で描かれた共通のナラティブ（物語）が存在した。\nこのように殺陣は幾つもの動作の組合せによって成立し、それによってアクションの幅を広げている。では、ゲームである『鬼武者』の中ではこの殺陣がどうなったのか。\nこのように、『鬼武者』においてはどのアクションを使っても相手を倒すことができる。様々なアクションが用意され、プレイヤーに選択が委ねられているというのが、大きな特長だ。\n本作をプレイしていれば、どのプレイヤーも佐々木巌流とは必ず対戦する。 しかし、その戦い方はプレイヤーによって異なる。終始、攻撃を受け流して勝利してもよい。一方で、弾きでどんどん力動を削るのもいい。可能なら、一閃を狙ってもいい。 私も他のプレイヤーの動画をみたが、完全に同じプレイという人は、まずいなかった。つまり、同じ『鬼武者』というタイトルをプレイしながら、個別の体験を、自らの選択によって得ることができるわけなのだ。 これこそが、本作『鬼武者』の魅力であり、最も皆さんに楽しんでほしいポイントである。\nここまで、フェイシャルによる感情移入、三船敏郎という顔が背負う説得力、そして殺陣を翻訳した戦闘システムについて書いてきた。振り返ってみると、私が『鬼武者』に感じていた興奮は、単に「アクションゲームとしてよくできている」という一言では片付けられないものだったと思う。\n『水戸黄門』、『暴れん坊将軍』、『必殺仕事人』…… 私が子供の頃は、地上波のゴールデンタイムでこれらの時代劇が毎日のように流れていた。両親が共働きだった私は、よく祖父母の家で遊んでいた。そのため、祖父がよくこれらの時代劇を観ていたことを憶えている。\nところが、この時代劇が地上波のゴールデンタイムから去り、15年ほど経つのだそうだ。\n2011年12月19日、TBS系列の看板時代劇『水戸黄門』が42年の歴史に幕を下ろした。 1969年の放送開始から実に1,227回。平均視聴率は20%を超え、1979年の放送回では43.7%という日本のドラマ史上でも屈指の数字を記録した番組である。その『水戸黄門』の終了をもって、地上波ゴールデンタイムに定番として存在していた時代劇は、事実上姿を消すことになった。"
+          }
+        ]
+      },
+      {
+        "eventKey": "488b1912dda0d9de6e63",
+        "eventKind": "other",
+        "subjectKey": "購入申し込み",
+        "subject": {
+          "kind": "game",
+          "key": "購入申し込み"
+        },
+        "publishability": "direct",
+        "headline": "品薄続くPS5 Pro、ソニーストアで“購入申し込み”開始。ゲームのプレイ時間「60時間以上」など応募条件あり",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260928-470300/",
+            "publishedAt": "2026-09-28T01:40:45+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260928-470300/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260928-470300-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "ソニー・インタラクティブエンタテインメントは9月28日、「PlayStation 5 Pro」のソニーストアでの購入申し込みを本日より受付開始すると発表した。\n品薄続くPS5 Pro、ソニーストアで“購入申し込み”開始。ゲームのプレイ時間「60時間以上」など応募条件あり\nソニー・インタラクティブエンタテインメントは9月28日、「 PlayStation 5 Pro 」（以下、PS5 Pro）のソニーストアでの購入申し込みを本日より受付開始すると発表した。応募期間は10月7日23時59分までで、応募数が販売予定台数を超えた場合は抽選となる。\n「PlayStation®5 Pro」のソニーストアでの購入申し込みを、本日9月28日（月）より受け付けます。 ご応募・ご購入には条件がございます。ご応募数が販売予定台数を超えた場合は抽選となりますので、あらかじめご了承ください。 詳しくはこちら⇒ https://t.co/h4rOIltI9Q pic.twitter.com/71VaLlu5ed\n本日SIEは、PS5 Proの購入申し込み受付を開始すると発表。応募期間は10月7日23時59分までであり、応募数が販売予定台数を超えた場合は抽選となる。当選結果は10月26日より順次案内され、購入期限は11月2日11時59分までとなるそうだ。なお応募・購入には以下の条件をすべて満たしている必要がある。\n品薄状態も続いていたPS5 Pro。今年2月に発売された『バイオハザード レクイエム』を皮切りにPSSRの進化版に対応するタイトルも登場したほか、PS5/PC向けに10月29日に発売予定の『Phantom Blade Zero』や、PS5/Xbox Series X|S向けに11月19日に発売予定の『グランド・セフト・オートVI』など注目の新作タイトルも控えている。そうしたなかでソニーストアにて、購入申し込み制で在庫が復活する格好だ。\n「PlayStation 5 Pro」のソニーストアでの 購入申し込み は10月7日23時59分まで受付中だ。\nPS5 Proは、PS5の上位モデルだ。より高解像度、高フレームレートでの動作を期待でき、またPS5 Proに最適化されたタイトルでは、超解像技術PSSRやアドバンスドレイトレーシングなども利用できる。なおディスクドライブ非搭載のため、パッケージ版ゲームをプレイする場合はディスクドライブを別途購入する必要がある。"
+          }
+        ]
+      },
+      {
+        "eventKey": "8239ecee32fcfdc6f082",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "基本プレイ無料『NTE』この5か月で街はどう変わった？どんどん妙な進化、“遊べる無法地帯”に。Ver.1.4では「車が木をなぎ倒す」らしい",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-27T08:02:45.651Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260926-470167/",
+            "publishedAt": "2026-09-27T03:01:02+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260926-470167/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260926-470167-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『NTE: Neverness to Everness』のこれまでの進化を振り返りつつ、次回大型アップデートVer.1.4の注目点を考えてみる。\n基本プレイ無料『NTE』この5か月で街はどう変わった？どんどん妙な進化、“遊べる無法地帯”に。Ver.1.4では「車が木をなぎ倒す」らしい\n街オープンワールドRPG『 NTE: Neverness to Everness 』（以下、NTE）では、9月30日にVer.1.4「名もなき祈歌」の配信が予定されている。新キャラや新たな遊び場が登場する今回の更新だが、筆者が思わず目を疑ったのは、車で木をなぎ倒せるようになるという変更だ。先行配信された中国版では、大木を引っこ抜きながら爆走する映像がSNSで話題となっている。\nもっとも、約5か月にわたって本作を遊んできた身としては、「いつもの『NTE』だ」とも感じる。重機でビーチバレーをしたり、透明化して街で悪さをしたり、郊外の家で田舎暮らしを試したり。本連載でもさまざまな遊びを紹介してきたが、そのたびに街で試したいことが増えてきた。\n車で木をなぎ倒すという次の変化を前に、そもそもこの街はリリースからどれほど変わったのか。今回はアップデートの積み重ねを振り返りつつ、Ver.1.4で加わる楽しみも紹介したい。なお、本稿には一部先行体験コンテンツが含まれるため留意してほしい。\n今の『NTE』では、そんな休日を過ごせる。ずいぶん落ち着きのない一日だが、星暮保護区も、ジャンプできるバイクも、ベーグルも、ファイトクラブも、正式リリース後のアップデートで加わったものだ。別々に登場した要素が、気づけばひと続きの寄り道になっている。\n4月の正式リリースからの更新を振り返ると、まず驚くのは追加内容の振れ幅だ。ポルシェとのコラボでとんでもなく速い車が登場したかと思えば、剣と魔法のファンタジー世界を冒険する「九百九十九夜」が追加。さらにVer.1.3では、ヘテロシティとほぼ同じサイズの広大な新エリアまでやってきた。\n筆者はこうした運営型のゲームで新ストーリーをひと通り終えると、装備を厳選し、編成を詰め、少しでも高いダメージを目指すような遊び方に落ち着きがちだ。もちろん『NTE』にも、その楽しさはある。一方この街では、強くなることと直接関係のない目的にも、つい時間とお金を使ってしまう。\nそこへVer.1.0後半に登場したのが、時間を止められる潯である。監視に追い立てられていた場所でも、時間停止を使えば探索の余裕を作れる。その後はレクイエムの飛行でレーザーを越えられるようになり、残虹の透明化では、ついに監視の目そのものを無視できるようになった。連れていく仲間が増えるにつれて、強盗の手口まで大胆になっていく。\nこれまで街を運転していて、道路脇の木にぶつかって止められた人もいるだろう。その障害物を、今度は車の勢いでなぎ倒して進めるという。詳しい模様は日本向けの実装後に確かめたいところだが、いつものドライブがずいぶん豪快になりそうだ。"
+          }
+        ]
+      },
+      {
+        "eventKey": "515741c850bdfb219699",
+        "eventKind": "other",
+        "subjectKey": "mindseye",
+        "subject": {
+          "kind": "game",
+          "key": "mindseye"
+        },
+        "publishability": "direct",
+        "headline": "批判殺到『MindsEye』開発元、相次ぐレイオフの末ついに経営破綻。「GTAの対抗馬」とも注目された『EVERYWHERE』プロジェクトは実現せずか",
+        "tier": "B",
+        "score": 88,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "automaton-media",
+            "label": "AUTOMATON",
+            "url": "https://automaton-media.com/articles/newsjp/20260928-470295/",
+            "publishedAt": "2026-09-28T01:51:25+00:00",
+            "canonicalUrl": "https://automaton-media.com/articles/newsjp/20260928-470295/",
+            "imageUrl": "https://automaton-media.com/wp-content/uploads/2026/09/20260928-470295-header.jpg",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "『MindsEye』を手がけたことで知られるデベロッパーのBuild A Rocket Boyグループの親会社、Build A Rocket Boy Ltdが9月23日に、イギリスの倒産手続きに当たるAdministrationに入っていたことが明らかになった。\n批判殺到『MindsEye』開発元、相次ぐレイオフの末ついに経営破綻。「GTAの対抗馬」とも注目された『EVERYWHERE』プロジェクトは実現せずか\n賛否両論となった『MindsEye』を手がけたことで知られるデベロッパーのBuild A Rocket Boyグループの親会社、Build A Rocket Boy Ltdが9月23日に、イギリスの倒産手続きに当たるAdministrationに入っていたことが明らかになった。\nBuild A Rocket Boyは、Leslie Benzies氏によって創設されたゲームスタジオだ。同氏はかつてRockstar Northに在籍し、『グランド・セフト・オートIII』以降の同シリーズ作品などで、プロデューサーなどを担当した人物。同氏はRockstar Northを退職後、2017年にBuild A Rocket Boyを設立。多額の資金調達を経てSFアクションアドベンチャーゲーム『MindsEye』が開発され、2025年6月11日にリリースを迎えた。\nBuild A Rocket Boyは設立後、資金調達を進めながらユーザー作成コンテンツ（UGC）を備えたオープンワールドゲーム『EVERYWHERE』の開発を進めていた。2024年には第1作となる『MindsEye』とUGCツール『ARCADIA』の3つのプロジェクトを展開する計画で1億1000万ドル（当時のレートで約160億円）超を調達するなどしていた。\nそして2025年6月についに『MindsEye』がリリース。一方でその評価は厳しいものとなり執筆時点でもSteamユーザーレビューは約2900件のうち48%が好評とする「賛否両論」ステータスとなっている。グラフィックやストーリーについては一定の評価を受けたものの、ゲームプレイの単調さやパフォーマンス面の指摘が相次いでいた（ 関連記事 ）。\nこうした苦境は財務状況にも表れており、7月に公開された2025年9月締めの 年次報告書 ではほぼ『MindsEye』のものと思われる売上高は約460万ポンド（約10億円）。対して営業利益は約4800万ポンド（約100億円）の損失となっている。また、2025年9月時点での預金額は約1900万ポンドであり、1年以内に支払期限を迎える約2500万ポンドを下回っている状況であった。資金繰りに苦戦している様子がうかがえる。\nこうした状況の中、Steam上では直近まで『MindsEye』へのアップデートが続けられていた一方で、親会社がAdministrationの手続きに入ってしまったかたちだ。現時点では『MindsEye』の今後や、『EVERYWHERE』『ARCADIA』などの扱いは明らかになっていない。前述のとおり、今回の手続きの方針は8週間以内にまとめられるため、今後の動向にも注目が集まる。\nイギリスにおけるAdministrationでは、まず管財人（Administrator）を選任。会社の資産はすべて管財人の管理家となり、事業の継続か売却か、資産の処分などを検討し、8週間以内に事業の継続や売却などに関する方針を提案書としてまとめるフローとなっている。そのため、現時点で倒産が確定したわけではない。"
+          }
+        ]
+      },
+      {
+        "eventKey": "271ae494ef636d48551b",
+        "eventKind": "announcement",
+        "subjectKey": "roco kingdom ロコキングダム",
+        "subject": {
+          "kind": "game",
+          "key": "roco kingdom ロコキングダム"
+        },
+        "publishability": "direct",
+        "headline": "『Roco Kingdom（ロコキングダム）』でジニとかけがえのない絆を結んで世界を探索してほしい。出演声優のKENNさんや相羽あいなさんもゲームを堪能した“日本版発表会＆体験試遊会”をリポート",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-25T07:41:43.050Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-25-daily",
+            "2026-09-26-daily",
+            "2026-09-27-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/88947",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/88947",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/88947/thumbnail_ECPA.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "2026年9月21日に行われた“『ロコキングダム』日本版発表会＆体験試遊会”の模様と、開発者へのインタビューをお届けする。\n『Roco Kingdom（ロコキングダム）』でジニとかけがえのない絆を結んで世界を探索してほしい。出演声優のKENNさんや相羽あいなさんもゲームを堪能した“日本版発表会＆体験試遊会”をリポート\n『Roco Kingdom（ロコキングダム）』の魅力を紹介。400種以上のモンスターとともにくり広げる、次世代オープンワールドの魅力をお届けする。\nイリス役のKENNさんとイェッシー役の相羽あいなさんが『ロコキングダム』の世界を堪能\nMorefun Studios ナラティブディレクター兼ローカライズ責任者\n本記事はアフィリエイトプログラムによる収益を得ている場合があります"
+          }
+        ]
+      },
+      {
+        "eventKey": "9c746ad21975b65ce83e",
+        "eventKind": "dlc",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "【テニプリ】『学プリ』越前リョーガ＆『ドキサバ』財前光のDLC配信日＆価格が決定！ 『学プリ』は10月15日、『ドキサバ』は11月13日。価格は各1980円",
+        "tier": "B",
+        "score": 87,
+        "timeRelation": "unknown",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "famitsu",
+            "label": "Famitsu",
+            "url": "https://www.famitsu.com/article/202609/89293",
+            "publishedAt": null,
+            "canonicalUrl": "https://www.famitsu.com/article/202609/89293",
+            "imageUrl": "https://cimg.kgl-systems.io/camion/files/89293/thumbnail_TUkb.jpg?x=1280",
+            "declaredLanguage": "ja",
+            "detectedLanguage": "ja",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "【テニプリ】『学プリ』越前リョーガ＆『ドキサバ』財前光のDLC配信日＆価格が決定。\n【テニプリ】『学プリ』越前リョーガ＆『ドキサバ』財前光のDLC配信日＆価格が決定！ 『学プリ』は10月15日、『ドキサバ』は11月13日。価格は各1980円\n【テニプリ】『学プリ』『ドキサバ』リマスター版・石原プロデューサーインタビューを掲載。ほぼすべて描き直しの気合のリマスター。DLC越前リョーガ＆財前光参加の理由、ルービックキューブや手書き特典の制作意図までまるっと聞きました。\nリマスター版『学プリ』に越前リョーガ、『ドキサバ』に財前光がDLC追加攻略キャラとして登場することが、“ジャンプフェスタ2026”で発表。\n【テニプリ】『学プリ』リマスター版先行プレイレビュー。リマスターとはいうものの、実際に過去のタイトルとどのような差があるのか調査。"
+          }
+        ]
+      },
+      {
+        "eventKey": "3cf7d7e701ffc7641627",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Horror visual novel Shinjuku Anomaly launches September 30",
+        "tier": "B",
+        "score": 85,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "gematsu",
+            "label": "Gematsu",
+            "url": "https://www.gematsu.com/2026/09/horror-visual-novel-shinjuku-anomaly-launches-september-30",
+            "publishedAt": "2026-09-28T01:45:03+00:00",
+            "canonicalUrl": "https://www.gematsu.com/2026/09/horror-visual-novel-shinjuku-anomaly-launches-september-30",
+            "imageUrl": "https://www.gematsu.com/wp-content/uploads/2026/09/Shinjuku-Anomaly-Date_09-27-26.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Shinjuku Anomaly, a short horror visual novel with multiple ending, will launch for PC via Steam on September 30 at 10:00 JST for $3.99, AMATA Games announced.\nHorror visual novel Shinjuku Anomaly launches September 30\nShinjuku Anomaly , a short horror visual novel with multiple ending, will launch for PC via Steam on September 30 at 10:00 JST for $3.99, AMATA Games announced.\nThis is a short horror visual novel game. It has multiple endings.\nYou have a part-time job taking photos of anomalies in the night in Shinjuku.\nSeptember 29 @ 1:00 pm - 2:00 pm EDT\nHere is an overview of the game, via its Steam page :"
+          }
+        ]
+      },
+      {
+        "eventKey": "e4775ee800148dfa95dc",
+        "eventKind": "launch",
+        "subjectKey": "control resonant",
+        "subject": {
+          "kind": "game",
+          "key": "control resonant"
+        },
+        "publishability": "direct",
+        "headline": "Control Resonant Launch Patch Will Address Its Biggest Combat Complaints",
+        "tier": "B",
+        "score": 83,
+        "timeRelation": "unknown",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-25T07:41:43.050Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-25-daily",
+            "2026-09-26-daily",
+            "2026-09-27-daily",
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "game-informer",
+            "label": "Game Informer",
+            "url": "https://gameinformer.com/2026/09/24/control-resonant-launch-patch-will-address-its-biggest-combat-complaints",
+            "publishedAt": "2026-09-24T12:00:00Z",
+            "canonicalUrl": "https://gameinformer.com/2026/09/24/control-resonant-launch-patch-will-address-its-biggest-combat-complaints",
+            "imageUrl": "https://gameinformer.com/sites/default/files/styles/og_image/public/2026/09/24/d919201a/control-resonant-mold-monster.jpg.webp",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The game&#039;s biggest pre-launch criticism will already by smoothed over when players jump in today. - Game Informer\nControl Resonant Launch Patch Will Address Its Biggest Combat Complaints\nControl Resonant launches today, and the game’s first update will address one of its biggest pre-release criticisms: its enemies take too long to defeat, and protagonist Dylan Faden feels too weak. While early access players and reviewers, including us, had to endure a much harder game in the weeks before release, the wider player base will likely have a smoother ride thanks to this hotfix.\nRemedy promises to continue working on other known issues in Control Resonant as players begin diving into the sequel today. Overall, despite&nbsp;some combat headaches, we enjoyed Control Resonant quite a bit, scoring it an 8.5 out of 10. Be sure to read our full review. &nbsp;\nDeveloper Remedy Entertainment has announced in a blog post that after reading reviews (which have overall been very positive despite the combat critiques), and early player impressions, “we have decided to deploy a hotfix (1.3.3) at launch to address a few specific things: enemy health pools feeling too high, requiring too many hits to Falter (stun) enemies for executions, and Dylan’s overall combat strength early on in the game not feeling powerful enough (even if the man just woke up from a coma).”\nTo improve the combat flow and overall experience, the launch update will do the following:\nThe patch will also lower the cost of respeccing the ability tree, and vendors will also carry more stock of the special resource required to respec. A UI text update aims to better explain Build Power and Aberrant (Dylan’s primary weapon) strength. This will take the following forms;"
+          }
+        ]
+      },
+      {
+        "eventKey": "d74ff3187ea6d059bd0d",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "After 12 years, Dark Souls 2 is finally playable in co-op without interruptions",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/dark-souls/after-12-years-dark-souls-2-is-finally-playable-in-co-op-without-interruptions/",
+            "publishedAt": "2026-09-27T19:28:43Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/dark-souls/after-12-years-dark-souls-2-is-finally-playable-in-co-op-without-interruptions/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/xE6DG35sZvSVNyCzEDCVzG-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Community maestro Yui made similar mods for Elden Ring and the original Dark Souls.\nAfter 12 years, Dark Souls 2 is finally playable in co-op without interruptions\nI've always been content to admire the Dark Souls games from afar, rather than get particularly into them myself, and part of that is probably a crumb of leftover resentment from trying to wrangle the multiplayer features in those early games. Love it or hate it, it's esoteric at the best of times and not terribly consistent. If you've a mind to mod those annoyances out of Dark Souls 2, now's your chance.\nThat's thanks to Yui, a soulslike modder who made similar mods for Elden Ring and Dark Souls . Her latest creation, Dark Souls 2: Seamless Co-op , just released into alpha last week and promises a straightforward co-op experience with up to five other players. \"With this, it's theoretically possible to play the game from the tutorial up to the final boss completely in one co-op session,\" the release blog on Patreon notes. I'm sure one of you will be doing just that with a DDR mat or something.\nWhile you could try to do a full playthrough with a buddy in the original Dark Souls 2, it'd involve a lot of stopping, starting, summoning, and fog walls. With this mod, there are no fog walls, progression is synced up, and the session won't end when someone dies&mdash;instead, they respawn at their last bonfire.\nIf you're worried this will take all the sexy mystery out of Dark Souls' purposefully friction-heavy online play, you may be glad to know the mod's features are accessed via a bunch of unique items with titles like \"Pharros' Heliograph\" and \"Petrified Fingers.\" It's a very different&mdash;and as Yui's release blog notes, a much easier&mdash;way to play DS2, but a welcome way to enjoy it with your friends, especially if you've been exploring its every corner since its release.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "4cd47070ae96d28e7e6f",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Former Dragon Age executive producer Mark Darrah explains what he'd change about each game: 'It's kind of filler'",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/dragon-age/former-dragon-age-executive-producer-mark-darrah-explains-what-hed-change-about-each-game-its-kind-of-filler/",
+            "publishedAt": "2026-09-28T00:15:39Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/dragon-age/former-dragon-age-executive-producer-mark-darrah-explains-what-hed-change-about-each-game-its-kind-of-filler/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/hH9KJHTAQRZMDWEMXBw6iM-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "A candid look at what one of the series' creators would like to have done differently.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nFormer Dragon Age executive producer Mark Darrah explains what he'd change about each game: 'It's kind of filler'\nOver on Tiktok , Mark Darrah was asked, \"If you could go back in time what would you remove from each of the Dragon Age games and what would you add?\"\nLike everyone who ever installed the Skip the Fade mod for Dragon Age: Origins, Darrah thinks the Lost in Dreams quest needs a snip. \"I would be tempted to cut or dramatically reduce the dream sequence part from the Mage Tower,\" he said. \"It's not very good content. It's kind of filler. It was definitely done pretty fast in the end.\"\nAs for what he'd add to the original, Darrah suggested the planned human origin where you'd get to play one of the avvar in the Korcari Wilds. \"I would like to have another human origin,\" he said, \"but wow, what an expensive add.\"\nFor Dragon Age 2, Darrah would remove one of the things I found frustrating about it&mdash;no matter whether you side with the templars or the mages, you're forced to fight both at the end. Even if you side with Orsino and the Circle of Magi he wigs out from blood magic, proving Meredith and the templars right in believing the mages are \"barely tethered nuclear bombs\" who do deserve \"to be treated as non-humans.\"\nDarrah's first suggestion for something to add to Dragon Age 2 is \"probably just a couple of more levels to use,\" and yeah, a little more variety in locations would certainly help. He'd also like to have less gold available in the main questline during act two, as the idea was to encourage sidequesting to raise money for the expedition. As it stands, \"If you just do the crit path, the crith path gives you enough gold to go on the expedition so it kind of doesn't work. I don't know where I'd make this cut, but I'd be tempted to cut one of those crit-path missions just to get that back.\"\nWhen I replayed Dragon Age: Inquisition in advance of The Veilguard , the open-world bloat hit me as a much bigger issue than it did on my first playthrough. Darrah suggests snipping parts of it, saying, \"I'd probably cut Hissing Wastes maybe or one of the big levels because it's too big. And the other thing I would change would be to dramatically reduce the amount of Power that you need to go on the crit-path missions. That's there for not-super-great reasons, and I think you could cut it by 40 to 60% and the game would just be paced better.\"\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "2c5eea7cca2c79a5a919",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Gears of War story director laid off mere days after E-Day went gold",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/third-person-shooter/gears-of-war-story-director-laid-off-mere-days-after-e-day-went-gold/",
+            "publishedAt": "2026-09-27T18:19:43Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/third-person-shooter/gears-of-war-story-director-laid-off-mere-days-after-e-day-went-gold/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/ZkAd6Pu64tN54SNVBUpoeG-2560-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Microsoft's layoffs continue to hit accomplished teams.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!\nSave on your next hardware purchase\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nHardware nerds unite, sign up to our free tech newsletter for a weekly digest of the hottest new tech, the latest gadgets on the test bench, and much more.\nGet full access to premium articles, exclusive features and a growing list of member rewards.\nGears of War story director laid off mere days after E-Day went gold\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member."
+          }
+        ]
+      },
+      {
+        "eventKey": "55687bd3f03b1ceefe5c",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "I'm loving WoW: Forever, but I can't help but miss the music of my other beloved MMO",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/world-of-warcraft/im-loving-wow-forever-but-i-cant-help-but-miss-the-music-of-my-other-beloved-mmo/",
+            "publishedAt": "2026-09-27T17:00:00Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/world-of-warcraft/im-loving-wow-forever-but-i-cant-help-but-miss-the-music-of-my-other-beloved-mmo/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/fouT8RfEVh8SxqiDuXyuvV-1920-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "My brain requires musical stimulation.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nI'm loving WoW: Forever, but I can't help but miss the music of my other beloved MMO\nWhen you purchase through links on our site, we may earn an affiliate commission. Here&rsquo;s how it works .\nUh-oh. The MMO no-life virus started coursing through me as soon as I jumped into WoW: Forever's beta, and it's refusing to let up. Which is a problem, considering I'm also housing the kind of sickness that makes me pump dozens of hours into Final Fantasy 14 every week like it's a goddamn full-time job. My body is a temple for poor time management afflictions.\nMy only prior experience with Blizzard's MMO is a level 13 Paladin I made a poor attempt at trying out around the release of Battle for Azeroth nearly a decade ago. This time it's sticking. I am absolutely loving WoW: Forever's stripped-back, old-school feel, complete with sprinklings of modernity that make it palatable for folks like me who lack those rose-tinted glasses.\nThe one thing I'm struggling to come around to, though? The music. Not that I think it's bad. The opposite, in fact&mdash;I've been loving the ominous tones of Durotar's overworld music, and venturing into Orgrimmar for the first time I was met with the perfect grand, foreboding sound that a city for the Horde deserves.\nMy problem is how little I seem to hear any of it. World of Warcraft likes for you to sit in these long, occasionally uncomfortable stretches of silence, instead letting the sounds of its world do the talking. Crunchy orc footsteps, the whispering of the wind, the squawk of an eagle. I am admittedly warming up to that deliberate choice of ambiance, but I also can't help but yearn for the thoroughly themed ways of Final Fantasy 14.\nDo some of its songs get relentlessly overused? Of course. I'm pretty sure most Warriors of Light suffer from some sort of Machinations-induced trauma at this point. But I'm convinced that for the most part Masayoshi Soken and the wider music team have, in fact, spoiled me rotten in this regard.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      },
+      {
+        "eventKey": "666c3f85625334e58210",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Industry insiders and Tokyo gossip suggest Kojima is getting less money from Xbox than original PlayStation budget for Physint",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/industry-insiders-and-tokyo-gossip-suggest-kojima-is-getting-less-money-from-xbox-than-original-playstation-budget-for-physint/",
+            "publishedAt": "2026-09-28T01:19:40Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/industry-insiders-and-tokyo-gossip-suggest-kojima-is-getting-less-money-from-xbox-than-original-playstation-budget-for-physint/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/DexicgJSYh9xBnB9nLdRnb-1200-80.png",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "Whatever this game costs, people seem to agree it's in the nine figures.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nKeep up to date with the most important stories and the best deals, as picked by the PC Gamer team.\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nYour membership journey starts here."
+          }
+        ]
+      },
+      {
+        "eventKey": "6fed9bede4df24682de4",
+        "eventKind": "other",
+        "subjectKey": null,
+        "subject": {
+          "kind": "topic",
+          "key": null
+        },
+        "publishability": "requires_subject_identity",
+        "headline": "Lords of the End Times' greatest fantasy is letting us rewrite the most hated lore in Warhammer's history",
+        "tier": "B",
+        "score": 80,
+        "timeRelation": "window",
+        "readiness": "single-media",
+        "ledger": {
+          "firstSeenAt": "2026-09-28T08:38:08.230Z",
+          "lastSeenAt": "2026-09-28T08:38:08.230Z",
+          "windowsSeen": [
+            "2026-09-28-daily"
+          ],
+          "state": "candidate",
+          "editorialState": null,
+          "lastDecision": null,
+          "lastDecisionReason": null,
+          "tracking": null
+        },
+        "sources": [
+          {
+            "sourceIndex": 0,
+            "status": "opened",
+            "kind": "secondary",
+            "independenceKey": "pcgamer",
+            "label": "PC Gamer",
+            "url": "https://www.pcgamer.com/games/strategy/lords-of-the-end-times-greatest-fantasy-is-letting-us-rewrite-the-most-hated-lore-in-warhammers-history/",
+            "publishedAt": "2026-09-27T15:00:00Z",
+            "canonicalUrl": "https://www.pcgamer.com/games/strategy/lords-of-the-end-times-greatest-fantasy-is-letting-us-rewrite-the-most-hated-lore-in-warhammers-history/",
+            "imageUrl": "https://cdn.mos.cms.futurecdn.net/qAquXxiW4Cah9xamfr77oP-2560-80.jpg",
+            "declaredLanguage": "en",
+            "detectedLanguage": "en",
+            "languageConfidence": "high",
+            "languageBasis": "registry+html-lang+metadata",
+            "evidenceText": "The end of The End Times.\nJoin the club for quick access. Enter your email below and we'll send confirmation, and sign you up to our newsletter.\nBy submitting your information, you confirm you are aged 16 or over, have read our Privacy Policy and agree to the Terms & Conditions . Geographical rules apply.\nFinding the best discounts on PC gaming hardware has never been more important. Check out our handpicked hardware deals.\nGet the latest PC gaming news, rumors, recommendations, and deals delivered to your inbox. (You can turn them off anytime.)\nKeep up to date with the most important stories and the best deals, as picked by the PC Gamer team.\nYour weekly update on everything you could ever want to know about the games you already love, games we know you're going to love in the near future, and tales from the communities that surround them.\nOur special GTA 6 newsletter, with breaking news, insider info, and rumor analysis from the award-winning GTA 6 O'clock experts.\nFrom the creators of Edge: A weekly videogame industry newsletter with analysis from expert writers, guidance from professionals, and insight into what's on the horizon.\nYour membership journey starts here.\nKeep exploring and earning more as a member.\nEarn badges by reading articles, leaving comments, and taking quizzes. Show off your website-using chops!"
+          }
+        ]
+      }
+    ],
+    "trackingQueue": [
+      {
+        "eventKey": "0c277dc3287f69373699",
+        "eventKind": "other",
+        "subjectKey": "フォートナイト",
+        "lastHeadline": "荷兰消费者组织拟就《堡垒之夜》未成年人付费机制向 Epic Games 发起集体诉讼",
+        "firstSeenAt": "2026-09-25T07:41:43.050Z",
+        "lastSeenAt": "2026-09-27T09:38:59.148Z",
+        "lastDecisionEdition": "2026-09-26-daily",
+        "lastDecisionAt": "2026-09-27T10:37:37Z",
+        "reason": "窗口内的游戏产业法律动态，程序状态和诉求主体明确，后续仍需跟踪是否正式进入法院程序。",
+        "sourceUrls": [
+          "https://automaton-media.com/articles/newsjp/20260925-469916/"
+        ]
+      }
+    ],
+    "budget": {
+      "maxInputChars": 120000,
+      "usedInputChars": 108713,
+      "estimatedInputTokens": 27179,
+      "activeTrackingItems": 2,
+      "candidateItems": 30,
+      "includedItems": 30,
+      "omittedItems": 0,
+      "omittedTierA": 0,
+      "omittedTierB": 0,
+      "omissions": [],
+      "titleHintItems": 0
+    },
+    "titleHints": [],
+    "upcomingBaseline": {
+      "sourceEditionId": "2026-09-27-daily",
+      "items": [
+        {
+          "id": "2026-09-29-transport-fever-3-pc",
+          "date": "09.29",
+          "title": {
+            "title_key": "transport-fever-3",
+            "title_zh_cn": "狂热运输3",
+            "title_en": "Transport Fever 3",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "全球",
+          "releaseType": "launch",
+          "source": {
+            "kind": "primary",
+            "label": "Transport Fever 3 Official Site",
+            "url": "https://www.transportfever3.com/"
+          },
+          "note": "官方网站确认2026年9月29日推出；此补丁记录 PC 正式版。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "kind": "primary",
+              "label": "Transport Fever 3 Official Site",
+              "url": "https://www.transportfever3.com/"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-17-daily/2026-09-29-transport-fever-3-pc-cover.jpg",
+            "alt": "狂热运输3游戏封面",
+            "credit": "Transport Fever 3 Official Site",
+            "sourceUrl": "https://www.transportfever3.com/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-09-29-minecraft-dungeons-ii-pc",
+          "date": "09.29",
+          "title": {
+            "title_key": "minecraft-dungeons-ii",
+            "title_zh_cn": "我的世界：地下城2",
+            "title_en": "Minecraft Dungeons II",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "Steam商店",
+          "releaseType": "launch",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/1912410/",
+            "kind": "primary"
+          },
+          "note": "Steam 官方页面确认 PC 版于2026年9月29日解锁。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/1912410/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-18-daily/2026-09-29-minecraft-dungeons-ii-pc-cover.jpg",
+            "alt": "我的世界：地下城2游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/1912410/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-09-29-minecraft-dungeons-ii-switch-2",
+          "date": "09.29",
+          "title": {
+            "title_key": "minecraft-dungeons-ii",
+            "title_zh_cn": "我的世界：地下城2",
+            "title_en": "Minecraft Dungeons II",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "美国",
+          "releaseType": "launch",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-switch-2/",
+            "kind": "primary"
+          },
+          "note": "Nintendo 美国官方商品页确认 Switch 2 版于2026年9月29日发售。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-18-daily/2026-09-29-minecraft-dungeons-ii-switch-2-cover.jpg",
+            "alt": "我的世界：地下城2游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-the-witcher-3-wild-hunt-remastered",
+          "date": "09.29",
+          "title": {
+            "title_key": "the-witcher-3-wild-hunt-remastered",
+            "title_en": "The Witcher 3: Wild Hunt — Remastered",
+            "title_zh_status": "official_simplified",
+            "title_zh_cn": "巫师 3：狂猎 — 重制版"
+          },
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/the-witcher-3-wild-hunt-remastered-switch-2/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/the-witcher-3-wild-hunt-remastered-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-20-daily/upcoming-the-witcher-3-wild-hunt-remastered-cover.jpg",
+            "alt": "The Witcher 3: Wild Hunt — Remastered游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/the-witcher-3-wild-hunt-remastered-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-toem-2",
+          "date": "09.29",
+          "title": {
+            "title_key": "toem-2",
+            "title_en": "TOEM 2",
+            "title_zh_status": "official_simplified",
+            "title_zh_cn": "TOEM 2 摄影冒险2"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/2900640/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/2900640/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-26-daily/upcoming-toem-2-cover.jpg",
+            "alt": "TOEM 2游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/2900640/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-09-30-dynasty-warriors-3-complete-edition-remastered-pc",
+          "date": "09.30",
+          "title": {
+            "title_key": "dynasty-warriors-3-complete-edition-remastered",
+            "title_en": "DYNASTY WARRIORS 3: Complete Edition Remastered",
+            "title_zh_status": "unavailable"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "全球",
+          "releaseType": "launch",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/3841510/",
+            "kind": "primary"
+          },
+          "note": "Steam 官方商品页确认 PC 版于2026年9月30日推出。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/3841510/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-24-daily/2026-09-30-dynasty-warriors-3-complete-edition-remastered-pc-cover.jpg",
+            "alt": "DYNASTY WARRIORS 3: Complete Edition Remastered游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/3841510/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-10-01-octopath-traveler-switch-2",
+          "date": "10.01",
+          "title": {
+            "title_key": "octopath-traveler",
+            "title_en": "Octopath Traveler",
+            "title_zh_status": "common_translation",
+            "title_zh_cn": "歧路旅人"
+          },
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "美国",
+          "releaseType": "port",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/octopath-traveler-switch-2/",
+            "kind": "primary"
+          },
+          "note": "Nintendo 美国官方商品页确认 Switch 2 版于2026年10月1日发售；这是平台版本。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/octopath-traveler-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-18-daily/2026-10-01-octopath-traveler-switch-2-cover.jpg",
+            "alt": "歧路旅人游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/octopath-traveler-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-10-01-rayman-legends-retold-switch-2",
+          "date": "10.01",
+          "title": {
+            "title_key": "rayman-legends-retold",
+            "title_zh_cn": "雷曼：传奇再叙",
+            "title_en": "Rayman Legends Retold",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "美国",
+          "releaseType": "launch",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/rayman-legends-retold-switch-2/",
+            "kind": "primary"
+          },
+          "note": "Nintendo美国官方商品页确认Switch 2数字版于2026年10月1日发售。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/rayman-legends-retold-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-19-daily/2026-10-01-rayman-legends-retold-switch-2-cover.jpg",
+            "alt": "雷曼：传奇再叙游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/rayman-legends-retold-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-10-01-ace-combat-8-pc",
+          "date": "10.01",
+          "title": {
+            "title_key": "ace-combat-8-wings-of-theve",
+            "title_zh_cn": "空战奇兵8 希孚之翼",
+            "title_en": "ACE COMBAT 8: WINGS OF THEVE",
+            "title_zh_status": "official_simplified"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "全球",
+          "releaseType": "launch",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/2288340/",
+            "kind": "primary"
+          },
+          "note": "Steam 官方商品页确认 PC 版于2026年10月1日推出；未采用第三方日历所列的冲突日期。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/2288340/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-24-daily/2026-10-01-ace-combat-8-pc-cover.jpg",
+            "alt": "空战奇兵8 希孚之翼游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/2288340/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-end-of-abyss",
+          "date": "10.01",
+          "title": {
+            "title_key": "end-of-abyss",
+            "title_en": "End of Abyss",
+            "title_zh_status": "unavailable"
+          },
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Xbox",
+            "url": "https://www.xbox.com/en-us/games/store/end-of-abyss/9n7qx8c7nsh2",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Xbox",
+              "url": "https://www.xbox.com/en-us/games/store/end-of-abyss/9n7qx8c7nsh2",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-26-daily/upcoming-end-of-abyss-cover.jpg",
+            "alt": "End of Abyss游戏封面",
+            "credit": "Steam store page",
+            "sourceUrl": "https://store.steampowered.com/app/1966720/End_of_Abyss/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-retrospace",
+          "date": "10.01",
+          "title": {
+            "title_key": "retrospace",
+            "title_en": "RetroSpace",
+            "title_zh_status": "official_simplified",
+            "title_zh_cn": "复古时空"
+          },
+          "platforms": [
+            "PC",
+            "Xbox"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/2067820/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/2067820/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-26-daily/upcoming-retrospace-cover.jpg",
+            "alt": "RetroSpace游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/2067820/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-aion-2",
+          "date": "10.05",
+          "title": {
+            "title_key": "aion-2",
+            "title_en": "AION 2",
+            "title_zh_status": "common_translation",
+            "title_zh_cn": "永恒之塔2"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/3393110/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/3393110/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-20-daily/upcoming-aion-2-cover.jpg",
+            "alt": "AION 2游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/3393110/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-gears-of-war-e-day",
+          "date": "10.06",
+          "title": {
+            "title_key": "gears-of-war-e-day",
+            "title_zh_cn": "战争机器：事变日",
+            "title_en": "Gears of War: E-Day",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/3010850/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/3010850/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-26-daily/upcoming-gears-of-war-e-day-cover.jpg",
+            "alt": "战争机器：事变日游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/3010850/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-10-08-clive-barkers-hellraiser-revival-pc",
+          "date": "10.08",
+          "title": {
+            "title_key": "clive-barkers-hellraiser-revival",
+            "title_en": "Clive Barker's Hellraiser: Revival",
+            "title_zh_status": "official_simplified",
+            "title_zh_cn": "克里夫·巴克猛鬼追魂：复苏"
+          },
+          "platforms": [
+            "PC"
+          ],
+          "region": "全球",
+          "releaseType": "launch",
+          "source": {
+            "label": "Steam",
+            "url": "https://store.steampowered.com/app/1551980/",
+            "kind": "primary"
+          },
+          "note": "Steam 官方商品页确认 PC 版于2026年10月8日推出。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Steam",
+              "url": "https://store.steampowered.com/app/1551980/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-24-daily/2026-10-08-clive-barkers-hellraiser-revival-pc-cover.jpg",
+            "alt": "Clive Barker's Hellraiser: Revival游戏封面",
+            "credit": "Steam",
+            "sourceUrl": "https://store.steampowered.com/app/1551980/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "2026-10-08-order-of-the-sinking-star-switch-2",
+          "date": "10.08",
+          "title": {
+            "title_key": "order-of-the-sinking-star",
+            "title_en": "Order of the Sinking Star",
+            "title_zh_status": "official_simplified",
+            "title_zh_cn": "沉星之序"
+          },
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "美国",
+          "releaseType": "launch",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/order-of-the-sinking-star-switch-2/",
+            "kind": "primary"
+          },
+          "note": "Nintendo 美国官方商品页确认 Nintendo Switch 2 版于2026年10月8日推出。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/order-of-the-sinking-star-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-24-daily/2026-10-08-order-of-the-sinking-star-switch-2-cover.jpg",
+            "alt": "Order of the Sinking Star游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/order-of-the-sinking-star-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "upcoming-dragon-s-dogma-2-dark-arisen",
+          "date": "10.09",
+          "title": {
+            "title_key": "dragon-s-dogma-2-dark-arisen",
+            "title_zh_cn": "龙之信条2：黑暗觉者",
+            "title_en": "Dragon's Dogma 2: Dark Arisen",
+            "title_zh_status": "common_translation"
+          },
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "美国",
+          "releaseType": "正式发售",
+          "source": {
+            "label": "Nintendo",
+            "url": "https://www.nintendo.com/us/store/products/dragons-dogma-2-dark-arisen-switch-2/",
+            "kind": "primary"
+          },
+          "note": "降级发布仅采用自动发现中日期唯一、位于完整15天窗口内且来自官方平台的一手记录；媒体线索、日期冲突和低置信单源候选不会自动写入。",
+          "cover_status": "verified",
+          "mediaSources": [
+            {
+              "label": "Nintendo",
+              "url": "https://www.nintendo.com/us/store/products/dragons-dogma-2-dark-arisen-switch-2/",
+              "kind": "primary"
+            }
+          ],
+          "cover": {
+            "url": "media/briefs/2026/09/2026-09-26-daily/upcoming-dragon-s-dogma-2-dark-arisen-cover.jpg",
+            "alt": "龙之信条2：黑暗觉者游戏封面",
+            "credit": "Nintendo",
+            "sourceUrl": "https://www.nintendo.com/us/store/products/dragons-dogma-2-dark-arisen-switch-2/",
+            "kind": "cover",
+            "aspect": "landscape"
+          }
+        }
+      ],
+      "refreshRange": {
+        "startInclusive": "2026-09-29",
+        "endInclusive": "2026-10-13"
+      }
+    },
+    "upcomingDiscovery": {
+      "editionDate": "2026-09-28",
+      "window": {
+        "startInclusive": "2026-09-29",
+        "endInclusive": "2026-10-13"
+      },
+      "fetchedAt": "2026-09-28T08:38:19.092Z",
+      "coverage": [
+        {
+          "sourceId": "steam-popular",
+          "url": "https://store.steampowered.com/explore/upcoming/?l=english&cc=us",
+          "platform": "PC",
+          "status": "partial",
+          "pages": 1,
+          "parsedCount": 55,
+          "inWindow": 20,
+          "reviewLinks": 0
+        },
+        {
+          "sourceId": "steam-calendar",
+          "url": "https://store.steampowered.com/search/?filter=comingsoon&sort_by=Released_ASC&category1=998&l=english&cc=us",
+          "platform": "PC",
+          "status": "partial",
+          "pages": 4,
+          "parsedCount": 125,
+          "inWindow": 44,
+          "reviewLinks": 0
+        },
+        {
+          "sourceId": "nintendo-coming",
+          "url": "https://www.nintendo.com/us/store/games/coming-soon/",
+          "platform": "Nintendo",
+          "status": "partial",
+          "pages": 1,
+          "parsedCount": 118,
+          "inWindow": 25,
+          "reviewLinks": 0
+        },
+        {
+          "sourceId": "xbox-weekly",
+          "url": "https://news.xbox.com/en-us/tag/next-week-on-xbox/feed/",
+          "platform": "Xbox",
+          "status": "partial",
+          "pages": 1,
+          "parsedCount": 115,
+          "inWindow": 29,
+          "reviewLinks": 3
+        },
+        {
+          "sourceId": "playstation-blog",
+          "url": "https://blog.playstation.com/feed/",
+          "platform": "PlayStation",
+          "status": "partial",
+          "pages": 1,
+          "parsedCount": 0,
+          "inWindow": 0,
+          "reviewLinks": 3
+        },
+        {
+          "sourceId": "gamesradar-calendar",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platform": "multiplatform",
+          "status": "partial",
+          "pages": 1,
+          "parsedCount": 364,
+          "inWindow": 21,
+          "reviewLinks": 0
+        }
+      ],
+      "candidates": [
+        {
+          "title": "Minecraft Dungeons II",
+          "date": "2026-09-29",
+          "url": "https://store.steampowered.com/app/1912410/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Sep 29, 2026",
+          "productId": "steam:1912410",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "The Witcher 3: Wild Hunt — Remastered",
+          "date": "2026-09-29",
+          "url": "https://www.nintendo.com/us/store/products/the-witcher-3-wild-hunt-remastered-switch-2/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000128692",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "The Witcher 3: Wild Hunt — Remastered",
+          "date": "2026-09-29",
+          "url": "https://www.xbox.com/en-US/games/store/the-witcher-3-wild-hunt-complete-edition/c261457lcnmj",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "September 29",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Toem 2",
+          "date": "2026-09-29",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "NS"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "September 29",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Transport Fever 3",
+          "date": "2026-09-29",
+          "url": "https://store.steampowered.com/app/3493540/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Sep 29, 2026",
+          "productId": "steam:3493540",
+          "sources": [
+            "steam-popular",
+            "steam-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "The Witcher 3: Wild Hunt — Remastered",
+          "date": "2026-09-29",
+          "url": "https://www.nintendo.com/us/store/products/the-witcher-3-wild-hunt-remastered-switch-2/",
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000128692",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "RetroSpace",
+          "date": "2026-10-01",
+          "url": "https://www.xbox.com/en-us/games/store/retrospace/9nncj4nz8m56",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 1",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "The Witcher 3: Wild Hunt Remastered",
+          "date": "2026-09-29",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX",
+            "NS2"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "September 29",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "TOEM 2",
+          "date": "2026-09-29",
+          "url": "https://store.steampowered.com/app/2900640/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Sep 29, 2026",
+          "productId": "steam:2900640",
+          "sources": [
+            "steam-popular",
+            "steam-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Minecraft Dungeons II",
+          "date": "2026-09-29",
+          "url": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-switch-2/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000110905",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Ace Combat 8: Wings of Theve",
+          "date": "2026-10-02",
+          "url": "https://www.xbox.com/en-us/games/store/ace-combat-8-wings-of-theve-pre-order/9mwj5cx0wbbr",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 2",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-02"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Transport Fever 3",
+          "date": "2026-09-29",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "September 29",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "ACE COMBAT 8: WINGS OF THEVE",
+          "date": "2026-10-01",
+          "url": "https://store.steampowered.com/app/2288340/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 1, 2026",
+          "productId": "steam:2288340",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Minecraft Dungeons II",
+          "date": "2026-09-29",
+          "url": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-switch-2/",
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000110905",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "MXGP 26 – The Official Game",
+          "date": "2026-10-01",
+          "url": "https://www.xbox.com/en-us/games/store/mxgp-26-the-official-game/9nqhx9nwdz33",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 1",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Ace Combat 8: Wings of Theve",
+          "date": "2026-10-02",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 2",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-02"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "RetroSpace",
+          "date": "2026-10-01",
+          "url": "https://store.steampowered.com/app/2067820/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 1, 2026",
+          "productId": "steam:2067820",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Order of the Sinking Star",
+          "date": "2026-10-08",
+          "url": "https://www.nintendo.com/us/store/products/order-of-the-sinking-star-switch-2/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000109838",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-10-08"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Monster Nursery",
+          "date": "2026-10-02",
+          "url": "https://www.xbox.com/en-us/games/store/monster-nursery/9p5sr99rmfnj",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 2",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-02"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Gears of War: E-Day",
+          "date": "2026-10-06",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "XSX",
+            "PC"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 6",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-06"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Gears of War: E-Day",
+          "date": "2026-10-06",
+          "url": "https://store.steampowered.com/app/3010850/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 6, 2026",
+          "productId": "steam:3010850",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-06"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Order of the Sinking Star",
+          "date": "2026-10-08",
+          "url": "https://www.nintendo.com/us/store/products/order-of-the-sinking-star-switch-2/",
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000109838",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-10-08"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Dynasty Warriors 3: Complete Edition Remastered",
+          "date": "2026-10-01",
+          "url": "https://www.xbox.com/en-us/games/store/dynasty-warriors-3-complete-edition-remastered/9pkwz4n202mp",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 1",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Clive Barker's Hellraiser: Revival",
+          "date": "2026-10-08",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 8",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-08"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Clive Barker's Hellraiser: Revival",
+          "date": "2026-10-08",
+          "url": "https://store.steampowered.com/app/1551980/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 8, 2026",
+          "productId": "steam:1551980",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-08"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Dragon's Dogma 2: Dark Arisen",
+          "date": "2026-10-09",
+          "url": "https://www.nintendo.com/us/store/products/dragons-dogma-2-dark-arisen-switch-2/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000118031",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-10-09"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "End of Abyss",
+          "date": "2026-10-01",
+          "url": "https://www.xbox.com/en-us/games/store/end-of-abyss/9n7qx8c7nsh2",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "October 1",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Order of the Sinking Star",
+          "date": "2026-10-08",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 8",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-08"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Nivalis Nights",
+          "date": "2026-09-29",
+          "url": "https://store.steampowered.com/app/1488490/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Sep 29, 2026",
+          "productId": "steam:1488490",
+          "sources": [
+            "steam-popular",
+            "steam-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Dragon's Dogma 2: Dark Arisen",
+          "date": "2026-10-09",
+          "url": "https://www.nintendo.com/us/store/products/dragons-dogma-2-dark-arisen-switch-2/",
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000118031",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-10-09"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "NEIGHBORS: Suburban Warfare",
+          "date": "2026-09-29",
+          "url": "https://www.xbox.com/en-us/games/store/neighbors/9PB1CHMGC0LS",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "September 29",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Dragon's Dogma 2: Dark Arisen",
+          "date": "2026-10-09",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "NS2"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 9",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-09"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "MXGP 26 - The Official Game",
+          "date": "2026-10-01",
+          "url": "https://store.steampowered.com/app/3634190/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 1, 2026",
+          "productId": "steam:3634190",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Monster Nursery",
+          "date": "2026-10-01",
+          "url": "https://www.nintendo.com/us/store/products/monster-nursery-switch/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000130716",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Cat Lines",
+          "date": "2026-09-30",
+          "url": "https://www.xbox.com/en-us/games/store/cat-lines/9pmwk4mmk87f",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "September 30",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-09-30"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Minecraft Dungeons 2",
+          "date": "2026-09-29",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX",
+            "NS2"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "September 29",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": true,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "AION 2",
+          "date": "2026-10-05",
+          "url": "https://store.steampowered.com/app/3393110/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Oct 5, 2026",
+          "productId": "steam:3393110",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-10-05"
+          ],
+          "knownTitle": true,
+          "inBaseline": true,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Minecraft Dungeons II Deluxe Edition",
+          "date": "2026-09-29",
+          "url": "https://www.nintendo.com/us/store/products/minecraft-dungeons-ii-deluxe-edition-switch-2/",
+          "platforms": [
+            "Nintendo Switch 2"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70070000036386",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-29"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "King’s Blade",
+          "date": "2026-09-30",
+          "url": "https://www.xbox.com/en-us/games/store/kings-blade-xbox-series-x-s/9nj5jdh04p4g",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "September 30",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-09-30"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "End of Abyss",
+          "date": "2026-10-01",
+          "url": "https://www.gamesradar.com/video-game-release-dates/",
+          "platforms": [
+            "PC",
+            "PS5",
+            "XSX"
+          ],
+          "region": "source-listed",
+          "sourceId": "gamesradar-calendar",
+          "family": "gamesradar",
+          "kind": "discovery",
+          "priority": 3,
+          "dateText": "October 1",
+          "sources": [
+            "gamesradar-calendar"
+          ],
+          "dates": [
+            "2026-10-01"
+          ],
+          "knownTitle": false,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "DYNASTY WARRIORS 3: Complete Edition Remastered",
+          "date": "2026-09-30",
+          "url": "https://store.steampowered.com/app/3841510/",
+          "platforms": [
+            "PC"
+          ],
+          "region": "US",
+          "sourceId": "steam-popular",
+          "family": "steam",
+          "kind": "primary",
+          "priority": 3,
+          "dateText": "Sep 30, 2026",
+          "productId": "steam:3841510",
+          "sources": [
+            "steam-popular"
+          ],
+          "dates": [
+            "2026-09-30"
+          ],
+          "knownTitle": false,
+          "inBaseline": true,
+          "crossSource": true,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Middle-earth™: Shadow of Mordor™ Game of the Year Edition",
+          "date": "2026-09-30",
+          "url": "https://www.nintendo.com/us/store/products/middle-earth-shadow-of-mordor-game-of-the-year-edition-switch-2/",
+          "platforms": [
+            "Nintendo Switch"
+          ],
+          "region": "US",
+          "sourceId": "nintendo-coming",
+          "family": "nintendo",
+          "kind": "primary",
+          "priority": 3,
+          "productId": "nintendo:70010000131244",
+          "sources": [
+            "nintendo-coming"
+          ],
+          "dates": [
+            "2026-09-30"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        },
+        {
+          "title": "Mia’s Journey",
+          "date": "2026-09-30",
+          "url": "https://www.xbox.com/en-us/games/store/mias-journey-xbox-series/9p9q6wbdpbzm",
+          "platforms": [
+            "Xbox"
+          ],
+          "region": "US",
+          "sourceId": "xbox-weekly",
+          "family": "xbox",
+          "kind": "primary",
+          "priority": 3,
+          "announcementUrl": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "dateText": "September 30",
+          "sources": [
+            "xbox-weekly"
+          ],
+          "dates": [
+            "2026-09-30"
+          ],
+          "knownTitle": false,
+          "inBaseline": false,
+          "crossSource": false,
+          "review": "open_primary_source_before_publication"
+        }
+      ],
+      "reviewLinks": [
+        {
+          "title": "Next Week on XBOX: New Games for September 28 to October 2",
+          "url": "https://news.xbox.com/en-us/2026/09/25/next-week-on-xbox-new-games-for-september-28-to-october-2/",
+          "published": "2026-09-25",
+          "sourceId": "xbox-weekly"
+        },
+        {
+          "title": "Next Week on XBOX: New Games for September 21 to 25",
+          "url": "https://news.xbox.com/en-us/2026/09/18/next-week-on-xbox-new-games-for-september-21-to-25/",
+          "published": "2026-09-18",
+          "sourceId": "xbox-weekly"
+        },
+        {
+          "title": "Next Week on XBOX: New Games for September 14 to 18",
+          "url": "https://news.xbox.com/en-us/2026/09/11/next-week-on-xbox-new-games-for-september-14-to-18/",
+          "published": "2026-09-11",
+          "sourceId": "xbox-weekly"
+        },
+        {
+          "title": "Luma Island is coming to PS5",
+          "url": "https://blog.playstation.com/2026/09/24/luma-island-is-coming-to-ps5/",
+          "published": "2026-09-24",
+          "sourceId": "playstation-blog"
+        },
+        {
+          "title": "(For Southeast Asia) Lisa x PlayStation arrives this October: First look at the DualSense wireless controller",
+          "url": "https://blog.playstation.com/2026/09/21/20260922-lisa/",
+          "published": "2026-09-22",
+          "sourceId": "playstation-blog"
+        },
+        {
+          "title": "Lisa x PlayStation arrives this October: First look at the DualSense wireless controller – Lisa Limited Edition and all-new merchandise",
+          "url": "https://blog.playstation.com/2026/09/21/lisa-x-playstation-arrives-this-october-first-look-at-the-dualsense-wireless-controller-lisa-limited-edition-and-all-new-merchandise/",
+          "published": "2026-09-21",
+          "sourceId": "playstation-blog"
+        }
+      ],
+      "omittedCandidates": 92,
+      "coverageNote": "Partial discovery, not a complete release database. Zero results or a successful fetch never prove platform coverage.",
+      "requiredChecks": [
+        "Open primary pages for missing known titles and cross-source leads first.",
+        "Check all four platform families over the entire 15-day window; search failed/empty sources with web lookup.",
+        "Recheck existing releases for postponements, cancellations, region/platform and early-access differences.",
+        "Treat listing date conflicts as unresolved; do not publish guessed dates or turn missing records into deletions."
+      ]
+    }
+  }
+}
