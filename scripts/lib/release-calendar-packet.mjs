@@ -91,9 +91,10 @@ function familyCounts(leads) {
 }
 
 function makePacket(report, leads, reviewLinks, telemetry) {
+  const { allCandidates, ...inlineReport } = report;
   const omittedCandidates = Number(report?.omittedCandidates || 0) + telemetry.packetCapOmittedTasks + telemetry.budgetOmittedTasks;
   const encoded = encodePacketLeads(leads);
-  return { ...report, candidates: encoded.candidates, observationDefaultsBySource: encoded.observationDefaultsBySource, sharedObservationUrls: encoded.sharedObservationUrls, reviewLinks, omittedCandidates, omissionTelemetry: telemetry };
+  return { ...inlineReport, candidates: encoded.candidates, observationDefaultsBySource: encoded.observationDefaultsBySource, sharedObservationUrls: encoded.sharedObservationUrls, reviewLinks, omittedCandidates, omissionTelemetry: telemetry };
 }
 
 function reviewLinkPlatform(link, report) {

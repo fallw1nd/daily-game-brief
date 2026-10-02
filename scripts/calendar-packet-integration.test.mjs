@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { expectedEditorialWindow, validateFinalizedEditorialPacket } from "./lib/editorial-packet.mjs";
+import { gitBlobSha } from "./lib/edition-state.mjs";
 const exec = promisify(execFile);
 
 describe("calendar packet integration", () => {
@@ -58,13 +59,19 @@ describe("calendar packet integration", () => {
     const existingReport = {
       editionDate: "2026-09-08", fetchedAt: "2026-09-08T04:00:00.000Z", window: { startInclusive: "2026-09-09", endInclusive: "2026-09-23" },
       coverage: [{ sourceId: "cached", status: "failed", sourceStatus: "failed", parserStatus: "unknown", pages: 0, pagesAttempted: 1, pagesSucceeded: 0, pagesFailed: 1, parsedCount: 0, inWindow: 0, usefulLeads: 0, durationMs: 1 }],
-      candidates: [], reviewLinks: [], omittedCandidates: 0,
+      candidates: [], allCandidates: [{ title: "Game beyond inline preview", observations: [{ url: "https://official.example/game", date: "2026-09-10", platforms: ["PC"] }] }], reviewLinks: [], omittedCandidates: 1,
     };
     await writeFile(reportPath, JSON.stringify(existingReport));
     await exec(process.execPath, ["--import", pathToFileURL(preload).href, "scripts/editorialize.mjs"], { cwd: resolve("."), env });
     await writeFile(healthPath, JSON.stringify({ sentinel: true }));
     await exec(process.execPath, ["--import", pathToFileURL(preload).href, "scripts/editorialize.mjs"], { cwd: resolve("."), env });
     expect(JSON.parse(await readFile(healthPath, "utf8"))).toEqual({ sentinel: true });
+    const packet = JSON.parse(await readFile(packetPath, "utf8"));
+    const page = packet.editorialInput.calendarWork.pages[0];
+    const pageText = await readFile(join(root, "editorial-batches", page.name), "utf8");
+    expect(gitBlobSha(pageText)).toBe(page.blobSha);
+    expect(JSON.parse(pageText).items[0].candidate.title).toBe("Game beyond inline preview");
+    expect(packet.editorialInput.calendarWork.totalTasks).toBe(1);
   }, 20000);
 
   it("loads the previous calendar ledger on editorialize's direct discovery path", async () => {

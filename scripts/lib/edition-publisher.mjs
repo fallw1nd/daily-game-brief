@@ -337,7 +337,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     schemaVersion: 2,
     sourceReport: {
       checked: ["程序化来源注册表、事件账本与受限证据包", ...(editorial.checkedExtra || [])],
-      limited: [...limitedSources, ...(editorial.limitedExtra || []), ...(input.budget?.omittedItems ? [`本编辑包还有 ${input.budget.omittedItems} 个候选待编辑核验；不代表已完成收录。`] : [])],
+      limited: [...limitedSources, ...(editorial.limitedExtra || []), ...(editorial.calendarReview ? [...editorial.calendarReview.pages, ...editorial.calendarReview.platforms].filter(row => row.status === "deferred").map(row => `日历核验延期 ${row.key}：${row.reason}`) : []), ...(input.budget?.omittedItems ? [`本编辑包还有 ${input.budget.omittedItems} 个候选待编辑核验；不代表已完成收录。`] : [])],
       checkedGroups: ["已配置的 active 官方与活动来源", "已配置的 active 中英日媒体与发现源", "相邻期去重与持续事件账本", "固定截止前最终候选与已打开证据包"],
       trackingResults: included.filter((item) => item.tracking).map((item) => `${item.headline}：继续追踪。`),
       excludedMajorCandidates: editorial.decisions.filter((item) => item.decision !== "include").map((item) => `${item.eventKey}：${item.reason}`),
@@ -354,6 +354,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       },
       note: editorial.editorialNote,
       editorialDecisionDigest: decisionDigest,
+      ...(editorial.calendarReview ? { calendarReview: editorial.calendarReview } : authorizedLatestRevision && latest.sourceReport?.calendarReview ? { calendarReview: latest.sourceReport.calendarReview } : {}),
     },
     archiveTitle,
     leadEntryId,

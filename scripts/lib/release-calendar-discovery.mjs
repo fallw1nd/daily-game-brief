@@ -330,6 +330,8 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
       maxAdditionalRequests: Math.min(2, (config.fallbackSources || []).length),
     },
     candidates: selection.candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
+    // Keep the complete deduplicated work set outside the bounded inline view.
+    allCandidates: selectCalendarLeads(grouped, grouped.length).candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
     reviewLinks: results.flatMap(r => r.reviewLinks),
     omittedCandidates: selection.capOmittedTasks,
     omissionTelemetry: {

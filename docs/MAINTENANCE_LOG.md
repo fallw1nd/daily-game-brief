@@ -723,3 +723,13 @@ An additive news continuation on the October 2 automatic fact list removed the f
 - A stranded news batch is reconciled only when every event has an include/exclude with a reason, matching edition and committed decision digest, after activation. Otherwise it remains visible for repair.
 - Incident lookup now requires the exact title/edition after GitHub search, preventing neighboring dates from being commented on or closed.
 - Validation: full `npm run check`, 101 files / 568 tests, canonical/locale validation and production build passed. These fixes do not establish scheduler punctuality or calendar review completeness.
+
+## 2026-10-02 — Calendar work preservation and same-invocation delivery
+
+- **Status:** implementation verification in progress; natural cloud task execution remains unverified.
+- Preserve every parsed, deduplicated calendar candidate before the report cap and every review link in bounded, SHA-pinned pages. The 24,000-character inline discovery remains a preview. New Daily submissions account for all page identities and four platform families as reviewed or explicitly deferred; fallback marks all deferred and cannot promote discovery into verified calendar facts.
+- The cloud editorial contract now waits up to ten minutes after its exact liveness wake, consumes the ready packet in the same invocation, and observes its submission receipt with a separate bound. It repairs one invalid submission, while respecting packet, concurrent submission and GitHub ownership. No runtime activation is claimed from this document.
+- Publisher construction errors now return their bounded diagnostics to the same submission as editorial-invalid instead of leaving it valid and retrying unchanged input. Infrastructure/check failures remain workflow failures rather than guessed editorial defects.
+- Full check passed before final explanatory additions; final full check and production receipts are required below. No archive or issue/window identity is changed.
+
+- **2026-10-02 validation:** final full check passed: 103 test files / 571 tests, Canonical and English validation, and production build. Integration executes the real handoff builder and verifies that a candidate omitted from the inline preview is preserved in the emitted SHA-pinned page. Fallback and exact-page/platform receipt rejection are covered. Production/natural-run evidence remains separately required.

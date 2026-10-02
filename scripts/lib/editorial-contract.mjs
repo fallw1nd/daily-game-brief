@@ -4,6 +4,7 @@ import {
   verifiedWindowTimeError,
 } from "./time-window.mjs";
 import { validateJsonSchema } from "./json-schema.mjs";
+import { calendarReviewSchema, validateCalendarReview } from "./calendar-review.mjs";
 
 const sections = ["releases", "reviews", "news", "industry", "features", "rumors", "observations"];
 const factStatuses = ["official", "media_relay_official", "media_report", "multi_source_verified", "unconfirmed"];
@@ -70,6 +71,7 @@ export const editorialSchema = {
     contractVersion: { type: "integer", enum: [2] },
     packetBlobSha: { type: "string", pattern: "^[0-9a-f]{40}$" },
     editionId: { type: "string" },
+    calendarReview: calendarReviewSchema,
     archiveTitle: { type: "string" },
     leadEventKey: { type: "string" },
     decisions: {
@@ -350,6 +352,7 @@ export function validateEnglishEditorialLocale(output) {
 
 export function validateEditorialOutput(output, input) {
   const errors = [];
+  errors.push(...validateCalendarReview(input.calendarWork, output?.calendarReview));
   if (!output || !Array.isArray(output.decisions)) return ["output.decisions must be an array"];
   const allowedKeys = new Set([...input.packages.map((item) => item.eventKey), ...(input.trackingQueue || []).map((item) => item.eventKey)]);
   errors.push(...validateJsonSchema(output, editorialSchema));
