@@ -237,8 +237,29 @@ jobs:
         run: |
           git pull --ff-only origin main
           git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
-          node scripts/publish-editorial-decision.mjs
+          node scripts/build-publication-with-receipt.mjs
           npm run check
+
+      - name: Return rejected publication construction to editorial repair
+        if: failure() && steps.build.outcome == 'failure' && steps.submission.outputs.mode == 'publish'
+        shell: bash
+        run: |
+          if node -e 'process.exit(JSON.parse(require("fs").readFileSync("artifacts/editorial-validation.json", "utf8")).stage === "publication-build" ? 0 : 1)'; then
+            bash scripts/update-edition-state-branch.sh \
+              "${{ steps.submission.outputs.edition }}" editorial-invalid \
+              --packet-blob-sha="${{ steps.submission.outputs.packet_blob_sha }}" \
+              --submission-sha="${{ steps.submission.outputs.submission_sha }}" \
+              --validation=artifacts/editorial-validation.json
+          fi
+
+      - name: Save publication construction diagnostics
+        if: failure() && steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v6
+        with:
+          name: publication-construction-${{ github.run_id }}
+          path: artifacts/editorial-validation.json
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Publish atomically
         id: publication
@@ -448,7 +469,7 @@ jobs:
         run: bash scripts/update-showcase-queue-branch.sh --no-refresh-sources
 
       - name: Retry a validated failed publication once
-        if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success' && steps.submission.outputs.mode == 'publish'
+        if: failure() && github.event_name != 'workflow_dispatch' && steps.validation.outcome == 'success' && steps.build.outcome == 'success' && steps.submission.outputs.mode == 'publish'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

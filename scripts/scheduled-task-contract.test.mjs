@@ -31,7 +31,9 @@ describe("Daily scheduled-task contract", () => {
 
   it("keeps liveness and continuation identities GitHub-owned", () => {
     expect(contract).toContain('reason:"packet_missing_at_handoff"');
-    expect(contract).toContain("Do not wait or poll");
+    expect(contract).toContain("at most 10 minutes");
+    expect(contract).toContain("finish the Daily in this same invocation");
+    expect(contract).toContain("never as delivered");
     expect(contract).toContain("Never choose packet or event identity yourself");
     expect(packetWorkflow).toContain('"automation/editorial/*-daily"');
     expect(packetWorkflow).toContain('"automation/wake/*.json"');

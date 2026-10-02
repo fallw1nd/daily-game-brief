@@ -6,6 +6,7 @@ import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calen
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
 import { gitBlobSha } from "./lib/edition-state.mjs";
 import { persistCalendarHealth, readOptionalJson } from "./lib/release-calendar-health-io.mjs";
+import { buildCalendarWorkPages } from "./lib/calendar-work-pages.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const LEDGER_PATH = resolve(process.env.EVENT_LEDGER_PATH || "artifacts/event-ledger.json");
@@ -32,6 +33,7 @@ if (titleHintReserve >= MAX_INPUT_CHARS) throw new Error("title hints exceed the
 
 let calendarBaseline;
 let calendarDiscovery;
+let calendarWork;
 if (evidence.window.period === "daily") {
   const [latest, manifest, config, titleRegistry] = await Promise.all([
     "public/data/latest.json", "public/data/manifest.json", "config/release-calendar-sources.json", "config/title-translations.json",
@@ -55,11 +57,12 @@ if (evidence.window.period === "daily") {
   await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   calendarDiscovery = boundCalendarReport(report);
+  calendarWork = buildCalendarWorkPages(report);
   console.log("Calendar coverage: " + JSON.stringify(report.coverage));
   const calendarMetrics = calendarDiscovery.omissionTelemetry;
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarMetrics.visibleRawRows} visible report rows → ${calendarMetrics.uniqueTasks} unique tasks (${calendarMetrics.dedupeReduction} duplicate rows removed); ${calendarDiscovery.candidates.length} tasks in packet. Omitted: ${calendarMetrics.capOmittedTasks} at candidate cap, ${calendarMetrics.budgetOmittedTasks} at character budget, ${calendarMetrics.linkOmitted} review links at character budget. Final family task counts: ${JSON.stringify(calendarMetrics.platformFinalTaskCounts)}. Calendar packet ${JSON.stringify(calendarDiscovery).length}/24000 chars; discovery requires primary-source verification.\n`);
 }
-const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length : 0;
+const calendarReserve = calendarBaseline ? JSON.stringify(calendarBaseline).length + JSON.stringify(calendarDiscovery).length + JSON.stringify(calendarWork.manifest).length : 0;
 let showcaseReport = { events: [], announcements: [], coverage: [] };
 try { showcaseReport = JSON.parse(await readFile(process.env.SHOWCASE_REPORT_PATH || "artifacts/showcase-evidence.json", "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
 const showcaseManifest = { events: showcaseReport.events, announcements: showcaseReport.announcements.map(({ id, showcaseId, factUnits }) => ({ id, showcaseId, ...(factUnits ? { factUnits: factUnits.map(({ id }) => ({ id })) } : {}) })), coverage: showcaseReport.coverage };
@@ -94,6 +97,7 @@ editorialInput.budget.titleHintItems = titleHints.length;
 if (calendarBaseline) {
   editorialInput.upcomingBaseline = calendarBaseline;
   editorialInput.upcomingDiscovery = calendarDiscovery;
+  editorialInput.calendarWork = calendarWork.manifest;
   editorialInput.budget.usedInputChars += calendarReserve;
   editorialInput.budget.estimatedInputTokens = Math.ceil(editorialInput.budget.usedInputChars / 4);
 }
@@ -108,6 +112,7 @@ if (Date.parse(generatedAt) < Date.parse(cutoffAt)) {
   throw new Error(`Cannot finalize ${editorialInput.window.id} before ${cutoffAt}`);
 }
 const instructions = [
+  "若 editorialInput.calendarWork 存在，upcomingDiscovery 只是预览；必须按 calendarWork.pages 中的 blobSha 读取完整分页（automation/state 分支 automation/batches/<edition-id>/<name>）。calendarReview.pages 对每个 blobSha、calendarReview.platforms 对 PC/PlayStation/Xbox/Nintendo 各给一个 key/status/reason；status 只能 reviewed 或 deferred，reason 记录实际核验或具体阻塞。未读完不能声称 reviewed；延期必须显式保留。分页只提供日历线索，采用前仍须打开官方详情核验。",
   "发布会条目须用coveredFactIds登记正文或简讯实际覆盖的showcaseFacts；同一页面、同一游戏不等于全部事实已覆盖。只有存在会改变正文事实边界的实质证据缺口才继续needs_review，不因热度或预算排除，也不要把needs_review当作默认保守选项。",
   "输出 contractVersion=2。你是游戏行业简报编辑；事件事实仅来自已打开的 packet 证据。对 packages 和 trackingQueue 每个 eventKey 恰好给一个 include/exclude/needs_review。needs_review 必须 tracking=true；跟踪项无新证据也须明确继续或关闭，关闭时 tracking=false 且 reason 写依据。",
   "从 automation/status/<edition-id>.json 原样复制 packet.blobSha 到 packetBlobSha；不得使用可变分支 HEAD。publishability=requires_subject_identity 只能 exclude/needs_review，不得从标题虚构 titleKey/titleEn。",
@@ -138,6 +143,7 @@ await mkdir(dirname(PACKET_PATH), { recursive: true });
 await writeFile(PACKET_PATH, packetText);
 const batchDirectory = resolve(dirname(PACKET_PATH), "editorial-batches");
 await mkdir(batchDirectory, { recursive: true });
+for (const page of calendarWork?.pages || []) await writeFile(resolve(batchDirectory, page.name), page.text);
 await writeFile(resolve(batchDirectory, "showcase-evidence.json"), JSON.stringify(showcaseReport, null, 2) + "\n");
 const queue = { schemaVersion: 1, editionId: editorialInput.window.id, totalAnnouncements: showcaseManifest.announcements.length, initialEventKeys: editorialInput.packages.map(item => item.eventKey), batches: [] };
 queue.requiredFacts = Object.fromEntries(showcaseManifest.announcements.map(item => [item.id, (item.factUnits || []).map(fact => fact.id)]));
@@ -147,6 +153,7 @@ if (initialShowcase.length) {
   const input = { ...editorialInput, packages: initialShowcase, trackingQueue: [] };
   delete input.upcomingBaseline;
   delete input.upcomingDiscovery;
+  delete input.calendarWork;
   await writeFile(resolve(batchDirectory, name), JSON.stringify({ ...packet, editorialInput: input, continuation: { index: 0, scope: "showcase", preservePublished: true } }, null, 2) + "\n");
   queue.batches.push({ name, scope: "showcase", status: "awaiting_retry", eventKeys: initialShowcase.map(item => item.eventKey) });
 }

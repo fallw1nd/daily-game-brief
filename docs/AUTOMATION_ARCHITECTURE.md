@@ -1,6 +1,6 @@
 # Production Automation Architecture
 
-Daily is the active production cadence. GitHub Actions is the durable orchestrator and only trusted publisher; the single enabled ChatGPT task performs bounded editorial decisions from immutable packets.
+Daily is the active production cadence. GitHub Actions is the durable orchestrator and only trusted publisher; the configured single ChatGPT task is intended to perform bounded editorial decisions from immutable packets.
 
 ## Current timeline
 
@@ -27,7 +27,7 @@ ChatGPT owns editorial judgment inside a finalized packet: include/exclude/revie
 1. `config/news-sources.json` defines curated discovery sources.
 2. `scripts/collect-news.mjs` creates normalized A/B/C candidates for the fixed Daily window.
 3. `scripts/build-evidence.mjs` opens only shortlisted pages and produces bounded evidence packages. Readiness describes evidence composition, not publication eligibility. Article metadata/visible time is preferred; a trusted RSS/feed timestamp may be retained when the article template omits time.
-4. `scripts/editorialize.mjs` builds packet v3 / editorial input v2 after cutoff. Provider-facing input is capped at 120,000 characters per packet. Title hints and the release-calendar discovery stay fact-bounded.
+4. `scripts/editorialize.mjs` builds packet v3 / editorial input v2 after cutoff. Provider-facing input is capped at 120,000 characters per packet. Title hints and the release-calendar discovery stay fact-bounded. The full deduplicated calendar work set is retained in SHA-pinned pages under automation/batches, outside the inline 24,000-character preview. Every new Daily decision records a reviewed/deferred receipt for each page and platform; fallback explicitly defers all calendar research.
 5. The packet and its Git blob SHA are acknowledged on `automation/state`. Mutable latest pointers are convenience views only.
 
 ## Durable state
@@ -48,7 +48,7 @@ The persistent 45-day event ledger keeps discovery and editorial fields separate
 
 ## Liveness, recovery, and fallback
 
-If the active task finds the immediate next Daily missing a ready packet after cutoff, it may write the exact `packet_missing_at_handoff` wake file. The wake only asks GitHub to build/acknowledge the packet; it is not recovery state.
+If the active task finds the immediate next Daily missing a ready packet after cutoff, it may write the exact `packet_missing_at_handoff` wake file. The wake only asks GitHub to build/acknowledge the packet; it is not recovery state. The cloud editor waits on the exact durable status for at most ten minutes and consumes the acknowledged packet in that same invocation, then observes its own publication receipt with a separate ten-minute bound. A timeout is pending work, never a successful delivery. This removes dependence on the next editorial slot but does not guarantee external scheduler punctuality.
 
 The SLA watchdog restores the acknowledged packet first. If it is missing/stale/invalid, GitHub rebuilds collection → ledger → evidence → packet and acknowledges the replacement before further action. At the degraded deadline, fallback publication admits only conservative A-level facts supported by an opened primary source or two independent opened reliable sources. It never invents translations, rumors, or analysis.
 
