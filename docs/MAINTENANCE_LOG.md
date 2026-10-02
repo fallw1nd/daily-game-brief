@@ -709,3 +709,8 @@
 ### 2026-10-01：受信历史缺刊补刊
 
 9月28日 fallback 失败后，后续期次已占用编号，普通恢复会回退首页。新增显式用户授权的历史插入模式，固定下一未占用编号与当前 latest，保持原 packet/window 和既有 archive，隔离旧稿 ledger feedback。日期排序与编号分配顺序分离；正常定时流程和直接恢复边界不变。
+
+
+## 2026-10-02 — Degraded continuation preserves published identities
+
+An additive news continuation on the October 2 automatic fact list removed the four existing placeholders while retaining their lead ID. Preserve all published entries whenever the immutable continuation requests preservePublished; only the separately authorized formal revision replaces or removes degraded placeholders. Regression coverage checks retained content, lead, title, and issue identity.
