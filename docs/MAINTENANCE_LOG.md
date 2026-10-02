@@ -714,3 +714,12 @@
 ## 2026-10-02 — Degraded continuation preserves published identities
 
 An additive news continuation on the October 2 automatic fact list removed the four existing placeholders while retaining their lead ID. Preserve all published entries whenever the immutable continuation requests preservePublished; only the separately authorized formal revision replaces or removes degraded placeholders. Regression coverage checks retained content, lead, title, and issue identity.
+
+## 2026-10-02 — Exact coverage and monotonic operational receipts
+
+- **Status:** implementation verified locally; production and natural-run acceptance pending.
+- A shared subject/source URL no longer proves news coverage. New publisher entries retain their event key; legacy matches require identical headlines and sources. Publication audits bind explicit exclusions/review decisions to the committed editorial digest and save an Actions receipt.
+- Deployment acknowledgements ignore ancestor commits and cancelled runs; a late failure cannot replace success for the same commit. Missing Git ancestry fails visibly.
+- A stranded news batch is reconciled only when every event has an include/exclude with a reason, matching edition and committed decision digest, after activation. Otherwise it remains visible for repair.
+- Incident lookup now requires the exact title/edition after GitHub search, preventing neighboring dates from being commented on or closed.
+- Validation: full `npm run check`, 101 files / 568 tests, canonical/locale validation and production build passed. These fixes do not establish scheduler punctuality or calendar review completeness.

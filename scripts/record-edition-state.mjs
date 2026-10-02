@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { applyEditionStateEvent, editionStatePath, gitBlobSha, validateEditionState } from "./lib/edition-state.mjs";
 
 function argument(name) {
@@ -24,7 +25,20 @@ const packetContent = packetPath ? await readFile(resolve(packetPath)) : null;
 const decision = await optionalJson(argument("decision"));
 const validation = await optionalJson(argument("validation"));
 const packetBlobSha = argument("packet-blob-sha") || decision?.packetBlobSha || (packetContent ? gitBlobSha(packetContent) : "");
+let superseded = false;
+if (event.startsWith("deployment-") && current?.deployment?.mainSha && argument("main-sha")) {
+  const incoming = argument("main-sha");
+  const recorded = current.deployment.mainSha;
+  if (!/^[a-f0-9]{40}$/.test(incoming) || !/^[a-f0-9]{40}$/.test(recorded)) throw new Error("invalid deployment SHA");
+  if (incoming !== recorded) {
+    // Fetching occurs in the caller; fail visibly if ancestry cannot be resolved.
+    for (const sha of [incoming, recorded]) execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`]);
+    try { execFileSync("git", ["merge-base", "--is-ancestor", incoming, recorded]); superseded = true; }
+    catch (error) { if (error.status !== 1) throw error; }
+  }
+}
 const next = applyEditionStateEvent(current, event, {
+  superseded,
   editionId, packetBlobSha, submissionSha: argument("submission-sha"), mainSha: argument("main-sha"),
   source: argument("source"), status: argument("status"), reason: argument("reason"), error: argument("error"),
   decisionDigest: argument("decision-digest"),

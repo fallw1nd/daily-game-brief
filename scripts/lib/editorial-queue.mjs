@@ -96,7 +96,7 @@ function nextBatch(queue, nowMs) {
  * identity/fact checks. The caller persists the returned state and packet in
  * the same automation/state transaction.
  */
-export function advanceEditorialQueue({ queue, state, canonical, packets, now = new Date().toISOString() }) {
+export function advanceEditorialQueue({ queue, state, canonical, packets, ledger = null, now = new Date().toISOString() }) {
   if (queue.editionId !== state.editionId || canonical.id !== queue.editionId) {
     throw new Error("editorial queue requires the same current edition");
   }
@@ -121,13 +121,24 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, now = 
     if (batch.status !== "editing" || state.revisionRequest?.status === "open" || state.publication.status !== "committed") continue;
     if (batch.scope === "news") {
       if (state.revisionRequest?.reason !== EDITORIAL_CONTINUATION_REASON || state.revisionRequest.batchName !== batch.name) {
-        throw new Error(`news batch ${batch.name} was not completed by its scoped continuation publication`);
+        const digest = canonical.sourceReport?.editorialDecisionDigest;
+        const reconciled = digest && Number.isFinite(Date.parse(batch.activatedAt)) && batch.eventKeys.every(key => {
+          const decision = ledger?.events?.[key];
+          return decision?.lastDecisionEdition === queue.editionId
+            && decision.lastDecisionIdentity === digest
+            && ["include", "exclude"].includes(decision.lastDecision)
+            && Boolean(decision.lastDecisionReason)
+            && Date.parse(decision.lastDecisionAt) >= Date.parse(batch.activatedAt);
+        });
+        if (!reconciled) throw new Error(`news batch ${batch.name} was not completed by its scoped continuation publication; exact committed decision reconciliation required`);
+        batch.reconciliation = { decisionDigest: digest, at: now, reason: "accounted-by-committed-revision" };
       }
       batch.status = "completed";
     } else {
       batch.status = "awaiting_retry";
     }
   }
+  if (!nextQueue.batches.some(batch => batch.name === nextQueue.activeBatchName && batch.status === "editing")) nextQueue.activeBatchName = null;
 
   if (state.revisionRequest?.status === "open" || state.publication.status !== "committed") {
     return { queue: nextQueue, state, packet: null, batch: null };

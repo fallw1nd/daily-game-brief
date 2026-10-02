@@ -166,6 +166,23 @@ describe("durable editorial continuation queue", () => {
     expect(() => advanceEditorialQueue({ ...input, canonical: { id: "2026-09-10-daily", entries: [] } })).toThrow("same current edition");
   });
 
+  it("reconciles an orphan only against every exact committed manual decision", () => {
+    const input = queueFixture();
+    input.queue.batches = [{ name: "news-1.json", scope: "news", status: "editing", eventKeys: ["news-1"], activatedAt: "2026-09-11T04:00:00Z" }];
+    input.queue.activeBatchName = "news-1.json";
+    input.canonical.sourceReport = { editorialDecisionDigest: "committed" };
+    const decision = { lastDecision: "exclude", lastDecisionReason: "Confirmed duplicate", lastDecisionEdition: editionId, lastDecisionIdentity: "committed", lastDecisionAt: "2026-09-11T05:00:00Z" };
+    expect(() => advanceEditorialQueue(input)).toThrow("reconciliation required");
+    for (const changed of [{ lastDecisionIdentity: "stale" }, { lastDecision: "needs_review" }, { lastDecisionEdition: "2026-09-10-daily" }, { lastDecisionAt: "2026-09-11T03:00:00Z" }]) {
+      expect(() => advanceEditorialQueue({ ...input, ledger: { events: { "news-1": { ...decision, ...changed } } } })).toThrow("reconciliation required");
+    }
+    const result = advanceEditorialQueue({ ...input, ledger: { events: { "news-1": decision } } });
+    expect(result.queue.batches[0]).toMatchObject({ status: "completed", reconciliation: { decisionDigest: "committed" } });
+    expect(result.queue.activeBatchName).toBeNull();
+    expect(result.packet).toBeNull();
+    expect(result.state).toEqual(input.state);
+  });
+
   it("prioritizes a Canonical news continuation over a pending showcase batch", () => {
     const input = queueFixture();
     input.queue.batches = [
