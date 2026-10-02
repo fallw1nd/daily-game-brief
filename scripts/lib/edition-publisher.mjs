@@ -285,7 +285,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         ...previousEntries.flatMap((entry) => {
           const replacement = revisedById.get(entry.id);
           if (replacement) return [replacement];
-          if (isDegradedPlaceholder(entry)) return [];
+          if (isDegradedPlaceholder(entry) && packet.continuation?.preservePublished !== true) return [];
           return [entry];
         }),
         ...revisedEntries.filter((entry) => !previousIds.has(entry.id)),
