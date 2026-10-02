@@ -314,13 +314,13 @@ jobs:
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
-          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          existing="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,url | node scripts/find-exact-incident.mjs "$title" url)"
           body="The scheduled edition did not reach a healthy deployed state by the degraded fallback deadline.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Pages re-dispatched: **${{ steps.fallback.outputs.deploy_retriggered || 'false' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
           body="$body\n- Ledger feedback: **${{ steps.ledger_feedback.outcome || 'not run' }}**"
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --body "$(printf '%b' "$body")"
           else
-            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+            gh issue create --title "$title" --body "$(printf '%b' "$body")" --label "automation" || gh issue create --title "$title" --body "$(printf '%b' "$body")"
           fi
 
       - name: Close resolved SLA incident
@@ -330,7 +330,7 @@ jobs:
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
-          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          number="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,number | node scripts/find-exact-incident.mjs "$title" number)"
           if [ -n "$number" ]; then
             gh issue close "$number" --comment "The archive and deployed manifest now contain ${{ steps.sla.outputs.expected }}."
           fi

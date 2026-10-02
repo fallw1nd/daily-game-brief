@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { auditCoverage } from "./lib/coverage-audit.mjs";
+import { editorialDecisionDigest } from "./lib/edition-publisher.mjs";
 
 const EVIDENCE_PATH = resolve(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json");
 const OUTPUT_PATH = resolve(process.env.NEWS_COVERAGE_AUDIT_PATH || "artifacts/news-coverage-audit.json");
@@ -16,7 +17,15 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
-const audit = { schemaVersion: 1, generatedAt: new Date().toISOString(), ...auditCoverage(evidence, edition) };
+let editorial = null;
+if (process.env.EDITORIAL_DECISION_PATH) {
+  editorial = JSON.parse(await readFile(resolve(process.env.EDITORIAL_DECISION_PATH), "utf8"));
+  if (editorial.editionId !== id) throw new Error("coverage decision edition does not match evidence");
+}
+const audit = { schemaVersion: 1, generatedAt: new Date().toISOString(), ...auditCoverage(evidence, edition, {
+  decisions: editorial?.decisions,
+  decisionDigest: editorial ? editorialDecisionDigest(editorial) : null,
+}) };
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, JSON.stringify(audit, null, 2) + "\n");
 console.log(`Coverage audit: status=${audit.status}; covered=${audit.totals.covered}; high omissions=${audit.totals.highConfidenceOmissions}; review omissions=${audit.totals.reviewOmissions}`);

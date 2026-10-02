@@ -248,6 +248,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
     return {
       id,
+      eventKey: decision.eventKey,
       section: decision.section,
       ...(showcaseRefs ? { showcaseRefs: mergeShowcaseRefs([...(previous?.showcaseRefs || []), ...showcaseRefs]), showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
       title,

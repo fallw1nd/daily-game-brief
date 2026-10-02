@@ -319,6 +319,22 @@ jobs:
             --status="${{ steps.publication.outputs.locale_status }}" \
             --reason="${{ steps.publication.outputs.locale_reason }}"
 
+      - name: Audit exact published facts
+        if: steps.submission.outputs.mode == 'publish' && steps.publication.outcome == 'success'
+        env:
+          NEWS_EVIDENCE_PATH: artifacts/editorial-packet.json
+          EDITORIAL_DECISION_PATH: artifacts/editorial-decisions.json
+        run: node scripts/audit-news-coverage.mjs
+
+      - name: Save publication coverage receipt
+        if: always() && steps.submission.outputs.mode == 'publish'
+        uses: actions/upload-artifact@v6
+        with:
+          name: publication-coverage-${{ github.run_id }}
+          path: artifacts/news-coverage-audit.json
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Acknowledge repaired English locale
         if: steps.submission.outputs.mode == 'locale-repair' && steps.publication.outcome == 'success' && steps.publication.outputs.locale_status == 'available'
         shell: bash
@@ -346,11 +362,11 @@ jobs:
           reason="${{ steps.publication.outputs.locale_reason }}"
           title="English locale degraded: $edition"
           body="Canonical Simplified Chinese publication succeeded, but the English presentation overlay was rejected or missing.\n\n- Edition: **$edition**\n- Reason: **$reason**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe canonical archive remains authoritative. Repair must use the trusted publisher's locale-repair mode and must not modify canonical publication files."
-          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          existing="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,url | node scripts/find-exact-incident.mjs "$title" url)"
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --body "$(printf '%b' "$body")"
           else
-            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+            gh issue create --title "$title" --body "$(printf '%b' "$body")" --label "automation" || gh issue create --title "$title" --body "$(printf '%b' "$body")"
           fi
 
       - name: Close repaired English incident
@@ -361,7 +377,7 @@ jobs:
         run: |
           edition="${{ steps.submission.outputs.edition }}"
           title="English locale degraded: $edition"
-          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          number="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,number | node scripts/find-exact-incident.mjs "$title" number)"
           if [ -n "$number" ]; then
             gh issue close "$number" --comment "English locale is available after trusted locale repair. Canonical publication remained unchanged."
           fi
@@ -374,7 +390,7 @@ jobs:
         run: |
           edition="${{ steps.submission.outputs.edition }}"
           title="Editorial publication failed: $edition"
-          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          number="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,number | node scripts/find-exact-incident.mjs "$title" number)"
           if [ -n "$number" ]; then
             gh issue close "$number" --comment "Recovered by trusted publisher run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Canonical publication is committed for the same edition; fixed window and issue identity are unchanged."
           fi
@@ -448,11 +464,11 @@ jobs:
         run: |
           title="Editorial publication failed: ${{ steps.submission.outputs.edition || github.ref_name }}"
           body="The evidence-bounded editorial or locale submission failed before a verified publication.\n\n- Branch: **${{ steps.submission.outputs.branch || github.ref_name }}**\n- Mode: **${{ steps.submission.outputs.mode || 'unresolved' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n- Automatic retry: **${{ steps.submission.outputs.mode == 'publish' && github.event_name != 'workflow_dispatch' && 'requested when validation succeeded' || 'not used for locale-only repair' }}**\n\nThe fixed editorial window, Canonical facts, and issue numbering must be preserved during recovery."
-          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          existing="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,url | node scripts/find-exact-incident.mjs "$title" url)"
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --body "$(printf '%b' "$body")"
           else
-            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+            gh issue create --title "$title" --body "$(printf '%b' "$body")" --label "automation" || gh issue create --title "$title" --body "$(printf '%b' "$body")"
           fi
 
       - name: Summarize publication
