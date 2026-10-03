@@ -124,7 +124,40 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [archiveLimit, setArchiveLimit] = useState(6);
   const [resultLimit, setResultLimit] = useState(12);
   const settingsRef = useRef<HTMLDetailsElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [activeArea, setActiveArea] = useState("content");
   const t = (zh: string, en: string) => english ? en : zh;
+
+  useEffect(() => {
+    if (!edition || !pageRef.current) return;
+    const page = pageRef.current;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const remaining = document.documentElement.scrollHeight - window.innerHeight;
+      page.style.setProperty("--r-progress", String(remaining > 0 ? Math.min(1, Math.max(0, window.scrollY / remaining)) : 0));
+      const area = ["archive", "upcoming"].find(id => (document.getElementById(id)?.getBoundingClientRect().top ?? Infinity) <= 160);
+      setActiveArea(area || "content");
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
+    measure();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    // Content is visible by default, including when observers are unavailable.
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const observer = !reduced && typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) { (entry.target as HTMLElement).dataset.arrived = "true"; observer?.unobserve(entry.target); }
+      });
+    }, { threshold: 0, rootMargin: "0px 0px -32px 0px" }) : null;
+    page.querySelectorAll(".r-department > header, .r-section-heading").forEach(node => observer?.observe(node));
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    resizeObserver?.observe(page);
+    return () => {
+      window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule);
+      window.cancelAnimationFrame(frame); observer?.disconnect(); resizeObserver?.disconnect();
+    };
+  }, [edition?.id]);
 
   useEffect(() => {
     document.documentElement.lang = english ? "en" : "zh-CN";
@@ -218,17 +251,17 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const switchHref = readingHref(currentId, window.location.hash.slice(1) || undefined, !english);
   const archiveTitle = (id: string, title?: string) => english ? englishTitles[id] : title;
 
-  return <IconContext.Provider value={{ weight: "regular", size: 20, "aria-hidden": true, focusable: false }}><div className="reading-app" data-theme={theme} data-accent={accent}>
+  return <IconContext.Provider value={{ weight: "regular", size: 20, "aria-hidden": true, focusable: false }}><div ref={pageRef} className="reading-app" data-theme={theme} data-accent={accent}>
     <a className="r-skip" href="#content">{t("跳到新闻正文", "Skip to news")}</a>
     <header className="r-header"><div className="r-header-inner">
       <a className="r-brand" href={readingHref(undefined, undefined, english)}><NewspaperClipping aria-hidden="true" /><span>{t("游戏圈动态", "Daily Game Brief")}</span></a>
-      <nav aria-label={t("主导航", "Main navigation")}><a href="#content">{t("内容", "Content")}</a><a href="#upcoming">{t("日历", "Calendar")}</a><a href="#archive">{t("归档", "Archive")}</a></nav>
+      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档", "Archive")]].map(([id, name]) => <a key={id} href={`#${id}`} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
       <div className="r-controls">
         <a href={switchHref} lang={english ? "zh-CN" : "en"} aria-label={t("Switch to English", "切换到中文")}>{english ? "中文" : "EN"}</a>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? t("切换夜间模式", "Use dark theme") : t("切换日间模式", "Use light theme")} title={t("切换明暗主题", "Toggle theme")}>{theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</button>
         <details ref={settingsRef} className="r-settings"><summary aria-label={t("阅读设置", "Reading settings")} title={t("阅读设置", "Reading settings")}><SlidersHorizontal aria-hidden="true" /></summary><fieldset><legend>{t("强调色", "Accent color")}</legend>{accents.map((value, index) => <label key={value} data-color={value}><input type="radio" name="reading-accent" checked={accent === value} onChange={() => setAccent(value)} /><span className="r-swatch" />{english ? ["Orange", "Cobalt", "Jade", "Violet", "Rose"][index] : ["橙", "钴蓝", "松绿", "紫", "玫红"][index]}{accent === value && <Check aria-hidden="true" />}</label>)}</fieldset></details>
       </div>
-    </div></header>
+    </div><span className="r-reading-progress" aria-hidden="true" /></header>
 
     {!edition ? <main className="r-loading r-container" aria-live="polite">
       {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : readingHref()}>{t("返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <><p>{t("正在读取简报…", "Loading the edition…")}</p><div className="r-skeleton" /><div className="r-skeleton r-skeleton--short" /></>}
