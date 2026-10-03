@@ -23,3 +23,7 @@ Maintain accessible dark/light themes with persistent keyboard-operable switchin
 
 Keep top navigation to `内容`, `日历`, and `归档`. Use `DAILY EDITION` as the nonnumeric masthead eyebrow and show `NO.###` only once in top chrome. Let edition H1 titles use the full available width and remain single-line when they fit. Reserve inset space for archive selection rails so they never overlap issue or date text.
 
+
+## ReadingApp refinement (2026-10-03)
+
+The default ReadingApp now uses a primary and complementary accent, calibrated paper surfaces, and shared motion tokens. Its current palette supersedes the classic numeric colours above for this view only. See [the design rationale and verification](VISUAL_UPGRADE_20261003.md). Keep motion optional through reduced-motion preferences and preserve visible content before observer callbacks.
