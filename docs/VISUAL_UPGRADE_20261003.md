@@ -1,6 +1,12 @@
 # ReadingApp visual refinement — 2026-10-03
 
-## Direction
+## Accent follow-up
+
+The user subsequently chose a cohesive, single-hue theme. The fixed teal (and jade theme's gold) companion has been replaced by a supporting tone derived from the selected accent: 85% accent plus 15% ink. Calendar, overview, evidence and section decorations now change together. Neutral dark surfaces replace the prior green-tinted surfaces. This supersedes the original complementary-colour direction below; its motion and layout specifications remain applicable.
+
+Verification: all 250 contrast combinations pass again; actual settings interaction and reload persistence pass for all five accents in both themes. Full check and responsive browser coverage are repeated for this follow-up.
+
+## Original direction
 
 Preserve the editorial news hierarchy and compact archive. Warm paper and rust form the default identity; a deep teal companion distinguishes navigation, calendar and reading aids. Dark mode uses calibrated warm and green highlights. Reader-selected cobalt, jade, violet and rose remain available. Thin rules, restrained paper washes, image frames and small hatch details add depth without turning articles into marketing cards.
 
