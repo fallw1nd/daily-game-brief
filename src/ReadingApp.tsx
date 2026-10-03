@@ -12,8 +12,13 @@ import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactSta
 import "./reading.css";
 
 type Theme = "light" | "dark";
-type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose";
-const accents: Accent[] = ["orange", "cobalt", "jade", "violet", "rose"];
+type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose" | "playstation" | "switch" | "xbox" | "pink";
+const accents: Accent[] = ["orange", "cobalt", "jade", "violet", "rose", "playstation", "switch", "xbox", "pink"];
+const accentNames: Record<Accent, [string, string]> = {
+  orange: ["橙", "Orange"], cobalt: ["钴蓝", "Cobalt"], jade: ["松绿", "Jade"],
+  violet: ["紫", "Violet"], rose: ["玫红", "Rose"], playstation: ["PS 经典蓝", "PS classic blue"],
+  switch: ["Switch 红", "Switch red"], xbox: ["Xbox 绿", "Xbox green"], pink: ["糖果粉", "Candy pink"],
+};
 const sectionOrder: SectionKey[] = ["focus", "releases", "reviews", "news", "industry", "features", "rumors", "observations", "tracking", "upcoming", "search-report"];
 const sectionNames: Record<SectionKey, [string, string]> = {
   focus: ["重点新闻", "In focus"], releases: ["发售与上线", "Releases"], reviews: ["新作评分", "Reviews"],
@@ -259,7 +264,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
       <div className="r-controls">
         <a href={switchHref} lang={english ? "zh-CN" : "en"} aria-label={t("Switch to English", "切换到中文")}>{english ? "中文" : "EN"}</a>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? t("切换夜间模式", "Use dark theme") : t("切换日间模式", "Use light theme")} title={t("切换明暗主题", "Toggle theme")}>{theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</button>
-        <details ref={settingsRef} className="r-settings"><summary aria-label={t("阅读设置", "Reading settings")} title={t("阅读设置", "Reading settings")}><SlidersHorizontal aria-hidden="true" /></summary><fieldset><legend>{t("强调色", "Accent color")}</legend>{accents.map((value, index) => <label key={value} data-color={value}><input type="radio" name="reading-accent" checked={accent === value} onChange={() => setAccent(value)} /><span className="r-swatch" />{english ? ["Orange", "Cobalt", "Jade", "Violet", "Rose"][index] : ["橙", "钴蓝", "松绿", "紫", "玫红"][index]}{accent === value && <Check aria-hidden="true" />}</label>)}</fieldset></details>
+        <details ref={settingsRef} className="r-settings"><summary aria-label={t("阅读设置", "Reading settings")} title={t("阅读设置", "Reading settings")}><SlidersHorizontal aria-hidden="true" /></summary><fieldset><legend>{t("强调色", "Accent color")}</legend>{accents.map((value) => <label key={value} data-color={value}><input type="radio" name="reading-accent" checked={accent === value} onChange={() => setAccent(value)} /><span className="r-swatch" />{label(accentNames[value], english)}{accent === value && <Check aria-hidden="true" />}</label>)}</fieldset></details>
       </div>
     </div><span className="r-reading-progress" aria-hidden="true" /></header>
 
