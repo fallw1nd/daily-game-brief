@@ -145,7 +145,9 @@ describe("reading sample", () => {
     const jade = container.querySelector<HTMLInputElement>('[data-color="jade"] input')!;
     await act(async () => jade.click());
     expect(localStorage.getItem("brief-accent")).toBe("jade");
-    const about = container.querySelector<HTMLAnchorElement>('.r-edition-line a')!;
+    expect(container.querySelector('.r-edition-line a')).toBeNull();
+    expect(container.querySelector<HTMLDetailsElement>("#edition-note")?.open).toBe(false);
+    const about = container.querySelector<HTMLElement>("#edition-note summary")!;
     await act(async () => about.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
     expect(container.querySelector<HTMLDetailsElement>("#edition-note")?.open).toBe(true);
     const input = container.querySelector<HTMLInputElement>('input[type="search"]')!;
@@ -324,7 +326,7 @@ describe("reader navigation continuity", () => {
     await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
     const panel = container.querySelector<HTMLDetailsElement>(".r-settings")!;
     const radio = panel.querySelector<HTMLInputElement>("input")!;
-    const next = container.querySelector<HTMLAnchorElement>(".r-edition-line a")!;
+    const next = container.querySelector<HTMLAnchorElement>(".r-lead .r-source-line a")!;
     panel.open = true;
     await act(async () => { radio.focus(); next.focus(); });
     expect(panel.open).toBe(false);
