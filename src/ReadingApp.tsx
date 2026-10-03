@@ -125,13 +125,50 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [retry, setRetry] = useState(0);
   const [theme, setTheme] = useState<Theme>(storedTheme);
   const [accent, setAccent] = useState<Accent>(storedAccent);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
+  const [searchRequested, setSearchRequested] = useState(() => Boolean(new URLSearchParams(window.location.search).get("q")));
+  const archiveRef = useRef<HTMLElement>(null);
   const [archiveLimit, setArchiveLimit] = useState(6);
-  const [resultLimit, setResultLimit] = useState(12);
+  const [resultLimit, setResultLimit] = useState(() => Math.max(12, Math.min(1200, Number(new URLSearchParams(window.location.search).get("results")) || 12)));
   const settingsRef = useRef<HTMLDetailsElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const [activeArea, setActiveArea] = useState("content");
   const t = (zh: string, en: string) => english ? en : zh;
+
+  const updateSearch = (value: string, limit = 12) => {
+    setQuery(value); setResultLimit(limit); setSearchRequested(true);
+    const url = new URL(window.location.href);
+    if (value.trim()) { url.searchParams.set("q", value); url.searchParams.set("results", String(limit)); }
+    else { url.searchParams.delete("q"); url.searchParams.delete("results"); }
+    window.history.replaceState({ ...window.history.state, readingSearch: null }, "", url);
+  };
+  const saveSearchPosition = () => window.history.replaceState({ ...window.history.state, readingSearch: { query, y: window.scrollY } }, "");
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery(params.get("q") || "");
+      setResultLimit(Math.max(12, Math.min(1200, Number(params.get("results")) || 12)));
+      if (params.get("q")) setSearchRequested(true);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    if (!edition || searchRequested || initialSearchIndex) return;
+    if (typeof IntersectionObserver === "undefined") { setSearchRequested(true); return; }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { setSearchRequested(true); observer.disconnect(); }
+    }, { rootMargin: "200px" });
+    if (archiveRef.current) observer.observe(archiveRef.current);
+    return () => observer.disconnect();
+  }, [edition, searchRequested, initialSearchIndex]);
+  useEffect(() => {
+    const saved = window.history.state?.readingSearch;
+    if (!edition || !searchIndex || !query || saved?.query !== query || !Number.isFinite(saved.y)) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => window.scrollTo({ top: saved.y, behavior: "instant" })); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [edition, searchIndex, query]);
 
   useEffect(() => {
     if (!edition || !pageRef.current) return;
@@ -190,6 +227,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     void (async () => {
       try {
         const [loadedManifest, latest] = await Promise.all([loadBriefManifest(controller.signal), loadLatestEdition(controller.signal)]);
+        if (!controller.signal.aborted) setManifest(loadedManifest);
         const requestedId = new URLSearchParams(window.location.search).get("edition");
         const requested = loadedManifest.editions.find((item) => item.id === requestedId);
         if (requestedId && !requested) throw new Error(t("找不到这一期归档。", "This edition could not be found."));
@@ -228,20 +266,22 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   }, [edition, manifest, english, calendarRetry]);
 
   useEffect(() => {
-    if (initialSearchIndex) return;
+    if (initialSearchIndex || !searchRequested) return;
     const controller = new AbortController();
     setSearchError(false);
     const load = english ? loadEnglishSearchIndex : loadSearchIndex;
     void load(controller.signal).then((index) => { if (!controller.signal.aborted) setSearchIndex(index); }).catch(() => { if (!controller.signal.aborted) setSearchError(true); });
     return () => controller.abort();
-  }, [english, initialSearchIndex, retry]);
+  }, [english, initialSearchIndex, retry, searchRequested]);
 
   useEffect(() => {
     if (!edition) return;
     document.title = `${edition.archiveTitle || t("游戏日报", "Daily Game Brief")} · ${t("游戏圈动态", "Daily Game Brief")}`;
     let id = "";
     try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
-    if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" }));
+    if (!id) return;
+    const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" }));
+    return () => cancelAnimationFrame(frame);
   }, [edition, english]);
 
   const lead = edition ? readingLead(edition) : undefined;
@@ -260,18 +300,19 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     <a className="r-skip" href="#content">{t("跳到新闻正文", "Skip to news")}</a>
     <header className="r-header"><div className="r-header-inner">
       <a className="r-brand" href={readingHref(undefined, undefined, english)}><NewspaperClipping aria-hidden="true" /><span>{t("游戏圈动态", "Daily Game Brief")}</span></a>
-      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档", "Archive")]].map(([id, name]) => <a key={id} href={`#${id}`} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
+      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={`#${id}`} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
       <div className="r-controls">
         <a href={switchHref} lang={english ? "zh-CN" : "en"} aria-label={t("Switch to English", "切换到中文")}>{english ? "中文" : "EN"}</a>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? t("切换夜间模式", "Use dark theme") : t("切换日间模式", "Use light theme")} title={t("切换明暗主题", "Toggle theme")}>{theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</button>
-        <details ref={settingsRef} className="r-settings"><summary aria-label={t("阅读设置", "Reading settings")} title={t("阅读设置", "Reading settings")}><SlidersHorizontal aria-hidden="true" /></summary><fieldset><legend>{t("强调色", "Accent color")}</legend>{accents.map((value) => <label key={value} data-color={value}><input type="radio" name="reading-accent" checked={accent === value} onChange={() => setAccent(value)} /><span className="r-swatch" />{label(accentNames[value], english)}{accent === value && <Check aria-hidden="true" />}</label>)}</fieldset></details>
+        <details ref={settingsRef} className="r-settings" onBlur={(event) => { if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}><summary aria-label={t("阅读设置", "Reading settings")} title={t("阅读设置", "Reading settings")}><SlidersHorizontal aria-hidden="true" /></summary><fieldset><legend>{t("强调色", "Accent color")}</legend>{accents.map((value) => <label key={value} data-color={value}><input type="radio" name="reading-accent" checked={accent === value} onChange={() => setAccent(value)} /><span className="r-swatch" />{label(accentNames[value], english)}{accent === value && <Check aria-hidden="true" />}</label>)}</fieldset></details>
       </div>
     </div><span className="r-reading-progress" aria-hidden="true" /></header>
 
     {!edition ? <main className="r-loading r-container" aria-live="polite">
-      {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : readingHref()}>{t("返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <><p>{t("正在读取简报…", "Loading the edition…")}</p><div className="r-skeleton" /><div className="r-skeleton r-skeleton--short" /></>}
+      {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <><p>{t("正在读取简报…", "Loading the edition…")}</p><div className="r-skeleton" /><div className="r-skeleton r-skeleton--short" /></>}
     </main> : <main className="r-container" id="top">
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span><a href="#edition-note" onClick={() => { const note = document.querySelector<HTMLDetailsElement>("#edition-note"); if (note) note.open = true; }}>{t("本期说明", "About this edition")}<ArrowDown aria-hidden="true" /></a></div>
+      <details className="r-edition-directory"><summary>{t(`本期 ${edition.entries.length} 条新闻 · 浏览目录`, `${edition.entries.length} stories · Browse contents`)}<CaretDown /></summary><nav aria-label={t("本期新闻目录", "Edition contents")}><ol>{edition.entries.map(entry => <li key={entry.id}><a href={`#${entry.id}`}>{entry.headline}</a></li>)}</ol></nav></details>
       <section className="r-lead" id="content" aria-labelledby="r-edition-title">
         {lead ? <article id={lead.id} className={`r-lead-grid${lead.images?.some((asset) => !asset.placeholder) ? "" : " r-lead-grid--text"}`}>
           <div className="r-lead-copy"><div className="r-eyebrow">{t("本期头条", "The lead")}<span>{label(sectionNames[lead.section], english)}</span></div>
@@ -288,7 +329,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
           {section.key === "observations" && <p className="r-department-note">{t("补遗与跨窗口观察，不计入本轮新增。", "Supplements and cross-window observations, separate from new reports.")}</p>}
           {section.entries.map((entry) => <Story key={entry.id} entry={entry} english={english} />)}
         </section>)}
-      </div><aside className="r-overview"><div className="r-overview-sticky"><h2>{t("本期速览", "In this edition")}</h2><p>{t(`${edition.entries.length} 条新闻`, `${edition.entries.length} stories`)}</p><ol>{otherStories.slice(0, 5).map((entry) => <li key={entry.id}><a href={`#${entry.id}`}><small>{label(sectionNames[entry.section], english)}</small><span>{entry.headline}</span><ArrowDown aria-hidden="true" /></a></li>)}</ol><a className="r-overview-archive" href="#archive"><MagnifyingGlass aria-hidden="true" />{t("查找往期新闻", "Search past stories")}</a></div></aside></div>}
+      </div><aside className="r-overview"><div className="r-overview-sticky"><h2>{t("精选速览", "Selected stories")}</h2><p>{t(`本期 ${edition.entries.length} 条 · 以下精选 ${Math.min(5, otherStories.length)} 条`, `${edition.entries.length} stories · ${Math.min(5, otherStories.length)} selected`)}</p><ol>{otherStories.slice(0, 5).map((entry) => <li key={entry.id}><a href={`#${entry.id}`}><small>{label(sectionNames[entry.section], english)}</small><span>{entry.headline}</span><ArrowDown aria-hidden="true" /></a></li>)}</ol><a className="r-overview-archive" href="#archive"><MagnifyingGlass aria-hidden="true" />{t("查找往期新闻", "Search past stories")}</a></div></aside></div>}
 
       {edition.showcases?.map(showcase => <section className="r-department r-showcase" id={showcase.id} key={showcase.id} aria-labelledby={`heading-${showcase.id}`}>
         <header><h2 id={`heading-${showcase.id}`}>{english ? showcase.titleEn : showcase.title}</h2><span>{showcase.covered}</span></header>
@@ -301,7 +342,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {calendar && upcoming.length > 0 && <p className="r-calendar-note r-warning">{t(`沿用 ${calendar.sourceDate} 收录的计划，本期未重新核验；日期如有调整，请以来源公告为准。`, `Plans recorded on ${calendar.sourceDate}, not reverified for this edition. Check the linked sources for schedule changes.`)} <a href={readingHref(calendar.sourceId, "upcoming", english)}>{t("查看原期日历", "View source edition")}<ArrowRight /></a></p>}
         {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} <button className="r-button" onClick={() => setCalendarRetry((value) => value + 1)}>{t("重试", "Try again")}</button></> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
         <div className="r-calendar-list">{upcoming.map((item) => <article key={item.id} className="r-calendar-item">
-        {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{item.title.title_zh_cn || item.title.title_en}</h3><p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && <p>{item.note}</p>}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
+        {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{item.title.title_zh_cn || item.title.title_en}</h3><p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && (/API|appids=|字段|解析/.test(item.note) ? <details className="r-calendar-evidence"><summary>日期依据与核验说明</summary><p>{item.note}</p></details> : <p>{item.note}</p>)}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
       </article>)}</div></section>}
 
       <nav className="r-pager" aria-label={t("期次导航", "Edition navigation")}>
@@ -309,9 +350,9 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {next ? <a href={readingHref(next.id, undefined, english)}><small>{t("下一期", "Next edition")} · {next.date}</small><span>{archiveTitle(next.id, next.archiveTitle)}<ArrowRight aria-hidden="true" /></span></a> : <span className="r-pager-boundary">{t("已是最新一期", "Latest edition")}<small>{t("下期计划：", "Next scheduled: ")}{edition.nextEditionAt}</small></span>}
       </nav>
 
-      <section id="archive" className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{t(`${archives.length} 期归档`, `${archives.length} editions`)}</span></header>
-        <label className="r-search"><MagnifyingGlass aria-hidden="true" /><span className="r-sr-only">{t("搜索所有期次的游戏、平台或事件", "Search all editions by game, platform or event")}</span><input type="search" value={query} placeholder={t("搜索游戏、平台或事件", "Search games, platforms or events")} onChange={(event) => { setQuery(event.target.value); setResultLimit(12); }} /></label>
-        {query.trim() ? <div className="r-search-results"><p className="r-result-count" role="status">{searchError ? t("搜索暂时不可用。", "Search is temporarily unavailable.") : !searchIndex ? t("正在读取搜索索引…", "Loading search…") : t(`找到 ${results.length} 条新闻`, `${results.length} matching stories`)}</p>{searchError && <button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重新加载", "Retry")}</button>}{results.slice(0, resultLimit).map((item) => <a key={`${item.editionId}-${item.entryId}`} className="r-search-result" href={readingHref(item.editionId, item.entryId, english)}><small>{item.date} · NO.{String(item.issueNumber).padStart(3, "0")} · {label(statusNames[item.factStatus], english)}{item.tracking ? t(" · 持续跟踪", " · Tracking") : ""}</small><h3>{item.headline}</h3><p>{item.summary}</p><ArrowRight aria-hidden="true" /></a>)}{searchIndex && !results.length && <p>{t("没有匹配的新闻，试试更短的关键词。", "No matching stories. Try a shorter keyword.")}</p>}{results.length > resultLimit && <button className="r-button" onClick={() => setResultLimit((value) => value + 12)}>{t("显示更多结果", "Show more results")}</button>}</div> : <><div className="r-archive-list">{archives.slice(0, archiveLimit).map((item) => <a href={readingHref(item.id, undefined, english)} className={item.id === edition.id ? "is-current" : ""} key={item.id} aria-current={item.id === edition.id ? "page" : undefined}><span className="r-archive-meta"><time>{item.date}</time><span>NO.{String(item.issueNumber).padStart(3, "0")}</span>{item.id === edition.id && <small>{t("当前阅读", "Reading")}</small>}</span><strong>{archiveTitle(item.id, item.archiveTitle) || t("本期简报", "Edition")}</strong><ArrowRight aria-hidden="true" /></a>)}</div>{archives.length > archiveLimit && <button className="r-button" onClick={() => setArchiveLimit((value) => value + 12)}>{t("浏览更多期次", "More editions")}<ArrowDown aria-hidden="true" /></button>}</>}
+      <section ref={archiveRef} id="archive" className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{t(`${archives.length} 期归档`, `${archives.length} editions`)}</span></header>
+        <label className="r-search"><MagnifyingGlass aria-hidden="true" /><span className="r-sr-only">{t("搜索所有期次的游戏、平台或事件", "Search all editions by game, platform or event")}</span><input type="search" value={query} placeholder={t("搜索游戏、平台或事件", "Search games, platforms or events")} onFocus={() => setSearchRequested(true)} onChange={(event) => updateSearch(event.target.value)} /></label>
+        {query.trim() ? <div className="r-search-results"><p className="r-result-count" role="status">{searchError ? t("搜索暂时不可用。", "Search is temporarily unavailable.") : !searchIndex ? t("正在读取搜索索引…", "Loading search…") : t(`找到 ${results.length} 条新闻`, `${results.length} matching stories`)}</p>{searchError && <button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重新加载", "Retry")}</button>}{results.slice(0, resultLimit).map((item) => <a key={`${item.editionId}-${item.entryId}`} className="r-search-result" onClick={saveSearchPosition} href={readingHref(item.editionId, item.entryId, english)}><small>{item.date} · NO.{String(item.issueNumber).padStart(3, "0")} · {label(statusNames[item.factStatus], english)}{item.tracking ? t(" · 持续跟踪", " · Tracking") : ""}</small><h3>{item.headline}</h3><p>{item.summary}</p><ArrowRight aria-hidden="true" /></a>)}{searchIndex && !results.length && <p>{t("没有匹配的新闻，试试更短的关键词。", "No matching stories. Try a shorter keyword.")}</p>}{results.length > resultLimit && <button className="r-button" onClick={() => updateSearch(query, resultLimit + 12)}>{t("显示更多结果", "Show more results")}</button>}</div> : <><div className="r-archive-list">{archives.slice(0, archiveLimit).map((item) => <a href={readingHref(item.id, undefined, english)} className={item.id === edition.id ? "is-current" : ""} key={item.id} aria-current={item.id === edition.id ? "page" : undefined}><span className="r-archive-meta"><time>{item.date}</time><span>NO.{String(item.issueNumber).padStart(3, "0")}</span>{item.id === edition.id && <small>{t("当前阅读", "Reading")}</small>}</span><strong>{archiveTitle(item.id, item.archiveTitle) || t("本期简报", "Edition")}</strong><ArrowRight aria-hidden="true" /></a>)}</div>{archives.length > archiveLimit && <button className="r-button" onClick={() => setArchiveLimit((value) => value + 12)}>{t("浏览更多期次", "More editions")}<ArrowDown aria-hidden="true" /></button>}</>}
       </section>
 
       <details className="r-edition-note" id="edition-note"><summary>{t("本期说明与检索记录", "Edition details & source report")}<CaretDown aria-hidden="true" /></summary><div><dl><div><dt>{t("信息窗口", "Evidence window")}</dt><dd>{readingWindow(edition)}</dd></div><div><dt>{t("计划发布", "Scheduled release")}</dt><dd>{edition.plannedAt}</dd></div><div><dt>{t("生成时间", "Generated")}</dt><dd>{edition.generatedAt}</dd></div></dl>{edition.sourceReport && <><h3>{t("已检查来源", "Sources checked")}</h3><p>{edition.sourceReport.checked.join(" / ")}</p><h3>{t("访问受限", "Limited access")}</h3><p>{edition.sourceReport.limited.join(" / ") || t("无", "None")}</p><p>{edition.sourceReport.note}</p></>}</div></details>
