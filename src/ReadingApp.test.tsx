@@ -300,3 +300,34 @@ it("keeps a readable calendar item and a stable cover slot after cover load fail
   expect(item.querySelector(".r-calendar-date")).not.toBeNull();
 });
 
+
+describe("reader navigation continuity", () => {
+  it("restores shared search parameters and responds to browser history", async () => {
+    vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0); // Scroll restoration is covered by real-browser tests.
+    window.history.replaceState(null, "", "/daily-game-brief/?q=历史游戏&results=24#archive");
+    const container = document.createElement("div"); document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+    expect(container.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("历史游戏");
+    expect(container.querySelector(".r-search-result")?.textContent).toContain("历史游戏跨期新闻");
+    await act(async () => {
+      window.history.replaceState(null, "", "/daily-game-brief/#archive");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(container.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("");
+    expect(container.querySelector(".r-archive-list")).not.toBeNull();
+  });
+
+  it("closes settings when keyboard focus leaves, without stealing the new focus", async () => {
+    const container = document.createElement("div"); document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+    const panel = container.querySelector<HTMLDetailsElement>(".r-settings")!;
+    const radio = panel.querySelector<HTMLInputElement>("input")!;
+    const next = container.querySelector<HTMLAnchorElement>(".r-edition-line a")!;
+    panel.open = true;
+    await act(async () => { radio.focus(); next.focus(); });
+    expect(panel.open).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+});

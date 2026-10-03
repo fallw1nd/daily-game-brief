@@ -733,3 +733,9 @@ An additive news continuation on the October 2 automatic fact list removed the f
 - Full check passed before final explanatory additions; final full check and production receipts are required below. No archive or issue/window identity is changed.
 
 - **2026-10-02 validation:** final full check passed: 103 test files / 571 tests, Canonical and English validation, and production build. Integration executes the real handoff builder and verifies that a candidate omitted from the inline preview is preserved in the emitted SHA-pinned page. Fallback and exact-page/platform receipt rejection are covered. Production/natural-run evidence remains separately required.
+
+## 2026-10-03 — Reader continuity and loading stability
+
+- Reproduced search context loss after opening a result, keyboard focus obscured by an open settings panel, and initial footer displacement (390px lab CLS about 0.177).
+- Search URL/history persistence, focus-leave dismissal and stable loading space address these failures. Archive search is deferred until needed. Reading navigation and calendar evidence are more discoverable without changing content or publication behavior.
+- Local verification: full check passed with 573 tests, 20 responsive browser combinations, search/back/refresh, focus, error recovery and evidence disclosure; local CLS approximately 0.0011. Production deployment evidence is recorded in the associated PR and local acceptance artifacts.
