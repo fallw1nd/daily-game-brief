@@ -4,10 +4,21 @@ import { gitBlobSha } from "./edition-state.mjs";
 // facts. Their exact bytes are pinned inside the acknowledged Daily packet.
 export function buildCalendarWorkPages(report, { maxChars = 24000 } = {}) {
   if (!Number.isInteger(maxChars) || maxChars < 1000) throw new Error("invalid calendar page budget");
+  const evidence = new Map();
+  const compact = item => {
+    if (!item.primaryEvidence) return item;
+    const { primaryEvidence, ...rest } = item;
+    primaryEvidence.forEach(row => evidence.set(row.url, row));
+    return { ...rest, primaryEvidenceUrls: primaryEvidence.map(row => row.url) };
+  };
   const tasks = [
-    ...(report.allCandidates || report.candidates || []).map(candidate => ({ kind: "candidate", candidate })),
-    ...(report.reviewLinks || []).map(link => ({ kind: "review-link", link })),
+    ...(report.baselineChecks || []).map(check => ({ kind: "baseline-check", baseline: compact(check) })),
+    ...(report.allCandidates || report.candidates || []).map(candidate => ({ kind: "candidate", candidate: compact(candidate) })),
+    ...(report.reviewLinks || []).map(link => ({ kind: "review-link", link: compact(link) })),
   ];
+  // Store a fetched page only once even when it supports several candidates.
+  // Put the evidence first so a reader encounters facts before the long lead list.
+  tasks.unshift(...[...evidence.values()].map(source => ({ kind: "primary-evidence", source })));
   const pages = [];
   let items = [];
   const document = items => ({ schemaVersion: 1, editionDate: report.editionDate, window: report.window, verification: "open_primary_source_before_publication", items });
@@ -31,6 +42,7 @@ export function buildCalendarWorkPages(report, { maxChars = 24000 } = {}) {
       schemaVersion: 1,
       editionDate: report.editionDate,
       totalTasks: tasks.length,
+      ...(report.primaryEvidenceSummary ? { primaryEvidenceSummary: report.primaryEvidenceSummary } : {}),
       unavailableUpstreamTasks: report.allCandidates ? 0 : Number(report.omittedCandidates || 0),
       pages: pages.map(({ text, ...receipt }) => receipt),
     },

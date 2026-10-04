@@ -1,5 +1,13 @@
 # Maintenance Issue Log
 
+## MNT-20261004-01 — 日历线索全部延期后没有编辑续接
+
+- **Status:** in_progress
+- **Evidence:** 2026-10-04 Daily 的 154 条日历任务完整进入 11 个 pinned pages，但全部页和四个平台的回执为 deferred；Canonical 沿用前日 12 项，第二次编辑执行转去历史英文修复。
+- **Root cause:** discovery 没有配套官方详情快照；deferred 只有报告文字，没有 queue 消费者；前端只对跨期 fallback 提示未复核，漏掉直接继承到本期的列表。
+- **Resolution:** 采集 bounded 官方详情/Steam US 商品接口并冻结到去重分页，保留请求预算/失败；未完成日历进入现有 editorial_continuation 的 calendar scope，以 page SHA 授权并严格隔离新闻/追踪；全部页与四平台 reviewed 才完成，否则继续重试。前端中英文均显示未完成核验。任务数量、时刻和 Daily 身份不变。
+- **Verification:** 本地完整 check 与真实官方详情采集；PR/生产证据在合并后补充。MNT-20260908-02 的自然期次持续核验验收仍需真实后续运行，不能以单元测试代替。
+
 本文件是项目长期维护的“问题发现 → 处理 → 验证 → 关闭”账本，不是版本发布日志，也不替代 GitHub Issues / Pull Requests。
 
 项目事实仍以当前 `main`、生产数据、Actions 日志和线上结果为准。PR 描述与专题文档负责解释某次修改，本文件负责保留“为什么需要修改、目前是否真正解决”的连续历史。

@@ -205,6 +205,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
   const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
   const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
+  if (packet.continuation?.scope === "calendar" && (input.packages.length || input.trackingQueue?.length || editorial.decisions.length)) throw new Error("calendar continuation cannot change news or tracking");
   const previousIds = new Set(previousEntries.map((entry) => entry.id));
   const counters = sectionCounters(previousEntries, window.id);
   const entryByEvent = new Map();
@@ -359,6 +360,16 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     archiveTitle,
     leadEntryId,
   };
+  if (packet.continuation?.scope === "calendar" && latest.sourceReport) {
+    const calendarReport = edition.sourceReport;
+    edition.sourceReport = {
+      ...latest.sourceReport,
+      checked: [...new Set([...(latest.sourceReport.checked || []), ...(editorial.checkedExtra || [])])],
+      limited: [...(latest.sourceReport.limited || []).filter(row => !row.startsWith("日历核验延期 ")), ...calendarReport.limited],
+      calendarReview: editorial.calendarReview,
+      editorialDecisionDigest: decisionDigest,
+    };
+  }
   if (input.showcases?.events?.length) {
     edition.showcases = input.showcases.events.map(event => {
       const items = input.showcases.announcements.filter(item => item.showcaseId === event.id);

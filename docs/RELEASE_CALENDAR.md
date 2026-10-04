@@ -11,6 +11,14 @@ The Daily packet includes a rolling future-15-day release calendar. Discovery is
 5. Open official developer/publisher/platform pages before adoption.
 6. Submit only verified additions/changes through Daily `upcomingMode:"inherit_and_patch"`.
 
+### Official detail evidence and unfinished work
+
+GitHub opens at most 80 unique official detail URLs per collection, two concurrently, with an 8-second timeout and 2 MB response limit. The closed host list covers Steam, Nintendo, Xbox and PlayStation; arbitrary hosts and redirects are not followed. Inherited entries are rechecked even when absent from discovery. Conflicts/baseline leads precede a rotating, platform-balanced remainder. URLs not fetched under the budget and failed/limited responses remain explicit. Unsupported developer hosts still require the editor's bounded lookup.
+
+Full SHA-pinned work pages contain deduplicated `primary-evidence` snapshots and `baseline-check` tasks. The 24,000-character inline preview excludes the snapshots. Fetch success never automatically publishes a release: the editor must verify identity/date/platform/region/type from the text/structured data or open the official page when insufficient. A sufficient already-opened snapshot must not be deferred solely because the editor has not repeated its fetch.
+
+Every new Daily with calendar pages also creates a calendar-only continuation in the existing durable queue. GitHub skips it when the initial submission reviewed every page and all four platforms; otherwise it activates the exact pinned work after publication. No new scheduled task or invocation is added. Calendar continuations cannot change news/tracking/headlines/issue/window, use the normal edition inbox, and remain awaiting retry after partial review. Their receipts are carried to the public calendar so inherited plans cannot masquerade as a freshly completed review. Global completeness is never implied by reviewing configured sources.
+
 If Daily enters the degraded publication fallback, calendar discovery remains review-only. The fallback emits an empty `upcoming` patch with `removeUpcomingIds:[]` and `upcomingMode:"inherit_and_patch"`; it preserves the verified Canonical baseline and the publisher naturally removes entries outside the rolling 15-day window. Calendar-only final official detail verification is deferred, and known-title hints or cross-source discovery matches are not evidence.
 
 Discovery never writes `public/data` directly.

@@ -93,7 +93,7 @@ export function validateEditionState(state) {
       if (!revisionReasons.has(state.revisionRequest.reason)) errors.push("state.revisionRequest.reason is invalid");
       if (state.revisionRequest.reason === SHOWCASE_COMPLETION_REASON && (!Array.isArray(state.revisionRequest.announcementIds) || !state.revisionRequest.announcementIds.length)) errors.push("showcase completion requires scoped announcement identities");
       if (state.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON) {
-        if (state.revisionRequest.batchScope !== "news") errors.push("editorial continuation must use the news batch scope");
+        if (!["news", "calendar"].includes(state.revisionRequest.batchScope)) errors.push("editorial continuation must use the news or calendar batch scope");
         if (!/^[\w-]+\.json$/u.test(String(state.revisionRequest.batchName || ""))) errors.push("editorial continuation requires a safe batch name");
         if (!Array.isArray(state.revisionRequest.eventKeys) || !state.revisionRequest.eventKeys.length || state.revisionRequest.eventKeys.some(key => typeof key !== "string" || !key)) {
           errors.push("editorial continuation requires scoped event identities");
@@ -146,7 +146,7 @@ export function applyEditionStateEvent(current, event, data = {}) {
         : "same-edition revision requires explicit user authorization");
     }
     if (event === "supplement-opened" && (!Array.isArray(data.announcementIds) || !data.announcementIds.length || data.announcementIds.some(id => typeof id !== "string" || !id))) throw new Error("supplement requires announcement identities");
-    if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || data.batchScope !== "news" || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
+    if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || !["news", "calendar"].includes(data.batchScope) || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
       throw new Error("editorial continuation requires a scoped news batch");
     }
     if (state.revisionRequest?.status === "open") {

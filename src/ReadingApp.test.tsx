@@ -33,6 +33,18 @@ beforeEach(() => {
 afterEach(async () => { if (root) { await act(async () => root?.unmount()); root = undefined; } document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
 describe("reading sample", () => {
+  it("shows incomplete calendar review even when this edition already has inherited items", () => {
+    const value = structuredClone(edition);
+    value.upcoming = (calendarSnapshot as BriefEdition).upcoming;
+    value.sourceReport = { checked: [], limited: [], note: "", calendarReview: { pages: [{ key: "page", status: "deferred", reason: "Detail unavailable" }], platforms: [] } };
+    render(value);
+    expect(document.querySelector("#upcoming .r-warning")?.textContent).toContain("尚未完成复核");
+    render(value, true);
+    expect(document.querySelector("#upcoming .r-warning")?.textContent).toContain("Calendar review is incomplete");
+    value.sourceReport.calendarReview!.pages[0].status = "reviewed";
+    render(value);
+    expect(document.querySelector("#upcoming .r-warning")).toBeNull();
+  });
   it("renders showcase gaps with one unique anchor per story across multiple groups", () => {
     const value = structuredClone(edition);
     const brief = value.entries.find(entry => entry.id !== value.leadEntryId)!;

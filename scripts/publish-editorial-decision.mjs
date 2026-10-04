@@ -96,6 +96,13 @@ async function hasAuthorizedSameEditionRevision(editorial) {
     const state = JSON.parse(stdout);
     const packetEventKeys = new Set(packet?.editorialInput?.packages?.map(item => item.eventKey) || []);
     const continuationKeys = new Set(state.revisionRequest?.eventKeys || []);
+    const calendarKeys = packet?.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
+    const calendarContinuation = state.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON
+      && state.revisionRequest.batchScope === "calendar" && packet?.continuation?.scope === "calendar"
+      && packet.continuation.preservePublished === true && !packet.editorialInput.packages.length
+      && !packet.editorialInput.trackingQueue.length && calendarKeys.length > 0
+      && new Set(calendarKeys).size === calendarKeys.length && calendarKeys.length === continuationKeys.size
+      && calendarKeys.every(key => /^[0-9a-f]{40}$/.test(key) && continuationKeys.has(key));
     const newsContinuation = state.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON &&
       packet?.continuation?.scope === "news" &&
       packet?.continuation?.preservePublished === true &&
@@ -111,7 +118,7 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)));
     return state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
-      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation) &&
+      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation || calendarContinuation) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
@@ -213,7 +220,7 @@ if (historicalInsertion) {
 }
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
-const continuationPacket = ["news", "showcase"].includes(packet.continuation?.scope);
+const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
 }
