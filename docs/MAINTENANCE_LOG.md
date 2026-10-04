@@ -6,7 +6,9 @@
 - **Evidence:** 2026-10-04 Daily 的 154 条日历任务完整进入 11 个 pinned pages，但全部页和四个平台的回执为 deferred；Canonical 沿用前日 12 项，第二次编辑执行转去历史英文修复。
 - **Root cause:** discovery 没有配套官方详情快照；deferred 只有报告文字，没有 queue 消费者；前端只对跨期 fallback 提示未复核，漏掉直接继承到本期的列表。
 - **Resolution:** 采集 bounded 官方详情/Steam US 商品接口并冻结到去重分页，保留请求预算/失败；未完成日历进入现有 editorial_continuation 的 calendar scope，以 page SHA 授权并严格隔离新闻/追踪；全部页与四平台 reviewed 才完成，否则继续重试。前端中英文均显示未完成核验。任务数量、时刻和 Daily 身份不变。
-- **Verification:** 本地完整 check 与真实官方详情采集；PR/生产证据在合并后补充。MNT-20260908-02 的自然期次持续核验验收仍需真实后续运行，不能以单元测试代替。
+- **Verification (2026-10-05, Asia/Shanghai):** [PR #204](https://github.com/fallw1nd/daily-game-brief/pull/204) 已合并为 `6f4f9e4999a21d8a4e5e6e2d27048497168eab02`；最终完整 check 通过 104 文件 / 580 测试、数据/英文校验和生产构建。原 packet `69cd0deccf8eb488ebdb1d5d67431a7cc74a991f` 的授权修订通过 inbox `b9a66c7001577034668a625d4647a916cbb5ef26` 交稿，GitHub 发布为 `d92979a4fbef688900a93305aea6d4733cda5132`，[Pages run 37218081058](https://github.com/fallw1nd/daily-game-brief/actions/runs/37218081058) 的 durable receipt 为 deployed。
+- **Production result:** 10月4日 NO.55 的10月5日至19日日历由12条增至144条，补入132条官方来源支持的平台发售计划。线上 latest/archive 与 main 一致，英文校验有效；15条新闻、追踪、原12项基线、期号/窗口与其他历史归档保持。真实 Chrome 的中英文、明暗主题、320/390/768/1024/1440px 共20组布局及交互检查通过。封面未核实的条目明确标记 unavailable，不用虚构图片掩盖缺失。
+- **Still open:** 跨平台日期冲突、部分年龄验证页面及官方源覆盖上限仍明确 deferred。下一次自然 Daily 的官方快照、calendar scope 排队及真实编辑续接尚未获得运行证据；本次手动补核和单元测试不能替代 MNT-20260908-02 的持续自然运行验收。证据保存于 `D:/Tool/Codex/artifacts/calendar-fix-20261004/production-verification.json`、`runtime-status.json`、`responsive-results.json`。
 
 本文件是项目长期维护的“问题发现 → 处理 → 验证 → 关闭”账本，不是版本发布日志，也不替代 GitHub Issues / Pull Requests。
 
