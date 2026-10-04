@@ -6,6 +6,7 @@ import {
 } from "./edition-state.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
 import { mergeShowcaseRefs, showcaseRetryDue } from "./showcase.mjs";
+import { calendarReviewComplete } from "./calendar-review.mjs";
 
 const SAFE_BATCH_NAME = /^[\w-]+\.json$/u;
 
@@ -14,7 +15,7 @@ function unique(values) {
 }
 
 function assertBatchShape(batch) {
-  if (!batch || !["news", "showcase"].includes(batch.scope)) throw new Error("editorial queue contains an unsupported batch scope");
+  if (!batch || !["news", "showcase", "calendar"].includes(batch.scope)) throw new Error("editorial queue contains an unsupported batch scope");
   if (!SAFE_BATCH_NAME.test(String(batch.name || ""))) throw new Error("editorial queue contains an unsafe batch filename");
   if (!Array.isArray(batch.eventKeys) || !batch.eventKeys.length || batch.eventKeys.some(key => typeof key !== "string" || !key)) {
     throw new Error(`editorial batch ${batch.name} requires event identities`);
@@ -33,6 +34,15 @@ function validateBatchPacket(packetText, batch, editionId) {
     throw new Error(`editorial batch ${batch.name} has an invalid continuation scope`);
   }
   const packages = packet.editorialInput?.packages || [];
+  if (batch.scope === "calendar") {
+    const keys = packet.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
+    if (packages.length || packet.editorialInput?.trackingQueue?.length || !keys.length
+      || keys.some(key => !/^[0-9a-f]{40}$/.test(key)) || new Set(keys).size !== keys.length
+      || [...keys].sort().join("\0") !== [...batch.eventKeys].sort().join("\0")) {
+      throw new Error(`calendar batch ${batch.name} must contain only its pinned calendar page identities`);
+    }
+    return packet;
+  }
   if (!packages.length) throw new Error(`editorial batch ${batch.name} must contain at least one package`);
   const packageKeys = packages.map(item => item.eventKey);
   if (packageKeys.some(key => typeof key !== "string" || !key) || new Set(packageKeys).size !== packageKeys.length) {
@@ -66,6 +76,8 @@ function showcaseCoverage(queue, canonical) {
 }
 
 function nextBatch(queue, nowMs) {
+  const calendar = queue.batches.find(batch => batch.scope === "calendar" && (batch.status === "pending"
+    || (batch.status === "awaiting_retry" && showcaseRetryDue(queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
   // News gets the first continuation turn, then a pending showcase gets the
   // next turn when one exists. This keeps Canonical progress ahead of a
   // showcase without allowing a sustained news backlog to starve it.
@@ -75,6 +87,8 @@ function nextBatch(queue, nowMs) {
   const pending = newsFirst
     ? pendingNews || pendingShowcase
     : pendingShowcase || pendingNews;
+  if (pendingNews) return pending;
+  if (calendar) return calendar;
   if (pending) return pending;
   const dueNews = queue.batches.find(batch => batch.scope === "news" && batch.status === "awaiting_retry" && showcaseRetryDue(
     queue.firstPublishedAt,
@@ -114,6 +128,10 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, ledger
   }
 
   for (const batch of nextQueue.batches) {
+    if (batch.scope === "calendar" && calendarReviewComplete(batch.eventKeys, canonical.sourceReport?.calendarReview)) {
+      batch.status = "completed";
+      continue;
+    }
     if (batch.scope === "showcase" && batch.eventKeys.every(key => covered.has(key))) {
       batch.status = "completed";
       continue;

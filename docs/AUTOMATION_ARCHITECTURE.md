@@ -57,6 +57,7 @@ The SLA watchdog restores the acknowledged packet first. If it is missing/stale/
 A published edition may receive queue-authorized same-edition continuations without changing its issue/window.
 
 - `editorial_continuation`: bounded news packet with exact event-key scope and `preservePublished:true`.
+- `editorial_continuation` with `batchScope:"calendar"`: an empty-news packet scoped to the exact calendar page blob SHAs in its queue entry. Preserves published news/tracking/title/issue/window; applies only calendar patches and review receipts. Unfinished calendar work stays queued ahead of English repair, using the existing task slots and recovery sweep.
 - `showcase_completion`: bounded showcase/fact supplement; see `docs/SHOWCASE_RECOVERY.md`.
 - user-authorized same-edition revision: explicit wake/revision authorization tied to the existing edition and packet rules.
 

@@ -24,3 +24,8 @@ export function validateCalendarReview(work, review) {
   }
   return errors;
 }
+
+export function calendarReviewComplete(pageKeys, review) {
+  return validateCalendarReview({ pages: pageKeys.map(blobSha => ({ blobSha })) }, review).length === 0
+    && [...review.pages, ...review.platforms].every(row => row.status === "reviewed");
+}

@@ -4,9 +4,56 @@ import { applyEditionStateEvent, createEditionState, gitBlobSha } from "./lib/ed
 import { buildEdition } from "./lib/edition-publisher.mjs";
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
 import { projectionDigest } from "./lib/locale-digest.mjs";
+import { deferredCalendarReview } from "./lib/calendar-review.mjs";
 
 const editionId = "2026-09-11-daily";
 const window = expectedEditorialWindow(editionId);
+
+it("keeps deferred calendar work in the trusted queue and closes it only after every page and platform is reviewed", () => {
+  const pageKey = "a".repeat(40);
+  const calendarWork = { pages: [{ blobSha: pageKey }] };
+  const text = packet([], "calendar", { calendarWork });
+  const fixture = { state: publishedState(), canonical: { id: editionId, entries: [], sourceReport: { calendarReview: deferredCalendarReview(calendarWork, "Official detail unavailable") } },
+    queue: { editionId, batches: [{ name: "calendar.json", scope: "calendar", status: "pending", eventKeys: [pageKey] }] }, packets: { "calendar.json": text } };
+  const first = advanceEditorialQueue(fixture);
+  expect(first.batch.scope).toBe("calendar");
+  expect(first.state.revisionRequest).toMatchObject({ reason: "editorial_continuation", batchScope: "calendar", eventKeys: [pageKey] });
+  expect(first.state.packet.blobSha).toBe(gitBlobSha(text));
+  const state = publishContinuation(first.state, text, "4".repeat(40));
+  const partial = advanceEditorialQueue({ ...fixture, state, queue: first.queue });
+  expect(partial.queue.batches[0].status).toBe("awaiting_retry");
+  expect(partial.packet).toBeNull();
+  const reviewed = structuredClone(fixture.canonical);
+  [...reviewed.sourceReport.calendarReview.pages, ...reviewed.sourceReport.calendarReview.platforms].forEach(row => row.status = "reviewed");
+  const complete = advanceEditorialQueue({ ...fixture, canonical: reviewed });
+  expect(complete.queue.batches[0].status).toBe("completed");
+  expect(complete.packet).toBeNull();
+  const tampered = packet(["foreign-news"], "calendar", { calendarWork });
+  expect(() => advanceEditorialQueue({ ...fixture, packets: { "calendar.json": tampered } })).toThrow(/only its pinned calendar/);
+  expect(() => advanceEditorialQueue({ ...fixture, queue: { ...fixture.queue, batches: [{ ...fixture.queue.batches[0], eventKeys: ["b".repeat(40)] }] } })).toThrow(/only its pinned calendar/);
+});
+
+it("publishes a calendar-only continuation without changing news, issue, lead, tracking or news audit", () => {
+  const existing = { id: `${editionId}-news-0`, title: { title_key: "game", title_en: "Game", title_zh_status: "unavailable" }, headline: "Game 已确认新闻", sources: [] };
+  const latest = { id: editionId, issueNumber: 40, archiveTitle: "日报｜Game 已确认新闻", leadEntryId: existing.id, entries: [existing], upcoming: [], tracking: ["keep"], sourceReport: { checked: ["news evidence"], limited: ["news limitation", "日历核验延期 old"], note: "news note", auditStats: { eventLedgerCandidates: 29 } } };
+  const manifest = { latest: editionId, editions: [{ id: editionId, issueNumber: 40 }] };
+  const calendarWork = { pages: [{ blobSha: "a".repeat(40) }] };
+  const calendarPacket = JSON.parse(packet([], "calendar", { calendarWork }));
+  const editorial = { editionId, archiveTitle: latest.archiveTitle, decisions: [], upcomingMode: "inherit_and_patch", removeUpcomingIds: [], upcoming: [{ id: "release", date: "2026-09-12", titleKey: "new-game", titleEn: "New Game", titleZhCn: null, titleZhStatus: "unavailable", platforms: ["PC"], region: "US", releaseType: "正式发售", source: { label: "Steam", url: "https://store.steampowered.com/app/123/", kind: "primary" }, note: "Official store date verified" }], checkedExtra: ["calendar detail"], limitedExtra: [], editorialNote: "Calendar review", calendarReview: deferredCalendarReview(calendarWork, "one remaining blocker") };
+  const result = buildEdition({ packet: calendarPacket, editorial, latest, manifest, allowSameEditionRevision: true });
+  expect(result.edition.entries).toEqual(latest.entries);
+  expect(result.edition.tracking).toEqual(latest.tracking);
+  expect(result.edition.issueNumber).toBe(40);
+  expect(result.edition.archiveTitle).toBe(latest.archiveTitle);
+  expect(result.edition.leadEntryId).toBe(latest.leadEntryId);
+  expect(result.edition.upcoming).toHaveLength(1);
+  expect(result.edition.upcoming[0].date).toBe("09.12");
+  expect(result.edition.sourceReport.auditStats).toEqual(latest.sourceReport.auditStats);
+  expect(result.edition.sourceReport.note).toBe("news note");
+  expect(result.edition.sourceReport.limited).toContain("news limitation");
+  expect(result.edition.sourceReport.limited).not.toContain("日历核验延期 old");
+  expect(() => buildEdition({ packet: calendarPacket, editorial: { ...editorial, decisions: [{ decision: "include" }] }, latest, manifest, allowSameEditionRevision: true })).toThrow(/cannot change news/);
+});
 
 function publishedState() {
   let state = createEditionState(editionId, "2026-09-11T04:00:00.000Z");

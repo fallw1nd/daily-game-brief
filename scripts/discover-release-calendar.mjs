@@ -3,13 +3,14 @@ import { dirname, resolve } from "node:path";
 import { collectReleaseCalendar, boundCalendarReport } from "./lib/release-calendar-discovery.mjs";
 import { loadCanonicalUpcomingBaseline } from "./lib/upcoming-baseline.mjs";
 import { persistCalendarHealth, readOptionalJson } from "./lib/release-calendar-health-io.mjs";
+import { collectCalendarPrimaryEvidence } from "./lib/calendar-primary-evidence.mjs";
 const date = process.argv.find(arg => arg.startsWith("--date="))?.slice(7)
   || JSON.parse(await readFile(process.env.NEWS_EVIDENCE_PATH || "artifacts/news-evidence.json", "utf8")).window.id.slice(0, 10);
 if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) throw new Error("Pass --date=YYYY-MM-DD (edition date in Asia/Shanghai)");
 const [config, latest, manifest, titleRegistry] = await Promise.all(["config/release-calendar-sources.json", "public/data/latest.json", "public/data/manifest.json", "config/title-translations.json"].map(path => readFile(path, "utf8").then(JSON.parse)));
 const baseline = await loadCanonicalUpcomingBaseline({ latest, manifest, editionDate: date });
 const previousHealth = await readOptionalJson(process.env.RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH || "artifacts/release-calendar-health-previous.json", { allowMalformed: true });
-const report = await collectReleaseCalendar({ config, editionDate: date, baseline: baseline.items, titleRegistry, previousHealth });
+const report = await collectCalendarPrimaryEvidence(await collectReleaseCalendar({ config, editionDate: date, baseline: baseline.items, titleRegistry, previousHealth }), { baseline: baseline.items });
 const reportPath = resolve(process.env.RELEASE_CALENDAR_REPORT_PATH || "artifacts/release-calendar-discovery.json");
 const packetPath = resolve(process.env.RELEASE_CALENDAR_PACKET_PATH || "artifacts/release-calendar-packet.json");
 await mkdir(dirname(reportPath), { recursive: true });

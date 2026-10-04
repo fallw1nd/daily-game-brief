@@ -32,7 +32,7 @@ export interface UpcomingEntry {
   id: string; date: string; title: GameTitle; platforms: string[]; region: string; releaseType: string; source: SourceLink; mediaSources?: SourceLink[]; note: string;
   cover?: ImageAsset; cover_status?: ImageAvailabilityStatus; coverNote?: string;
 }
-export interface SourceReport { checked: string[]; limited: string[]; note: string; }
+export interface SourceReport { checked: string[]; limited: string[]; note: string; calendarReview?: { pages: { key: string; status: "reviewed" | "deferred"; reason: string }[]; platforms: { key: string; status: "reviewed" | "deferred"; reason: string }[] }; }
 export interface BriefEdition {
   showcases?: { id: string; title: string; titleEn: string; status: "complete" | "partial"; total: number; covered: number; entryIds: string[] }[];
   schemaVersion?: 1 | 2; archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: EditionPeriod; plannedAt: string;

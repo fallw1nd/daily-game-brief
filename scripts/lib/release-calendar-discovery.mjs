@@ -352,5 +352,7 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
 }
 
 export function boundCalendarReport(report, maxChars = 24000) {
-  return selectCalendarPacket({ report, maxCandidates: 100, maxChars });
+  const compact = item => { const { primaryEvidence, ...rest } = item; return rest; };
+  const { baselineChecks, ...preview } = report;
+  return selectCalendarPacket({ report: { ...preview, candidates: (report.candidates || []).map(compact), allCandidates: report.allCandidates?.map(compact), reviewLinks: (report.reviewLinks || []).map(compact) }, maxCandidates: 100, maxChars });
 }
