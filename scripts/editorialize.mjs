@@ -59,7 +59,12 @@ if (evidence.window.period === "daily") {
   await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   calendarDiscovery = boundCalendarReport(report);
-  calendarWork = buildCalendarWorkPages(report);
+  // Keep the complete inherited calendar in the existing pinned research pages,
+  // not in the news input budget a second time (including images and provenance).
+  // Cached reports may predate baseline checks, so restore every Canonical item.
+  const checksById = new Map((report.baselineChecks || []).map(check => [check.item.id, check]));
+  calendarWork = buildCalendarWorkPages({ ...report, baselineChecks: calendarBaseline.items.map(item => ({ ...checksById.get(item.id), item })) });
+  calendarBaseline = { ...calendarBaseline, itemCount: calendarBaseline.items.length, items: [], itemsLocation: "calendarWork.pages:baseline-check" };
   console.log("Calendar coverage: " + JSON.stringify(report.coverage));
   const calendarMetrics = calendarDiscovery.omissionTelemetry;
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, "\n### Release calendar discovery\n\n" + report.coverage.map(s => `- ${s.sourceId}: ${s.status}, ${s.inWindow} rows in window`).join("\n") + `\n\n${calendarMetrics.visibleRawRows} visible report rows → ${calendarMetrics.uniqueTasks} unique tasks (${calendarMetrics.dedupeReduction} duplicate rows removed); ${calendarDiscovery.candidates.length} tasks in packet. Omitted: ${calendarMetrics.capOmittedTasks} at candidate cap, ${calendarMetrics.budgetOmittedTasks} at character budget, ${calendarMetrics.linkOmitted} review links at character budget. Final family task counts: ${JSON.stringify(calendarMetrics.platformFinalTaskCounts)}. Calendar packet ${JSON.stringify(calendarDiscovery).length}/24000 chars; discovery requires primary-source verification.\n`);
@@ -72,6 +77,7 @@ const showcaseReserve = showcaseManifest.events.length ? JSON.stringify(showcase
 const extraPackages = showcaseEvidencePackages(showcaseReport);
 const combinedEvidence = { ...evidence, packages: [...evidence.packages, ...extraPackages].sort((a, b) => Number(b.tier === "A") - Number(a.tier === "A") || (b.score || 0) - (a.score || 0)) };
 const inputLimit = MAX_INPUT_CHARS - titleHintReserve - calendarReserve - showcaseReserve;
+if (inputLimit <= 0) throw new Error(`editorial metadata exceeds input budget: calendar=${calendarReserve}, titleHints=${titleHintReserve}, showcases=${showcaseReserve}, total=${MAX_INPUT_CHARS}`);
 const editorialInput = buildEditorialInput(combinedEvidence, inputLimit, ledger);
 if (showcaseManifest.events.length) editorialInput.showcases = showcaseManifest;
 const delivered = new Set(editorialInput.packages.map(item => item.eventKey));
@@ -79,7 +85,7 @@ let remaining = combinedEvidence.packages.filter(item => !delivered.has(item.eve
 const continuationInputs = [];
 while (remaining.length) {
   const showcaseRemaining = remaining.filter(item => item.showcaseRefs?.length);
-  const input = buildEditorialInput({ ...evidence, packages: showcaseRemaining.length ? showcaseRemaining : remaining }, inputLimit, null);
+  const input = buildEditorialInput({ ...evidence, packages: showcaseRemaining.length ? showcaseRemaining : remaining }, MAX_INPUT_CHARS - titleHintReserve - showcaseReserve, null);
   if (!input.packages.length) throw new Error("an evidence item cannot fit in a bounded continuation packet");
   if (showcaseManifest.events.length) input.showcases = showcaseManifest;
   continuationInputs.push(input);

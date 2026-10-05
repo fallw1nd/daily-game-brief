@@ -16,6 +16,8 @@ Priority: new Canonical work → current Daily liveness wake → oldest ready `e
 
 ## 2. Decide within the packet
 
+The complete inherited calendar is in the pinned `calendarWork.pages` items with `kind:"baseline-check"`, under `baseline.item`. `upcomingBaseline.itemCount` records its count; `items:[]` with `itemsLocation:"calendarWork.pages:baseline-check"` means paged storage, not an empty calendar. Read these pages before calendar edits. The publisher still inherits the full Canonical baseline.
+
 - Return one `include`/`exclude`/`needs_review` per packet item; add nothing outside the packet.
 - Follow `AGENTS.md` evidence thresholds. `official` needs primary evidence; two independent reliable sources are required only for `multi_source_verified`; `needs_review` requires a material blocker. Never invent a `requires_subject_identity` subject.
 - Continuations preserve the edition, existing published content, issue/window, and scoped identities. News continuations cannot add calendar/showcase facts. Showcase completion follows `docs/SHOWCASE_RECOVERY.md`.
