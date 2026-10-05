@@ -1,5 +1,12 @@
 # Maintenance Issue Log
 
+## MNT-20261005-01 — Large calendar blocks next-day packet and missing-state recovery aborts
+
+- **Status:** in_progress
+- **Evidence:** October 5 wake `65525ef853dee440edbed29d539286dc8436e336` did trigger run 37255198618. Collection succeeded, but editorialization failed with “active tracking queue exceeds the editorial input budget”. The illustrated 144-item calendar occupied 111,185 characters before other metadata; reserving the complete baseline again exhausted the news budget. The 11:00 watchdog run 37257602382 then exited 128 in its missing-status `git show | node` command substitution under Bash pipefail, skipping recovery entirely.
+- **Resolution:** Store the complete baseline losslessly in existing SHA-pinned baseline-check pages; inline only its count/location/range. Keep news continuation capacity independent from calendar metadata. Restore exact packets with explicit missing/invalid results while retaining hard failures for unreadable state refs; missing state now enters GitHub rebuild.
+- **Validation:** Added next-day integration with 300 illustrated baseline items, complete SHA/page round-trip and surviving news, plus real-Git missing/invalid/immutable packet tests. Full check, CI and real October 5 recovery/publication evidence remain required before closure.
+
 ## MNT-20261004-01 — 日历线索全部延期后没有编辑续接
 
 - **Status:** in_progress

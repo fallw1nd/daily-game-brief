@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { pathToFileURL } from "node:url";
-import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, mkdir, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -11,6 +11,33 @@ import { gitBlobSha } from "./lib/edition-state.mjs";
 const exec = promisify(execFile);
 
 describe("calendar packet integration", () => {
+  it("carries a large illustrated calendar into the next Daily without starving news or losing baseline items", async () => {
+    const root = await mkdtemp(join(tmpdir(), "calendar-next-day-"));
+    await mkdir(join(root, "public/data"), { recursive: true });
+    await mkdir(join(root, "config"));
+    for (const name of ["release-calendar-sources.json", "title-translations.json"]) await copyFile(resolve("config", name), join(root, "config", name));
+    const items = Array.from({ length: 300 }, (_, i) => ({ id: `release-${i}`, date: "10.08", title: { title_key: `game-${i}`, title_en: `Game ${i}` }, platforms: ["PC"], region: "美国", releaseType: "正式发售", note: "verified source context ".repeat(30), source: { url: `https://store.steampowered.com/app/${i+1}/`, label: "Steam", kind: "primary" }, cover: { url: `media/${i}.jpg`, alt: `Game ${i}`, credit: "Steam" } }));
+    await writeFile(join(root, "public/data/latest.json"), JSON.stringify({ id: "2026-10-04-daily", upcoming: items }));
+    await writeFile(join(root, "public/data/manifest.json"), JSON.stringify({ editions: [] }));
+    const evidence = { window: expectedEditorialWindow("2026-10-05-daily"), packages: [{ eventKey: "news-still-delivered", subjectKey: "test-game", headline: "Confirmed game update", sources: [{ status: "opened", kind: "primary", label: "Official", url: "https://official.example/update", evidenceText: "Confirmed game update details.".repeat(100) }] }] };
+    await writeFile(join(root, "evidence.json"), JSON.stringify(evidence));
+    await writeFile(join(root, "report.json"), JSON.stringify({ editionDate: "2026-10-05", window: { startInclusive: "2026-10-06", endInclusive: "2026-10-20" }, coverage: [], allCandidates: [], candidates: [], reviewLinks: [] }));
+    await exec(process.execPath, [resolve("scripts/editorialize.mjs")], { cwd: root, env: { ...process.env, NEWS_EVIDENCE_PATH: join(root, "evidence.json"), EDITORIAL_PACKET_PATH: join(root, "packet.json"), RELEASE_CALENDAR_REPORT_PATH: join(root, "report.json"), REUSE_RELEASE_CALENDAR_REPORT: "true", EVENT_LEDGER_PATH: join(root, "absent-ledger.json"), TITLE_HINTS_PATH: join(root, "absent-hints.json") } });
+    const packet = JSON.parse(await readFile(join(root, "packet.json"), "utf8"));
+    expect(packet.editorialInput.packages.map(x => x.eventKey)).toEqual(["news-still-delivered"]);
+    expect(JSON.stringify(packet.editorialInput).length).toBeLessThan(120000);
+    expect(packet.editorialInput.upcomingBaseline.itemCount).toBe(300);
+    expect(packet.editorialInput.upcomingBaseline.items).toEqual([]);
+    const restored = [];
+    for (const page of packet.editorialInput.calendarWork.pages) {
+      const text = await readFile(join(root, "editorial-batches", page.name), "utf8");
+      expect(gitBlobSha(text)).toBe(page.blobSha);
+      expect(text.length).toBeLessThanOrEqual(24000);
+      restored.push(...JSON.parse(text).items.filter(x=>x.kind==="baseline-check").map(x=>x.baseline.item));
+    }
+    expect(restored).toEqual(items);
+    expect(validateFinalizedEditorialPacket(packet, { editionId: "2026-10-05-daily", period: "daily" })).toEqual([]);
+  }, 20000);
   it("runs the real handoff builder with a failed discovery network without breaking news or inventing releases", async () => {
     const root = await mkdtemp(join(tmpdir(), "calendar-packet-"));
     const evidencePath = join(root, "evidence.json");
@@ -70,8 +97,10 @@ describe("calendar packet integration", () => {
     const page = packet.editorialInput.calendarWork.pages[0];
     const pageText = await readFile(join(root, "editorial-batches", page.name), "utf8");
     expect(gitBlobSha(pageText)).toBe(page.blobSha);
-    expect(JSON.parse(pageText).items[0].candidate.title).toBe("Game beyond inline preview");
-    expect(packet.editorialInput.calendarWork.totalTasks).toBe(1);
+    const workItems = [];
+    for (const receipt of packet.editorialInput.calendarWork.pages) workItems.push(...JSON.parse(await readFile(join(root, "editorial-batches", receipt.name), "utf8")).items);
+    expect(workItems.filter(item=>item.kind==="candidate").map(item=>item.candidate.title)).toEqual(["Game beyond inline preview"]);
+    expect(packet.editorialInput.calendarWork.totalTasks).toBe(1 + packet.editorialInput.upcomingBaseline.itemCount);
   }, 20000);
 
   it("loads the previous calendar ledger on editorialize's direct discovery path", async () => {
