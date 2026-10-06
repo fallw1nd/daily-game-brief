@@ -27,4 +27,8 @@ describe("standalone headline subjects", () => {
   it("rejects unknown identity rather than inventing one", () => {
     expect(() => headline("新作公布", {})).toThrow("confirmed title identity");
   });
+  it("recognizes an evidence-named company after the archive prefix", () => {
+    expect(headline("日报｜Nintendo推出日本限定套装", title, { archive: true, entities: ["Nintendo"] })).toBe("日报｜Nintendo推出日本限定套装");
+    expect(headline("日报｜Nintendo Direct结束后上线", title, { archive: true, entities: ["Nintendo Direct"] })).toBe("日报｜《神鬼寓言》：Nintendo Direct结束后上线");
+  });
 });

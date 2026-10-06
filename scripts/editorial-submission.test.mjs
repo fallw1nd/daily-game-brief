@@ -41,6 +41,13 @@ const editorial = {
 };
 
 describe("editorial submission handoff", () => {
+  it("rejects an archive title that only exceeds the limit after subject normalization", () => {
+    const longTitle = "Nintendo Switch 2 (Japanese / Japan-Only) Choose-Your-Game Bundle";
+    const draft = { ...editorial, archiveTitle: "早报｜日本自选软件套装公布", decisions: [{ ...editorial.decisions[0], titleKey: "nintendo-bundle", titleZhCn: null, titleEn: longTitle, sharedFactFrame: { ...editorial.decisions[0].sharedFactFrame, subjectTitleKey: "nintendo-bundle" } }] };
+    expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: draft, packetBlobSha })).toContain("normalized archiveTitle must contain 8–40 characters with the matching period prefix; use a confirmed subject and shorten the title");
+    const repaired = { ...draft, archiveTitle: "早报｜Nintendo推出日本自选软件套装", decisions: [{ ...draft.decisions[0], sharedFactFrame: { ...draft.decisions[0].sharedFactFrame, peopleAndEntities: ["Nintendo"] } }] };
+    expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: repaired, packetBlobSha })).toEqual([]);
+  });
   it("accepts an evidence-bounded decision on the matching branch", () => {
     expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial, packetBlobSha })).toEqual([]);
   });
