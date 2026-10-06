@@ -10,10 +10,9 @@ import { loadReadingCalendar, type ReadingCalendar } from "./lib/reading-calenda
 import { readingHref, readingLead, readingWindow } from "./lib/reading";
 import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactStatus, ImageAsset, SectionKey } from "./types";
 import "./reading.css";
+import { EditionLoading } from "./components/EditionLoading";
+import { accents, storedTheme, storedAccent, type Theme, type Accent } from "./lib/reading-preferences";
 
-type Theme = "light" | "dark";
-type Accent = "orange" | "cobalt" | "jade" | "violet" | "rose" | "playstation" | "switch" | "xbox" | "pink";
-const accents: Accent[] = ["orange", "cobalt", "jade", "violet", "rose", "playstation", "switch", "xbox", "pink"];
 const accentNames: Record<Accent, [string, string]> = {
   orange: ["暖阳橙", "Sunset orange"], cobalt: ["深海蓝", "Ocean blue"], jade: ["松林绿", "Forest green"],
   violet: ["暮光紫", "Twilight purple"], rose: ["蔷薇红", "Rose red"], playstation: ["PS蓝", "PS blue"],
@@ -35,14 +34,6 @@ const subject = (entry: BriefEntry) => entry.title.title_zh_cn || entry.title.ti
 const label = (pair: [string, string], english: boolean) => pair[english ? 1 : 0];
 const mediaUrl = (url: string) => /^https?:/.test(url) ? url : import.meta.env.BASE_URL + url.replace(/^\/+/, "");
 
-function storedTheme(): Theme {
-  try { const value = localStorage.getItem("brief-theme"); if (value === "light" || value === "dark") return value; } catch { /* Storage is optional. */ }
-  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-function storedAccent(): Accent {
-  try { const value = localStorage.getItem("brief-accent"); if (accents.includes(value as Accent)) return value as Accent; } catch { /* Storage is optional. */ }
-  return "orange";
-}
 
 function Photo({ asset, lead = false, cover = false, english }: { asset?: ImageAsset; lead?: boolean; cover?: boolean; english: boolean }) {
   const [failedUrl, setFailedUrl] = useState("");
@@ -309,7 +300,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     </div><span className="r-reading-progress" aria-hidden="true" /></header>
 
     {!edition ? <main className="r-loading r-container" aria-live="polite">
-      {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <><p>{t("正在读取简报…", "Loading the edition…")}</p><div className="r-skeleton" /><div className="r-skeleton r-skeleton--short" /></>}
+      {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <EditionLoading english={english} />}
     </main> : <main className="r-container" id="top">
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
       <section className="r-lead" id="content" aria-labelledby="r-edition-title">

@@ -5,6 +5,8 @@ import App from "./App";
 import EnglishApp from "./EnglishApp";
 import "./styles.css";
 import "./locale.css";
+import "./reading.css";
+import { LoadingPage } from "./components/EditionLoading";
 
 function LocaleSwitch({ english }: { english: boolean }) {
   const [target, setTarget] = React.useState<HTMLElement | null>(null);
@@ -44,7 +46,7 @@ document.documentElement.lang = english ? "en" : "zh-CN";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {reading ? <React.Suspense fallback={<p role="status">正在读取简报 / Loading…</p>}><ReadingApp english={english} /></React.Suspense> : english ? <EnglishApp /> : <App />}
+    {reading ? <React.Suspense fallback={<LoadingPage english={english} />}><ReadingApp english={english} /></React.Suspense> : english ? <EnglishApp /> : <App />}
     {!reading && <LocaleSwitch english={english} />}
   </React.StrictMode>,
 );
