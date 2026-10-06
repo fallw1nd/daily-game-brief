@@ -1,6 +1,7 @@
 import { validateEditorialOutput } from "./editorial-contract.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
 import { archiveTitlePrefix, hasValidArchiveTitle } from "./archive-title.mjs";
+import { normalizeEditorialArchiveTitle } from "./headline-subject.mjs";
 
 const editionPattern = /^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/;
 
@@ -78,6 +79,13 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
     item.eventKey === editorial?.leadEventKey && item.decision === "include"
   );
   if (!lead && !noOpNewsContinuation && !isCalendarContinuation) errors.push("leadEventKey must reference an included decision");
+  if (lead && !packet?.continuation?.preservePublished) {
+    try {
+      if (!hasValidArchiveTitle(normalizeEditorialArchiveTitle(editorial.archiveTitle, lead), period)) {
+        errors.push("normalized archiveTitle must contain 8–40 characters with the matching period prefix; use a confirmed subject and shorten the title");
+      }
+    } catch (error) { errors.push(`archiveTitle normalization failed: ${error.message}`); }
+  }
   return [...new Set(errors)];
 }
 

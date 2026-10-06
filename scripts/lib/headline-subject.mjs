@@ -1,4 +1,4 @@
-import { getRegisteredTitleTranslation } from "./title-translations.mjs";
+import { getRegisteredTitleTranslation, localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 
 function normalize(value) {
   return String(value || "").normalize("NFKC").toLowerCase().replace(/[’‘]/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -21,16 +21,24 @@ export function normalizeSubjectHeadline(headline, title, { locale = "zh", entit
   const registered = getRegisteredTitleTranslation(title.title_key, title.title_en);
   const aliases = [title.title_en, ...(locale === "en" ? [] : [title.title_zh_cn, title.title_ja]), ...(registered?.titleEnAliases || [])];
   if (aliases.some(alias => containsName(headline, alias))) return headline;
-  // An institution mentioned in a time clause or platform suffix is not the headline's subject.
-  if (entities.some(entity => {
-    const value = normalize(entity);
-    const text = normalize(headline);
-    return value.length >= 2 && text.startsWith(value) && !/^(?:[a-z0-9]|\s*(?:结束后|之后|期间|版|版本|after\b|during\b|version\b))/i.test(text.slice(value.length));
-  })) return headline;
-  // Preserve the degraded marker at the start: recovery uses it to identify placeholders.
   const marker = headline.match(/^\[自动事实清单\]\s*/)?.[0] || "";
   const rest = headline.slice(marker.length);
   const prefix = archive ? rest.match(/^(?:日报｜|早报｜|晚报｜|Daily Brief\s*\|\s*|Morning Brief\s*\|\s*|Evening Brief\s*\|\s*)/)?.[0] || "" : "";
+  // An institution mentioned in a time clause or platform suffix is not the headline's subject.
+  if (entities.some(entity => {
+    const value = normalize(entity);
+    const text = normalize(rest.slice(prefix.length));
+    return value.length >= 2 && text.startsWith(value) && !/^(?:[a-z0-9]|\s*(?:结束后|之后|期间|版|版本|after\b|during\b|version\b))/i.test(text.slice(value.length));
+  })) return headline;
+  // Preserve the degraded marker at the start: recovery uses it to identify placeholders.
   const subject = locale === "en" || registered?.subjectType === "entity" ? name : `《${name}》`;
   return `${marker}${prefix}${subject}${locale === "en" ? ": " : "："}${rest.slice(prefix.length)}`;
+}
+
+// Submission validation and publication must check the same normalized title.
+export function normalizeEditorialArchiveTitle(headline, decision) {
+  const resolved = resolveTitleTranslation({ titleKey: decision.titleKey, titleEn: decision.titleEn, titleZhCn: decision.titleZhCn, titleZhStatus: decision.titleZhStatus });
+  const title = { title_key: resolved.titleKey, title_en: resolved.titleEn, title_zh_cn: resolved.titleZhCn };
+  const names = { titleEn: title.title_en, titleZhCn: title.title_zh_cn };
+  return normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(headline, names), names), title, { archive: true, entities: decision.sharedFactFrame?.peopleAndEntities || [] });
 }
