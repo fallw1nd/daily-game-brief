@@ -30,6 +30,10 @@ The default ReadingApp now uses the selected accent for the entire interface, wi
 
 ReadingApp additionally offers PS classic blue, Switch red, Xbox green and Candy pink. These are platform-inspired reader themes with accessible light/dark text variants, not uniform brand-colour fills. The pink swatch is soft candy pink; foregrounds deepen on light surfaces. All nine options drive supporting regions and persist locally. Keep the settings panel scrollable on short screens.
 
+## Loading screen (2026-10-06)
+
+Use one compact paper-sheet mark, clear loading text and an indeterminate accent rule across the initial HTML, lazy module and edition-data loading states. Reuse ReadingApp theme/accent tokens and saved preferences; never show invented percentages or delay ready content to finish an animation. Paper/rule motion is subtle, stops after six paper cycles, and is disabled under reduced motion. After ten seconds, show a plain slow-connection message. Keep existing failure/retry states and load completion behavior. Both Chinese and English copy must fit 320px screens.
+
 ## Reader chrome adjustment (2026-10-03)
 
 The user's revised preference supersedes the earlier above-lead directory placement: keep the edition date/number at the top, with no edition-details shortcut. Place the complete directory near the bottom, beside the edition-details disclosure; both start collapsed. Readers explicitly expand either disclosure when needed. Accent labels use PS蓝, NS红, XBOX绿 and three-character descriptive names 暖阳橙、深海蓝、松林绿、暮光紫、蔷薇红、糖果粉. Internal accent IDs and saved preferences are unchanged.
