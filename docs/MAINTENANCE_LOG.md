@@ -1,5 +1,12 @@
 # Maintenance Issue Log
 
+## MNT-20261015-01 — Calendar labels reject otherwise complete English editions
+
+- Status: root fix verified locally; production repair in progress.
+- October 10–15 English-unavailable receipts identify unmapped calendar region/release labels. Add the seven observed dictionary values rather than loosening English validation. October 13 also needs its untranslated presentation labels repaired through the locale inbox.
+- Verification: full check passed, 105 files / 585 tests, 66 Canonical archives and locale infrastructure, production build. The new regression runs the English repair builder against all five affected platform release types and both region labels.
+- Audit, secondary request results and outstanding work: [2026-10-15 report](incident-notes/second-publish-20261015.md).
+
 ## MNT-20261006-01 — Archive title passes validation but fails after subject normalization
 
 - **Status:** resolved

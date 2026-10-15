@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { canonicalCopyDigest, factsDigest, localeDigest } from "./lib/locale-digest.mjs";
 import { validateEnglishOverlay } from "./lib/locale-overlay.mjs";
+import { buildEnglishRepairOverlay } from "./lib/bilingual-publisher.mjs";
+import { upcomingKey } from "../src/lib/locale-projection.js";
+
+it("keeps a complete English edition available for the calendar labels used since October 10", () => {
+  const canonical = canonicalEdition();
+  const types = ["PC版发售", "平台版发售", "PS5版发售", "Nintendo Switch版发售", "Nintendo Switch 2版发售"];
+  canonical.upcoming = types.map((releaseType, index) => ({
+    id: `calendar-${index}`, date: "2026-09-01", title: canonical.entries[0].title,
+    platforms: ["PC"], region: index % 2 ? "英国" : "未限定", releaseType,
+    source: { label: "Steam", url: "https://store.steampowered.com/app/123", kind: "primary" },
+  }));
+  const result = buildEnglishRepairOverlay({ canonical, draft: {
+    schemaVersion: 1, locale: "en", editionId: canonical.id,
+    archiveTitle: "Morning Brief | Test Game announces an update",
+    entries: [{ entryId: canonical.entries[0].id, headline: "Test Game announces an update",
+      summary: "The official source announced an update for Test Game.",
+      verification: "The primary source was opened.", timeNote: "Within the fixed window." }],
+    upcoming: canonical.upcoming.map(item => ({ upcomingId: upcomingKey(canonical.id, item) })),
+  } });
+  expect(result.errors).toEqual([]);
+  expect(result.status).toBe("available");
+});
 
 function canonicalEdition() {
   return {
