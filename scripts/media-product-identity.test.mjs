@@ -4,6 +4,32 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
 import { processEdition, resolveRecord } from "./enrich-media.mjs";
+import { identifyProductTitle } from "./lib/media-product-identity.mjs";
+
+it("ignores trademark marks before compatibility normalization and PSN platform chrome", () => {
+  expect(identifyProductTitle({title:{title_en:"Helldivers 2"}}, {openGraphTitle:"HELLDIVERS™ 2"}, "https://store.playstation.com/en-us/concept/10000657").status).toBe("match");
+  const metadata = {openGraphTitle:"Resident Evil 4 Gold Edition PS4 & PS5"};
+  expect(identifyProductTitle({title:{title_en:"Resident Evil 4 Gold Edition"}}, metadata, "https://store.playstation.com/en-us/product/game").status).toBe("match");
+  expect(identifyProductTitle({title:{title_en:"Resident Evil 4"}}, metadata, "https://store.playstation.com/en-us/product/game").status).toBe("mismatch");
+});
+
+describe("Nintendo platform suffixes", () => {
+  const record = { title: { title_en: "Tales of Eternia Remastered" } };
+  it("accepts matching Nintendo titles with platform chrome across metadata fields", () => {
+    expect(identifyProductTitle(record, {
+      openGraphTitle: "Tales of Eternia Remastered for Nintendo Switch 2",
+      documentTitle: "Tales of Eternia Remastered for Nintendo Switch 2 - Nintendo Official Site",
+    }, "https://www.nintendo.com/us/store/products/tales-of-eternia-remastered-switch-2/").status).toBe("match");
+    expect(identifyProductTitle({title:{title_en:"Nintendo Switch Sports Resort"}}, {
+      documentTitle: "Nintendo Switch Sports Resort – Nintendo Switch 2 Exclusive - Nintendo Official Site",
+    }, "https://www.nintendo.com/us/store/products/nintendo-switch-sports-resort-switch-2/").status).toBe("match");
+  });
+  it("does not erase edition differences or normalize a different host", () => {
+    const metadata = {documentTitle:"Tales of Eternia Remastered Deluxe Edition for Nintendo Switch 2 - Nintendo Official Site"};
+    expect(identifyProductTitle(record, metadata, "https://www.nintendo.com/us/store/products/game/").status).toBe("mismatch");
+    expect(identifyProductTitle(record, {documentTitle:"Tales of Eternia Remastered for Nintendo Switch 2"}, "https://example.com/game").status).toBe("mismatch");
+  });
+});
 
 const wrongSteamUrl = "https://store.steampowered.com/app/1966720/End_of_Abyss/";
 const correctStoreUrl = "https://www.xbox.com/en-us/games/store/end-of-abyss/9n7qx8c7nsh2";

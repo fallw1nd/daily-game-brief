@@ -1,5 +1,12 @@
 # Maintenance Issue Log
 
+## MNT-20261015-02 — Official cover titles rejected as mismatches
+
+- Status: resolved.
+- Evidence: six exact Nintendo product pages were rejected because platform suffixes remained in their title metadata. HELLDIVERS™ 2 also failed because NFKC expanded the trademark mark before it was removed. PlayStation platform suffixes prevented exact edition matching for Resident Evil 4 Gold Edition.
+- Resolution: remove trademark marks before normalization; strip only host-scoped Nintendo/PlayStation platform chrome, preserving sequel and edition identity. Add regression coverage and exact official alternate sources for three games. Fill the October 15 edition's nine missing covers; all 24 calendar records now have verified covers. Latest and same-edition archive remain identical; all non-media fields remain unchanged.
+- Verification: full project check passed (105 files / 588 tests), 66 archived editions and locale infrastructure validated, production build succeeded. All nine JPEGs preserve source orientation and are below 125 KB each. No earlier editions or calendar facts were changed.
+
 ## MNT-20261015-01 — Calendar labels reject otherwise complete English editions
 
 - Status: resolved for the October 12–15 English failures; broader historical backlog remains recorded separately.
