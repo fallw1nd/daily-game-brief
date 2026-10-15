@@ -2,9 +2,10 @@
 
 ## MNT-20261015-01 — Calendar labels reject otherwise complete English editions
 
-- Status: root fix verified locally; production repair in progress.
+- Status: resolved for the October 12–15 English failures; broader historical backlog remains recorded separately.
 - October 10–15 English-unavailable receipts identify unmapped calendar region/release labels. Add the seven observed dictionary values rather than loosening English validation. October 13 also needs its untranslated presentation labels repaired through the locale inbox.
 - Verification: full check passed, 105 files / 585 tests, 66 Canonical archives and locale infrastructure, production build. The new regression runs the English repair builder against all five affected platform release types and both region labels.
+- Production: all four recent English repairs, two-name title backfill, October 15 news supplement and October 14 archive-title revision passed trusted publication and Pages. Content deployment baseline: ee275f7dac2c0fc0516fd22a1cb2d2e63d6f7223; Pages run 38694226240 succeeded.
 - Audit, secondary request results and outstanding work: [2026-10-15 report](incident-notes/second-publish-20261015.md).
 
 ## MNT-20261006-01 — Archive title passes validation but fails after subject normalization
