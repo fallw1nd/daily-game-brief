@@ -29,6 +29,13 @@ The October 19 Love and Deepspace candidate has conflicting source metadata (Oct
 
 ## Deployment and remaining work
 
-At 11:10 Beijing time, the latest Pages artifact was waiting at the existing October 19 noon release gate. Repository commits are not an online-success receipt. Final deployment/HTTP verification is recorded below after the gate.
+At 11:10 Beijing time, the latest Pages artifact was waiting at the existing October 19 noon release gate. Repository commits are not an online-success receipt.
 
-New queued calendar/news continuations may reset the mutable editorial/publication lane to pending after a successful publication. Use the immutable publication transitions above, not that pending follow-up lane, to determine delivery. Calendar final verification remains explicitly deferred and queued; this recovery does not claim all calendar pages were reviewed. News media is verified for 24 of 25 entries; the remaining October 19 item has an explicit unavailable reason.
+New queued calendar/news continuations may reset the mutable editorial/publication lane to pending after a successful publication. Use the immutable publication transitions above, not that pending follow-up lane, to determine delivery. Calendar work deferred by these submissions remains distinct from news recovery; this report does not claim all calendar pages were reviewed. At 11:10 news media was verified for 24 of 25 entries, with the remaining item explicitly unavailable; later media enrichment resolved that item too.
+
+### Final online verification
+
+- [Pages 39194802235](https://github.com/fallw1nd/daily-game-brief/actions/runs/39194802235) successfully released the four Chinese repairs after noon.
+- During the wait, the existing October 19 calendar continuation published 57 additional items (16 → 73) in `606b1561`. This correctly preserved news, but invalidated the retained English calendar presentation. Restore English through the existing locale-only inbox: reuse the four retained news translations and provide the exact current 73 upcoming identities and translated region/release labels. No Canonical bytes were modified by this repair.
+- [Locale publisher 39197369406](https://github.com/fallw1nd/daily-game-brief/actions/runs/39197369406) succeeded as `962cbe5cf6ad9e9d7d960cfaeb525c911e0529ab`; [final Pages 39197480043](https://github.com/fallw1nd/daily-game-brief/actions/runs/39197480043) succeeded.
+- After deployment, HTTP reads of all four Chinese and English archive URLs returned 200 and matched main exactly. News counts are 7/5/9/4; English news counts are identical; calendar counts are 16/16/16/73 with matching English identities. No `[自动事实清单]` headline remains in these editions. Latest is `2026-10-19-daily`, issue 70. All 25 news entries have verified media.
