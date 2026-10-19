@@ -16,6 +16,8 @@ Priority: new Canonical work → current Daily liveness wake → oldest ready `e
 
 ## 2. Decide within the packet
 
+Wake payload example: `{"schemaVersion":1,"editionId":"<edition-id>","period":"daily","reason":"packet_missing_at_handoff"}`. The exact Daily branch/edition identifies the period; GitHub also accepts the documented minimal payload without `period`, but rejects an explicitly conflicting period.
+
 The complete inherited calendar is in the pinned `calendarWork.pages` items with `kind:"baseline-check"`, under `baseline.item`. `upcomingBaseline.itemCount` records its count; `items:[]` with `itemsLocation:"calendarWork.pages:baseline-check"` means paged storage, not an empty calendar. Read these pages before calendar edits. The publisher still inherits the full Canonical baseline.
 
 - Return one `include`/`exclude`/`needs_review` per packet item; add nothing outside the packet.

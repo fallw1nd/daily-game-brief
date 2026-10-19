@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261019-01 — Missing-packet wakes rejected before collection
+
+- Root cause: October 16–19 editorial tasks sent the documented three-field wake. Both workflow preflight validators additionally required `period:"daily"`; all four runs failed before collection with `invalid Daily wake payload`. Delayed scheduled packet runs subsequently published October 16/17 degraded editions. October 18 fallback correctly refused a packet with no eligible A-level fact; October 19 had no status at investigation time.
+- Repair: infer Daily from the already-validated exact branch/edition when `period` is absent; retain explicit mismatched-period rejection. Execute both real inline validators in a regression test using the observed minimal payload and explicit Daily/conflicting PM variants. Document a complete payload example. Do not weaken fallback evidence eligibility or change schedules.
+- Verification: full check passed 105 files / 589 tests, 68 archives, locale validation and production build. Same-window editorial recovery is being executed through existing trusted wake/inbox/publication workflows, not direct Canonical or state edits.
+
 ## MNT-20261015-02 — Official cover titles rejected as mismatches
 
 - Status: resolved.
