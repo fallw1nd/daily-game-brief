@@ -787,3 +787,13 @@ An additive news continuation on the October 2 automatic fact list removed the f
 - Reproduced search context loss after opening a result, keyboard focus obscured by an open settings panel, and initial footer displacement (390px lab CLS about 0.177).
 - Search URL/history persistence, focus-leave dismissal and stable loading space address these failures. Archive search is deferred until needed. Reading navigation and calendar evidence are more discoverable without changing content or publication behavior.
 - Local verification: full check passed with 573 tests, 20 responsive browser combinations, search/back/refresh, focus, error recovery and evidence disclosure; local CLS approximately 0.0011. Production deployment evidence is recorded in the associated PR and local acceptance artifacts.
+
+## 2026-10-19 — Archive naming evidence and repeated localization
+
+- Review-stage audit found unavailable names with official Chinese evidence, weak historical naming citations, and repeated translated suffixes in existing Chinese copy.
+- The user authorized a pre-launch name-only review, including explicitly labeled assistant fallback after official/common-name lookup. Local review adds the minimal provisional status and prepares evidence-linked, exact-field revisions; no publication or automatic translation workflow is implied.
+- Scope, invariants and verification are recorded in `NAME_AUDIT_2026-10-19.md`. Historical topic-key identity problems remain separate from naming corrections.
+
+### 2026-10-19 — Chinese-name audit local review completed
+
+Applied 5,629 scoped presentation edits to 70 archives on the review branch; no key/ID/fact migration or publication. Reconciled 855 researched decisions across 878 existing keys, including explicit assistant-provisional status and intentional original brands. Updated 61 English overlay digest pairs only, regenerated latest/manifest mirrors, and retained source spelling/identity exceptions for separate review. `npm run check` passed 105 files / 591 tests plus archive/locales validation and build. Separate invariants confirm all shared facts and English prose preserved. Two overlong archive headings use concise 暂译 labels while originals remain in the article. See `NAME_AUDIT_2026-10-19.md` and the standalone evidence package.

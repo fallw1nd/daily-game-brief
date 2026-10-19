@@ -17,7 +17,7 @@ export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
   title_en: string;
-  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "unavailable";
+  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "provisional_translation" | "unavailable";
   edition_zh?: string;
 }
 export interface BriefEntry {

@@ -78,6 +78,7 @@ const titleStatusLabels = {
   official_simplified: "官方简中",
   official_traditional: "官方繁中",
   common_translation: "常用译名",
+  provisional_translation: "助手暂译（非官方）",
   unavailable: "暂无官方中文名",
 };
 

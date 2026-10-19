@@ -29,7 +29,7 @@ const statusNames: Record<FactStatus, [string, string]> = {
   official: ["官方消息", "Official"], multi_source_verified: ["多源核实", "Verified by multiple sources"],
   media_report: ["媒体报道", "Media report"], media_relay_official: ["媒体转述官方", "Reported official statement"], unconfirmed: ["未经证实", "Unconfirmed"],
 };
-const titleNames = { official_simplified: "官方简中", official_traditional: "官方繁中", common_translation: "常用译名", unavailable: "暂无官方中文名" };
+const titleNames = { official_simplified: "官方简中", official_traditional: "官方繁中", common_translation: "常用译名", provisional_translation: "助手暂译（非官方）", unavailable: "暂无官方中文名" };
 const subject = (entry: BriefEntry) => entry.title.title_zh_cn || entry.title.title_en;
 const label = (pair: [string, string], english: boolean) => pair[english ? 1 : 0];
 const mediaUrl = (url: string) => /^https?:/.test(url) ? url : import.meta.env.BASE_URL + url.replace(/^\/+/, "");
