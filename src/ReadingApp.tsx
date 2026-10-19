@@ -1,6 +1,6 @@
 import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, ImageSquare, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
+import { BookOpen, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, ImageSquare, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
 import { loadArchivedEdition, loadBriefManifest, loadEnglishLocaleIndex, loadEnglishOverlay, loadLatestEdition, loadSearchIndex } from "./data/briefLoader";
 import { loadEnglishSearchIndex } from "./data/englishLoader";
 import { searchArchiveEntries } from "./lib/brief";
@@ -10,6 +10,7 @@ import { loadReadingCalendar, type ReadingCalendar } from "./lib/reading-calenda
 import { readingHref, readingLead, readingWindow } from "./lib/reading";
 import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactStatus, ImageAsset, SectionKey } from "./types";
 import "./reading.css";
+import { Catchup } from "./components/Catchup";
 import { EditionLoading } from "./components/EditionLoading";
 import { accents, storedTheme, storedAccent, type Theme, type Accent } from "./lib/reading-preferences";
 
@@ -103,6 +104,7 @@ export interface ReadingProps {
 }
 
 export default function ReadingApp({ english = false, initialEdition, initialManifest, initialSearchIndex }: ReadingProps) {
+  const [catchupOpen, setCatchupOpen] = useState(() => new URLSearchParams(window.location.search).get("catchup") === "1");
   const [edition, setEdition] = useState(initialEdition);
   const [manifest, setManifest] = useState(initialManifest);
   const [searchIndex, setSearchIndex] = useState(initialSearchIndex);
@@ -117,7 +119,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [theme, setTheme] = useState<Theme>(storedTheme);
   const [accent, setAccent] = useState<Accent>(storedAccent);
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
-  const [searchRequested, setSearchRequested] = useState(() => Boolean(new URLSearchParams(window.location.search).get("q")));
+  const [searchRequested, setSearchRequested] = useState(() => Boolean(new URLSearchParams(window.location.search).get("q") || new URLSearchParams(window.location.search).get("catchup")));
   const archiveRef = useRef<HTMLElement>(null);
   const [archiveLimit, setArchiveLimit] = useState(6);
   const [resultLimit, setResultLimit] = useState(() => Math.max(12, Math.min(1200, Number(new URLSearchParams(window.location.search).get("results")) || 12)));
@@ -126,6 +128,15 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [activeArea, setActiveArea] = useState("content");
   const t = (zh: string, en: string) => english ? en : zh;
 
+  const toggleCatchup = (open: boolean) => {
+    setCatchupOpen(open);
+    if (open) setSearchRequested(true);
+    const url = new URL(window.location.href);
+    if (open) url.searchParams.set("catchup", "1"); else url.searchParams.delete("catchup");
+    url.hash = open ? "catchup" : "top";
+    window.history.pushState(window.history.state, "", url);
+    window.scrollTo({ top: 0 });
+  };
   const updateSearch = (value: string, limit = 12) => {
     setQuery(value); setResultLimit(limit); setSearchRequested(true);
     const url = new URL(window.location.href);
@@ -137,6 +148,8 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
+      setCatchupOpen(params.get("catchup") === "1");
+      if (params.get("catchup")) setSearchRequested(true);
       setQuery(params.get("q") || "");
       setResultLimit(Math.max(12, Math.min(1200, Number(params.get("results")) || 12)));
       if (params.get("q")) setSearchRequested(true);
@@ -284,14 +297,14 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const previous = position >= 0 ? archives[position + 1] : undefined;
   const next = position > 0 ? archives[position - 1] : undefined;
   const currentId = edition?.id || new URLSearchParams(window.location.search).get("edition") || undefined;
-  const switchHref = readingHref(currentId, window.location.hash.slice(1) || undefined, !english);
+  const switchHref = readingHref(currentId, window.location.hash.slice(1) || undefined, !english).replace("?view=reading", `?view=reading${catchupOpen ? "&catchup=1" : ""}`);
   const archiveTitle = (id: string, title?: string) => english ? englishTitles[id] : title;
 
   return <IconContext.Provider value={{ weight: "regular", size: 20, "aria-hidden": true, focusable: false }}><div ref={pageRef} className="reading-app" data-theme={theme} data-accent={accent}>
-    <a className="r-skip" href="#content">{t("跳到新闻正文", "Skip to news")}</a>
+    <a className="r-skip" href={catchupOpen ? "#catchup" : "#content"}>{t("跳到新闻正文", "Skip to news")}</a>
     <header className="r-header"><div className="r-header-inner">
       <a className="r-brand" href={readingHref(undefined, undefined, english)}><NewspaperClipping aria-hidden="true" /><span>{t("游戏圈动态", "Daily Game Brief")}</span></a>
-      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={`#${id}`} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
+      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={`#${id}`} onClick={() => { if (catchupOpen) toggleCatchup(false); }} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
       <div className="r-controls">
         <a href={switchHref} lang={english ? "zh-CN" : "en"} aria-label={t("Switch to English", "切换到中文")}>{english ? "中文" : "EN"}</a>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? t("切换夜间模式", "Use dark theme") : t("切换日间模式", "Use light theme")} title={t("切换明暗主题", "Toggle theme")}>{theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</button>
@@ -302,6 +315,9 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     {!edition ? <main className="r-loading r-container" aria-live="polite">
       {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <EditionLoading english={english} />}
     </main> : <main className="r-container" id="top">
+      {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setRetry(value => value + 1)} onClose={() => toggleCatchup(false)} />}
+      <div hidden={catchupOpen}>
+      <div className="cu-entry"><button onClick={() => toggleCatchup(true)}><BookOpen aria-hidden="true" />{t("离线补课", "Catch up")}<ArrowRight aria-hidden="true" /></button><span>{t("离开了几天？从这里接上。", "Away for a few days? Pick up where you left off.")}</span></div>
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
       <section className="r-lead" id="content" aria-labelledby="r-edition-title">
         {lead ? <article id={lead.id} className={`r-lead-grid${lead.images?.some((asset) => !asset.placeholder) ? "" : " r-lead-grid--text"}`}>
@@ -348,6 +364,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
 
       <details className="r-edition-directory"><summary>{t(`本期 ${edition.entries.length} 条新闻 · 浏览目录`, `${edition.entries.length} stories · Browse contents`)}<CaretDown /></summary><nav aria-label={t("本期新闻目录", "Edition contents")}><ol>{edition.entries.map(entry => <li key={entry.id}><a href={`#${entry.id}`}>{entry.headline}</a></li>)}</ol></nav></details>
       <details className="r-edition-note" id="edition-note"><summary>{t("本期说明与检索记录", "Edition details & source report")}<CaretDown aria-hidden="true" /></summary><div><dl><div><dt>{t("信息窗口", "Evidence window")}</dt><dd>{readingWindow(edition)}</dd></div><div><dt>{t("计划发布", "Scheduled release")}</dt><dd>{edition.plannedAt}</dd></div><div><dt>{t("生成时间", "Generated")}</dt><dd>{edition.generatedAt}</dd></div></dl>{edition.sourceReport && <><h3>{t("已检查来源", "Sources checked")}</h3><p>{edition.sourceReport.checked.join(" / ")}</p><h3>{t("访问受限", "Limited access")}</h3><p>{edition.sourceReport.limited.join(" / ") || t("无", "None")}</p><p>{edition.sourceReport.note}</p></>}</div></details>
+      </div>
     </main>}
     <footer className="r-footer r-container"><div><strong>{t("游戏圈动态", "Daily Game Brief")}</strong><p>{t("编辑与维护 · Fallw1nd-津秋", "Edited and maintained by Fallw1nd-津秋")}</p></div><div><a href="https://space.bilibili.com/11108421" target="_blank" rel="noreferrer">B站<ArrowUpRight aria-hidden="true" /></a><a href="https://xiaoheihe.cn/app/user/profile/16936553" target="_blank" rel="noreferrer">{t("小黑盒", "HeyBox")}<ArrowUpRight aria-hidden="true" /></a><span>{t("微信公众号：芳墨集", "WeChat: 芳墨集")}</span><a href="#top">{t("返回顶部", "Back to top")}<ArrowUp /></a></div></footer>
   </div></IconContext.Provider>;

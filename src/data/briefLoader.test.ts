@@ -13,6 +13,7 @@ import {
   searchIndexUrl,
 } from "./briefLoader";
 import type { BriefManifest, BriefSearchIndex, BriefSearchIndexV2 } from "../types";
+import { loadEnglishSearchIndex } from "./englishLoader";
 
 const publishedEdition = { ...edition, schemaVersion: 1 as const, sourceReport };
 const manifest: BriefManifest = {
@@ -106,7 +107,39 @@ describe("brief loader", () => {
     const v1Fetcher = vi.fn(async () => new Response(JSON.stringify(searchIndex), { status: 200 })) as unknown as typeof fetch;
     const v2Fetcher = vi.fn(async () => new Response(JSON.stringify(searchIndexV2), { status: 200 })) as unknown as typeof fetch;
     await expect(loadSearchIndex(undefined, v1Fetcher)).resolves.toEqual(searchIndex);
-    await expect(loadSearchIndex(undefined, v2Fetcher)).resolves.toEqual(searchIndex);
+    await expect(loadSearchIndex(undefined, v2Fetcher)).resolves.toEqual({
+      ...searchIndex,
+      entries: [{ ...searchIndex.entries[0], titleKey: searchIndexV2.items[0].titleKey, section: searchIndexV2.items[0].section, titleStatus: searchIndexV2.items[0].titleStatus }],
+    });
+  });
+
+  it("preserves topic identities and sections in the English compatibility view", async () => {
+    const item = searchIndexV2.items[0];
+    const englishCopy = { subject: item.titleEn, headline: "English headline", summary: "English summary" };
+    const payload: BriefSearchIndexV2 = {
+      ...searchIndexV2,
+      items: [
+        { ...item, tracking: true, availableLocales: ["zh-CN", "en"], copy: { ...item.copy, en: englishCopy } },
+        { ...item, entryId: "no-english-copy", availableLocales: ["zh-CN", "en"] },
+        { ...item, entryId: "unavailable-english", copy: { ...item.copy, en: englishCopy } },
+      ],
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch;
+    await expect(loadEnglishSearchIndex(undefined, fetcher)).resolves.toEqual({
+      schemaVersion: 1,
+      updatedAt: payload.updatedAt,
+      entries: [{
+        editionId: item.editionId, issueNumber: item.issue, tracking: true, date: item.date, period: item.period,
+        entryId: item.entryId, titleKey: item.titleKey, section: item.section, titleStatus: item.titleStatus, titleEn: item.titleEn,
+        headline: englishCopy.headline, summary: englishCopy.summary, platforms: item.platforms,
+        region: item.region, factStatus: item.factStatus,
+      }],
+    });
+  });
+
+  it("does not treat Chinese v1 copy as an English search archive", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(searchIndex), { status: 200 })) as unknown as typeof fetch;
+    await expect(loadEnglishSearchIndex(undefined, fetcher)).resolves.toEqual({ schemaVersion: 1, updatedAt: "", entries: [] });
   });
 
   it("loads the manifest and selected archive", async () => {

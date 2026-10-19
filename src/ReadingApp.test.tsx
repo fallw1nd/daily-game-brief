@@ -345,3 +345,21 @@ describe("reader navigation continuity", () => {
     expect(document.activeElement).toBe(next);
   });
 });
+
+it("opens and closes the single catch-up entrance while preserving original reading regions", async () => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const entrance = container.querySelector('.cu-entry button') as HTMLButtonElement;
+  await act(async () => entrance.click());
+  expect(window.location.search).toContain('catchup=1');
+  expect(container.querySelector('#catchup')).not.toBeNull();
+  expect(container.querySelector('#content')?.closest('[hidden]')).not.toBeNull();
+  expect(container.querySelector('#archive')).not.toBeNull();
+  expect(container.querySelector('#upcoming')).not.toBeNull();
+  await act(async () => (container.querySelector('.cu-back') as HTMLButtonElement).click());
+  expect(window.location.search).not.toContain('catchup=1');
+  expect(container.querySelector('#content')?.closest('[hidden]')).toBeNull();
+});
