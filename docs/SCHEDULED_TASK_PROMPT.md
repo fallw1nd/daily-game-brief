@@ -33,6 +33,8 @@ Commit `automation/inbox/<edition-id>.json` on `automation/editorial/<edition-id
 
 ## 3. English repair
 
-If no higher-priority work exists, repair one oldest published Daily whose English is unavailable for an editorial overlay reason. Final Canonical IDs/order are authoritative. Commit only the locale repair to `automation/locale/en/<edition-id>`; do not rediscover or change facts.
+If no higher-priority work exists, repair one oldest published Daily whose English is unavailable for an editorial overlay reason. Final Canonical IDs/order are authoritative. Read its Canonical archive and `public/data/locales/en/status/YYYY/MM/<edition-id>.json` at the same pinned `main` commit. Copy the status's top-level `factsDigest` unchanged into the complete repair draft alongside `schemaVersion:1`, `locale:"en"`, and exact `editionId`; never copy the older digest inside `retainedPresentation`. If no current status is available, obtain the existing trusted `npm run build:locales` export from that same checkout as described in `docs/DATA_PIPELINE.md`, or report the missing baseline as a blocker. Do not calculate or guess a digest.
+
+Commit only `automation/locale-inbox/<edition-id>.json` on `automation/locale/en/<edition-id>`; do not rediscover or change facts. The draft must cover all current entries/upcoming items. Reuse retained wording only after checking it against current Canonical. If validation or a publication retry reports stale facts, reread the current Canonical and trusted baseline and review the complete translation before resubmitting; replacing only the digest is not a repair.
 
 Do not poll Actions logs (only the bounded durable-state checks above); create/delete workflows; edit `automation/state`; publish Canonical directly; advance editions; or mutate any Scheduled Task. A single failure must never change the task schedule or enable/disable state.

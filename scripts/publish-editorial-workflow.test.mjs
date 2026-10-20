@@ -29,6 +29,15 @@ describe("trusted bilingual publication workflow", () => {
     expect(workflow).toContain("--status=available");
   });
 
+  it("routes manual locale repair dispatches to the same bound locale inbox as push events", () => {
+    const dispatch = workflow.split('if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then')[1].split('elif [[ "$branch"')[0];
+    expect(dispatch).toContain('if [ "$mode" = "locale-repair" ]; then');
+    expect(dispatch).toContain('branch="automation/locale/en/$edition"');
+    expect(dispatch).toContain("locale_draft=true");
+    expect(dispatch).toContain('locale_repair_path="artifacts/locale-repair.json"');
+    expect(workflow).not.toContain('elif [ "$mode" = "locale-repair" ]; then');
+  });
+
   it("validates the complete publication before staging public data", () => {
     const buildIndex = workflow.indexOf("- name: Build and validate publication");
     const checkIndex = workflow.indexOf("npm run check", buildIndex);

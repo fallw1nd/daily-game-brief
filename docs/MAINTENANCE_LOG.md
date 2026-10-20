@@ -1,5 +1,12 @@
 # Maintenance Issue Log
 
+## MNT-20261020-02 — Locale repair silently rebound stale English to corrected facts
+
+- Status: implementation verified locally; release verification pending.
+- Evidence: the September 24 English overlay was accepted as a repair after its Canonical game's platforms changed to Steam-only with the same edition/entry IDs, retaining console claims. Repair checked only identity before stamping a new facts digest; the legacy editorial-replay repair path and stale retained presentation also bypassed baseline binding.
+- Resolution: require a complete repair draft carrying the existing trusted facts digest, compare it against current Canonical during validation and every build/retry, and preserve the checked binding. Only current-bound retained English may override the reviewed draft. Manual dispatch uses the existing locale inbox; ordinary editorial publication stays unchanged. Operational instructions obtain the digest from current trusted status or the existing generated-index exporter, never model calculation.
+- Local verification: 6 focused test files / 40 tests passed, including missing/malformed/stale baselines, copy/media-only compatibility, and the September 24 validator/build/retry CLI reproduction. Rejected builds leave Canonical, English, and index byte hashes unchanged; a freshly reviewed repair preserves Canonical bytes and cannot be overwritten by stale retained console prose. No historical data, registry, dependencies, or schedules changed.
+
 ## MNT-20261020-01 — Calendar title clutter and missing store covers
 
 - Calendar names now share one presentation helper across ReadingApp and the classic view: researched Chinese on the first line, a distinct original on the smaller second line, and original-only for unavailable Chinese names or the English view. Only the exact structured provisional suffix is separated; original names, naming status, registry evidence and editorial copy remain intact. This applies to all 1,688 historical calendar occurrences, including 515 provisional occurrences across 189 identities. No automatic translation or blanket provisional-to-English conversion was added.
