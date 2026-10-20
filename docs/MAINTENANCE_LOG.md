@@ -823,3 +823,9 @@ Applied 5,629 scoped presentation edits to 70 archives on the review branch; no 
 - **Boundary:** Ambiguous prose-only evidence is intentionally left unadopted. No new title registry data, archive, schema, publishing flow, or production state is changed. This is a local patch pending review, not a deployment or a historical naming repair.
 
 - **Final local validation:** `npm run check` passed: 108 test files / 669 tests, Canonical and English locale validation for 71 editions, and production build. One prior aggregate attempt hit an unchanged ReadingApp test timeout; its isolated recheck and the unchanged full retry passed. No timeout configuration or unrelated frontend code was changed.
+
+## 2026-10-20 — Successful Pages deployments own their receipts
+
+- **Reproduced:** The exact-edition dispatch could be cancelled/replaced by a main push, while successful push and empty-edition dispatch deployments never acknowledged durable state. Publication replay could also stamp a new SHA into a still-deployed lane without a corresponding success transition.
+- **Local fix:** Keep global Pages serialization and the noon release gate, stop cancelling running releases, and reconcile successful deployments against their immutable manifest/archives plus fresh trusted state. A bounded atomic retry selects only requested/latest or outstanding committed editions, checks publication ancestry, preserves newer receipts, and never creates missing states. Failure receipts remain exact-edition-only.
+- **Boundary:** No Canonical/archive, cadence, issue/window identity, state schema, or historical publication is changed. Focused regression verification and production acceptance are recorded separately; this entry is not proof of deployment.

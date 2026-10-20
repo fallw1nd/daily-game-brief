@@ -273,7 +273,8 @@ export function applyEditionStateEvent(current, event, data = {}) {
     // An acknowledgement describes its own release, not whichever release is
     // currently live. The trusted recorder checks Git ancestry before applying it.
     if (data.superseded === true) return current;
-    if (!deployed && state.deployment.status === "deployed" && state.deployment.mainSha === data.mainSha) return current;
+    if (!deployed && state.deployment.status === "deployed" && state.deployment.mainSha === data.mainSha
+      && state.transitions.findLast(item => item.event === "deployment-succeeded")?.mainSha === data.mainSha) return current;
     state.deployment = { status: deployed ? "deployed" : "failed", mainSha: data.mainSha || state.publication.mainSha, runId, updatedAt: at, error: deployed ? null : String(data.error || "deployment failed") };
     return record(state, event, at, actor, runId, { mainSha: state.deployment.mainSha });
   }
