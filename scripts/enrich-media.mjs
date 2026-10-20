@@ -52,7 +52,10 @@ function decodeEntities(value) {
   return value
     .replaceAll("&amp;", "&")
     .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
+    .replace(/&#(?:x([0-9a-f]+)|(\d+));/gi, (entity, hex, dec) => {
+      const code = Number.parseInt(hex || dec, hex ? 16 : 10);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    })
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">");
 }
@@ -76,7 +79,20 @@ function extractMeta(html, pageUrl) {
   const psnImage = pageHost === "store.playstation.com"
     ? html.match(/(?:https:\\\/\\\/|https:\/\/)image\.api\.playstation\.com[^"'\\<\s]+/i)?.[0]
     : null;
-  const rawImage = psnImage?.replaceAll("\\/", "/") ||
+  const isXboxProduct = /(^|\.)(xbox|microsoft)\.com$/.test(pageHost) && /\/games\/store\//.test(new URL(pageUrl).pathname);
+  let xboxBoxArt = isXboxProduct
+    ? (html.match(/<img\b[^>]*>/gi) || []).map(tagAttributes)
+      .find(attrs => attrs["data-testid"] === "ProductDetailsHeaderBoxArt")?.src
+    : null;
+  if (xboxBoxArt) {
+    const art = new URL(xboxBoxArt, pageUrl);
+    if (art.hostname === "store-images.s-microsoft.com") {
+      art.searchParams.set("w", "600");
+      art.searchParams.set("h", "900");
+      xboxBoxArt = art.href;
+    }
+  }
+  const rawImage = xboxBoxArt || psnImage?.replaceAll("\\/", "/") ||
     values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
   const imageUrl = rawImage ? new URL(rawImage, pageUrl).href : null;
@@ -350,7 +366,22 @@ async function discoverFromSource(source, record, { fetchPage = fetchLimited, ki
     const [imageUrl, ...fallbackImageUrls] = youtubeImageCandidates(videoId);
     return { imageUrl, fallbackImageUrls, alt: "", pageUrl: source.url };
   }
-  const result = await openSourcePage(source, fetchPage);
+  let result = await openSourcePage(source, fetchPage);
+  // Roundups are discovery pages, never product identity evidence. Open only an
+  // exact-title Xbox store link and run the ordinary product metadata checks.
+  if (kind === "cover" && new URL(result.url).hostname === "news.xbox.com") {
+    for (const match of result.bytes.toString("utf8").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+      const attrs = tagAttributes(match[1]);
+      if (!attrs.href) continue;
+      let linked;
+      try { linked = new URL(attrs.href, result.url); } catch { continue; }
+      if (linked.protocol !== "https:" || linked.hostname !== "www.xbox.com" || !/\/games\/store\//.test(linked.pathname)) continue;
+      const title = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).replace(/\s+[–—]\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}.*$/i, "").trim();
+      if (identifyProductTitle(titleIdentityRecord(record), { documentTitle: title }, linked.href).status !== "match") continue;
+      result = await openSourcePage({ ...source, url: linked.href }, fetchPage);
+      break;
+    }
+  }
   const { meta } = result;
   if (!meta.imageUrl) throw new Error("no usable social image metadata");
   if (kind === "cover") {

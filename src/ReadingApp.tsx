@@ -7,6 +7,7 @@ import { searchArchiveEntries } from "./lib/brief";
 import { projectEnglishEdition } from "./lib/english-render";
 import { validateEnglishOverlayForRender } from "./lib/locale";
 import { loadReadingCalendar, type ReadingCalendar } from "./lib/reading-calendar";
+import { calendarTitle } from "./lib/calendar-title";
 import { readingHref, readingLead, readingWindow } from "./lib/reading";
 import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactStatus, ImageAsset, SectionKey } from "./types";
 import "./reading.css";
@@ -317,8 +318,10 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     </main> : <main className="r-container" id="top">
       {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setRetry(value => value + 1)} onClose={() => toggleCatchup(false)} />}
       <div hidden={catchupOpen}>
-      <div className="cu-entry"><button onClick={() => toggleCatchup(true)}><BookOpen aria-hidden="true" />{t("离线补课", "Catch up")}<ArrowRight aria-hidden="true" /></button><span>{t("离开了几天？从这里接上。", "Away for a few days? Pick up where you left off.")}</span></div>
+      <div className="r-edition-bar">
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
+      <div className="cu-entry"><button onClick={() => toggleCatchup(true)}><BookOpen aria-hidden="true" />{t("离线补课", "Catch up")}<ArrowRight aria-hidden="true" /></button><span>{t("离开了几天？从这里接上。", "Away for a few days? Pick up where you left off.")}</span></div>
+      </div>
       <section className="r-lead" id="content" aria-labelledby="r-edition-title">
         {lead ? <article id={lead.id} className={`r-lead-grid${lead.images?.some((asset) => !asset.placeholder) ? "" : " r-lead-grid--text"}`}>
           <div className="r-lead-copy"><div className="r-eyebrow">{t("本期头条", "The lead")}<span>{label(sectionNames[lead.section], english)}</span></div>
@@ -348,9 +351,9 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {!calendar && edition.sourceReport?.calendarReview && [...edition.sourceReport.calendarReview.pages, ...edition.sourceReport.calendarReview.platforms].some(row => row.status === "deferred") && <p className="r-calendar-note r-warning">{t("本期发售日历尚未完成复核，包含沿用计划，也可能遗漏新公布或调整的发售日期。请以各条目官方来源为准。", "Calendar review is incomplete. Some plans are carried forward; newly announced or changed dates may be missing. Check the official sources linked below.")}</p>}
         {calendar && upcoming.length > 0 && <p className="r-calendar-note r-warning">{t(`沿用 ${calendar.sourceDate} 收录的计划，本期未重新核验；日期如有调整，请以来源公告为准。`, `Plans recorded on ${calendar.sourceDate}, not reverified for this edition. Check the linked sources for schedule changes.`)} <a href={readingHref(calendar.sourceId, "upcoming", english)}>{t("查看原期日历", "View source edition")}<ArrowRight /></a></p>}
         {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} <button className="r-button" onClick={() => setCalendarRetry((value) => value + 1)}>{t("重试", "Try again")}</button></> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
-        <div className="r-calendar-list">{upcoming.map((item) => <article key={item.id} className="r-calendar-item">
-        {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{item.title.title_zh_cn || item.title.title_en}</h3><p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && (/API|appids=|字段|解析/.test(item.note) ? <details className="r-calendar-evidence"><summary>日期依据与核验说明</summary><p>{item.note}</p></details> : <p>{item.note}</p>)}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
-      </article>)}</div></section>}
+        <div className="r-calendar-list">{upcoming.map((item) => { const name = calendarTitle(item.title, english); return <article key={item.id} className="r-calendar-item">
+        {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{name.primary}</h3>{name.original && <p className="r-calendar-original" lang="en">{name.original}</p>}<p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && (/API|appids=|字段|解析/.test(item.note) ? <details className="r-calendar-evidence"><summary>日期依据与核验说明</summary><p>{item.note}</p></details> : <p>{item.note}</p>)}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
+      </article>; })}</div></section>}
 
       <nav className="r-pager" aria-label={t("期次导航", "Edition navigation")}>
         {previous ? <a href={readingHref(previous.id, undefined, english)}><small>{t("上一期", "Previous edition")} · {previous.date}</small><span><ArrowLeft />{archiveTitle(previous.id, previous.archiveTitle)}</span></a> : <span className="r-pager-boundary">{t("已是最早一期", "First edition")}</span>}

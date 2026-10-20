@@ -16,6 +16,9 @@ function stripStoreSuffix(value, host = "") {
   if (host === "store.playstation.com") {
     return title.replace(/\s+PS[45](?:\s*&\s*PS[45])?\s*$/i, "").trim();
   }
+  if (host === "xbox.com" || host.endsWith(".xbox.com")) {
+    return title.replace(/^Buy\s+/i, "").replace(/\s*\(Xbox (?:Series(?: X\|S)?|One)\)\s*$/i, "").trim();
+  }
   // Nintendo appends platform chrome to product metadata, not to the game name.
   // Keep edition/sequel text intact and scope this normalization to its store.
   return host === "nintendo.com" || host.endsWith(".nintendo.com")

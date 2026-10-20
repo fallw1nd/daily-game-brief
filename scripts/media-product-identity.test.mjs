@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
-import { processEdition, resolveRecord } from "./enrich-media.mjs";
+import { discoverFromSource, processEdition, resolveRecord } from "./enrich-media.mjs";
 import { identifyProductTitle } from "./lib/media-product-identity.mjs";
 
 it("ignores trademark marks before compatibility normalization and PSN platform chrome", () => {
@@ -11,6 +11,23 @@ it("ignores trademark marks before compatibility normalization and PSN platform 
   const metadata = {openGraphTitle:"Resident Evil 4 Gold Edition PS4 & PS5"};
   expect(identifyProductTitle({title:{title_en:"Resident Evil 4 Gold Edition"}}, metadata, "https://store.playstation.com/en-us/product/game").status).toBe("match");
   expect(identifyProductTitle({title:{title_en:"Resident Evil 4"}}, metadata, "https://store.playstation.com/en-us/product/game").status).toBe("mismatch");
+});
+
+describe("Xbox product chrome", () => {
+  const record = { title: { title_en: "CyberBot: Zero" } };
+  it("strips Buy and platform chrome only on Xbox", () => {
+    const metadata = { documentTitle: "Buy CyberBot: Zero (Xbox Series) | XBOX" };
+    expect(identifyProductTitle(record, metadata, "https://www.xbox.com/en-us/games/store/game/id").status).toBe("match");
+    expect(identifyProductTitle(record, metadata, "https://example.com/game").status).toBe("mismatch");
+    expect(identifyProductTitle(record, {documentTitle:"Buy CyberBot: Zero Deluxe Edition | XBOX"}, "https://www.xbox.com/en-us/games/store/game/id").status).toBe("mismatch");
+  });
+});
+
+it("uses the verified Warrior Cats alias without admitting a different edition", () => {
+  const record = {title:{title_en:"Warrior Cats: Clan of the Forest"},titleAliases:["Warrior Cats: Clans of the Forest"]};
+  const url = "https://www.xbox.com/en-us/games/store/warrior-cats-clans-of-the-forest/9n9rtllldnd7";
+  expect(identifyProductTitle(record,{documentTitle:"Buy Warrior Cats: Clans of the Forest | XBOX"},url).status).toBe("match");
+  expect(identifyProductTitle(record,{documentTitle:"Buy Warrior Cats: Clans of the Forest Deluxe Edition | XBOX"},url).status).toBe("mismatch");
 });
 
 describe("Nintendo platform suffixes", () => {
@@ -103,6 +120,27 @@ async function coverResolver(sourceUrl, page, { kind = "primary", webSearch = fa
 }
 
 describe("cover identity through the media resolver", () => {
+  it("follows an exact roundup link but verifies the opened product independently", async () => {
+    const roundup = "https://news.xbox.com/en-us/2026/10/16/next-week-on-xbox/";
+    const pages = new Map([[roundup, Buffer.from(`<title>Next Week on Xbox</title><a href="${correctStoreUrl}">End of Abyss – October 22</a>`)],[correctStoreUrl,htmlFixture({productTitle:"Buy End of Abyss | XBOX"})]]);
+    const result = await discoverFromSource({url:roundup,kind:"primary"},game,{kind:"cover",fetchPage:fixtureFetchPage(pages)});
+    expect(result.pageUrl).toBe(correctStoreUrl);
+    pages.set(correctStoreUrl,htmlFixture({productTitle:"Buy End of Abyss Deluxe Edition | XBOX"}));
+    await expect(discoverFromSource({url:roundup,kind:"primary"},game,{kind:"cover",fetchPage:fixtureFetchPage(pages)})).rejects.toThrow("does not match");
+  });
+
+  it("reads Xbox product box art without social metadata and requests usable dimensions", async () => {
+    const result = await coverResolver(correctStoreUrl, Buffer.from(`<title>Buy End of Abyss | XBOX</title><img data-testID="ProductDetailsHeaderBoxArt" src="https://store-images.s-microsoft.com/image/apps.exact?w=177&amp;h=265" alt="End of Abyss">`));
+    expect(result.status).toBe("applied");
+    expect(result.imageUrl).toBe("https://store-images.s-microsoft.com/image/apps.exact?w=600&h=900");
+    const wrong = await coverResolver(correctStoreUrl, Buffer.from(`<title>Buy Other Game | XBOX</title><img data-testID="ProductDetailsHeaderBoxArt" src="https://store-images.s-microsoft.com/image/apps.exact?w=177&amp;h=265">`));
+    expect(wrong.status).toBe("unavailable");
+  });
+  it("decodes numeric apostrophe entities before exact identity checks", async () => {
+    const result = await coverResolver(correctStoreUrl, htmlFixture({productTitle:"End of Abyss&#x27;",documentTitle:"End of Abyss&#39;"}));
+    expect(result.status).toBe("applied");
+  });
+
   it("rejects Steam app 1966720 even when its URL slug and description say End of Abyss", async () => {
     const results = await Promise.all([
       coverResolver(wrongSteamUrl, wrongGameHtml, { kind: "primary" }), // catalog source

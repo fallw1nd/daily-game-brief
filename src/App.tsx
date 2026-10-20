@@ -1,3 +1,4 @@
+import { calendarTitle } from "./lib/calendar-title";
 import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -358,14 +359,15 @@ function StorySection({ id, number, title, entries, note }: { id: string; number
 }
 
 function UpcomingItem({ item }: { item: UpcomingEntry }) {
-  const title = item.title.title_zh_cn ? "《" + item.title.title_zh_cn + "》" : item.title.title_en;
+  const name = calendarTitle(item.title);
+  const title = name.primary;
   return (
     <article className="upcoming-item">
       <EditorialImage asset={item.cover} kind="cover" presentation="cover" title={title} unavailableNote={item.coverNote} />
       <div className="upcoming-item__body">
         <time>{item.date}</time>
         <h3>{title}</h3>
-        {item.title.title_zh_cn && <p>{item.title.title_en}</p>}
+        {name.original && <p lang="en">{name.original}</p>}
         <div><span>{item.platforms.join(" / ")}</span><span>{item.releaseType}</span><span>{item.region}</span></div>
         <a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>
       </div>
