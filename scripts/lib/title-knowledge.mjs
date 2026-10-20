@@ -1,6 +1,17 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
-const normalizeIdentity = value => String(value || "").normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, " ").trim();
+// Symbols and punctuation can identify a different game (N, N+, N++).
+// Only normalize explicit presentation equivalents, never whole Unicode
+// punctuation/symbol classes. Remove trademark glyphs before NFKC turns ™ into TM.
+const normalizeIdentity = value => String(value || "")
+  .replace(/[™®©]/gu, "")
+  .normalize("NFKC")
+  .toLowerCase()
+  .replace(/[‘’]/gu, "'")
+  .replace(/[“”]/gu, '"')
+  .replace(/[‐‑‒–—]/gu, "-")
+  .replace(/\s+/gu, " ")
+  .trim();
 
 const config = JSON.parse(readFileSync(resolve("config/title-evidence-sources.json")));
 

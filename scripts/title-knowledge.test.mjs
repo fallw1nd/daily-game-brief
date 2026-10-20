@@ -56,6 +56,56 @@ describe("persistent title evidence", () => {
       titleZhCn: "示例二", titleEnAliases: [identity], titleZhStatus: "official_simplified",
     });
   });
+  it.each([
+    ["N++", "《忍者》（N）", "忍者"],
+    ["N++", "《忍者》（N+）", "忍者"],
+    ["N+", "《忍者》（N）", "忍者"],
+    ["N#", "《忍者》（N）", "忍者"],
+    ["N!", "《忍者》（N）", "忍者"],
+    ["N?", "《忍者》（N）", "忍者"],
+    ["A & B", "《忍者》（A B）", "忍者"],
+    ["A × B", "《忍者》（A B）", "忍者"],
+    ["N", "《忍者》（N++）", "忍者"],
+    ["N", "《忍者++》（N）", "忍者"],
+    ["N", "《忍者!》（N）", "忍者"],
+    ["N", "《忍者?》（N）", "忍者"],
+    ["N++", "N 忍者", "忍者"],
+    ["N!", "N 忍者", "忍者"],
+    ["N?", "N 忍者", "忍者"],
+    ["N", "N 忍者!", "忍者"],
+    ["N", "N 忍者 unrelated", "忍者"],
+  ])("does not erase semantic punctuation: %s / %s", (identity, text, chinese) => {
+    const target = { titleKey: "symbol-regression", subjectKey: identity };
+    const sources = [page("https://store.steampowered.com/app/10/?l=schinese", text)];
+    expect(classifyTitleSource(sources[0], target, chinese)).toBeNull();
+    const hint = validateTitleHintCandidate(target, { titleZhCn: chinese, suggestedStatus: "official_simplified" }, sources);
+    expect(hint).toBeNull();
+    expect(adoptTitleHints({ translations: {} }, hint ? [hint] : []).translations).toEqual({});
+  });
+  it.each([
+    ["N++", "《忍者》（N++）", "忍者"],
+    ["N++", "《忍者》（Ｎ＋＋）", "忍者"],
+    ["N++", "N++ 忍者", "忍者"],
+    ["N!", "N! 忍者", "忍者"],
+    ["N?", "忍者 N?", "忍者"],
+    ["N#", "《忍者》（N#）", "忍者"],
+    ["A & B", "《忍者》（A & B）", "忍者"],
+    ["A × B", "《忍者》（A × B）", "忍者"],
+    ["N", "《忍者++》（N）", "忍者++"],
+    ["N", "《忍者!》（N）", "忍者!"],
+    ["N", "《忍者?》（N）", "忍者?"],
+    ["N++", "《忍者》（N++™）", "忍者"],
+    ["N++®", "《忍者》（N++）", "忍者"],
+    ["N", "《忍者》（N©）", "忍者"],
+    ["Example's Game - II", "《忍者》（Example’s Game – II）", "忍者"],
+    ['Example "II"', '《忍者》（Example “II”）', "忍者"],
+  ])("preserves exact symbols and explicit typography: %s / %s", (identity, text, chinese) => {
+    const target = { titleKey: "symbol-regression", subjectKey: identity };
+    const hint = validateTitleHintCandidate(target, { titleZhCn: chinese, suggestedStatus: "official_simplified" },
+      [page("https://store.steampowered.com/app/10/?l=schinese", text)]);
+    expect(hint).toMatchObject({ autoAdoptable: true, titleZhCn: chinese });
+    expect(adoptTitleHints({ translations: {} }, [hint]).translations[target.titleKey].titleZhCn).toBe(chinese);
+  });
   it("does not let two independent media families legitimize a wrong identity", () => {
     expect(validateTitleHintCandidate(subject, { titleZhCn: "示例二", suggestedStatus: "common_translation" }, [
       page("https://www.gamersky.com/news/a", "示例二（Example 2 Deluxe Edition）"),
