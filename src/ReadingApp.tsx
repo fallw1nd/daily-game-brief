@@ -106,8 +106,13 @@ export interface ReadingProps {
 
 export default function ReadingApp({ english = false, initialEdition, initialManifest, initialSearchIndex }: ReadingProps) {
   const [catchupOpen, setCatchupOpen] = useState(() => new URLSearchParams(window.location.search).get("catchup") === "1");
-  const [edition, setEdition] = useState(initialEdition);
+  const [requestedId, setRequestedId] = useState(() => new URLSearchParams(window.location.search).get("edition"));
+  const [loadedEdition, setLoadedEdition] = useState<{ value: BriefEdition; requestedId: string | null; english: boolean }>();
+  // A changed URL/language must never render the preceding request's content.
+  const edition = initialEdition ?? (loadedEdition?.requestedId === requestedId && loadedEdition.english === english ? loadedEdition.value : undefined);
   const [manifest, setManifest] = useState(initialManifest);
+  const [manifestState, setManifestState] = useState<"loading" | "ready" | "error">(initialManifest ? "ready" : initialEdition ? "error" : "loading");
+  const [manifestRetry, setManifestRetry] = useState(0);
   const [searchIndex, setSearchIndex] = useState(initialSearchIndex);
   const [englishTitles, setEnglishTitles] = useState<Record<string, string>>({});
   const [calendar, setCalendar] = useState<ReadingCalendar>();
@@ -117,6 +122,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [loadError, setLoadError] = useState("");
   const [searchError, setSearchError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [searchRetry, setSearchRetry] = useState(0);
   const [theme, setTheme] = useState<Theme>(storedTheme);
   const [accent, setAccent] = useState<Accent>(storedAccent);
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
@@ -149,6 +155,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
+      setRequestedId(params.get("edition"));
       setCatchupOpen(params.get("catchup") === "1");
       if (params.get("catchup")) setSearchRequested(true);
       setQuery(params.get("q") || "");
@@ -226,18 +233,32 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   }, []);
 
   useEffect(() => {
+    if (initialEdition || initialManifest) return;
+    const controller = new AbortController();
+    setManifestState("loading");
+    void loadBriefManifest(controller.signal).then((value) => {
+      if (!controller.signal.aborted) { setManifest(value); setManifestState("ready"); }
+    }).catch(() => {
+      if (!controller.signal.aborted) setManifestState("error");
+    });
+    return () => controller.abort();
+  }, [initialEdition, initialManifest, manifestRetry]);
+
+  useEffect(() => {
     if (initialEdition) return;
     const controller = new AbortController();
     setLoadError("");
+    setLoadedEdition(undefined);
+    setEnglishTitles({});
     void (async () => {
       try {
-        const [loadedManifest, latest] = await Promise.all([loadBriefManifest(controller.signal), loadLatestEdition(controller.signal)]);
-        if (!controller.signal.aborted) setManifest(loadedManifest);
-        const requestedId = new URLSearchParams(window.location.search).get("edition");
-        const requested = loadedManifest.editions.find((item) => item.id === requestedId);
-        if (requestedId && !requested) throw new Error(t("找不到这一期归档。", "This edition could not be found."));
-        if (!requested && latest.source === "fallback") throw new Error(t("暂时无法读取最新一期。", "The latest edition could not be loaded."));
-        let canonical = requested ? await loadArchivedEdition(requested, controller.signal) : latest.edition;
+        let canonical: BriefEdition;
+        if (requestedId !== null) canonical = await loadArchivedEdition(requestedId, controller.signal);
+        else {
+          const latest = await loadLatestEdition(controller.signal);
+          if (latest.source === "fallback") throw new Error(t("暂时无法读取最新一期。", "The latest edition could not be loaded."));
+          canonical = latest.edition;
+        }
         if (english) {
           const locales = await loadEnglishLocaleIndex(controller.signal);
           const availability = locales.editions.find((item) => item.editionId === canonical.id);
@@ -250,34 +271,36 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
           canonical = projected;
           if (!controller.signal.aborted) setEnglishTitles(Object.fromEntries(locales.editions.flatMap((item) => item.status === "available" ? [[item.editionId, item.archiveTitle]] : [])));
         }
-        if (!controller.signal.aborted) { setManifest(loadedManifest); setEdition(canonical); }
+        if (!controller.signal.aborted) setLoadedEdition({ value: canonical, requestedId, english });
       } catch (error) {
         if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : t("简报暂时无法读取。", "The edition could not be loaded."));
       }
     })();
     return () => controller.abort();
-  }, [english, initialEdition, retry]);
+  }, [english, initialEdition, requestedId, retry]);
 
   useEffect(() => {
-    if (!edition || !manifest) return;
     setCalendar(undefined);
+    if (!edition) return;
     if (edition.upcoming.length) { setCalendarState("ready"); return; }
+    if (!manifest) { setCalendarState(manifestState === "error" ? "error" : "loading"); return; }
     const controller = new AbortController();
     setCalendarState("loading");
     void loadReadingCalendar(edition, manifest, english, controller.signal).then((value) => {
       if (!controller.signal.aborted) { setCalendar(value); setCalendarState("ready"); }
     }).catch(() => { if (!controller.signal.aborted) setCalendarState("error"); });
     return () => controller.abort();
-  }, [edition, manifest, english, calendarRetry]);
+  }, [edition, manifest, manifestState, english, calendarRetry]);
 
   useEffect(() => {
     if (initialSearchIndex || !searchRequested) return;
     const controller = new AbortController();
     setSearchError(false);
+    setSearchIndex(undefined);
     const load = english ? loadEnglishSearchIndex : loadSearchIndex;
     void load(controller.signal).then((index) => { if (!controller.signal.aborted) setSearchIndex(index); }).catch(() => { if (!controller.signal.aborted) setSearchError(true); });
     return () => controller.abort();
-  }, [english, initialSearchIndex, retry, searchRequested]);
+  }, [english, initialSearchIndex, searchRetry, searchRequested]);
 
   useEffect(() => {
     if (!edition) return;
@@ -297,7 +320,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const position = archives.findIndex((item) => item.id === edition?.id);
   const previous = position >= 0 ? archives[position + 1] : undefined;
   const next = position > 0 ? archives[position - 1] : undefined;
-  const currentId = edition?.id || new URLSearchParams(window.location.search).get("edition") || undefined;
+  const currentId = edition?.id || requestedId || undefined;
   const switchHref = readingHref(currentId, window.location.hash.slice(1) || undefined, !english).replace("?view=reading", `?view=reading${catchupOpen ? "&catchup=1" : ""}`);
   const archiveTitle = (id: string, title?: string) => english ? englishTitles[id] : title;
 
@@ -316,7 +339,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     {!edition ? <main className="r-loading r-container" aria-live="polite">
       {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <EditionLoading english={english} />}
     </main> : <main className="r-container" id="top">
-      {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setRetry(value => value + 1)} onClose={() => toggleCatchup(false)} />}
+      {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setSearchRetry(value => value + 1)} onClose={() => toggleCatchup(false)} />}
       <div hidden={catchupOpen}>
       <div className="r-edition-bar">
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
@@ -350,19 +373,20 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         <p className="r-calendar-note">{t(`以本期 ${edition.date} 为基准，展示次日起15天内的发售计划。`, `Scheduled releases in the 15 days after this edition, ${edition.date}.`)}</p>
         {!calendar && edition.sourceReport?.calendarReview && [...edition.sourceReport.calendarReview.pages, ...edition.sourceReport.calendarReview.platforms].some(row => row.status === "deferred") && <p className="r-calendar-note r-warning">{t("本期发售日历尚未完成复核，包含沿用计划，也可能遗漏新公布或调整的发售日期。请以各条目官方来源为准。", "Calendar review is incomplete. Some plans are carried forward; newly announced or changed dates may be missing. Check the official sources linked below.")}</p>}
         {calendar && upcoming.length > 0 && <p className="r-calendar-note r-warning">{t(`沿用 ${calendar.sourceDate} 收录的计划，本期未重新核验；日期如有调整，请以来源公告为准。`, `Plans recorded on ${calendar.sourceDate}, not reverified for this edition. Check the linked sources for schedule changes.`)} <a href={readingHref(calendar.sourceId, "upcoming", english)}>{t("查看原期日历", "View source edition")}<ArrowRight /></a></p>}
-        {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} <button className="r-button" onClick={() => setCalendarRetry((value) => value + 1)}>{t("重试", "Try again")}</button></> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
+        {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} {(!initialEdition || manifest) && <button className="r-button" onClick={() => manifest ? setCalendarRetry((value) => value + 1) : setManifestRetry((value) => value + 1)}>{t("重试", "Try again")}</button>}</> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
         <div className="r-calendar-list">{upcoming.map((item) => { const name = calendarTitle(item.title, english); return <article key={item.id} className="r-calendar-item">
         {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{name.primary}</h3>{name.original && <p className="r-calendar-original" lang="en">{name.original}</p>}<p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && (/API|appids=|字段|解析/.test(item.note) ? <details className="r-calendar-evidence"><summary>日期依据与核验说明</summary><p>{item.note}</p></details> : <p>{item.note}</p>)}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
       </article>; })}</div></section>}
 
-      <nav className="r-pager" aria-label={t("期次导航", "Edition navigation")}>
+      {manifest && <nav className="r-pager" aria-label={t("期次导航", "Edition navigation")}>
         {previous ? <a href={readingHref(previous.id, undefined, english)}><small>{t("上一期", "Previous edition")} · {previous.date}</small><span><ArrowLeft />{archiveTitle(previous.id, previous.archiveTitle)}</span></a> : <span className="r-pager-boundary">{t("已是最早一期", "First edition")}</span>}
         {next ? <a href={readingHref(next.id, undefined, english)}><small>{t("下一期", "Next edition")} · {next.date}</small><span>{archiveTitle(next.id, next.archiveTitle)}<ArrowRight aria-hidden="true" /></span></a> : <span className="r-pager-boundary">{t("已是最新一期", "Latest edition")}<small>{t("下期计划：", "Next scheduled: ")}{edition.nextEditionAt}</small></span>}
-      </nav>
+      </nav>}
 
-      <section ref={archiveRef} id="archive" className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{t(`${archives.length} 期归档`, `${archives.length} editions`)}</span></header>
+      <section ref={archiveRef} id="archive" className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{manifest ? t(`${archives.length} 期归档`, `${archives.length} editions`) : ""}</span></header>
+        {!manifest && <p className="r-result-count" role="status">{manifestState === "error" ? <>{t("归档目录暂时无法读取，当前简报仍可阅读。", "The archive list could not be loaded. You can still read this edition.")} {!initialEdition && <button className="r-button" onClick={() => setManifestRetry(value => value + 1)}>{t("重试归档目录", "Retry archive list")}</button>}</> : t("正在读取归档目录…", "Loading archive list…")}</p>}
         <label className="r-search"><MagnifyingGlass aria-hidden="true" /><span className="r-sr-only">{t("搜索所有期次的游戏、平台或事件", "Search all editions by game, platform or event")}</span><input type="search" value={query} placeholder={t("搜索游戏、平台或事件", "Search games, platforms or events")} onFocus={() => setSearchRequested(true)} onChange={(event) => updateSearch(event.target.value)} /></label>
-        {query.trim() ? <div className="r-search-results"><p className="r-result-count" role="status">{searchError ? t("搜索暂时不可用。", "Search is temporarily unavailable.") : !searchIndex ? t("正在读取搜索索引…", "Loading search…") : t(`找到 ${results.length} 条新闻`, `${results.length} matching stories`)}</p>{searchError && <button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重新加载", "Retry")}</button>}{results.slice(0, resultLimit).map((item) => <a key={`${item.editionId}-${item.entryId}`} className="r-search-result" onClick={saveSearchPosition} href={readingHref(item.editionId, item.entryId, english)}><small>{item.date} · NO.{String(item.issueNumber).padStart(3, "0")} · {label(statusNames[item.factStatus], english)}{item.tracking ? t(" · 持续跟踪", " · Tracking") : ""}</small><h3>{item.headline}</h3><p>{item.summary}</p><ArrowRight aria-hidden="true" /></a>)}{searchIndex && !results.length && <p>{t("没有匹配的新闻，试试更短的关键词。", "No matching stories. Try a shorter keyword.")}</p>}{results.length > resultLimit && <button className="r-button" onClick={() => updateSearch(query, resultLimit + 12)}>{t("显示更多结果", "Show more results")}</button>}</div> : <><div className="r-archive-list">{archives.slice(0, archiveLimit).map((item) => <a href={readingHref(item.id, undefined, english)} className={item.id === edition.id ? "is-current" : ""} key={item.id} aria-current={item.id === edition.id ? "page" : undefined}><span className="r-archive-meta"><time>{item.date}</time><span>NO.{String(item.issueNumber).padStart(3, "0")}</span>{item.id === edition.id && <small>{t("当前阅读", "Reading")}</small>}</span><strong>{archiveTitle(item.id, item.archiveTitle) || t("本期简报", "Edition")}</strong><ArrowRight aria-hidden="true" /></a>)}</div>{archives.length > archiveLimit && <button className="r-button" onClick={() => setArchiveLimit((value) => value + 12)}>{t("浏览更多期次", "More editions")}<ArrowDown aria-hidden="true" /></button>}</>}
+        {query.trim() ? <div className="r-search-results"><p className="r-result-count" role="status">{searchError ? t("搜索暂时不可用。", "Search is temporarily unavailable.") : !searchIndex ? t("正在读取搜索索引…", "Loading search…") : t(`找到 ${results.length} 条新闻`, `${results.length} matching stories`)}</p>{searchError && <button className="r-button" onClick={() => setSearchRetry((value) => value + 1)}>{t("重新加载", "Retry")}</button>}{results.slice(0, resultLimit).map((item) => <a key={`${item.editionId}-${item.entryId}`} className="r-search-result" onClick={saveSearchPosition} href={readingHref(item.editionId, item.entryId, english)}><small>{item.date} · NO.{String(item.issueNumber).padStart(3, "0")} · {label(statusNames[item.factStatus], english)}{item.tracking ? t(" · 持续跟踪", " · Tracking") : ""}</small><h3>{item.headline}</h3><p>{item.summary}</p><ArrowRight aria-hidden="true" /></a>)}{searchIndex && !results.length && <p>{t("没有匹配的新闻，试试更短的关键词。", "No matching stories. Try a shorter keyword.")}</p>}{results.length > resultLimit && <button className="r-button" onClick={() => updateSearch(query, resultLimit + 12)}>{t("显示更多结果", "Show more results")}</button>}</div> : <><div className="r-archive-list">{archives.slice(0, archiveLimit).map((item) => <a href={readingHref(item.id, undefined, english)} className={item.id === edition.id ? "is-current" : ""} key={item.id} aria-current={item.id === edition.id ? "page" : undefined}><span className="r-archive-meta"><time>{item.date}</time><span>NO.{String(item.issueNumber).padStart(3, "0")}</span>{item.id === edition.id && <small>{t("当前阅读", "Reading")}</small>}</span><strong>{archiveTitle(item.id, item.archiveTitle) || t("本期简报", "Edition")}</strong><ArrowRight aria-hidden="true" /></a>)}</div>{archives.length > archiveLimit && <button className="r-button" onClick={() => setArchiveLimit((value) => value + 12)}>{t("浏览更多期次", "More editions")}<ArrowDown aria-hidden="true" /></button>}</>}
       </section>
 
       <details className="r-edition-directory"><summary>{t(`本期 ${edition.entries.length} 条新闻 · 浏览目录`, `${edition.entries.length} stories · Browse contents`)}<CaretDown /></summary><nav aria-label={t("本期新闻目录", "Edition contents")}><ol>{edition.entries.map(entry => <li key={entry.id}><a href={`#${entry.id}`}>{entry.headline}</a></li>)}</ol></nav></details>

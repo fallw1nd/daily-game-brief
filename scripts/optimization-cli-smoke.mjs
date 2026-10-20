@@ -313,10 +313,11 @@ try {
     schemaVersion: 1,
     locale: "en",
     editionId,
+    factsDigest: retainedStatus.factsDigest,
     archiveTitle: "Daily Brief | Smoke Game confirms a new fact",
     entries: canonicalAfterFirst.entries.map(entry => {
       const old = retained.entries.find(item => item.entryId === entry.id);
-      if (old) return { ...old, headline: "This draft overwrite must be ignored for retained English." };
+      if (old) return { ...old };
       return {
         entryId: entry.id,
         headline: "Smoke Game Confirms a New Fact",
@@ -381,7 +382,7 @@ try {
     localeRepair: {
       stdout: repairRun.stdout.trim(),
       canonicalUnchanged: ["archiveHash", "latestHash", "manifestHash"].every(key => repairBefore[key] === afterRepair[key]),
-      oldEnglishWasRetained: retainedOld?.headline !== draftOld?.headline && retainedOld?.headline === retained.entries.find(entry => entry.entryId === retainedOld.entryId)?.headline,
+      oldEnglishWasRetained: retainedOld?.headline === draftOld?.headline && retainedOld?.headline === retained.entries.find(entry => entry.entryId === retainedOld.entryId)?.headline,
       newEntryReadable: repairedNew?.headline === "Smoke Game Confirms a New Fact" && repairedNew?.summary.includes("newly added fact"),
       overlayAvailable: afterRepair.localeOverlayHash !== null && afterRepair.localeStatusHash === null,
     },

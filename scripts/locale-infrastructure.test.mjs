@@ -13,7 +13,7 @@ it("keeps a complete English edition available for the calendar labels used sinc
     source: { label: "Steam", url: "https://store.steampowered.com/app/123", kind: "primary" },
   }));
   const result = buildEnglishRepairOverlay({ canonical, draft: {
-    schemaVersion: 1, locale: "en", editionId: canonical.id,
+    schemaVersion: 1, locale: "en", editionId: canonical.id, factsDigest: factsDigest(canonical),
     archiveTitle: "Morning Brief | Test Game announces an update",
     entries: [{ entryId: canonical.entries[0].id, headline: "Test Game announces an update",
       summary: "The official source announced an update for Test Game.",
