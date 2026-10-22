@@ -1,3 +1,5 @@
+import { applyCalendarImportance } from "./lib/calendar-importance.mjs";
+import { loadCalendarInterestHistory } from "./lib/calendar-interest-history-io.mjs";
 import { showcaseEvidencePackages } from "./lib/showcase.mjs";
 import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -49,6 +51,8 @@ if (evidence.window.period === "daily") {
   } else {
     const previousHealth = await readOptionalJson(process.env.RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH || "artifacts/release-calendar-health-previous.json", { allowMalformed: true });
     report = await collectReleaseCalendar({ config, editionDate, baseline: calendarBaseline.items, titleRegistry, previousHealth });
+    const interestHistory = await loadCalendarInterestHistory({ manifest, editionDate, titleRegistry, lookbackDays: config.importance?.historyLookbackDays || 120 });
+    report = applyCalendarImportance(report, { config, ...interestHistory });
     report = await collectCalendarPrimaryEvidence(report, { baseline: calendarBaseline.items });
     await persistCalendarHealth({
       previousPath: process.env.RELEASE_CALENDAR_HEALTH_PREVIOUS_PATH || "artifacts/release-calendar-health-previous.json",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEdition } from "./lib/edition-publisher.mjs";
+import { applyRevisionSubjectIdentityOverrides } from "./lib/revision-packet.mjs";
 import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 
 const packet = {
@@ -70,6 +71,69 @@ const latest = {
 const manifest = { schemaVersion: 1, updatedAt: "2026-08-26 17:04", latest: "2026-08-26-pm", editions: [{ id: "2026-08-26-pm", issueNumber: 12 }] };
 
 describe("idempotent edition publisher", () => {
+  it("does not inherit a corrected same-ID row's old subject or cover", () => {
+    const old = { ...latest.upcoming[0], title: { title_key: "old-game", title_en: "Old Game", title_zh_cn: "旧游戏", title_zh_status: "official_simplified" }, cover_status: "verified", cover: { kind: "cover", url: "old.jpg" } };
+    const patch = { id: old.id, date: "2026-08-28", titleKey: "correct-game", titleEn: "Correct Game", titleZhCn: "正确游戏", titleZhStatus: "official_simplified", platforms: ["PC"], region: "全球", releaseType: "正式发售", source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/456/" } };
+    const result = buildEdition({ packet, editorial: { ...editorial, upcoming: [patch] }, latest: { upcoming: [old] }, manifest });
+    expect(result.edition.upcoming[0]).toMatchObject({ id: old.id, title: { title_key: "correct-game", title_en: "Correct Game", title_zh_cn: "正确游戏" }, cover_status: "unavailable", source: patch.source });
+    expect(result.edition.upcoming[0].cover).toBeUndefined();
+  });
+  it("rejects exact duplicate decisions even under distinct event keys", () => {
+    const duplicatePacket = structuredClone(packet);
+    duplicatePacket.editorialInput.packages.push({ ...duplicatePacket.editorialInput.packages[0], eventKey: "event-2" });
+    const duplicateDraft = structuredClone(editorial);
+    duplicateDraft.decisions.push({ ...duplicateDraft.decisions[0], eventKey: "event-2" });
+    expect(() => buildEdition({ packet: duplicatePacket, editorial: duplicateDraft, latest, manifest }))
+      .toThrow("exact duplicate news stories");
+    duplicateDraft.decisions[1].headline = "《Example Game》公布另一段预告";
+    duplicateDraft.decisions[1].summary = "同一来源还报道了独立的另一项事实。";
+    expect(buildEdition({ packet: duplicatePacket, editorial: duplicateDraft, latest, manifest }).edition.entries).toHaveLength(2);
+  });
+
+  it("reuses the stable legacy entry ID for an exact continuation replay without existingEntryId", () => {
+    const initial = buildEdition({ packet, editorial, latest, manifest });
+    const canonical = structuredClone(initial.edition);
+    delete canonical.entries[0].eventKey;
+    const scoped = structuredClone(packet);
+    scoped.continuation = { scope: "news", preservePublished: true };
+    scoped.editorialInput.packages[0].eventKey = "replayed-event";
+    const draft = structuredClone(editorial);
+    draft.decisions[0].eventKey = "replayed-event";
+    draft.leadEventKey = "replayed-event";
+    const result = buildEdition({ packet: scoped, editorial: draft, latest: canonical, manifest: initial.manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries).toEqual(canonical.entries);
+    expect(result.entryIdsByEvent["replayed-event"]).toBe(canonical.entries[0].id);
+    const historicalDuplicates = structuredClone(canonical);
+    historicalDuplicates.entries.push({ ...historicalDuplicates.entries[0], id: `${canonical.id}-news-1` });
+    expect(() => buildEdition({ packet: scoped, editorial: draft, latest: historicalDuplicates, manifest: initial.manifest, allowSameEditionRevision: true }))
+      .toThrow("multiple published exact duplicates");
+    const calendarPacket = { ...scoped, continuation: { scope: "calendar", preservePublished: true },
+      editorialInput: { ...scoped.editorialInput, packages: [] } };
+    const calendarDraft = { ...draft, decisions: [] };
+    const repaired = buildEdition({ packet: calendarPacket, editorial: calendarDraft, latest: historicalDuplicates, manifest: initial.manifest, allowSameEditionRevision: true, repairExactDuplicateStories: true });
+    expect(repaired.edition.entries).toEqual(canonical.entries);
+    expect(repaired.duplicateStoryRepairs).toEqual([{ removedEntryId: `${canonical.id}-news-1`, retainedEntryId: canonical.entries[0].id }]);
+    historicalDuplicates.leadEntryId = `${canonical.id}-news-1`;
+    const leadRepair = buildEdition({ packet: calendarPacket, editorial: calendarDraft, latest: historicalDuplicates, manifest: initial.manifest, allowSameEditionRevision: true, repairExactDuplicateStories: true });
+    expect(leadRepair.edition.entries[0].id).toBe(historicalDuplicates.leadEntryId);
+    expect(leadRepair.edition.leadEntryId).toBe(historicalDuplicates.leadEntryId);
+    historicalDuplicates.entries[1].verification = "Different factual verification must not be discarded.";
+    expect(buildEdition({ packet: calendarPacket, editorial: calendarDraft, latest: historicalDuplicates, manifest: initial.manifest, allowSameEditionRevision: true, repairExactDuplicateStories: true }).duplicateStoryRepairs).toEqual([]);
+
+    expect(buildEdition({ packet: calendarPacket, editorial: calendarDraft, latest: historicalDuplicates, manifest: initial.manifest, allowSameEditionRevision: true }).edition.entries)
+      .toEqual(historicalDuplicates.entries);
+    // Same game and source do not establish the same fact.
+    draft.decisions[0].summary = "另一段预告展示了不同的玩法内容。";
+    expect(buildEdition({ packet: scoped, editorial: draft, latest: canonical, manifest: initial.manifest, allowSameEditionRevision: true }).edition.entries).toHaveLength(2);
+  });
+
+  it("coalesces a calendar alias into the published ID rather than adding a second release", () => {
+    const prior = { ...latest.upcoming[0], source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/123/" } };
+    const patch = { id: "new-store-id", date: prior.date, titleKey: "new-key", titleEn: prior.title.title_en, titleZhStatus: "unavailable", platforms: prior.platforms, region: prior.region, releaseType: prior.releaseType, source: prior.source, note: "Updated verification." };
+    const result = buildEdition({ packet, editorial: { ...editorial, upcoming: [patch] }, latest: { upcoming: [prior] }, manifest });
+    expect(result.edition.upcoming).toHaveLength(1);
+    expect(result.edition.upcoming[0]).toMatchObject({ id: prior.id, title: { title_key: prior.title.title_key } });
+  });
   it("publishes degraded Daily news while retaining and naturally expiring the verified calendar baseline", () => {
     const dailyPacket = structuredClone(packet);
     dailyPacket.editorialInput.window = {
@@ -354,5 +418,61 @@ describe("idempotent edition publisher", () => {
     expect(result.manifest.latest).toBe("2026-09-01-daily");
     expect(result.archivePath).toBe("archive/2026/09/2026-09-01-daily.json");
     expect(result.edition.upcoming).toEqual([]);
+  });
+});
+
+
+describe("manual factual metadata corrections", () => {
+  function companyFixture() {
+    const input = structuredClone(packet);
+    input.editorialInput.packages[0].headline = '『Ever17』の作者が新会社「Crash Keys」設立';
+    input.editorialInput.packages[0].sources[0].evidenceText = "株式会社Crash Keysの設立を正式に発表した。";
+    Object.assign(input.editorialInput.packages[0], { subjectKey: "ever17", publishability: "direct" });
+    const draft = structuredClone(editorial);
+    Object.assign(draft.decisions[0], { titleKey: "ever17", titleEn: "Crash Keys", headline: "Crash Keys公司正式成立", summary: "Crash Keys将开展原创项目。",
+      sharedFactFrame: { subjectTitleKey: "ever17", dates: [], times: [], numbers: [], platforms: ["PC"], peopleAndEntities: ["Crash Keys"], versionsAndTerms: [] } });
+    draft.archiveTitle = "早报｜Crash Keys公司正式成立";
+    const initial = buildEdition({ packet: input, editorial: draft, latest, manifest });
+    input.continuation = { scope: "news", preservePublished: true };
+    draft.decisions[0].existingEntryId = initial.edition.entries[0].id;
+    return { input, draft, initial };
+  }
+  it("corrects only verification under explicit manual authorization and exact fact identity", () => {
+    const { input, draft, initial } = companyFixture();
+    draft.decisions[0].verification = "Corrected opened-source verification.";
+    const options = { packet: input, editorial: draft, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true };
+    expect(buildEdition(options).edition.entries[0].verification).toBe(initial.edition.entries[0].verification);
+    const corrected = buildEdition({ ...options, repairExactDuplicateStories: true }).edition.entries[0];
+    expect(corrected).toEqual({ ...initial.edition.entries[0], verification: draft.decisions[0].verification });
+    draft.decisions[0].summary = "Changed event facts.";
+    expect(() => buildEdition({ ...options, repairExactDuplicateStories: true })).toThrow("preserve the exact published fact");
+  });
+  it("reuses the bound company's stable ID across a key correction and rejects unsafe rebindings", () => {
+    const { input, draft, initial } = companyFixture();
+    const prior = initial.edition.entries[0];
+    delete input.continuation;
+    const other = { ...prior, id: `${initial.edition.id}-news-9`, title: { title_key: "other", title_en: "Other", title_zh_status: "unavailable" }, headline: "Other story", summary: "Different facts" };
+    initial.edition.entries.push(other);
+    initial.edition.leadEntryId = other.id;
+    initial.edition.archiveTitle = "早报｜另外一条新闻作为本期头条";
+    const repaired = applyRevisionSubjectIdentityOverrides(input, { editionId: initial.edition.id, reason: "user_authorized_same_edition_revision", packetBlobSha: "a".repeat(40),
+      subjectIdentityOverrides: { "event-1": { key: "crash-keys", kind: "entity", expectedOldSubjectKey: "ever17", expectedEntryId: prior.id,
+        expectedBeijingTime: prior.beijingTime, expectedSourceUrls: prior.sources.map(source => source.url) } } });
+    draft.decisions[0].titleKey = "crash-keys";
+    draft.decisions[0].sharedFactFrame.subjectTitleKey = "crash-keys";
+    const options = { packet: repaired, editorial: draft, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true, repairExactDuplicateStories: true };
+    const result = buildEdition(options);
+    expect(result.edition.entries).toHaveLength(2);
+    expect(result.edition.leadEntryId).toBe(other.id);
+    expect(result.edition.archiveTitle).toBe(initial.edition.archiveTitle);
+    expect(result.edition.entries[0]).toMatchObject({ id: prior.id, title: { title_key: "crash-keys", title_en: "Crash Keys" }, headline: prior.headline, summary: prior.summary, sources: prior.sources, beijingTime: prior.beijingTime });
+    expect(result.edition.entries[0].sharedFactFrameDigest).not.toBe(prior.sharedFactFrameDigest);
+    expect(() => buildEdition({ ...options, repairExactDuplicateStories: false })).toThrow("bound published event");
+    for (const property of ["eventKey", "beijingTime"]) {
+      const badLatest = structuredClone(initial.edition); badLatest.entries[0][property] = "wrong";
+      expect(() => buildEdition({ ...options, latest: badLatest })).toThrow("bound published event");
+    }
+    draft.decisions[0].sharedFactFrame.numbers = ["invented fact"];
+    expect(() => buildEdition(options)).toThrow("preserve the shared fact frame");
   });
 });

@@ -69,6 +69,7 @@ const releaseTypeLabels = new Map([
   ["产业动态", "Industry news"],
   ["平台移植上线", "Platform port release"],
   ["PC版发售", "PC release"],
+  ["多平台发售", "Multi-platform release"],
   ["平台版发售", "Platform release"],
   ["PS5版发售", "PlayStation 5 release"],
   ["Nintendo Switch版发售", "Nintendo Switch release"],

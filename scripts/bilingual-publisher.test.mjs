@@ -114,6 +114,23 @@ function repairDraft(canonical) {
 }
 
 describe("trusted bilingual publication planner", () => {
+  it("binds an incoming calendar alias presentation to the retained Canonical ID", () => {
+    const canonical = canonicalEdition();
+    const editorial = bilingualEditorial();
+    const item = { id: "retained-id", date: "09.01", title: { title_key: "test-game", title_en: "Test Game", title_zh_status: "unavailable" }, platforms: ["PC"], region: "美国", releaseType: "PC版发售", source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/123/" }, cover_status: "unavailable" };
+    canonical.upcoming = [item];
+    editorial.upcoming = [{ ...item, id: "incoming-alias", date: "2026-09-01", title: undefined, titleEn: "Test Game" }];
+    editorial.locales.en.upcoming = [{ upcomingId: "incoming-alias", regionLabel: "United States", releaseTypeLabel: "PC release", sourceLabel: "Steam", coverAlt: "Test Game cover" }];
+    const result = buildEnglishOverlay({ canonical, editorial });
+    expect(result.errors).toEqual([]);
+    expect(result.status).toBe("available");
+    expect(result.overlay.upcoming).toEqual([{ upcomingId: "retained-id", regionLabel: "United States", releaseTypeLabel: "PC release", sourceLabel: "Steam", coverAlt: "Test Game cover" }]);
+    canonical.upcoming[0] = { ...item, platforms: ["PC", "PS5"], releaseType: "多平台发售" };
+    const broader = buildEnglishOverlay({ canonical, editorial });
+    expect(broader.errors).toEqual([]);
+    expect(broader.status).toBe("available");
+    expect(broader.overlay.upcoming[0].releaseTypeLabel).toBe("Multi-platform release");
+  });
   it("keeps existing English when a showcase revision only attaches references", () => {
     const canonical = canonicalEdition();
     const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;

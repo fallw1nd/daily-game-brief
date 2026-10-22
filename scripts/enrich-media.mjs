@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { getRegisteredTitleTranslation } from "./lib/title-translations.mjs";
+import { repairLegacyGeneratedAlts } from "./lib/legacy-generated-alt.mjs";
 import { identifyProductTitle } from "./lib/media-product-identity.mjs";
 
 const DATA_ROOT = resolve("public/data");
@@ -671,6 +672,9 @@ async function processEdition(manifestItem, options) {
 
   await mapLimit(edition.entries, 4, async (entry) => {
     if (options.recordId && entry.id !== options.recordId) return;
+    const altRepairs = repairLegacyGeneratedAlts(edition.id, entry, options);
+    results.push(...altRepairs);
+    if (altRepairs.some(result => result.status === "applied")) changed = true;
     if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) return;
     const sources = [...(entry.sources || [])]
       .filter((source) => source.url?.startsWith("https://"))

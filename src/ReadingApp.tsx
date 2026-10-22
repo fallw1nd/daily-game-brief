@@ -1,3 +1,5 @@
+import { useCalendarFocus } from "./lib/calendar-focus";
+import { CalendarFocusControl } from "./components/CalendarFocusControl";
 import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BookOpen, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, IconContext, ImageSquare, CaretDown, Check, MagnifyingGlass, Moon, NewspaperClipping, SlidersHorizontal, Sun, WarningCircle } from "@phosphor-icons/react";
@@ -119,6 +121,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const [calendarState, setCalendarState] = useState<"loading" | "ready" | "error">("loading");
   const [calendarRetry, setCalendarRetry] = useState(0);
   const upcoming = edition?.upcoming.length ? edition.upcoming : calendar?.items ?? [];
+  const calendarFocus = useCalendarFocus(upcoming, edition?.id, manifest?.latest);
   const [loadError, setLoadError] = useState("");
   const [searchError, setSearchError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -369,12 +372,13 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {showcase.entryIds.map(id => edition.entries.find(entry => entry.id === id)).filter((entry): entry is BriefEntry => Boolean(entry)).map(entry => entry.showcaseBrief && entry.id !== lead?.id && edition.showcases?.find(group => group.entryIds.includes(entry.id))?.id === showcase.id ? <Story key={entry.id} entry={entry} english={english} /> : <p className="r-showcase-link" key={entry.id}><a href={`#${entry.id}`}>{entry.headline}<ArrowUpRight aria-hidden="true" /></a></p>)}
       </section>)}
 
-      {<section className="r-calendar" id="upcoming" aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${upcoming.length} 款作品`, `${upcoming.length} games`)}</span></header>
+      {<section className="r-calendar" id="upcoming" aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${calendarFocus.items.length} 项计划`, `${calendarFocus.items.length} release plans`)}</span></header>
         <p className="r-calendar-note">{t(`以本期 ${edition.date} 为基准，展示次日起15天内的发售计划。`, `Scheduled releases in the 15 days after this edition, ${edition.date}.`)}</p>
+        <CalendarFocusControl focus={calendarFocus} english={english} />
         {!calendar && edition.sourceReport?.calendarReview && [...edition.sourceReport.calendarReview.pages, ...edition.sourceReport.calendarReview.platforms].some(row => row.status === "deferred") && <p className="r-calendar-note r-warning">{t("本期发售日历尚未完成复核，包含沿用计划，也可能遗漏新公布或调整的发售日期。请以各条目官方来源为准。", "Calendar review is incomplete. Some plans are carried forward; newly announced or changed dates may be missing. Check the official sources linked below.")}</p>}
         {calendar && upcoming.length > 0 && <p className="r-calendar-note r-warning">{t(`沿用 ${calendar.sourceDate} 收录的计划，本期未重新核验；日期如有调整，请以来源公告为准。`, `Plans recorded on ${calendar.sourceDate}, not reverified for this edition. Check the linked sources for schedule changes.`)} <a href={readingHref(calendar.sourceId, "upcoming", english)}>{t("查看原期日历", "View source edition")}<ArrowRight /></a></p>}
         {!upcoming.length && <div className="r-calendar-empty" role="status">{calendarState === "loading" ? t("正在读取发售日历…", "Loading release calendar…") : calendarState === "error" ? <>{t("发售日历暂时无法读取。", "The release calendar could not be loaded.")} {(!initialEdition || manifest) && <button className="r-button" onClick={() => manifest ? setCalendarRetry((value) => value + 1) : setManifestRetry((value) => value + 1)}>{t("重试", "Try again")}</button>}</> : t("这15天内暂无已收录的发售计划，不代表没有游戏发售。", "No release plans recorded for this window. This does not mean no games are releasing.")}</div>}
-        <div className="r-calendar-list">{upcoming.map((item) => { const name = calendarTitle(item.title, english); return <article key={item.id} className="r-calendar-item">
+        <div className="r-calendar-list">{calendarFocus.items.map((item) => { const name = calendarTitle(item.title, english); return <article key={item.id} className="r-calendar-item">
         {item.cover && !item.cover.placeholder ? <Photo asset={item.cover} cover english={english} /> : <div className="r-cover-unavailable"><ImageSquare /><span>{t("暂无核实封面", "No verified cover")}</span></div>}<div><time className="r-calendar-date" dateTime={item.date.length === 10 ? item.date : undefined} title={item.date}>{item.date.length === 10 ? item.date.slice(5).replace("-", ".") : item.date}</time><h3>{name.primary}</h3>{name.original && <p className="r-calendar-original" lang="en">{name.original}</p>}<p>{[item.platforms.join(" / "), item.region, item.releaseType].filter(Boolean).join(" · ")}</p>{item.note && !english && (/API|appids=|字段|解析/.test(item.note) ? <details className="r-calendar-evidence"><summary>日期依据与核验说明</summary><p>{item.note}</p></details> : <p>{item.note}</p>)}<a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>{!item.cover && <small>{english ? "No verified cover available" : item.coverNote || "暂无可核实封面"}</small>}</div>
       </article>; })}</div></section>}
 

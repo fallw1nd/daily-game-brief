@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { selectEvidenceCandidates } from "./lib/evidence-budget.mjs";
 import { classifyEvidenceReadiness, resolveEvidencePublishedAt } from "./lib/evidence-readiness.mjs";
 import { decodeEntities, normalizeHeadline, stripHtml } from "./lib/news-pipeline.mjs";
+import { confirmedCompanySubject } from "./lib/company-subject.mjs";
 import { extractExplicitOfficialLinks } from "./lib/primary-resolver.mjs";
 import { sourceVisiblePublishedAt } from "./lib/source-visible-time.mjs";
 
@@ -202,6 +203,7 @@ const packages = await mapLimit(selectedCandidates, 3, async (candidate) => {
     score: candidate.score,
     scoreSignals: candidate.scoreSignals || null,
     lane: candidate.lane || "news",
+    ...confirmedCompanySubject(candidate, sources),
     publisherFamily: candidate.publisherFamily || null,
     timeRelation: candidate.timeRelation,
     readiness,

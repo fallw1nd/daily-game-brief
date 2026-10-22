@@ -85,6 +85,11 @@ Media is nonblocking: failure cannot change Canonical facts or force unrelated a
 
 An authorized same-edition revision is an overlay, not a rebuild from an incomplete packet. It preserves previously published entries, stable matching entry IDs, verified media, tracking, and the current calendar baseline unless an explicit supported change replaces/removes them. New verified stories append without deleting unrelated published content.
 
+Explicit user-authorized manual repair may coalesce exact historical duplicate stories, retaining the lead ID or the first stable ID and recording removed-to-retained IDs. Factual/editorial fields must agree; distinct event keys and showcase associations are not coalesced. Automatic continuations never perform this cleanup. An explicit existing entry ID may also correct verification text only when headline, summary, subject, shared fact frame, selected sources, time, status, platforms, region, and release type still identify the exact published fact.
+
+Resolved subject overrides remain prohibited except for an incidental game key misclassifying a named-company formation. The original acknowledged packet must independently corroborate the same uniquely named company in its headline and opened evidence. The manual wake binds the expected old subject, entry ID, Beijing time, and original selected source URLs. Trusted restoration records internal provenance and GitHub acknowledges a new packet blob before publication. The publisher rechecks those bindings, the stable event key, and the otherwise unchanged shared fact frame; only subject key, image seed, and the corresponding fact-frame digest change. Identity-only repair preserves edition title, lead, calendar, and all unrelated entries. This is not permission to add event facts or perform arbitrary cross-key replacement.
+
+
 ## Publication and failure behavior
 
 `publish-editorial-decision.yml` restores the immutable packet, validates the submission, runs `npm run check`, rebuilds on current `main` if necessary, and publishes atomically. Exact-edition Pages/media workflows are then dispatched.

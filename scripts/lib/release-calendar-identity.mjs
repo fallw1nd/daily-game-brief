@@ -93,6 +93,7 @@ function normalizeObservation(record, aliases, knownNames, baselineSet) {
     family,
     priority: Number.isFinite(Number(record?.priority)) ? Number(record.priority) : 0,
   };
+  if (record?.editorialSpotlight) obs.editorialSpotlight = { section: record.editorialSpotlight.section, sourceUrl: record.editorialSpotlight.sourceUrl };
   if (record?.review !== undefined) obs.review = record.review;
   return {
     obs,
@@ -119,6 +120,7 @@ function observationKey(obs) {
     date: obs.date,
     dates: obs.dates,
     dateText: obs.dateText,
+    editorialSpotlight: obs.editorialSpotlight,
     releaseType: obs.releaseType,
     family: obs.family,
     priority: obs.priority,
