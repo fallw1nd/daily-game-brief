@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261023-03 — Target archived media through the existing secondary entry
+
+- Demonstrated invocation gap: a connector could push a secondary request but could not dispatch the existing exact-edition media workflow; the old run was outside GitHub's rerun window.
+- Add only a `media_repair` secondary adapter: trusted-main validation of manifest/archive identity and optional existing upcoming record, then dispatch the existing media workflow on main. Reject arbitrary metadata and unsafe request identities. No additional writer, credentials, permissions or schedule.
+- Dispatch acceptance is not completion: existing media checks, commit/state acknowledgement and deployment still require verification. Direct workflow dispatch remains the smaller route when available.
+
 ## MNT-20261023-02 — Stop immediate replay of incomplete old calendar packets
 
 - Observed October 18 pinned work had 163 unique official URLs: 79 opened, 1 limited and 83 deferred by the 80-request cap. October 20/21/22 also retained explicit budget omissions. Replaying an immutable packet does not fetch these missing details.
