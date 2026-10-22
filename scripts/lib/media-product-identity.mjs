@@ -1,5 +1,6 @@
 function normalizeTitle(value) {
   return String(value || "")
+    .replace(/[™®©]/g, "")
     .normalize("NFKC")
     .replace(/[™®©]/g, "")
     .toLocaleLowerCase("en")
@@ -7,11 +8,22 @@ function normalizeTitle(value) {
     .trim();
 }
 
-function stripStoreSuffix(value) {
-  return String(value || "")
+function stripStoreSuffix(value, host = "") {
+  const title = String(value || "")
     .replace(/\s+on\s+steam\s*$/i, "")
     .replace(/\s*[|–—-]\s*(?:steam(?:\s+store)?|xbox(?:\s+(?:games\s+)?store)?|official\s+playstation\s+store(?:\s+[a-z]{2}(?:-[a-z]{2})?)?|nintendo\s+official\s+site|the\s+official\s+(?:game\s+)?(?:site|website|product\s+page))\s*$/i, "")
     .trim();
+  if (host === "store.playstation.com") {
+    return title.replace(/\s+PS[45](?:\s*&\s*PS[45])?\s*$/i, "").trim();
+  }
+  if (host === "xbox.com" || host.endsWith(".xbox.com")) {
+    return title.replace(/^Buy\s+/i, "").replace(/\s*\(Xbox (?:Series(?: X\|S)?|One)\)\s*$/i, "").trim();
+  }
+  // Nintendo appends platform chrome to product metadata, not to the game name.
+  // Keep edition/sequel text intact and scope this normalization to its store.
+  return host === "nintendo.com" || host.endsWith(".nintendo.com")
+    ? title.replace(/(?:\s+for\s+Nintendo\s+Switch[™®]?(?:\s+2)?|\s*[–—-]\s*Nintendo\s+Switch[™®]?(?:\s+2)?\s+Exclusive)\s*$/i, "").trim()
+    : title;
 }
 
 const genericStoreTitles = new Set([
@@ -51,7 +63,7 @@ export function identifyProductTitle(record, metadata = {}, pageUrl = "") {
   })();
   const isSteamStore = host === "store.steampowered.com" || host.endsWith(".steampowered.com");
   const identifiedTitles = [...new Set(visibleTitles
-    .map(stripStoreSuffix)
+    .map(value => stripStoreSuffix(value, host))
     .filter((value) => value && !isGenericStoreTitle(value))
     .map(normalizeTitle))];
   if (!isSteamStore && identifiedTitles.length > 1) {
@@ -64,7 +76,7 @@ export function identifyProductTitle(record, metadata = {}, pageUrl = "") {
     return { status: "unknown", pageTitle: null };
   }
 
-  const exactProductTitle = stripStoreSuffix(productTitle);
+  const exactProductTitle = stripStoreSuffix(productTitle, host);
   if (isGenericStoreTitle(exactProductTitle)) return { status: "unknown", pageTitle: exactProductTitle };
   return expected.has(normalizeTitle(exactProductTitle))
     ? { status: "match", pageTitle: exactProductTitle }

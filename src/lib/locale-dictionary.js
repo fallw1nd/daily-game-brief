@@ -15,6 +15,7 @@ export const localeDictionary = {
     official_simplified: "Official Simplified Chinese",
     official_traditional: "Official Traditional Chinese",
     common_translation: "Common Chinese translation",
+    provisional_translation: "Provisional assistant translation (unofficial)",
     unavailable: "No established Chinese title",
   },
   sourceKind: {

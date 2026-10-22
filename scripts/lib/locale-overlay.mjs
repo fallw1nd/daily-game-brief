@@ -174,7 +174,8 @@ function validateUpcoming(canonical, overlay, errors) {
     if (!programmaticRegionLabel(canonicalItem.region)) requiredEnglish(item.regionLabel, `${context}.regionLabel`, errors);
     if (programmaticReleaseTypeLabel(canonicalItem.releaseType) === null) requiredEnglish(item.releaseTypeLabel, `${context}.releaseTypeLabel`, errors);
     if (!programmaticSourceLabel(canonicalItem.source?.label)) requiredEnglish(item.sourceLabel, `${context}.sourceLabel`, errors);
-    if (canonicalItem.cover && item.coverAlt !== undefined) requiredEnglish(item.coverAlt, `${context}.coverAlt`, errors);
+    // Validate supplied copy before a later media backfill makes it visible.
+    if (item.coverAlt !== undefined) requiredEnglish(item.coverAlt, `${context}.coverAlt`, errors);
   }
 }
 

@@ -71,6 +71,8 @@ Simplified Chinese Canonical lives in `public/data/archive/`, `latest.json`, and
 
 The publisher validates the submission against the acknowledged packet, rebuilds from current `main` on concurrent advances, runs `npm run check`, commits atomically, and dispatches exact-edition Pages/media work. Pages holds a staged Daily until `plannedAt`.
 
+Pages deployments share one non-cancelling concurrency group. Every successful deployment, including a main push or a dispatch without an edition, reconciles receipts from its own immutable manifest/archive files. It acknowledges the requested/latest edition and outstanding represented committed editions, never synthesizing missing durable state. A real success transition must cover the publication commit; a publication replay's mutable deployment SHA is not proof of deployment. Publication ancestry and existing newer-deployment protection prevent acknowledging content not in that release. Selection and recording use one fresh `automation/state` transaction on each bounded retry. Failed runs acknowledge only an explicitly requested represented edition, never all archives.
+
 ## Compatibility
 
 Historical AM/PM archives and manual `am|pm|daily` workflow inputs remain supported for explicit historical recovery/revision. They are not the current production cadence. The one-time first-Daily bridge window is encoded in shared window helpers and remains immutable historical compatibility, not an operational rule.
