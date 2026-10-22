@@ -109,7 +109,7 @@ describe("fixed historical ledger delta recovery", () => {
     snapshots[0].after.events[snapshots[0].entry.eventKeys[0]].lastDecisionEdition = "2026-10-22-daily";
     await expect(run(ledger, readGit)).rejects.toThrow("provenance mismatch");
   });
-  it("routes recovery through the existing state transaction without publication or queue side effects", async () => {
+  it("keeps routine publication independent of incident snapshots without coupling feedback to queue advancement", async () => {
     const workflow = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
     const feedbackStep = workflow.split("- name: Write editorial outcomes to persistent ledger")[1].split("- name:")[0];
     expect(feedbackStep).toContain("steps.publication.outcome == 'success'");
@@ -118,7 +118,8 @@ describe("fixed historical ledger delta recovery", () => {
     expect(workflow).not.toContain("recover-historical-ledger");
     const writer = await readFile("scripts/write-editorial-feedback-branch.sh", "utf8");
     expect(writer).toContain('if [ "${FEEDBACK_ELIGIBLE:-}" = "true" ]; then');
-    expect(writer).toContain("HISTORICAL_LEDGER_RECOVERY=historical-overlay-2026-10-22");
+    expect(writer).not.toContain("HISTORICAL_LEDGER_RECOVERY");
+    expect(workflow).not.toContain("HISTORICAL_LEDGER_RECOVERY");
     const feedbackBlock = writer.split('if [ "${FEEDBACK_ELIGIBLE:-}" = "true" ]; then')[1].split("  fi")[0];
     expect(feedbackBlock).not.toContain("advance-showcase-queue");
     expect(writer).toContain('  fi\n  node scripts/advance-showcase-queue.mjs');

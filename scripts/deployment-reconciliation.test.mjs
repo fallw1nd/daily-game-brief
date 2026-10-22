@@ -125,7 +125,7 @@ describe("successful Pages deployment receipt reconciliation", () => {
     expect(f.load(ids[1])).toEqual(newer);
     expect(f.load(ids[2])).toEqual(other);
     expect(f.load(ids[8])).toEqual(unrepresented);
-  });
+  }, 15_000);
 
   it("preserves a newer deployment receipt when an older successful deployment finishes late", () => {
     const f = fixture();

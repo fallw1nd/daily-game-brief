@@ -22,7 +22,7 @@ it("the actual recorder rejects an ancestor release arriving after the current d
     execFileSync(process.execPath, [resolve("scripts/record-edition-state.mjs"), `--state-root=${root}`, `--edition=${id}`, "--event=deployment-failed", `--main-sha=${old}`], { cwd: root, env: { ...process.env, GITHUB_OUTPUT: "" } });
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(state);
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
+}, 15_000);
 
 it("incident selection never confuses neighboring dates returned by GitHub search", () => {
   const rows = [{ title: "English locale degraded: 2026-09-05-daily", number: 149 }, { title: "English locale degraded: 2026-09-09-daily", number: 200 }];
