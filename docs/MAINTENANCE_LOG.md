@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261023-03 — Target archived media through the existing secondary entry
+
+- Demonstrated invocation gap: a connector could push a secondary request but could not dispatch the existing exact-edition media workflow; the old run was outside GitHub's rerun window.
+- Add only a `media_repair` secondary adapter: trusted-main validation of manifest/archive identity and optional existing upcoming record, then dispatch the existing media workflow on main. Reject arbitrary metadata and unsafe request identities. No additional writer, credentials, permissions or schedule.
+- Dispatch acceptance is not completion: existing media checks, commit/state acknowledgement and deployment still require verification. Direct workflow dispatch remains the smaller route when available.
+
 ## MNT-20261023-02 — Stop immediate replay of incomplete old calendar packets
 
 - Observed October 18 pinned work had 163 unique official URLs: 79 opened, 1 limited and 83 deferred by the 80-request cap. October 20/21/22 also retained explicit budget omissions. Replaying an immutable packet does not fetch these missing details.
@@ -882,3 +888,9 @@ Independent review found complete bilingual labels still collapsed different nam
 - Generate the compact, ignored `src/generated/calendar-focus.json` before dev, typecheck, tests and build. Only its exact latest-edition identity snapshot and selected IDs reach the client; historical editions are read at build time only. Regenerate after same-edition publication revisions.
 - Missing, partial, malformed or stale selection metadata fails open to all recorded plans, with an explicit availability notice. Identity binding includes item ID, date, canonical title, platforms and source URL/kind. Localized presentation fields are excluded so validated English projections share the same selection.
 - Coverage is intentionally conservative: games absent from recent substantive reporting may not be selected. No hard display cap, forced quota, paid API, persistent tracking, or changes to Canonical schemas were introduced.
+
+## 2026-10-23 — Repair two proven historical generated image descriptions
+
+- The September 2 `news-0` and `news-2` images retained generated degraded-headline descriptions after editorial recovery in `4f9ac246`. Their original generated values are proven by `d1468b45`; name normalization in `448fb0a2` explains the current exact strings. The September 3 fix `d86ebb10` already synchronizes newly revised exact generated descriptions, but cannot retrospectively identify these stale values.
+- The existing media-enrichment workflow now recognizes only these two edition/entry/subject/source/image/exact-alt bindings before its existing-image early return. It derives the replacement from the current headline using the shared generator. Custom descriptions, covers, assets, sources and event facts remain unchanged. No new request, schema, permission or publication lane is introduced.
+- Dry runs report candidates without mutation or writes; applying twice is a no-op on the second pass. Regression fixtures cover both historical records, altered bindings and custom descriptions. This records implementation, not production repair or deployment.
