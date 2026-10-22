@@ -112,7 +112,9 @@ describe("release calendar health persistence integration", () => {
     await writeFile(previousPath, JSON.stringify({ schemaVersion: 1, updatedAt: "2026-09-19T04:00:00.000Z", sources: {
       "playstation-ps5-rss": { sourceId: "playstation-ps5-rss", lastObservedAt: "2026-09-19T04:00:00.000Z", recent },
     } }));
-    await writeFile(preload, 'globalThis.fetch = async url => new Response(String(url).includes("news.xbox.com") ? "<rss><channel></channel></rss>" : "<html></html>");');
+    // Keep the historical health fixture within its retention window in the child process.
+    const fixedClock = 'const RealDate = Date; globalThis.Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : ["2026-09-20T04:00:00.000Z"])); } static now() { return RealDate.parse("2026-09-20T04:00:00.000Z"); } };';
+    await writeFile(preload, fixedClock + 'globalThis.fetch = async url => new Response(String(url).includes("news.xbox.com") ? "<rss><channel></channel></rss>" : "<html></html>");');
     await exec(process.execPath, ["--import", pathToFileURL(preload).href, "scripts/discover-release-calendar.mjs", "--date=2026-09-20"], {
       cwd: resolve("."), env: {
         ...process.env, RELEASE_CALENDAR_REPORT_PATH: reportPath,

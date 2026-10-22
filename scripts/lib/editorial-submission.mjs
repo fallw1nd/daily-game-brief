@@ -1,6 +1,7 @@
 import { validateEditorialOutput } from "./editorial-contract.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
 import { archiveTitlePrefix, hasValidArchiveTitle } from "./archive-title.mjs";
+import { normalizeEditorialArchiveTitle } from "./headline-subject.mjs";
 
 const editionPattern = /^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/;
 
@@ -52,6 +53,10 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
     errors.push("editorialNote is required");
   }
   const isNewsContinuation = packet?.continuation?.scope === "news" && packet.continuation.preservePublished === true;
+  const isCalendarContinuation = packet?.continuation?.scope === "calendar" && packet.continuation.preservePublished === true;
+  if (isCalendarContinuation && ((input?.packages || []).length || (input?.trackingQueue || []).length || (editorial?.decisions || []).length)) {
+    errors.push("calendar continuation cannot contain news or tracking decisions");
+  }
   if (isNewsContinuation && ((editorial?.upcoming || []).length || (editorial?.removeUpcomingIds || []).length)) {
     errors.push("news continuation cannot change the release calendar");
   }
@@ -73,7 +78,14 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   const lead = (editorial?.decisions || []).find((item) =>
     item.eventKey === editorial?.leadEventKey && item.decision === "include"
   );
-  if (!lead && !noOpNewsContinuation) errors.push("leadEventKey must reference an included decision");
+  if (!lead && !noOpNewsContinuation && !isCalendarContinuation) errors.push("leadEventKey must reference an included decision");
+  if (lead && !packet?.continuation?.preservePublished) {
+    try {
+      if (!hasValidArchiveTitle(normalizeEditorialArchiveTitle(editorial.archiveTitle, lead), period)) {
+        errors.push("normalized archiveTitle must contain 8–40 characters with the matching period prefix; use a confirmed subject and shorten the title");
+      }
+    } catch (error) { errors.push(`archiveTitle normalization failed: ${error.message}`); }
+  }
   return [...new Set(errors)];
 }
 

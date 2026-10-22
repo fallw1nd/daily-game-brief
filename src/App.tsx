@@ -1,3 +1,7 @@
+import { useCalendarFocus } from "./lib/calendar-focus";
+import { CalendarFocusControl } from "./components/CalendarFocusControl";
+import { calendarTitle } from "./lib/calendar-title";
+import { editionsNewestFirst } from "./lib/edition-order";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -77,6 +81,7 @@ const titleStatusLabels = {
   official_simplified: "官方简中",
   official_traditional: "官方繁中",
   common_translation: "常用译名",
+  provisional_translation: "助手暂译（非官方）",
   unavailable: "暂无官方中文名",
 };
 
@@ -356,14 +361,15 @@ function StorySection({ id, number, title, entries, note }: { id: string; number
 }
 
 function UpcomingItem({ item }: { item: UpcomingEntry }) {
-  const title = item.title.title_zh_cn ? "《" + item.title.title_zh_cn + "》" : item.title.title_en;
+  const name = calendarTitle(item.title);
+  const title = name.primary;
   return (
     <article className="upcoming-item">
       <EditorialImage asset={item.cover} kind="cover" presentation="cover" title={title} unavailableNote={item.coverNote} />
       <div className="upcoming-item__body">
         <time>{item.date}</time>
         <h3>{title}</h3>
-        {item.title.title_zh_cn && <p>{item.title.title_en}</p>}
+        {name.original && <p lang="en">{name.original}</p>}
         <div><span>{item.platforms.join(" / ")}</span><span>{item.releaseType}</span><span>{item.region}</span></div>
         <a href={item.source.url} target="_blank" rel="noreferrer">{item.source.label}<ArrowUpRight aria-hidden="true" /></a>
       </div>
@@ -394,6 +400,7 @@ function App({ initialEdition = fallbackEdition, initialManifest = null, initial
   });
   const [edition, setEdition] = useState(initialEdition);
   const [manifest, setManifest] = useState<BriefManifest | null>(initialManifest);
+  const calendarFocus = useCalendarFocus(edition?.upcoming ?? [], edition?.id, manifest?.latest);
   const [searchIndex, setSearchIndex] = useState<BriefSearchIndex | null>(initialSearchIndex);
   const [archiveError, setArchiveError] = useState("");
   const [archiveExpanded, setArchiveExpanded] = useState(false);
@@ -410,13 +417,14 @@ function App({ initialEdition = fallbackEdition, initialManifest = null, initial
   const featured = entriesForSection(edition.entries, "focus");
   const focusEntries = uniqueEntries([...featured, ...(sectionsByKey.news ?? []), ...(sectionsByKey.releases ?? []), ...(sectionsByKey.industry ?? []), ...(sectionsByKey.reviews ?? []), ...edition.entries]).slice(0, 5);
   const manifestEdition = manifest?.editions.find((item) => item.id === edition.id);
-  const manifestIndex = manifest?.editions.findIndex((item) => item.id === edition.id) ?? -1;
-  const previousManifestEdition = manifestIndex > 0 ? manifest?.editions[manifestIndex - 1] : undefined;
-  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1 ? manifest?.editions[manifestIndex + 1] : undefined;
+  const chronologicalEditions = editionsNewestFirst(manifest?.editions ?? []).reverse();
+  const manifestIndex = chronologicalEditions.findIndex((item) => item.id === edition.id) ?? -1;
+  const previousManifestEdition = manifestIndex > 0 ? chronologicalEditions[manifestIndex - 1] : undefined;
+  const nextManifestEdition = manifestIndex >= 0 && manifestIndex < (manifest?.editions.length ?? 0) - 1 ? chronologicalEditions[manifestIndex + 1] : undefined;
   const pageTitle = edition.archiveTitle?.trim() || manifestEdition?.archiveTitle?.trim() || `${period.edition}｜${focusEntries[0]?.headline ?? "本期简报"}`;
   const directoryItems = [...visibleStorySections.map((section) => ({ number: section.number, label: section.label, count: section.entries.length, href: "#" + section.id })), ...(edition.upcoming.length > 0 ? [{ number: upcomingNumber, label: "日历", count: edition.upcoming.length, href: "#upcoming" }] : [])];
   const primaryLinks = [{ href: "#content", label: "\u5185\u5bb9", icon: NewspaperClipping }, ...(edition.upcoming.length > 0 ? [{ href: "#upcoming", label: "\u65e5\u5386", icon: CalendarBlank }] : []), { href: "#archive", label: "\u5f52\u6863", icon: Archive }];
-  const archiveEditions = useMemo(() => [...(manifest?.editions ?? [])].reverse(), [manifest]);
+  const archiveEditions = useMemo(() => editionsNewestFirst(manifest?.editions ?? []), [manifest]);
   const archiveCounts = useMemo(() => { const counts = new Map<string, number>(); for (const entry of searchIndex?.entries ?? []) counts.set(entry.editionId, (counts.get(entry.editionId) ?? 0) + 1); return counts; }, [searchIndex]);
   const visibleArchiveEditions = archiveExpanded ? archiveEditions : archiveEditions.slice(0, 5);
   const hiddenArchiveCount = Math.max(archiveEditions.length - 5, 0);
@@ -475,7 +483,7 @@ function App({ initialEdition = fallbackEdition, initialManifest = null, initial
         {directoryItems.length > 0 && <div className="edition-directory" aria-label="本期非空栏目">{directoryItems.map((item) => <a key={item.href} href={item.href}><span>{item.number}</span><strong>{item.label}</strong><small>{String(item.count).padStart(2, "0")}</small></a>)}</div>}
         <div className="edition-content" id="content">
           {visibleStorySections.map((section) => <StorySection key={section.id} id={section.id} number={section.number} title={section.title} entries={section.entries} note={section.note} />)}
-          {edition.upcoming.length > 0 && <section className="editorial-section upcoming-section" id="upcoming" aria-labelledby="upcoming-title"><SectionHeader number={upcomingNumber} title="未来15天发售" count={edition.upcoming.length} id="upcoming-title" /><div className="upcoming-grid">{edition.upcoming.map((item) => <UpcomingItem key={item.id} item={item} />)}</div><EditionPager ariaLabel="简报期次导航" previousLabel="上一期" nextLabel="下一期" previousBoundary="已是最早一期" nextBoundary="已是最新一期" previous={previousManifestEdition ? { href: editionHref(previousManifestEdition.id), issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(previousManifestEdition.period), title: archiveEditionTitle(previousManifestEdition) } : undefined} next={nextManifestEdition ? { href: editionHref(nextManifestEdition.id), issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(nextManifestEdition.period), title: archiveEditionTitle(nextManifestEdition) } : undefined} /></section>}
+          {edition.upcoming.length > 0 && <section className="editorial-section upcoming-section" id="upcoming" aria-labelledby="upcoming-title"><SectionHeader number={upcomingNumber} title="未来15天发售" count={calendarFocus.items.length} id="upcoming-title" /><CalendarFocusControl focus={calendarFocus} /><div className="upcoming-grid">{calendarFocus.items.map((item) => <UpcomingItem key={item.id} item={item} />)}</div><EditionPager ariaLabel="简报期次导航" previousLabel="上一期" nextLabel="下一期" previousBoundary="已是最早一期" nextBoundary="已是最新一期" previous={previousManifestEdition ? { href: editionHref(previousManifestEdition.id), issue: "NO." + String(previousManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(previousManifestEdition.period), title: archiveEditionTitle(previousManifestEdition) } : undefined} next={nextManifestEdition ? { href: editionHref(nextManifestEdition.id), issue: "NO." + String(nextManifestEdition.issueNumber).padStart(3, "0") + " · " + archivePeriodLabel(nextManifestEdition.period), title: archiveEditionTitle(nextManifestEdition) } : undefined} /></section>}
           <section className="editorial-section source-report" id="source-report" aria-labelledby="source-report-title"><SectionHeader number={sourceReportNumber} title="检索记录" count={sourceReport.checked.length} id="source-report-title" /><div><section><h3>已检查</h3><p>{sourceReport.checked.join(" / ")}</p></section><section><h3>访问受限</h3><p>{sourceReport.limited.join(" / ") || "无"}</p></section><p>{sourceReport.note}</p></div></section>
         </div>
         <section className="archive-section" id="archive" aria-labelledby="archive-title"><header><span>{archiveNumber}</span><div><h2 id="archive-title">往期简报</h2><p>{manifest ? "已归档" + manifest.editions.length + "期，可按期次浏览或跨期检索新闻。" : "正在读取归档清单。"}</p></div><label className="search-field"><span>搜索所有期次的游戏、平台或事件</span><div><MagnifyingGlass aria-hidden="true" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入新闻关键词" /></div></label></header>

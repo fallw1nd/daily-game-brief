@@ -1,7 +1,11 @@
 import { lookup } from "node:dns/promises";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { getRegisteredTitleTranslation } from "./lib/title-translations.mjs";
+import { repairLegacyGeneratedAlts } from "./lib/legacy-generated-alt.mjs";
+import { identifyProductTitle } from "./lib/media-product-identity.mjs";
 
 const DATA_ROOT = resolve("public/data");
 const PUBLIC_ROOT = resolve("public");
@@ -21,35 +25,70 @@ function isPrivateIp(address) {
     /^172\.(1[6-9]|2\d|3[01])\./.test(address);
 }
 
-async function assertSafeHttps(input) {
+async function assertSafeHttps(input, lookupHost = lookup) {
   const url = new URL(input);
   if (url.protocol !== "https:") throw new Error("only HTTPS media is allowed");
   if (/^(localhost|.+\.local)$/i.test(url.hostname)) throw new Error("local host is not allowed");
-  const addresses = await lookup(url.hostname, { all: true });
+  const addresses = await lookupHost(url.hostname, { all: true });
   if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("private network target is not allowed");
   return url;
 }
 
-async function fetchLimited(input, limit, accept) {
-  const url = await assertSafeHttps(input);
-  const response = await fetch(url, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(18_000),
-    headers: { Accept: accept, "User-Agent": USER_AGENT },
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+async function fetchLimited(input, limit, accept, { fetcher = fetch, lookupHost = lookup } = {}) {
+  let url = await assertSafeHttps(input, lookupHost);
+  // One deadline covers the whole redirect chain and body, not each hop.
+  const signal = AbortSignal.timeout(18_000);
+  let response;
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    response = await fetcher(url, {
+      redirect: "manual",
+      signal,
+      headers: { Accept: accept, "User-Agent": USER_AGENT },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("redirect is missing a location");
+    if (redirects === 5) throw new Error("too many redirects");
+    url = await assertSafeHttps(new URL(location, url).href, lookupHost);
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`HTTP ${response.status}`);
+  }
   const declared = Number(response.headers.get("content-length") || 0);
-  if (declared > limit) throw new Error(`response exceeds ${limit} bytes`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > limit) throw new Error(`response exceeds ${limit} bytes`);
-  return { bytes, contentType: response.headers.get("content-type") || "", url: response.url };
+  if (declared > limit) {
+    await response.body?.cancel();
+    throw new Error(`response exceeds ${limit} bytes`);
+  }
+  const chunks = [];
+  let size = 0;
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > limit) throw new Error(`response exceeds ${limit} bytes`);
+        chunks.push(value);
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
+  return { bytes: Buffer.concat(chunks, size), contentType: response.headers.get("content-type") || "", url: response.url || url.href };
 }
 
 function decodeEntities(value) {
   return value
     .replaceAll("&amp;", "&")
     .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
+    .replace(/&#(?:x([0-9a-f]+)|(\d+));/gi, (entity, hex, dec) => {
+      const code = Number.parseInt(hex || dec, hex ? 16 : 10);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    })
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">");
 }
@@ -73,22 +112,61 @@ function extractMeta(html, pageUrl) {
   const psnImage = pageHost === "store.playstation.com"
     ? html.match(/(?:https:\\\/\\\/|https:\/\/)image\.api\.playstation\.com[^"'\\<\s]+/i)?.[0]
     : null;
-  const rawImage = psnImage?.replaceAll("\\/", "/") ||
+  const isXboxProduct = /(^|\.)(xbox|microsoft)\.com$/.test(pageHost) && /\/games\/store\//.test(new URL(pageUrl).pathname);
+  let xboxBoxArt = isXboxProduct
+    ? (html.match(/<img\b[^>]*>/gi) || []).map(tagAttributes)
+      .find(attrs => attrs["data-testid"] === "ProductDetailsHeaderBoxArt")?.src
+    : null;
+  if (xboxBoxArt) {
+    const art = new URL(xboxBoxArt, pageUrl);
+    if (art.hostname === "store-images.s-microsoft.com") {
+      art.searchParams.set("w", "600");
+      art.searchParams.set("h", "900");
+      xboxBoxArt = art.href;
+    }
+  }
+  const rawImage = xboxBoxArt || psnImage?.replaceAll("\\/", "/") ||
     values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
-  if (!rawImage) return null;
-  const imageUrl = new URL(rawImage, pageUrl).href;
-  if (/logo|avatar|favicon|icon[-_.]/i.test(imageUrl)) return null;
+  const imageUrl = rawImage ? new URL(rawImage, pageUrl).href : null;
+  const usableImageUrl = imageUrl && !/logo|avatar|favicon|icon[-_.]/i.test(imageUrl) ? imageUrl : null;
   const titleTag = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
   ?.replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
             .trim() || "";
+  const steamTitle = html.match(/<div\b[^>]*class=["'][^"']*\bapphub_AppName\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]
+    ?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "";
+  const documentTitle = decodeEntities(titleTag);
+  const openGraphTitle = values.get("og:title") || "";
+  const twitterTitle = values.get("twitter:title") || "";
   return {
-    imageUrl,
+    imageUrl: usableImageUrl,
     alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
-    pageTitle: values.get("og:title") || values.get("twitter:title") || decodeEntities(titleTag),
+    pageTitle: openGraphTitle || twitterTitle || documentTitle,
+    productTitleMetadata: {
+      steamAppName: decodeEntities(steamTitle),
+      openGraphTitle,
+      twitterTitle,
+      documentTitle,
+    },
     description: values.get("og:description") || values.get("twitter:description") || values.get("description") || "",
   };
+}
+
+function titleIdentityRecord(record) {
+  const registered = getRegisteredTitleTranslation(record.title?.title_key, record.title?.title_en);
+  return { ...record, titleAliases: registered?.titleEnAliases || [] };
+}
+
+async function openSourcePage(source, fetchPage = fetchLimited) {
+  const result = await fetchPage(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
+  if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
+  return { ...result, meta: extractMeta(result.bytes.toString("utf8"), result.url) };
+}
+
+async function inspectCoverIdentity(source, record, fetchPage = fetchLimited) {
+  const { meta, url } = await openSourcePage(source, fetchPage);
+  return identifyProductTitle(titleIdentityRecord(record), meta.productTitleMetadata, url);
 }
 
 const displayTitle = (record) => record.title?.title_zh_cn || record.title?.title_en || record.id;
@@ -306,8 +384,9 @@ const youtubeImageCandidates = (videoId) => [
   `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
 ];
 
-async function discoverFromSource(source, record) {
+async function discoverFromSource(source, record, { fetchPage = fetchLimited, kind = "editorial" } = {}) {
   if (source.imageUrl) {
+    if (kind === "cover") throw new Error("cover image URL has no opened product page to confirm game identity");
     return {
       imageUrl: source.imageUrl,
       alt: source.alt || "",
@@ -316,13 +395,36 @@ async function discoverFromSource(source, record) {
   }
   const videoId = source.kind === "primary" && youtubeVideoId(source.url);
   if (videoId) {
+    if (kind === "cover") throw new Error("cover video page has no product-title metadata to confirm game identity");
     const [imageUrl, ...fallbackImageUrls] = youtubeImageCandidates(videoId);
     return { imageUrl, fallbackImageUrls, alt: "", pageUrl: source.url };
   }
-  const result = await fetchLimited(source.url, MAX_HTML_BYTES, "text/html,application/xhtml+xml;q=0.9");
-  if (!/html|text/.test(result.contentType)) throw new Error(`not HTML (${result.contentType})`);
-  const meta = extractMeta(result.bytes.toString("utf8"), result.url);
-  if (!meta) throw new Error("no usable social image metadata");
+  let result = await openSourcePage(source, fetchPage);
+  // Roundups are discovery pages, never product identity evidence. Open only an
+  // exact-title Xbox store link and run the ordinary product metadata checks.
+  if (kind === "cover" && new URL(result.url).hostname === "news.xbox.com") {
+    for (const match of result.bytes.toString("utf8").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+      const attrs = tagAttributes(match[1]);
+      if (!attrs.href) continue;
+      let linked;
+      try { linked = new URL(attrs.href, result.url); } catch { continue; }
+      if (linked.protocol !== "https:" || linked.hostname !== "www.xbox.com" || !/\/games\/store\//.test(linked.pathname)) continue;
+      const title = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).replace(/\s+[–—]\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}.*$/i, "").trim();
+      if (identifyProductTitle(titleIdentityRecord(record), { documentTitle: title }, linked.href).status !== "match") continue;
+      result = await openSourcePage({ ...source, url: linked.href }, fetchPage);
+      break;
+    }
+  }
+  const { meta } = result;
+  if (!meta.imageUrl) throw new Error("no usable social image metadata");
+  if (kind === "cover") {
+    const identity = identifyProductTitle(titleIdentityRecord(record), meta.productTitleMetadata, result.url);
+    if (identity.status !== "match") {
+      throw new Error(identity.status === "mismatch"
+        ? `opened product title does not match this game: ${identity.pageTitle}`
+        : "opened page has no definitive product title for this game");
+    }
+  }
   if (source.webSearch && !pageMatchesRecord(record, source, meta, result.url)) {
     throw new Error("searched page did not confirm the requested subject");
   }
@@ -358,12 +460,12 @@ async function encodeUnderLimit(bytes, kind) {
   throw new Error("could not encode below 500 KB");
 }
 
-async function downloadCandidate(candidate, kind) {
+async function downloadCandidate(candidate, kind, fetchImage = fetchLimited) {
   const urls = [candidate.imageUrl, ...(candidate.fallbackImageUrls || [])];
   let lastError;
   for (const url of urls) {
     try {
-      const result = await fetchLimited(url, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
+      const result = await fetchImage(url, MAX_IMAGE_BYTES, "image/avif,image/webp,image/*");
       if (!result.contentType.startsWith("image/")) throw new Error(`not an image (${result.contentType})`);
       candidate.imageUrl = url;
       return await encodeUnderLimit(result.bytes, kind);
@@ -374,19 +476,19 @@ async function downloadCandidate(candidate, kind) {
   throw lastError || new Error("no image candidate succeeded");
 }
 
-function mediaPath(edition, record, kind) {
+function mediaPath(edition, record, kind, publicRoot = PUBLIC_ROOT) {
   const slug = record.id.replace(/[^a-zA-Z0-9_-]+/g, "-");
   const relative = `media/briefs/${edition.date.slice(0, 4)}/${edition.date.slice(5, 7)}/${edition.id}/${slug}-${kind}.jpg`;
-  return { relative, absolute: resolve(PUBLIC_ROOT, relative) };
+  return { relative, absolute: resolve(publicRoot, relative) };
 }
 
-async function resolveRecord(edition, record, kind, sourceList, apply) {
+async function resolveRecord(edition, record, kind, sourceList, apply, dependencies = {}) {
   const attempts = [];
   let reviewCandidate = null;
   for (const source of sourceList) {
     try {
-      const candidate = await discoverFromSource(source, record);
-      const encoded = await downloadCandidate(candidate, kind);
+      const candidate = await discoverFromSource(source, record, { fetchPage: dependencies.fetchPage, kind });
+      const encoded = await downloadCandidate(candidate, kind, dependencies.fetchImage);
       const eligible = kind === "editorial"
       ? source.kind === "primary" || source.kind === "secondary" || source.webSearch === true
       : eligibleCover(source);
@@ -411,7 +513,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
         continue;
       }
       if (!apply) return { status: "candidate", ...result };
-      const target = mediaPath(edition, record, kind);
+      const target = mediaPath(edition, record, kind, dependencies.publicRoot);
       await mkdir(dirname(target.absolute), { recursive: true });
       await writeFile(target.absolute, encoded.output);
       const title = displayTitle(record);
@@ -438,7 +540,7 @@ async function resolveRecord(edition, record, kind, sourceList, apply) {
 }
 
 async function resolveWithWebFallback(edition, record, kind, sources, options) {
-  const initial = await resolveRecord(edition, record, kind, sources, options.apply);
+  const initial = await resolveRecord(edition, record, kind, sources, options.apply, options);
   if (!DEEPSEEK_API_KEY || initial.status === "applied" || initial.eligible === true) {
     return initial;
   }
@@ -461,23 +563,118 @@ async function resolveWithWebFallback(edition, record, kind, sources, options) {
   }
   if (!webSources.length) return initial;
 
-  const searched = await resolveRecord(edition, record, kind, webSources, options.apply);
+  const searched = await resolveRecord(edition, record, kind, webSources, options.apply, options);
   if (searched.status === "applied" || searched.eligible === true) return searched;
   return {
     ...(initial.status === "candidate" ? initial : searched),
     attempts: [...(initial.attempts || []), ...(searched.attempts || [])],
   };
 }
+
+function unavailableMediaNote(kind, result) {
+  const errors = (result.attempts || []).map((attempt) => String(attempt.error || ""));
+  const categories = new Set();
+  for (const error of errors) {
+    if (/product title does not match|does not match this game/i.test(error)) {
+      categories.add("来源页面商品身份与记录不符");
+    } else if (/no definitive product title|no opened product page to confirm game identity|no product-title metadata/i.test(error)) {
+      categories.add("来源页面缺少可核验的商品标题");
+    } else if (/no usable social image metadata/i.test(error)) {
+      categories.add("来源页面没有可用图片");
+    } else if (/did not confirm the requested subject|candidate did not pass relevance/i.test(error)) {
+      categories.add("来源页面未能确认对应的消息主题");
+    } else if (/no image candidate succeeded|not an image|dimensions are too small|not sufficiently landscape|could not encode/i.test(error)) {
+      categories.add("图片文件无法读取或处理");
+    } else {
+      // Do not persist raw exceptions: fetch errors can contain URLs, query values, or credentials.
+      categories.add("来源页面无法访问或读取");
+    }
+  }
+  if (!categories.size) categories.add("没有可尝试的媒体来源");
+  const stableOrder = [
+    "来源页面商品身份与记录不符",
+    "来源页面缺少可核验的商品标题",
+    "来源页面没有可用图片",
+    "来源页面未能确认对应的消息主题",
+    "图片文件无法读取或处理",
+    "来源页面无法访问或读取",
+    "没有可尝试的媒体来源",
+  ];
+  const reasons = stableOrder.filter((reason) => categories.has(reason));
+  const mediaName = kind === "cover" ? "封面" : "配图";
+  return `未能取得已核验${mediaName}：${reasons.join("；")}。`;
+}
+
+function setUnavailableMedia(item, kind, result) {
+  if (result.status !== "unavailable") return false;
+  const statusKey = kind === "cover" ? "cover_status" : "image_status";
+  const noteKey = kind === "cover" ? "coverNote" : "imageNote";
+  const note = unavailableMediaNote(kind, result);
+  const changed = item[statusKey] !== "unavailable" || item[noteKey] !== note;
+  item[statusKey] = "unavailable";
+  item[noteKey] = note;
+  return changed;
+}
+
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + "\n");
 
+async function revalidateExistingCover(edition, item, sources, options) {
+  const oldCover = item.cover;
+  if (!oldCover?.sourceUrl) {
+    return { status: "preserved", recordId: item.id, kind: "cover", error: "existing cover has no source page to revalidate" };
+  }
+
+  let identity;
+  try {
+    identity = await inspectCoverIdentity({ url: oldCover.sourceUrl }, item, options.fetchPage);
+  } catch (error) {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: `could not verify existing cover identity; retained it: ${error.message}` };
+  }
+  if (identity.status === "match") {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, note: "existing cover page title still confirms this game" };
+  }
+  if (identity.status === "unknown") {
+    return { status: "preserved", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: "existing cover page has no definitive product title; retained the verified cover" };
+  }
+
+  const mismatchNote = `原封面来源页面商品标题“${identity.pageTitle}”与“${displayTitle(item)}”不符。`;
+  if (!options.apply) {
+    return { status: "candidate", recordId: item.id, kind: "cover", source: oldCover.sourceUrl, error: `${mismatchNote} Use --apply to replace this cover.` };
+  }
+
+  delete item.cover;
+  item.cover_status = "unavailable";
+  item.coverNote = `${mismatchNote} 已移除错误封面，正在核验本条记录的其他来源。`;
+  const result = await resolveWithWebFallback(edition, item, "cover", sources, options);
+  if (result.status === "applied") {
+    item.cover = result.asset;
+    item.cover_status = "verified";
+    delete item.coverNote;
+  } else {
+    item.cover_status = "unavailable";
+    item.coverNote = `${mismatchNote} 未能从本条记录的可用来源取得已核验封面。`;
+  }
+  return { ...result, identityMismatch: identity.pageTitle, previousSource: oldCover.sourceUrl };
+}
+
 async function processEdition(manifestItem, options) {
-  const path = resolve(DATA_ROOT, manifestItem.path);
+  const path = resolve(options.dataRoot || DATA_ROOT, manifestItem.path);
   const edition = await readJson(path);
+  if (options.revalidateCoverId && !(edition.upcoming || []).some((item) => item.id === options.revalidateCoverId)) {
+    throw new Error(`upcoming record ${options.revalidateCoverId} not found in edition ${manifestItem.id}`);
+  }
+  if (options.recordId && ![...(edition.entries || []), ...(edition.upcoming || [])].some((item) => item.id === options.recordId)) {
+    throw new Error(`record ${options.recordId} not found in edition ${manifestItem.id}`);
+  }
   let changed = false;
   const results = [];
 
   await mapLimit(edition.entries, 4, async (entry) => {
+    if (options.recordId && entry.id !== options.recordId) return;
+    const altRepairs = repairLegacyGeneratedAlts(edition.id, entry, options);
+    results.push(...altRepairs);
+    if (altRepairs.some(result => result.status === "applied")) changed = true;
     if (entry.images?.some((asset) => asset.kind === "editorial" && !asset.placeholder)) return;
     const sources = [...(entry.sources || [])]
       .filter((source) => source.url?.startsWith("https://"))
@@ -489,11 +686,13 @@ async function processEdition(manifestItem, options) {
       entry.image_status = "verified";
       delete entry.imageNote;
       changed = true;
+    } else if (options.apply && setUnavailableMedia(entry, "editorial", result)) {
+      changed = true;
     }
   });
 
   await mapLimit(edition.upcoming || [], 4, async (item) => {
-    if (item.cover?.kind === "cover" && !item.cover.placeholder) return;
+    if (options.recordId && item.id !== options.recordId) return;
     const catalogSources =
       options.catalog?.games?.[item.title?.title_key]?.mediaSources || [];
     const candidates = [
@@ -503,12 +702,21 @@ async function processEdition(manifestItem, options) {
     ]
       .filter((source) => source?.url?.startsWith("https://"))
       .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
+    if (options.revalidateCoverId === item.id) {
+      const result = await revalidateExistingCover(edition, item, candidates, options);
+      results.push(result);
+      if (options.apply && result.status !== "preserved") changed = true;
+      return;
+    }
+    if (item.cover?.kind === "cover" && !item.cover.placeholder) return;
     const result = await resolveWithWebFallback(edition, item, "cover", candidates, options);
     results.push(result);
     if (result.status === "applied") {
       item.cover = result.asset;
       item.cover_status = "verified";
       delete item.coverNote;
+      changed = true;
+    } else if (options.apply && setUnavailableMedia(item, "cover", result)) {
       changed = true;
     }
   });
@@ -525,7 +733,12 @@ async function main() {
   options.catalog = await readJson(resolve("config/media-catalog.json"));
   options.sourcePolicy = await readJson(resolve("config/media-sources.json"));
   const editionArg = argValue("--edition");
-  let items = hasArg("--all") ? manifest.editions : [manifest.editions.at(-1)];
+  const revalidateCoverId = argValue("--revalidate-cover-id");
+  if (revalidateCoverId && !editionArg) throw new Error("--revalidate-cover-id requires --edition=<edition-id>");
+  if (revalidateCoverId && !/^[a-zA-Z0-9_-]+$/.test(revalidateCoverId)) throw new Error("invalid --revalidate-cover-id");
+  options.revalidateCoverId = revalidateCoverId;
+  options.recordId = revalidateCoverId;
+  let items = hasArg("--all") ? manifest.editions : manifest.editions.filter(item => item.id === manifest.latest);
   if (editionArg) items = manifest.editions.filter((item) => item.id === editionArg);
   if (!items.length) throw new Error("no matching edition found");
 
@@ -547,7 +760,11 @@ async function main() {
   console.log(`Report: ${REPORT_PATH}`);
 }
 
-main().catch((error) => {
-  console.error(error.stack || error.message);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error.stack || error.message);
+    process.exit(1);
+  });
+}
+
+export { discoverFromSource, processEdition, resolveRecord, fetchLimited };

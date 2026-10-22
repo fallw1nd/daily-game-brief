@@ -96,27 +96,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state || true
+          git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
           git show "origin/automation/state:automation/ledger/events.json" > artifacts/event-ledger-previous.json 2>/dev/null || true
           git show "origin/automation/state:automation/health/release-calendar.json" > artifacts/release-calendar-health-previous.json 2>/dev/null || true
           edition="${{ steps.edition.outputs.edition }}"
-          packet_sha="$(git show "origin/automation/state:automation/status/$edition.json" 2>/dev/null | node -e 'let text=""; process.stdin.on("data", value => text += value).on("end", () => { try { process.stdout.write(JSON.parse(text).packet.blobSha || ""); } catch {} });')"
-          if [[ "$packet_sha" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$packet_sha^{blob}"; then
-            git cat-file blob "$packet_sha" > artifacts/editorial-packet.json
-          elif git show "origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json 2>/dev/null; then
-            packet_sha="$(git hash-object artifacts/editorial-packet.json)"
-          else
-            packet_sha=""
-          fi
-          if [ -n "$packet_sha" ] && node scripts/validate-editorial-packet.mjs \
-            --edition="$edition" \
-            --period=${{ steps.edition.outputs.period }}; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "packet_blob_sha=$packet_sha" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Exact packet is missing, stale, or invalid; GitHub recovery owns the rebuild." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          node scripts/restore-acknowledged-packet.mjs --edition="$edition"
 
       - name: Install packet recovery dependencies
         run: npm ci
@@ -314,13 +298,13 @@ jobs:
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
-          existing="$(gh issue list --state open --search "$title in:title" --json url --jq '.[0].url // ""')"
+          existing="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,url | node scripts/find-exact-incident.mjs "$title" url)"
           body="The scheduled edition did not reach a healthy deployed state by the degraded fallback deadline.\n\n- Expected: **${{ steps.sla.outputs.expected }}**\n- Status: **${{ steps.sla.outputs.status }}**\n- Local latest: **${{ steps.sla.outputs.local_latest }}**\n- Online latest: **${{ steps.sla.outputs.online_latest || 'unavailable' }}**\n- High-confidence omissions: **${{ steps.coverage.outputs.high_omissions || 'not available' }}**\n- Pages re-dispatched: **${{ steps.fallback.outputs.deploy_retriggered || 'false' }}**\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nThe fixed editorial window must not move during recovery."
           body="$body\n- Ledger feedback: **${{ steps.ledger_feedback.outcome || 'not run' }}**"
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --body "$(printf '%b' "$body")"
           else
-            gh issue create --title "$title" --body "$body" --label "automation" || gh issue create --title "$title" --body "$body"
+            gh issue create --title "$title" --body "$(printf '%b' "$body")" --label "automation" || gh issue create --title "$title" --body "$(printf '%b' "$body")"
           fi
 
       - name: Close resolved SLA incident
@@ -330,7 +314,7 @@ jobs:
         shell: bash
         run: |
           title="Brief SLA incident: ${{ steps.sla.outputs.expected }}"
-          number="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // ""')"
+          number="$(gh issue list --limit 100 --state open --search "$title in:title" --json title,number | node scripts/find-exact-incident.mjs "$title" number)"
           if [ -n "$number" ]; then
             gh issue close "$number" --comment "The archive and deployed manifest now contain ${{ steps.sla.outputs.expected }}."
           fi

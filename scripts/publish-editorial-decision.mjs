@@ -1,3 +1,4 @@
+import { assertHistoricalInsertion } from "./lib/historical-insertion.mjs";
 import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -29,6 +30,9 @@ const EDITORIAL_CONTINUATION_REASON = "editorial_continuation";
 if (!new Set(["publish", "locale-repair"]).has(PUBLICATION_MODE)) {
   throw new Error(`Unsupported PUBLICATION_MODE: ${PUBLICATION_MODE}`);
 }
+if (PUBLICATION_MODE === "locale-repair" && !LOCALE_REPAIR_DRAFT_PATH) {
+  throw new Error("Locale repair requires LOCALE_REPAIR_DRAFT_PATH pointing to a complete draft with the current trusted factsDigest; editorial decisions cannot be replayed as locale repairs.");
+}
 
 function sha256Text(text) {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -44,9 +48,8 @@ async function readOptionalJson(path) {
 }
 
 async function previousEnglishOverlay(manifest, editionId) {
-  const index = manifest.editions.findIndex((item) => item.id === editionId);
-  if (index <= 0) return null;
-  const previous = manifest.editions[index - 1];
+  const previous = manifest.editions.filter(item => item.id < editionId).sort((a, b) => b.id.localeCompare(a.id))[0];
+  if (!previous) return null;
   return readEnglishPresentation(previous.id);
 }
 
@@ -87,6 +90,7 @@ async function writeLocalePlan(canonical, localePlan, { preservePublished = fals
   await rm(overlayFile, { force: true });
 }
 
+let repairExactDuplicateStories = false;
 async function hasAuthorizedSameEditionRevision(editorial) {
   try {
     const { stdout } = await run("git", [
@@ -96,6 +100,13 @@ async function hasAuthorizedSameEditionRevision(editorial) {
     const state = JSON.parse(stdout);
     const packetEventKeys = new Set(packet?.editorialInput?.packages?.map(item => item.eventKey) || []);
     const continuationKeys = new Set(state.revisionRequest?.eventKeys || []);
+    const calendarKeys = packet?.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
+    const calendarContinuation = state.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON
+      && state.revisionRequest.batchScope === "calendar" && packet?.continuation?.scope === "calendar"
+      && packet.continuation.preservePublished === true && !packet.editorialInput.packages.length
+      && !packet.editorialInput.trackingQueue.length && calendarKeys.length > 0
+      && new Set(calendarKeys).size === calendarKeys.length && calendarKeys.length === continuationKeys.size
+      && calendarKeys.every(key => /^[0-9a-f]{40}$/.test(key) && continuationKeys.has(key));
     const newsContinuation = state.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON &&
       packet?.continuation?.scope === "news" &&
       packet?.continuation?.preservePublished === true &&
@@ -109,26 +120,28 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       packet?.continuation?.preservePublished === true &&
       packet.editorialInput.packages.length > 0 &&
       packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)));
-    return state.editionId === editorial.editionId &&
+    const authorized = state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
-      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation) &&
+      (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation || calendarContinuation) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
+    repairExactDuplicateStories = authorized && state.revisionRequest.reason === SAME_EDITION_REVISION_REASON;
+    return authorized;
   } catch {
     return false;
   }
 }
 
-const localeRepairDraft = PUBLICATION_MODE === "locale-repair" && LOCALE_REPAIR_DRAFT_PATH
-  ? await readOptionalJson(LOCALE_REPAIR_DRAFT_PATH)
+const localeRepairDraft = PUBLICATION_MODE === "locale-repair"
+  ? JSON.parse(await readFile(LOCALE_REPAIR_DRAFT_PATH, "utf8"))
   : null;
-const editorial = localeRepairDraft
-  ? null
-  : JSON.parse(await readFile(DECISION_PATH, "utf8"));
+const editorial = PUBLICATION_MODE === "publish"
+  ? JSON.parse(await readFile(DECISION_PATH, "utf8"))
+  : null;
 const packet = PUBLICATION_MODE === "publish"
   ? JSON.parse(await readFile(PACKET_PATH, "utf8"))
-  : await readOptionalJson(PACKET_PATH);
+  : null;
 const [latestText, manifestText] = await Promise.all([
   readFile("public/data/latest.json", "utf8"),
   readFile("public/data/manifest.json", "utf8"),
@@ -139,7 +152,7 @@ const contractErrors = PUBLICATION_MODE === "locale-repair" ? [] : validateEdito
 if (contractErrors.length) throw new Error(`Editorial decisions failed evidence validation:\n- ${contractErrors.join("\n- ")}`);
 
 if (PUBLICATION_MODE === "locale-repair") {
-  const editionId = localeRepairDraft?.editionId || editorial?.editionId;
+  const editionId = localeRepairDraft?.editionId;
   if (!editionId) throw new Error("Locale repair requires an exact editionId");
   const manifestItem = manifest.editions.find((item) => item.id === editionId);
   if (!manifestItem) throw new Error(`Cannot repair locale for unpublished edition ${editionId}`);
@@ -151,19 +164,8 @@ if (PUBLICATION_MODE === "locale-repair") {
     latest: sha256Text(latestText),
     manifest: sha256Text(manifestText),
   };
-  let localePlan;
-  if (localeRepairDraft) {
-    const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
-    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
-  } else {
-    const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
-    localePlan = buildEnglishOverlay({
-      canonical,
-      editorial,
-      entryIdsByEvent: deriveEntryIdsByEvent(editorial),
-      previousOverlay: priorOverlay,
-    });
-  }
+  const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
+  const localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
   if (localePlan.status !== "available") {
     throw new Error(`Locale repair rejected: ${localePlan.summary}`);
   }
@@ -203,13 +205,21 @@ if (PUBLICATION_MODE === "locale-repair") {
   process.exit(0);
 }
 
+const historicalInsertion = process.env.HISTORICAL_INSERTION_ISSUE
+  ? { issueNumber: Number(process.env.HISTORICAL_INSERTION_ISSUE), latestEditionId: process.env.HISTORICAL_INSERTION_LATEST }
+  : null;
+if (historicalInsertion) {
+  const { stdout } = await run("git", ["show", `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`]);
+  assertHistoricalInsertion({ manifest, editionId: editorial.editionId, insertion: historicalInsertion,
+    state: JSON.parse(stdout), packetBlobSha: editorial.packetBlobSha, phase: "publication" });
+}
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
-const continuationPacket = ["news", "showcase"].includes(packet.continuation?.scope);
+const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
 }
-const noOpNewsContinuation = packet.continuation?.scope === "news" &&
+const noOpNewsContinuation = !repairExactDuplicateStories && packet.continuation?.scope === "news" &&
   packet.continuation?.preservePublished === true &&
   !editorial.decisions.some(item => item.decision === "include");
 if (noOpNewsContinuation) {
@@ -236,22 +246,29 @@ if (historicalRevision) {
   publisherLatest = JSON.parse(await readFile(resolve("public/data", target.path), "utf8"));
 }
 if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "daily" && editorial.upcomingMode === "inherit_and_patch") {
+  const preceding = historicalInsertion
+    ? manifest.editions.filter(item => item.id < editorial.editionId).sort((a, b) => b.id.localeCompare(a.id))
+    : null;
+  if (historicalInsertion) {
+    if (!preceding.length) throw new Error("historical insertion requires a preceding Canonical calendar baseline");
+    publisherLatest = JSON.parse(await readFile(resolve("public/data", preceding[0].path), "utf8"));
+  }
   const baseline = await loadCanonicalUpcomingBaseline({
-    latest,
-    manifest,
+    latest: publisherLatest,
+    manifest: historicalInsertion ? { ...manifest, editions: [...preceding].reverse() } : manifest,
     editionDate: editorial.editionId.slice(0, 10),
   });
-  publisherLatest = { ...latest, upcoming: baseline.items };
+  publisherLatest = { ...publisherLatest, upcoming: baseline.items };
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
-const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision });
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion, repairExactDuplicateStories });
 if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
     ? JSON.parse(await readFile(resolve("public/data", manifestItem.path), "utf8"))
     : null;
-  const feedbackEligible = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const feedbackEligible = !historicalInsertion && existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
   let localeStatus = "unchanged";
   if (feedbackEligible && editorial.locales?.en) {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
@@ -294,7 +311,7 @@ await mkdir(dirname(archiveFile), { recursive: true });
 const editionText = JSON.stringify(result.edition, null, 2) + "\n";
 await Promise.all([
   writeFile(archiveFile, editionText),
-  ...(historicalRevision ? [] : [writeFile("public/data/latest.json", editionText)]),
+  ...((historicalRevision || historicalInsertion) ? [] : [writeFile("public/data/latest.json", editionText)]),
   writeFile("public/data/manifest.json", JSON.stringify(result.manifest, null, 2) + "\n"),
 ]);
 await writeLocalePlan(result.edition, localePlan, { preservePublished: packet.continuation?.preservePublished === true });
@@ -305,12 +322,13 @@ await writePublicationResult({
   publicationMode: "publish",
   decisionDigest: result.decisionDigest,
   canonicalStatus: "published",
+  duplicateStoryRepairs: result.duplicateStoryRepairs,
   localeStatus: localePlan.status,
   localeReasonCode: localePlan.reasonCode,
   localeSummary: localePlan.summary,
   localeWarnings: localePlan.warnings,
   localeErrors: localePlan.errors || [],
-  feedbackEligible: true,
+  feedbackEligible: !historicalInsertion,
 });
 if (localePlan.status === "available") {
   console.log(`${result.status === "revised" ? "Revised" : "Built"} ${result.edition.id} issue ${result.edition.issueNumber}: bilingual publication ready.`);

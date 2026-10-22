@@ -139,6 +139,7 @@ it("prioritizes a known title without claiming other games are unimportant", asy
   const report = await collectReleaseCalendar({ config, editionDate: "2026-09-08", titleRegistry: { translations: { known: { titleEnAliases: ["Known Game"] } } }, fetcher: async () => new Response(row(1, "First by date", "Sep 9, 2026") + row(2, "Known Game", "Sep 22, 2026")) });
   expect(report.candidates[0].title).toBe("Known Game");
   expect(report.omittedCandidates).toBe(1);
+  expect(report.allCandidates.map(item => item.title).sort()).toEqual(["First by date", "Known Game"]);
   expect(report.coverage[0]).toMatchObject({
     sourceStatus: "success", parserStatus: "success", parserPagesSucceeded: 1, parserPagesFailed: 0,
     pages: 1, pagesAttempted: 1, pagesSucceeded: 1, pagesFailed: 0, usefulLeads: 2,

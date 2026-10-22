@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { canonicalCopyDigest, factsDigest, localeDigest } from "./lib/locale-digest.mjs";
 import { validateEnglishOverlay } from "./lib/locale-overlay.mjs";
+import { buildEnglishRepairOverlay } from "./lib/bilingual-publisher.mjs";
+import { upcomingKey } from "../src/lib/locale-projection.js";
+
+it("keeps a complete English edition available for the calendar labels used since October 10", () => {
+  const canonical = canonicalEdition();
+  const types = ["PC版发售", "平台版发售", "PS5版发售", "Nintendo Switch版发售", "Nintendo Switch 2版发售"];
+  canonical.upcoming = types.map((releaseType, index) => ({
+    id: `calendar-${index}`, date: "2026-09-01", title: canonical.entries[0].title,
+    platforms: ["PC"], region: index % 2 ? "英国" : "未限定", releaseType,
+    source: { label: "Steam", url: "https://store.steampowered.com/app/123", kind: "primary" },
+  }));
+  const result = buildEnglishRepairOverlay({ canonical, draft: {
+    schemaVersion: 1, locale: "en", editionId: canonical.id, factsDigest: factsDigest(canonical),
+    archiveTitle: "Morning Brief | Test Game announces an update",
+    entries: [{ entryId: canonical.entries[0].id, headline: "Test Game announces an update",
+      summary: "The official source announced an update for Test Game.",
+      verification: "The primary source was opened.", timeNote: "Within the fixed window." }],
+    upcoming: canonical.upcoming.map(item => ({ upcomingId: upcomingKey(canonical.id, item) })),
+  } });
+  expect(result.errors).toEqual([]);
+  expect(result.status).toBe("available");
+});
 
 function canonicalEdition() {
   return {
@@ -120,5 +142,42 @@ describe("English locale infrastructure", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((error) => error.includes("forbidden factual field platforms"))).toBe(true);
     expect(result.errors).toContain("overlay.localeDigest cannot be reproduced");
+  });
+});
+
+
+describe("upcoming cover text before media enrichment", () => {
+  function calendarFixture(titleEn, coverAlt) {
+    const canonical = canonicalEdition();
+    canonical.upcoming = [{
+      id: "upcoming-boring-ball-pc-us", date: "2026-10-22",
+      title: { title_key: "boring-ball", title_en: titleEn, title_zh_status: "unavailable" },
+      platforms: ["PC"], region: "Global", releaseType: "Full release",
+      source: { label: "Steam", url: "https://store.steampowered.com/app/123", kind: "primary" },
+    }];
+    const overlay = validOverlay(canonical);
+    overlay.upcoming = [{ upcomingId: canonical.upcoming[0].id, ...(coverAlt === undefined ? {} : { coverAlt }) }];
+    overlay.localeDigest = localeDigest(overlay);
+    return { canonical, overlay };
+  }
+
+  it.each(["Boring Ball-無聊的球", "無聊的球遊戲"])("rejects untranslated alt for %s even without a cover", titleEn => {
+    const { canonical, overlay } = calendarFixture(titleEn, `《${titleEn}》 cover`);
+    const expected = "upcoming[0].coverAlt: text still contains substantial Chinese copy";
+    expect(canonical.upcoming[0].cover).toBeUndefined();
+    expect(validateEnglishOverlay(canonical, overlay).errors).toContain(expected);
+    const repair = buildEnglishRepairOverlay({ canonical, draft: overlay });
+    expect(repair.status).not.toBe("available");
+    expect(repair.errors).toContain(expected);
+    expect(canonical.upcoming[0].title.title_en).toBe(titleEn);
+  });
+
+  it.each([undefined, "Boring Ball cover", "Game cover artwork"])("allows optional or reviewed English alt %s before and after cover enrichment", coverAlt => {
+    const { canonical, overlay } = calendarFixture("Boring Ball-無聊的球", coverAlt);
+    expect(validateEnglishOverlay(canonical, overlay).errors).toEqual([]);
+    expect(buildEnglishRepairOverlay({ canonical, draft: overlay }).status).toBe("available");
+    canonical.upcoming[0].cover = { url: "media/boring-ball.jpg", alt: "官方封面", kind: "cover" };
+    expect(validateEnglishOverlay(canonical, overlay).errors).toEqual([]);
+    expect(canonical.upcoming[0].title.title_en).toBe("Boring Ball-無聊的球");
   });
 });

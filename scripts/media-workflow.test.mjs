@@ -11,6 +11,9 @@ describe("media publication workflow", () => {
     expect(workflow).toContain("gh workflow run deploy.yml --ref main");
     expect(workflow).not.toContain("gh pr create");
     expect(workflow).toContain("Acknowledge nonblocking media lane");
+    expect(workflow).toContain("record_id:");
+    expect(workflow).toContain("--revalidate-cover-id=\"$record\"");
+    expect(workflow).toContain('if [ -z "$edition" ]; then');
     expect(workflow).toContain('"$edition" media-status');
     expect(workflow).toContain('edition_path="public/data/archive/${edition:0:4}/${edition:5:2}/$edition.json"');
     expect(workflow).toContain('node scripts/media-status.mjs "$edition_path"');

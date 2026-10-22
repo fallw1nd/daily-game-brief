@@ -14,15 +14,6 @@ function normalizedUrl(input) {
   }
 }
 
-function entryText(entry) {
-  return normalizeHeadline([
-    entry.title?.title_zh_cn,
-    entry.title?.title_en,
-    entry.title?.title_ja,
-    entry.headline,
-  ].filter(Boolean).join(" "));
-}
-
 function isCovered(item, entries) {
   if (item.showcaseRefs?.length) {
     const published = mergeShowcaseRefs(entries.flatMap(entry => entry.showcaseRefs || []));
@@ -36,15 +27,13 @@ function isCovered(item, entries) {
     const values = [source.url, source.canonicalUrl].map(normalizedUrl).filter(Boolean);
     return values;
   }));
-  const subject = normalizeHeadline(item.subjectKey || "");
-  const headlineTokens = normalizeHeadline(item.headline).split(" ").filter((token) => token.length >= 4);
   return entries.some((entry) => {
-    if ((entry.sources || []).some((source) => sourceUrls.has(normalizedUrl(source.url)))) return true;
-    const text = entryText(entry);
-    if (subject && subject.length >= 4 && text.includes(subject)) return true;
-    if (headlineTokens.length < 2) return false;
-    const shared = headlineTokens.filter((token) => text.includes(token)).length;
-    return shared >= Math.min(3, headlineTokens.length) && shared / headlineTokens.length >= 0.6;
+    if (entry.eventKey) return entry.eventKey === item.eventKey;
+    // Legacy entries have no event identity. A shared game, article URL, or
+    // similar headline alone cannot establish that the same fact was covered.
+    const headline = normalizeHeadline(item.headline);
+    return Boolean(headline) && headline === normalizeHeadline(entry.headline)
+      && (entry.sources || []).some(source => sourceUrls.has(normalizedUrl(source.url)));
   });
 }
 
@@ -59,7 +48,7 @@ function confidence(item) {
   return "insufficient";
 }
 
-export function auditCoverage(evidence, edition) {
+export function auditCoverage(evidence, edition, { decisions = [], decisionDigest = null } = {}) {
   if (!edition) {
     return {
       status: "edition-missing",
@@ -68,6 +57,8 @@ export function auditCoverage(evidence, edition) {
       omissions: [],
     };
   }
+  const boundDecisions = decisionDigest && decisionDigest === edition.sourceReport?.editorialDecisionDigest
+    ? new Map(decisions.map(decision => [decision.eventKey, decision])) : new Map();
   const assessed = (evidence.packages || []).map((item) => ({
     eventKey: item.eventKey,
     headline: item.headline,
@@ -75,18 +66,23 @@ export function auditCoverage(evidence, edition) {
     readiness: item.readiness,
     confidence: confidence(item),
     covered: isCovered(item, edition.entries || []),
+    disposition: boundDecisions.get(item.eventKey)?.decision || null,
+    reason: boundDecisions.get(item.eventKey)?.reason || null,
     sourceUrls: (item.sources || []).filter((source) => source.status === "opened").map((source) => source.url),
   }));
-  const omissions = assessed.filter((item) => !item.covered && ["high", "review"].includes(item.confidence));
+  const omissions = assessed.filter((item) => !item.covered && item.disposition !== "exclude" && ["high", "review"].includes(item.confidence));
   return {
     status: "audited",
     editionId: edition.id,
     totals: {
       packages: assessed.length,
       covered: assessed.filter((item) => item.covered).length,
+      explicitlyExcluded: assessed.filter(item => !item.covered && item.disposition === "exclude").length,
+      awaitingReview: assessed.filter(item => !item.covered && item.disposition === "needs_review").length,
       highConfidenceOmissions: omissions.filter((item) => item.confidence === "high").length,
       reviewOmissions: omissions.filter((item) => item.confidence === "review").length,
     },
     omissions,
+    assessed,
   };
 }

@@ -81,3 +81,14 @@
 新版成为默认首页；原有view=reading链接继续有效，view=classic保留原版中英文入口。已同步origin/main的9月8日数据与媒体，发布改动不包含public/data、public/media、schema、采集脚本、Actions或依赖更新。新旧样式通过reading-page与r-*隔离，新版仅按需加载。此前独立的AGENTS.md精简工作不包含在本次视觉上线中。
 
 上线前同步main a88377f后的完整检查通过：319项测试、29期数据及英文校验、构建。
+
+## 2026-10-03 reader interaction follow-up
+
+- Search terms and expanded result counts use URL parameters; returning from a result restores the saved scroll position. History updates replace the current entry while typing.
+- The search index loads when archive approaches the viewport, the search input receives focus, or a URL contains a query.
+- The non-modal settings panel closes when focus leaves. Loading reserves viewport space to avoid the footer jumping out of the first screen.
+- A complete collapsible edition directory precedes the lead. The sidebar explicitly labels its five-story selection. Navigation advertises archive search; mobile source/caption text is larger.
+- Technical calendar notes are retained in a labelled disclosure. General notes remain visible. A failed latest-edition request offers a recent archive when its manifest is available.
+- GitHub alternatives reviewed: [nuqs](https://github.com/47ng/nuqs), [Radix Popover](https://github.com/radix-ui/primitives), [React Loading Skeleton](https://github.com/dvtng/react-loading-skeleton). Existing History/React/details/CSS capabilities cover this limited scope without adding dependencies.
+- Validation: 573 tests, production build, 20 Chrome responsive/theme/language layouts; actual 13th-result navigation and back restores 24 results and the same scroll position; focus dismissal, unavailable-latest recovery and calendar disclosure verified. Local 390px loading shift measured approximately 0.0011 (lab observation, not a field percentile).
+- Safari, physical devices, screen readers and full zoom conformance remain separate acceptance work; large-text preferences were an optional research recommendation, not introduced here.

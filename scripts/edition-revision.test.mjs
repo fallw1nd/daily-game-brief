@@ -159,3 +159,23 @@ describe("authorized same-edition production revision", () => {
     expect(state.publication.mainSha).toBe(revisedMainSha);
   });
 });
+
+
+it("preserves degraded stories and their lead identity during an additive news continuation", () => {
+  const prior = {
+    ...currentLatest,
+    archiveTitle: "日报｜《Existing Game》自动事实清单",
+    leadEntryId: editionId + "-news-0",
+    entries: [{ id: editionId + "-news-0", section: "news", title: { title_key: "existing-game", title_en: "Existing Game", title_zh_status: "unavailable" }, headline: "[自动事实清单] Existing Game announcement", sources: [{ label: "Publisher", url: "https://publisher.example/previous", kind: "primary" }] }],
+  };
+  const result = buildEdition({
+    packet: { ...packet, continuation: { scope: "news", preservePublished: true } },
+    editorial, latest: prior, manifest, allowSameEditionRevision: true,
+  });
+  expect(result.edition.entries).toHaveLength(2);
+  expect(result.edition.entries[0]).toEqual(prior.entries[0]);
+  expect(result.edition.leadEntryId).toBe(prior.leadEntryId);
+  expect(result.edition.entries.some(entry => entry.id === result.edition.leadEntryId)).toBe(true);
+  expect(result.edition.archiveTitle).toBe(prior.archiveTitle);
+  expect(result.edition.issueNumber).toBe(prior.issueNumber);
+});

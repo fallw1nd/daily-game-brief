@@ -70,6 +70,13 @@ function invalidStateFor(targetEditionId) {
 }
 
 describe("durable per-edition state machine", () => {
+  it("keeps a deployed release when an older release or same-release failure arrives late", () => {
+    const deployed = applyEditionStateEvent(validState(), "deployment-succeeded", { mainSha, runId: "new" });
+    expect(applyEditionStateEvent(deployed, "deployment-failed", { mainSha })).toEqual(deployed);
+    expect(applyEditionStateEvent(deployed, "deployment-failed", { mainSha: "4".repeat(40), superseded: true })).toEqual(deployed);
+    expect(applyEditionStateEvent(deployed, "deployment-succeeded", { mainSha: "4".repeat(40), superseded: true })).toEqual(deployed);
+    expect(applyEditionStateEvent(deployed, "deployment-failed", { mainSha: "5".repeat(40) }).deployment.status).toBe("failed");
+  });
   it("requires explicit reviewed recovery after failed fallback, preserving the packet and window", () => {
     const timedOut = applyEditionStateEvent(readyState(), "editorial-timeout", {});
     const failed = applyEditionStateEvent(timedOut, "publication-failed", { error: "No eligible automatic facts" });

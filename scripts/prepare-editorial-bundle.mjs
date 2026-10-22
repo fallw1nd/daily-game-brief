@@ -64,6 +64,7 @@ async function queuePackets() {
 }
 
 function packetQueueKeys(packet) {
+  if (packet.continuation?.scope === "calendar") return packet.editorialInput.calendarWork.pages.map(page => page.blobSha).sort();
   if (packet.continuation?.scope === "showcase") {
     return [...new Set((packet.editorialInput?.packages || []).flatMap(item => (item.showcaseRefs || []).map(ref => ref.announcementId)))].sort();
   }

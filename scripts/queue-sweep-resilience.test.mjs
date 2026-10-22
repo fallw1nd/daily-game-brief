@@ -7,6 +7,6 @@ describe("global editorial queue sweep resilience", () => {
   it("isolates a stale historical queue without weakening exact-edition checks", () => {
     expect(script).toContain("if (requestedEdition) throw error;");
     expect(script).toContain("queue advance skipped during global sweep");
-    expect(script).toMatch(/try \{\s*result = advanceEditorialQueue\(\{ queue, state, canonical, packets \}\);\s*\} catch \(error\)/u);
+    expect(script).toMatch(/try \{\s*result = advanceEditorialQueue\(\{ queue, state, canonical, packets, ledger \}\);\s*\} catch \(error\)/u);
   });
 });

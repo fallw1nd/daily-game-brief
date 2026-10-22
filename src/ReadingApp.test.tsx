@@ -33,6 +33,42 @@ beforeEach(() => {
 afterEach(async () => { if (root) { await act(async () => root?.unmount()); root = undefined; } document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
 describe("reading sample", () => {
+  it("uses two-line calendar names and honest missing-cover fallbacks in either language", () => {
+    const value = structuredClone(edition);
+    const base = (calendarSnapshot as BriefEdition).upcoming[0];
+    value.upcoming = [
+      { ...base, id: "provisional", cover: undefined, cover_status: "unavailable", coverNote: "官方来源暂无可核实封面", title: { title_key: "test", title_en: "Original Game", title_zh_cn: "中文游戏（Original Game，暂译）", title_zh_status: "provisional_translation" } },
+      { ...base, id: "original", title: { title_key: "nba", title_en: "NBA 2K27", title_zh_status: "unavailable" } },
+      { ...base, id: "same", title: { title_key: "brand", title_en: "Same Brand", title_zh_cn: "Same Brand", title_zh_status: "official_simplified" } },
+    ];
+    render(value);
+    const cards = document.querySelectorAll(".r-calendar-item");
+    expect(cards[0].querySelector("h3")?.textContent).toBe("中文游戏");
+    expect(cards[0].querySelector(".r-calendar-original")?.textContent).toBe("Original Game");
+    expect(cards[0].querySelector(".r-cover-unavailable")?.textContent).toContain("暂无核实封面");
+    expect(cards[0].querySelector("small")?.textContent).toBe("官方来源暂无可核实封面");
+    expect(cards[0].querySelector("h3")?.textContent).not.toContain("暂译");
+    expect(cards[1].querySelector("h3")?.textContent).toBe("NBA 2K27");
+    expect(cards[1].querySelector(".r-calendar-original")).toBeNull();
+    expect(cards[2].querySelector(".r-calendar-original")).toBeNull();
+    render(value, true);
+    expect(document.querySelector(".r-calendar-item h3")?.textContent).toBe("Original Game");
+    expect(document.querySelector(".r-calendar-original")).toBeNull();
+    expect(document.querySelector(".r-cover-unavailable")?.textContent).toContain("No verified cover");
+  });
+
+  it("shows incomplete calendar review even when this edition already has inherited items", () => {
+    const value = structuredClone(edition);
+    value.upcoming = (calendarSnapshot as BriefEdition).upcoming;
+    value.sourceReport = { checked: [], limited: [], note: "", calendarReview: { pages: [{ key: "page", status: "deferred", reason: "Detail unavailable" }], platforms: [] } };
+    render(value);
+    expect(document.querySelector("#upcoming .r-warning")?.textContent).toContain("尚未完成复核");
+    render(value, true);
+    expect(document.querySelector("#upcoming .r-warning")?.textContent).toContain("Calendar review is incomplete");
+    value.sourceReport.calendarReview!.pages[0].status = "reviewed";
+    render(value);
+    expect(document.querySelector("#upcoming .r-warning")).toBeNull();
+  });
   it("renders showcase gaps with one unique anchor per story across multiple groups", () => {
     const value = structuredClone(edition);
     const brief = value.entries.find(entry => entry.id !== value.leadEntryId)!;
@@ -103,9 +139,24 @@ describe("reading sample", () => {
     render();
     const row = document.querySelector<HTMLAnchorElement>(".r-archive-list a")!;
     expect(row.querySelector("time")?.textContent).toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(row.querySelector("strong")?.textContent).toBe(manifest.editions.at(-1)?.archiveTitle);
+    expect(row.querySelector("strong")?.textContent).toBe(manifest.editions.find(item => item.id === manifest.latest)?.archiveTitle);
     expect(row.href).toContain("view=reading");
     expect(readingHref("2026-08-21-pm", "historical-anchor", true)).toBe("/daily-game-brief/?view=reading&edition=2026-08-21-pm&lang=en#historical-anchor");
+  });
+
+  it("keeps archive and pager chronological after a late supplement allocates a higher issue", () => {
+    const supplementId = "2026-09-28-daily";
+    const preceding = manifest.editions.find(item => item.id === "2026-09-27-daily")!;
+    const supplemented: BriefManifest = { ...manifest, editions: [
+      ...manifest.editions.filter(item => item.id !== supplementId),
+      { ...preceding, id: supplementId, date: "2026-09-28", issueNumber: Math.max(...manifest.editions.map(item => item.issueNumber)) + 1, archiveTitle: "日报｜历史补刊测试" },
+    ] };
+    document.body.innerHTML = renderToStaticMarkup(<ReadingApp initialEdition={{ ...edition, id: supplementId, date: "2026-09-28" }} initialManifest={supplemented} initialSearchIndex={search} />);
+    const first = document.querySelector(".r-archive-list a");
+    expect(first?.querySelector("strong")?.textContent).toBe(manifest.editions.find(item => item.id === manifest.latest)?.archiveTitle);
+    const pager = document.querySelector(".r-pager");
+    expect(pager?.querySelector('a[href*="edition=2026-09-27-daily"]')).not.toBeNull();
+    expect(pager?.querySelector('a[href*="edition=2026-09-29-daily"]')).not.toBeNull();
   });
 
   it("preserves the calendar for historical editions, including verified source links", () => {
@@ -130,7 +181,13 @@ describe("reading sample", () => {
     const jade = container.querySelector<HTMLInputElement>('[data-color="jade"] input')!;
     await act(async () => jade.click());
     expect(localStorage.getItem("brief-accent")).toBe("jade");
-    const about = container.querySelector<HTMLAnchorElement>('.r-edition-line a')!;
+    expect(container.querySelector('.r-edition-line a')).toBeNull();
+    const editionBar = container.querySelector('.r-edition-bar')!;
+    expect(editionBar.firstElementChild?.className).toBe('r-edition-line');
+    expect(editionBar.querySelectorAll('.cu-entry button')).toHaveLength(1);
+    expect(editionBar.querySelector('time')?.textContent).toBe(edition.date.replaceAll('-', '.'));
+    expect(container.querySelector<HTMLDetailsElement>("#edition-note")?.open).toBe(false);
+    const about = container.querySelector<HTMLElement>("#edition-note summary")!;
     await act(async () => about.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
     expect(container.querySelector<HTMLDetailsElement>("#edition-note")?.open).toBe(true);
     const input = container.querySelector<HTMLInputElement>('input[type="search"]')!;
@@ -283,4 +340,54 @@ it("keeps a readable calendar item and a stable cover slot after cover load fail
   expect(item.querySelector(".r-cover-unavailable")?.textContent).toContain("封面暂不可用");
   expect(item.querySelector("h3")?.textContent).toBe(title);
   expect(item.querySelector(".r-calendar-date")).not.toBeNull();
+});
+
+
+describe("reader navigation continuity", () => {
+  it("restores shared search parameters and responds to browser history", async () => {
+    vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0); // Scroll restoration is covered by real-browser tests.
+    window.history.replaceState(null, "", "/daily-game-brief/?q=历史游戏&results=24#archive");
+    const container = document.createElement("div"); document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+    expect(container.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("历史游戏");
+    expect(container.querySelector(".r-search-result")?.textContent).toContain("历史游戏跨期新闻");
+    await act(async () => {
+      window.history.replaceState(null, "", "/daily-game-brief/#archive");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(container.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("");
+    expect(container.querySelector(".r-archive-list")).not.toBeNull();
+  });
+
+  it("closes settings when keyboard focus leaves, without stealing the new focus", async () => {
+    const container = document.createElement("div"); document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+    const panel = container.querySelector<HTMLDetailsElement>(".r-settings")!;
+    const radio = panel.querySelector<HTMLInputElement>("input")!;
+    const next = container.querySelector<HTMLAnchorElement>(".r-lead .r-source-line a")!;
+    panel.open = true;
+    await act(async () => { radio.focus(); next.focus(); });
+    expect(panel.open).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+});
+
+it("opens and closes the single catch-up entrance while preserving original reading regions", async () => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const entrance = container.querySelector('.cu-entry button') as HTMLButtonElement;
+  await act(async () => entrance.click());
+  expect(window.location.search).toContain('catchup=1');
+  expect(container.querySelector('#catchup')).not.toBeNull();
+  expect(container.querySelector('#content')?.closest('[hidden]')).not.toBeNull();
+  expect(container.querySelector('#archive')).not.toBeNull();
+  expect(container.querySelector('#upcoming')).not.toBeNull();
+  await act(async () => (container.querySelector('.cu-back') as HTMLButtonElement).click());
+  expect(window.location.search).not.toContain('catchup=1');
+  expect(container.querySelector('#content')?.closest('[hidden]')).toBeNull();
 });

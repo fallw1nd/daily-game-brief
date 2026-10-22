@@ -5,6 +5,10 @@ edition="${1:?edition is required}"
 event="${2:?state event is required}"
 shift 2
 main_root="$(pwd)"
+if [[ "$event" == deployment-* ]]; then
+  # Deployment state can point at a newer main than this runner checked out.
+  git fetch origin +refs/heads/main:refs/remotes/origin/main
+fi
 success=false
 packet_path=""
 

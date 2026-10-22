@@ -4,6 +4,8 @@ Media enrichment runs after Canonical publication and is nonblocking. It opens t
 
 Current recovery schedule is 11:10 `Asia/Shanghai`; exact-edition enrichment is also dispatched immediately after Canonical publication. Production timing belongs in `docs/SCHEDULED_TASK_PROMPT.md`, not historical migration notes.
 
+Cover identity is confirmed from the opened page's product title metadata against the record's exact English/Chinese title and registered aliases. URLs, descriptions, and partial title matches do not establish product identity. Existing covers are left alone during normal runs; for a bounded repair, run `node scripts/enrich-media.mjs --apply --edition=2026-09-29-daily --revalidate-cover-id=upcoming-end-of-abyss`. This reopens only that cover's source page in the selected edition. A confirmed product mismatch removes that one bad cover and resolves it from that record's configured sources; a fetch failure or indeterminate page title retains the current cover. The media workflow's manual dispatch accepts the same optional `edition_id` and `record_id` pair. Omitting `record_id` keeps the normal media flow.
+
 ## Required state
 
 New v2 news/calendar items need either:
@@ -24,6 +26,10 @@ Prefer the first verified same-title source available:
 3. Microsoft/Xbox Store, Steam, publisher store/media room;
 4. reliable retailer/media/game database only when the exact source page is opened and subject/edition identity is clear;
 5. bounded web-search discovery as a last resort when configured.
+
+Xbox roundup pages are discovery only: the resolver follows only an exact-title HTTPS link to an Xbox product-store page and independently checks that product’s metadata. It does not treat a matching roundup anchor as sufficient identity evidence.
+
+Xbox product pages may expose their real cover through the exact `ProductDetailsHeaderBoxArt` image rather than social metadata. The extractor accepts that element only on Xbox/Microsoft product-store paths, requests a usable size from the official Microsoft image host, and still requires the product-title identity gate before saving any image. Host-scoped `Buy`/Xbox platform chrome and numeric HTML entities are normalized; edition and sequel differences remain significant. Explicit official aliases require a traceable same-product link, not fuzzy title matching.
 
 The order is a reliability preference, not a shape requirement. Square, portrait, and landscape art are all valid when identity/provenance is verified.
 

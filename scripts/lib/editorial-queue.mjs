@@ -6,6 +6,7 @@ import {
 } from "./edition-state.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
 import { mergeShowcaseRefs, showcaseRetryDue } from "./showcase.mjs";
+import { calendarReviewComplete } from "./calendar-review.mjs";
 
 const SAFE_BATCH_NAME = /^[\w-]+\.json$/u;
 
@@ -14,7 +15,7 @@ function unique(values) {
 }
 
 function assertBatchShape(batch) {
-  if (!batch || !["news", "showcase"].includes(batch.scope)) throw new Error("editorial queue contains an unsupported batch scope");
+  if (!batch || !["news", "showcase", "calendar"].includes(batch.scope)) throw new Error("editorial queue contains an unsupported batch scope");
   if (!SAFE_BATCH_NAME.test(String(batch.name || ""))) throw new Error("editorial queue contains an unsafe batch filename");
   if (!Array.isArray(batch.eventKeys) || !batch.eventKeys.length || batch.eventKeys.some(key => typeof key !== "string" || !key)) {
     throw new Error(`editorial batch ${batch.name} requires event identities`);
@@ -33,6 +34,15 @@ function validateBatchPacket(packetText, batch, editionId) {
     throw new Error(`editorial batch ${batch.name} has an invalid continuation scope`);
   }
   const packages = packet.editorialInput?.packages || [];
+  if (batch.scope === "calendar") {
+    const keys = packet.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
+    if (packages.length || packet.editorialInput?.trackingQueue?.length || !keys.length
+      || keys.some(key => !/^[0-9a-f]{40}$/.test(key)) || new Set(keys).size !== keys.length
+      || [...keys].sort().join("\0") !== [...batch.eventKeys].sort().join("\0")) {
+      throw new Error(`calendar batch ${batch.name} must contain only its pinned calendar page identities`);
+    }
+    return packet;
+  }
   if (!packages.length) throw new Error(`editorial batch ${batch.name} must contain at least one package`);
   const packageKeys = packages.map(item => item.eventKey);
   if (packageKeys.some(key => typeof key !== "string" || !key) || new Set(packageKeys).size !== packageKeys.length) {
@@ -66,6 +76,8 @@ function showcaseCoverage(queue, canonical) {
 }
 
 function nextBatch(queue, nowMs) {
+  const calendar = queue.batches.find(batch => batch.scope === "calendar" && (batch.status === "pending"
+    || (batch.status === "awaiting_retry" && showcaseRetryDue(batch.lastAttemptAt || batch.activatedAt || queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
   // News gets the first continuation turn, then a pending showcase gets the
   // next turn when one exists. This keeps Canonical progress ahead of a
   // showcase without allowing a sustained news backlog to starve it.
@@ -75,6 +87,8 @@ function nextBatch(queue, nowMs) {
   const pending = newsFirst
     ? pendingNews || pendingShowcase
     : pendingShowcase || pendingNews;
+  if (pendingNews) return pending;
+  if (calendar) return calendar;
   if (pending) return pending;
   const dueNews = queue.batches.find(batch => batch.scope === "news" && batch.status === "awaiting_retry" && showcaseRetryDue(
     queue.firstPublishedAt,
@@ -89,6 +103,28 @@ function nextBatch(queue, nowMs) {
   return newsFirst ? dueNews || dueShowcase : dueShowcase || dueNews;
 }
 
+/** Keep non-calendar activation positions unchanged; share calendar turns across
+ * eligible editions instead of replaying the oldest immutable packet forever. */
+export function orderCalendarQueueEditions(editions, queues, now = Date.now()) {
+  const eligible = new Map();
+  for (const edition of editions) {
+    const queue = queues[edition.id];
+    if (!Array.isArray(queue?.batches)) continue;
+    const batch = nextBatch(queue, now);
+    if (batch?.scope !== "calendar") continue;
+    const attemptedAt = Date.parse(batch.lastAttemptAt || batch.activatedAt);
+    eligible.set(edition.id, Number.isFinite(attemptedAt) ? attemptedAt : -Infinity);
+  }
+  // Stable sort retains the caller's original edition/issue order for ties.
+  const calendars = editions.filter(edition => eligible.has(edition.id))
+    .sort((a, b) => {
+      const left = eligible.get(a.id), right = eligible.get(b.id);
+      return left === right ? 0 : left < right ? -1 : 1;
+    });
+  let index = 0;
+  return editions.map(edition => eligible.has(edition.id) ? calendars[index++] : edition);
+}
+
 /**
  * Advance exactly one durable editorial continuation for an already published
  * edition. News continuations use their own trusted state reason and exact
@@ -96,7 +132,7 @@ function nextBatch(queue, nowMs) {
  * identity/fact checks. The caller persists the returned state and packet in
  * the same automation/state transaction.
  */
-export function advanceEditorialQueue({ queue, state, canonical, packets, now = new Date().toISOString() }) {
+export function advanceEditorialQueue({ queue, state, canonical, packets, ledger = null, now = new Date().toISOString() }) {
   if (queue.editionId !== state.editionId || canonical.id !== queue.editionId) {
     throw new Error("editorial queue requires the same current edition");
   }
@@ -114,6 +150,10 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, now = 
   }
 
   for (const batch of nextQueue.batches) {
+    if (batch.scope === "calendar" && calendarReviewComplete(batch.eventKeys, canonical.sourceReport?.calendarReview)) {
+      batch.status = "completed";
+      continue;
+    }
     if (batch.scope === "showcase" && batch.eventKeys.every(key => covered.has(key))) {
       batch.status = "completed";
       continue;
@@ -121,13 +161,28 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, now = 
     if (batch.status !== "editing" || state.revisionRequest?.status === "open" || state.publication.status !== "committed") continue;
     if (batch.scope === "news") {
       if (state.revisionRequest?.reason !== EDITORIAL_CONTINUATION_REASON || state.revisionRequest.batchName !== batch.name) {
-        throw new Error(`news batch ${batch.name} was not completed by its scoped continuation publication`);
+        const digest = canonical.sourceReport?.editorialDecisionDigest;
+        const reconciled = digest && Number.isFinite(Date.parse(batch.activatedAt)) && batch.eventKeys.every(key => {
+          const decision = ledger?.events?.[key];
+          return decision?.lastDecisionEdition === queue.editionId
+            && decision.lastDecisionIdentity === digest
+            && ["include", "exclude"].includes(decision.lastDecision)
+            && Boolean(decision.lastDecisionReason)
+            && Date.parse(decision.lastDecisionAt) >= Date.parse(batch.activatedAt);
+        });
+        if (!reconciled) throw new Error(`news batch ${batch.name} was not completed by its scoped continuation publication; exact committed decision reconciliation required`);
+        batch.reconciliation = { decisionDigest: digest, at: now, reason: "accounted-by-committed-revision" };
       }
       batch.status = "completed";
     } else {
       batch.status = "awaiting_retry";
+      // An old edition must not immediately reopen the same immutable calendar
+      // packet after a partial review. Anchor its delay to this completed attempt,
+      // not the original publication; retain the unresolved work and exact scope.
+      if (batch.scope === "calendar") batch.lastAttemptAt = state.publication.updatedAt || now;
     }
   }
+  if (!nextQueue.batches.some(batch => batch.name === nextQueue.activeBatchName && batch.status === "editing")) nextQueue.activeBatchName = null;
 
   if (state.revisionRequest?.status === "open" || state.publication.status !== "committed") {
     return { queue: nextQueue, state, packet: null, batch: null };

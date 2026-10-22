@@ -28,13 +28,28 @@ describe("coverage audit", () => {
     expect(auditCoverage(evidence, { entries: [entry, { showcaseRefs: [{ ...ref, announcementId: "other", factIds: ["demo"] }] }] }).totals.covered).toBe(0);
   });
 
-  it("matches an edition entry by normalized source URL", () => {
+  it("matches legacy entries only with exact headline and normalized source URL", () => {
     const audit = auditCoverage({ window: { id: "2026-08-26-pm" }, packages: [baseItem] }, {
       id: "2026-08-26-pm",
-      entries: [{ headline: "中文标题", title: {}, sources: [{ url: "https://publisher.example/crimson-desert" }] }],
+      entries: [{ headline: baseItem.headline, title: {}, sources: [{ url: "https://publisher.example/crimson-desert" }] }],
     });
     expect(audit.totals.covered).toBe(1);
     expect(audit.omissions).toEqual([]);
+  });
+
+  it("does not confuse two facts about one game, even when they share a source page", () => {
+    const entry = { title: { title_en: "Crimson Desert" }, headline: "Crimson Desert studio closes", sources: baseItem.sources };
+    expect(auditCoverage({ packages: [baseItem] }, { entries: [entry] }).totals.highConfidenceOmissions).toBe(1);
+    expect(auditCoverage({ packages: [baseItem] }, { entries: [{ ...entry, eventKey: "other-event" }] }).totals.covered).toBe(0);
+    expect(auditCoverage({ packages: [baseItem] }, { entries: [{ ...entry, eventKey: baseItem.eventKey }] }).totals.covered).toBe(1);
+  });
+
+  it("accounts for explicit exclusions only when bound to the committed decision", () => {
+    const edition = { entries: [], sourceReport: { editorialDecisionDigest: "current" } };
+    const decisions = [{ eventKey: baseItem.eventKey, decision: "exclude", reason: "Duplicate of another scoped event" }];
+    expect(auditCoverage({ packages: [baseItem] }, edition, { decisions, decisionDigest: "stale" }).totals.highConfidenceOmissions).toBe(1);
+    const result = auditCoverage({ packages: [baseItem] }, edition, { decisions, decisionDigest: "current" });
+    expect(result.totals).toMatchObject({ covered: 0, explicitlyExcluded: 1, highConfidenceOmissions: 0 });
   });
 
   it("flags an unmatched A-level primary event as a high-confidence omission", () => {

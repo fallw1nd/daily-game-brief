@@ -100,6 +100,7 @@ export function expandSecondaryEditorial(request, packet) {
     trackingPolicy: _trackingPolicy,
     staleTrackingHours: _staleTrackingHours,
     recoverFailedPublication: _recoverFailedPublication,
+    historicalInsertion: _historicalInsertion,
     ...editorial
   } = request;
   return {

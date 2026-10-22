@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
-import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
+import { advanceEditorialQueue, orderCalendarQueueEditions } from "./lib/editorial-queue.mjs";
 import { showcaseRetryDue } from "./lib/showcase.mjs";
 import { mergeShowcaseReports, refreshedShowcaseBatches } from "./lib/showcase-refresh.mjs";
 
@@ -11,6 +11,9 @@ const requestedEdition = process.argv.find(arg => arg.startsWith("--edition="))?
 const maxActivations = Number(process.argv.find(arg => arg.startsWith("--max-activations="))?.slice("--max-activations=".length) || 1);
 if (!Number.isInteger(maxActivations) || maxActivations < 1) throw new Error("max activations must be a positive integer");
 const manifest = JSON.parse(await readFile("public/data/manifest.json", "utf8"));
+let ledger = null;
+try { ledger = JSON.parse(await readFile(resolve(root, "automation/ledger/events.json"), "utf8")); }
+catch (error) { if (error.code !== "ENOENT") throw error; }
 let refreshed = false;
 let activations = 0;
 let editions = requestedEdition
@@ -30,6 +33,16 @@ if (!requestedEdition) {
       break;
     }
   }
+}
+// Only the global sweep shares calendar turns. Explicit single-edition repairs
+// and the existing in-flight guard above retain their exact ownership.
+if (!requestedEdition && editions.length) {
+  const queues = {};
+  for (const edition of editions) {
+    try { queues[edition.id] = JSON.parse(await readFile(resolve(root, `automation/batches/${edition.id}/queue.json`), "utf8")); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+  editions = orderCalendarQueueEditions(editions, queues);
 }
 for (const edition of editions) {
   if (activations >= maxActivations) break;
@@ -85,7 +98,7 @@ for (const edition of editions) {
   })));
   let result;
   try {
-    result = advanceEditorialQueue({ queue, state, canonical, packets });
+    result = advanceEditorialQueue({ queue, state, canonical, packets, ledger });
   } catch (error) {
     if (requestedEdition) throw error;
     console.error(`${canonical.id}: queue advance skipped during global sweep: ${error.message}`);

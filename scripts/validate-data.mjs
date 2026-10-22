@@ -31,6 +31,7 @@ const titleZhStatuses = new Set([
   "official_simplified",
   "official_traditional",
   "common_translation",
+  "provisional_translation",
   "unavailable",
 ]);
 const entryFlags = new Set([
@@ -114,6 +115,9 @@ function validateTitle(title, context) {
   }
   if (!titleZhStatuses.has(title.title_zh_status)) {
     errors.push(`${context}: invalid title_zh_status ${title.title_zh_status}`);
+  }
+  if (title.title_zh_status === "provisional_translation" && !title.title_en && !title.title_ja) {
+    errors.push(`${context}: provisional translation requires the original searchable title`);
   }
   if (title.title_zh_status === "unavailable" && title.title_zh_cn) {
     errors.push(`${context}: unavailable Chinese title must not include title_zh_cn`);
@@ -375,9 +379,9 @@ if (manifest) {
       }
     }
 
-    const latestItem = manifest.editions.at(-1);
+    const latestItem = [...manifest.editions].sort((a, b) => b.id.localeCompare(a.id))[0];
     if (manifest.latest !== latestItem.id) {
-      errors.push("manifest.json: latest must reference the final edition");
+      errors.push("manifest.json: latest must reference the chronologically latest edition");
     }
     const latestArchive = await readJson(latestItem.path);
     if (latest && JSON.stringify(latest) !== JSON.stringify(latestArchive)) {

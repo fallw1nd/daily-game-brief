@@ -22,9 +22,14 @@ describe("zero-AI degraded decision", () => {
   });
 
   it("uses the Daily archive prefix and inherited calendar mode", () => {
-    const output = buildDegradedDecision(packet({}, { id: "2026-09-01-daily", period: "daily" }));
+    const input = packet({}, { id: "2026-09-01-daily", period: "daily" });
+    input.editorialInput.calendarWork = { pages: [{ blobSha: "a".repeat(40) }] };
+    const output = buildDegradedDecision(input);
     expect(output.archiveTitle).toMatch(/^日报｜/);
     expect(output.upcomingMode).toBe("inherit_and_patch");
+    expect(output.calendarReview.pages).toHaveLength(1);
+    expect(output.calendarReview.platforms).toHaveLength(4);
+    expect([...output.calendarReview.pages, ...output.calendarReview.platforms].every(item => item.status === "deferred" && item.reason)).toBe(true);
   });
 
   it("leaves Daily discovery candidates for final official detail verification", () => {

@@ -93,7 +93,7 @@ export function validateEditionState(state) {
       if (!revisionReasons.has(state.revisionRequest.reason)) errors.push("state.revisionRequest.reason is invalid");
       if (state.revisionRequest.reason === SHOWCASE_COMPLETION_REASON && (!Array.isArray(state.revisionRequest.announcementIds) || !state.revisionRequest.announcementIds.length)) errors.push("showcase completion requires scoped announcement identities");
       if (state.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON) {
-        if (state.revisionRequest.batchScope !== "news") errors.push("editorial continuation must use the news batch scope");
+        if (!["news", "calendar"].includes(state.revisionRequest.batchScope)) errors.push("editorial continuation must use the news or calendar batch scope");
         if (!/^[\w-]+\.json$/u.test(String(state.revisionRequest.batchName || ""))) errors.push("editorial continuation requires a safe batch name");
         if (!Array.isArray(state.revisionRequest.eventKeys) || !state.revisionRequest.eventKeys.length || state.revisionRequest.eventKeys.some(key => typeof key !== "string" || !key)) {
           errors.push("editorial continuation requires scoped event identities");
@@ -146,7 +146,7 @@ export function applyEditionStateEvent(current, event, data = {}) {
         : "same-edition revision requires explicit user authorization");
     }
     if (event === "supplement-opened" && (!Array.isArray(data.announcementIds) || !data.announcementIds.length || data.announcementIds.some(id => typeof id !== "string" || !id))) throw new Error("supplement requires announcement identities");
-    if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || data.batchScope !== "news" || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
+    if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || !["news", "calendar"].includes(data.batchScope) || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
       throw new Error("editorial continuation requires a scoped news batch");
     }
     if (state.revisionRequest?.status === "open") {
@@ -205,18 +205,23 @@ export function applyEditionStateEvent(current, event, data = {}) {
     requirePacket(state, data.packetBlobSha);
     assertSha(data.submissionSha, "submissionSha");
     if (state.editorial.submissionSha === data.submissionSha && state.editorial.status !== "pending") return state;
+    const canReplaceHistoricalSubmission = state.publication.status === "failed"
+      && data.reason === "user_authorized_historical_missing_insertion"
+      && state.editorial.packetBlobSha === data.packetBlobSha
+      && state.transitions.some(item => item.event === "editorial-submitted"
+        && item.reason === data.reason && item.submissionSha === state.editorial.submissionSha);
     if (["submitted", "valid"].includes(state.editorial.status)) {
       const canReplaceRevisionSubmission = state.revisionRequest?.status === "open"
         && ["pending", "failed"].includes(state.publication.status)
         && state.editorial.packetBlobSha === data.packetBlobSha;
-      if (!canReplaceRevisionSubmission) throw new Error("editorial submission is already owned by the GitHub publication lane");
+      if (!canReplaceRevisionSubmission && !canReplaceHistoricalSubmission) throw new Error("editorial submission is already owned by the GitHub publication lane");
     }
     const recoverFailedPublication = state.editorial.status === "timed_out"
       && state.publication.status === "failed"
-      && data.reason === "user_authorized_failed_publication_recovery";
+      && ["user_authorized_failed_publication_recovery", "user_authorized_historical_missing_insertion"].includes(data.reason);
     if (state.editorial.status === "timed_out" && !recoverFailedPublication) throw new Error("timed-out editorial work is owned by the GitHub SLA lane");
     state.editorial = { status: "submitted", packetBlobSha: data.packetBlobSha, submissionSha: data.submissionSha, validationErrors: [], updatedAt: at };
-    return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha, ...(recoverFailedPublication ? { reason: data.reason } : {}) });
+    return record(state, event, at, actor, runId, { submissionSha: data.submissionSha, packetBlobSha: data.packetBlobSha, ...((recoverFailedPublication || canReplaceHistoricalSubmission) ? { reason: data.reason } : {}) });
   }
   if (event === "editorial-valid" || event === "editorial-invalid") {
     requirePacket(state, data.packetBlobSha);
@@ -265,6 +270,11 @@ export function applyEditionStateEvent(current, event, data = {}) {
   if (event === "deployment-succeeded" || event === "deployment-failed") {
     if (data.mainSha) assertSha(data.mainSha, "mainSha");
     const deployed = event === "deployment-succeeded";
+    // An acknowledgement describes its own release, not whichever release is
+    // currently live. The trusted recorder checks Git ancestry before applying it.
+    if (data.superseded === true) return current;
+    if (!deployed && state.deployment.status === "deployed" && state.deployment.mainSha === data.mainSha
+      && state.transitions.findLast(item => item.event === "deployment-succeeded")?.mainSha === data.mainSha) return current;
     state.deployment = { status: deployed ? "deployed" : "failed", mainSha: data.mainSha || state.publication.mainSha, runId, updatedAt: at, error: deployed ? null : String(data.error || "deployment failed") };
     return record(state, event, at, actor, runId, { mainSha: state.deployment.mainSha });
   }

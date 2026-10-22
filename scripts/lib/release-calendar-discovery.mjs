@@ -158,7 +158,7 @@ export function parseReleaseSource(html, source, editionDate) {
             const match = text.match(/^(.+?)\s*\(([^)]+)\)\s*[–—-]\s*(.+)$/);
             if (!match) continue;
             const platforms = match[2].split(/,\s*/);
-            add(match[1], releaseDate(match[3], year + "-01-01"), source.url, platforms, { dateText: match[3], region: "source-listed" });
+            add(match[1], releaseDate(match[3], year + "-01-01"), source.url, platforms, { dateText: match[3], region: "source-listed", ...(/^biggest games of [a-z]+ 20\d{2}$/i.test(clean(heading.textContent)) ? { editorialSpotlight: { section: clean(heading.textContent), sourceUrl: source.url } } : {}) });
           }
           node = node.nextElementSibling;
         }
@@ -330,6 +330,8 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
       maxAdditionalRequests: Math.min(2, (config.fallbackSources || []).length),
     },
     candidates: selection.candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
+    // Keep the complete deduplicated work set outside the bounded inline view.
+    allCandidates: selectCalendarLeads(grouped, grouped.length).candidates.map(r => ({ ...r, review: "open_primary_source_before_publication" })),
     reviewLinks: results.flatMap(r => r.reviewLinks),
     omittedCandidates: selection.capOmittedTasks,
     omissionTelemetry: {
@@ -350,5 +352,7 @@ export async function collectReleaseCalendar({ config, editionDate, baseline = [
 }
 
 export function boundCalendarReport(report, maxChars = 24000) {
-  return selectCalendarPacket({ report, maxCandidates: 100, maxChars });
+  const compact = item => { const { primaryEvidence, ...rest } = item; return rest; };
+  const { baselineChecks, admittedCandidates, deferredReviewLinks, ...preview } = report;
+  return selectCalendarPacket({ report: { ...preview, candidates: (report.candidates || []).map(compact), allCandidates: (admittedCandidates || report.allCandidates)?.map(compact), reviewLinks: (report.reviewLinks || []).map(compact) }, maxCandidates: 100, maxChars });
 }

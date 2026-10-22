@@ -22,13 +22,34 @@ describe("final editorial packet workflow", () => {
     expect(workflow).toContain('EDITION_ID="$edition" node -e');
     expect(workflow).not.toContain('EDITION_ID="$edition" node - <<\'NODE\'');
     expect(workflow).toContain("wake.schemaVersion !== 1");
-    expect(workflow).toContain('wake.period !== "daily"');
+    expect(workflow).toContain('(wake.period != null && wake.period !== "daily")');
     expect(workflow).toContain('new Set(["packet_missing_at_handoff", "user_authorized_same_edition_revision"])');
     expect(workflow).toContain('state.revisionRequest?.status !== "open"');
     expect(workflow).toContain('state.editorial?.status !== "pending"');
     expect(workflow).toContain('state.packet?.status === "pending" || state.packet?.status === "ready"');
     expect(workflow).toContain('--edition="$edition"');
     expect(workflow).toContain("steps.edition.outcome == 'success'");
+  });
+
+  it("accepts the documented missing-packet wake at both actual validators", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const root = await mkdtemp(join(tmpdir(), "daily-wake-"));
+    try {
+      const validators = [...workflow.matchAll(/wake_reason="\$\(EDITION_ID="\$edition" node -e '([\s\S]*?)'\)"/g)].map(match => match[1]);
+      expect(validators).toHaveLength(2);
+      for (const period of [undefined, "daily", "pm"]) {
+        const wake = {schemaVersion:1,editionId:"2026-10-19-daily",reason:"packet_missing_at_handoff",...(period ? {period} : {})};
+        await Promise.all(["daily-wake.json", "daily-wake-preflight.json"].map(name => writeFile(join(root, name), JSON.stringify(wake))));
+        for (const validator of validators) {
+          const run = () => execFileSync(process.execPath,["-e",validator],{encoding:"utf8",env:{...process.env,RUNNER_TEMP:root,EDITION_ID:wake.editionId},stdio:["ignore","pipe","pipe"]});
+          if (period === "pm") expect(run).toThrow();
+          else expect(run()).toBe("packet_missing_at_handoff");
+        }
+      }
+    } finally { await rm(root,{recursive:true,force:true}); }
   });
 
   it("dispatches exact-edition SLA verification without requiring a checkout, except for authorized revision", () => {

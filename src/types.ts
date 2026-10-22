@@ -17,10 +17,11 @@ export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
   title_en: string;
-  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "unavailable";
+  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "provisional_translation" | "unavailable";
   edition_zh?: string;
 }
 export interface BriefEntry {
+  eventKey?: string;
   showcaseRefs?: { showcaseId: string; announcementId: string; factIds?: string[] }[];
   showcaseBrief?: boolean;
   id: string; section: SectionKey; title: GameTitle; headline: string; summary: string; beijingTime: string; timeEvidenceAt?: string; timeNote: string;
@@ -31,7 +32,7 @@ export interface UpcomingEntry {
   id: string; date: string; title: GameTitle; platforms: string[]; region: string; releaseType: string; source: SourceLink; mediaSources?: SourceLink[]; note: string;
   cover?: ImageAsset; cover_status?: ImageAvailabilityStatus; coverNote?: string;
 }
-export interface SourceReport { checked: string[]; limited: string[]; note: string; }
+export interface SourceReport { checked: string[]; limited: string[]; note: string; calendarReview?: { pages: { key: string; status: "reviewed" | "deferred"; reason: string }[]; platforms: { key: string; status: "reviewed" | "deferred"; reason: string }[] }; }
 export interface BriefEdition {
   showcases?: { id: string; title: string; titleEn: string; status: "complete" | "partial"; total: number; covered: number; entryIds: string[] }[];
   schemaVersion?: 1 | 2; archiveTitle?: string; leadEntryId?: string; id: string; issueNumber: number; date: string; period: EditionPeriod; plannedAt: string;
@@ -58,7 +59,7 @@ export type EnglishLocaleAvailability =
 export interface EnglishLocaleIndex { schemaVersion: 1; locale: "en"; updatedAt: string; latestCanonicalEditionId: string; latestAvailableEditionId: string | null; editions: EnglishLocaleAvailability[]; }
 
 export interface BriefSearchEntry {
-  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: EditionPeriod; entryId: string; titleZhCn?: string; titleEn: string;
+  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: EditionPeriod; entryId: string; titleKey?: string; section?: SectionKey; titleStatus?: GameTitle["title_zh_status"]; titleZhCn?: string; titleEn: string;
   headline: string; summary: string; platforms: string[]; region: string; factStatus: FactStatus;
 }
 export interface BriefSearchIndex { schemaVersion: 1; updatedAt: string; entries: BriefSearchEntry[]; }

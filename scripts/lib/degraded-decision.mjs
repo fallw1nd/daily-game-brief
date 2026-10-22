@@ -1,3 +1,5 @@
+import { deferredCalendarReview } from "./calendar-review.mjs";
+
 function slug(value) {
   const normalized = String(value || "untitled").normalize("NFKD").toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 72);
@@ -94,6 +96,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
     contractVersion: 2,
     packetBlobSha,
     editionId: input.window.id,
+    ...(input.calendarWork ? { calendarReview: deferredCalendarReview(input.calendarWork, "Automatic fallback cannot perform final official calendar verification; editorial follow-up required.") } : {}),
     archiveTitle: Array.from(`${prefix}${leadName}`).slice(0, 40).join(""),
     leadEventKey: included[0].eventKey,
     decisions,

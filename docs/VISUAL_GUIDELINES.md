@@ -23,3 +23,17 @@ Maintain accessible dark/light themes with persistent keyboard-operable switchin
 
 Keep top navigation to `内容`, `日历`, and `归档`. Use `DAILY EDITION` as the nonnumeric masthead eyebrow and show `NO.###` only once in top chrome. Let edition H1 titles use the full available width and remain single-line when they fit. Reserve inset space for archive selection rails so they never overlap issue or date text.
 
+
+## ReadingApp refinement (2026-10-03)
+
+The default ReadingApp now uses the selected accent for the entire interface, with supporting tones derived from that accent, neutral paper surfaces, and shared motion tokens. Calendar, overview, evidence panels and section rules must follow the selected hue; do not introduce a fixed second decorative hue. Supporting text uses 85% accent mixed with 15% ink; supporting surfaces use a restrained 6% wash. Status colours may remain independent only when they convey an explicit semantic state. Its current palette supersedes the classic numeric colours above for this view only. See [the design rationale and verification](VISUAL_UPGRADE_20261003.md). Keep motion optional through reduced-motion preferences and preserve visible content before observer callbacks.
+
+ReadingApp additionally offers PS classic blue, Switch red, Xbox green and Candy pink. These are platform-inspired reader themes with accessible light/dark text variants, not uniform brand-colour fills. The pink swatch is soft candy pink; foregrounds deepen on light surfaces. All nine options drive supporting regions and persist locally. Keep the settings panel scrollable on short screens.
+
+## Loading screen (2026-10-06)
+
+Use one compact paper-sheet mark, clear loading text and an indeterminate accent rule across the initial HTML, lazy module and edition-data loading states. Reuse ReadingApp theme/accent tokens and saved preferences; never show invented percentages or delay ready content to finish an animation. Paper/rule motion is subtle, stops after six paper cycles, and is disabled under reduced motion. After ten seconds, show a plain slow-connection message. Keep existing failure/retry states and load completion behavior. Both Chinese and English copy must fit 320px screens.
+
+## Reader chrome adjustment (2026-10-03)
+
+The user's revised preference supersedes the earlier above-lead directory placement: keep the edition date/number at the top, with no edition-details shortcut. Place the complete directory near the bottom, beside the edition-details disclosure; both start collapsed. Readers explicitly expand either disclosure when needed. Accent labels use PS蓝, NS红, XBOX绿 and three-character descriptive names 暖阳橙、深海蓝、松林绿、暮光紫、蔷薇红、糖果粉. Internal accent IDs and saved preferences are unchanged.

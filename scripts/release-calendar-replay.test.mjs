@@ -28,6 +28,7 @@ describe("historical release-calendar replay baseline", () => {
       packetTasks: 37,
       visibleTasksNotPacket: 28,
       omittedCandidates: 28,
+      calendarChars: 23898,
       budgetOmittedTasks: 28,
       overBudget: false,
     });
@@ -65,10 +66,12 @@ describe("historical release-calendar replay baseline", () => {
       omittedCandidates: 144,
       reportStageOmittedCandidates: 101,
       reportStageOmittedUnit: "unknown_rows_or_groups",
+      calendarChars: 23974,
       overBudget: false,
     });
     expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
     expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 144 });
+    expect(result.packet.roundTripVerified).toBeNull();
     expect(result.omissionAccounting.capOmittedUnit).toBe("unknown_rows_or_groups");
     expect(result.sourceDiagnostics.source).toEqual({ known: 0, unknown: 6, failed: null });
     expect(result.sourceDiagnostics.parser).toEqual({ known: 0, unknown: 6, failed: null });
@@ -91,7 +94,137 @@ describe("historical release-calendar replay baseline", () => {
       capOmissionRecovery: "unknown",
     });
     expect(result.proposed).toMatchObject({ roundTripVerified: true, restoredTasks: 33, omittedCandidates: 77, platformFinalTaskCounts: { PC: 22, PlayStation: 14, Xbox: 18, Nintendo: 15 } });
+    expect(result.proposed.calendarChars).toBe(23997);
     expect(result.proposed.calendarChars).toBeLessThanOrEqual(24000);
+  });
+
+  it("reads daily30 aggregate reports once and decodes compact packet observations before measuring platforms", async () => {
+    const result = await replayFixture("daily30", fixtureRoot);
+    expect(result.omissionAccounting).toMatchObject({
+      reportAvailableRows: 75,
+      reportObservationRows: 104,
+      reportUniqueTasks: 75,
+      reportDedupeReduction: 29,
+      reportTelemetry: { visibleRawRows: 104, uniqueTasks: 75, dedupeReduction: 29 },
+      capOmittedRows: 0,
+      packetRows: 28,
+      packetOmittedTotal: 47,
+      budgetOmittedRows: 47,
+      reconciles: true,
+    });
+    expect(result.packet).toMatchObject({
+      rows: 28,
+      observationRows: 50,
+      roundTripVerified: true,
+      packetJsonChars: 23956,
+      platformCoverage: { byFamily: { PC: 21, PlayStation: 14, Xbox: 20, Nintendo: 11 } },
+    });
+    expect(result.proposed).toMatchObject({
+      visibleRawRows: 104,
+      uniqueTasks: 75,
+      dedupeReduction: 29,
+      duplicateRatio: 0.2788,
+      packetTasks: 28,
+      capOmittedTasks: 0,
+      budgetOmittedTasks: 47,
+      omittedCandidates: 47,
+      linkOmitted: 8,
+      platformFinalTaskCounts: { PC: 21, PlayStation: 14, Xbox: 20, Nintendo: 11 },
+      calendarChars: 23956,
+      roundTripVerified: true,
+      restoredTasks: 28,
+      selectedObservationCount: 50,
+    });
+    expect(result.provenance).toMatchObject({
+      runId: "36689493814",
+      artifactId: "11085510421",
+      packetBlobSha: "2fd27f6be2cdbe8f1b6d5c4af888e039652acdb9",
+      sourceArchiveSha256: "616dbe6b7d917d2e7cd26218ac0d1abbe1fcac77ca829bc25fc0a571d6e83202",
+    });
+  });
+
+  it("rejects incomplete aggregate rows instead of silently treating them as raw candidates", async () => {
+    const fixture = await loadReplayFixture("daily30", fixtureRoot);
+    const report = structuredClone(fixture.report);
+    delete report.candidates[0].observations;
+    expect(() => replayCalendarBaseline({ report, packet: fixture.packet })).toThrow("aggregate report candidates must each contain at least one observation");
+  });
+
+  it("keeps absent, null, and empty telemetry values unknown", async () => {
+    const fixture = await loadReplayFixture("daily30", fixtureRoot);
+    const report = structuredClone(fixture.report);
+    report.omissionTelemetry.visibleRawRows = null;
+    report.omissionTelemetry.uniqueTasks = "";
+    report.omissionTelemetry.dedupeReduction = undefined;
+    const result = replayCalendarBaseline({ report, packet: fixture.packet });
+    expect(result.omissionAccounting.reportTelemetry).toEqual({ visibleRawRows: null, uniqueTasks: null, dedupeReduction: null });
+    expect(result.proposed).toMatchObject({ visibleRawRows: 104, uniqueTasks: 75, dedupeReduction: 29 });
+  });
+
+  it("detects compact packet defaults that would drop selected source fields", async () => {
+    const fixture = await loadReplayFixture("daily30", fixtureRoot);
+    const packet = structuredClone(fixture.packet);
+    let removed = false;
+    for (const [sourceId, defaults] of Object.entries(packet.observationDefaultsBySource)) {
+      for (const field of Object.keys(defaults)) {
+        if (["dates", "platforms"].includes(field)) continue;
+        const reliesOnDefault = packet.candidates.some((candidate) => candidate.observations.some((observation) => observation.sourceId === sourceId && !Object.hasOwn(observation, field)));
+        if (!reliesOnDefault) continue;
+        delete defaults[field];
+        removed = true;
+        break;
+      }
+      if (removed) break;
+    }
+    expect(removed).toBe(true);
+    expect(() => replayCalendarBaseline({ report: fixture.report, packet })).toThrow("historical calendar packet does not preserve its selected source observations");
+  });
+
+  it("counts an explicit family for an unknown device without inventing a platform", () => {
+    const observation = {
+      sourceId: "nintendo-coming",
+      title: "Unannounced Device Title",
+      platform: "unknown",
+      platforms: ["unknown"],
+      platformFamily: "Nintendo",
+      date: "2026-10-02",
+      dates: ["2026-10-02"],
+    };
+    const lead = {
+      title: observation.title,
+      date: observation.date,
+      platforms: [],
+      platformFamily: "Nintendo",
+      identityStatus: "needs_verification",
+      identity: { key: "name:unannounceddevicetitle", registryIds: [], conflictProductIds: [] },
+      knownTitle: false,
+      inBaseline: false,
+      crossSource: false,
+      observations: [observation],
+    };
+    const packet = {
+      candidates: [{
+        title: lead.title,
+        date: lead.date,
+        dateConflictStatus: "none",
+        identityStatus: lead.identityStatus,
+        identity: lead.identity,
+        knownTitle: false,
+        inBaseline: false,
+        crossSource: false,
+        observations: [{ ...observation }],
+      }],
+      observationDefaultsBySource: {},
+      sharedObservationUrls: [],
+      omittedCandidates: 0,
+      omissionTelemetry: {},
+    };
+    const report = { candidates: [lead], omittedCandidates: 0, coverage: [] };
+    const result = replayCalendarBaseline({ report, packet });
+    expect(result.packet.platformCoverage.byFamily.Nintendo).toBe(1);
+    expect(result.packet.platformCoverage.byPlatform.Nintendo).toBe(1);
+    expect(result.packet.platformCoverage.byPlatform["Nintendo Switch"]).toBeUndefined();
+    expect(result.packet.roundTripVerified).toBe(true);
   });
 
   it("counts a repeated lead once per platform and family while retaining original labels", async () => {

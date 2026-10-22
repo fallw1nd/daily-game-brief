@@ -30,7 +30,9 @@
 
 `user_authorized_failed_publication_recovery` 只用于 state 明确为 `editorial:timed_out` + `publication:failed`、目标 Canonical 仍缺失，且 **尚未发布任何日期更晚的 Canonical edition** 的情况。此时仍使用原 packet/window，不能通过新抓取事实“补造”旧期。
 
-如果目标缺刊之后已经发布了更新期次，则直接恢复会重新分配 issueNumber 或把 `manifest.latest/latest.json` 回退到旧日期，属于生产身份破坏；“二次发布”必须把它标成 blocker，不能强行补成功，也不能重排已经公开的后续 issueNumber。只有另行设计并授权历史缺刊插入/编号迁移方案后才能处理。
+如果目标缺刊之后已经发布了更新期次，则直接恢复会重新分配 issueNumber 或把 `manifest.latest/latest.json` 回退到旧日期，属于生产身份破坏；“二次发布”必须把它标成 blocker，不能强行补成功，也不能重排已经公开的后续 issueNumber。只有另行设计并授权历史缺刊插入方案后才能处理。
+
+已实现的显式历史补刊方案：用户授权追加下一个未占用编号，已有期次不重排；secondary request 增加 `historicalInsertion:{issueNumber,latestEditionId}`，不得同时使用 `recoverFailedPublication`。受信入口要求缺刊状态为 timed_out + failed、原 packet ready，并固定当前 latest 和下一个编号；任一身份变化即拒绝。publisher 追加 archive/manifest，但不写 latest.json、不改变既有 archive，不把旧稿反馈写回当前 ledger；日历只继承补刊日期之前的 Canonical 基线。manifest 保持编号分配顺序，归档展示、导航、英文 latest 与搜索按新闻日期排序。该流程仅响应另行授权的人工请求，不纳入定时编辑任务。
 
 ### D. 编辑门槛
 
@@ -65,6 +67,26 @@
 - `kind:"title_backfill"`；
 - 每个新增 registry 项必须携带 `titleZhCn`、`titleZhStatus`、英文 aliases（如有）和证据；
 - workflow 合并 registry、执行 `titles:backfill`、完整 `npm run check`，再提交 `main`；主分支 push 触发正常 Pages 部署。
+
+### media_repair request
+
+仅需重跑某期媒体时优先直接 dispatch 现有 `media-enrichment.yml`（`edition_id`，可选 `record_id`）。调用端只能推送分支、不能 dispatch 时，可使用同一 Secondary 入口；不新增媒体 writer、定时任务或凭据。
+
+例如分支 `automation/secondary/media-2026-09-02-repair-1`，唯一请求文件 `automation/secondary/media-2026-09-02-repair-1.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "media_repair",
+  "editionId": "2026-09-02-daily"
+}
+```
+
+- 分支后缀须为 1–128 位 ASCII 字母/数字/下划线/连字符，首位为字母或数字；不得嵌套路径。文件名必须对应分支后缀。
+- 如只需重验某条日历封面，增加 `"recordId":"目标 upcoming 条目的现有 id"`；必须是该归档中真实且唯一的 upcoming ID，不能用新闻条目 ID。不指定则沿用现有整期媒体补全行为。
+- 仅接受以上四个字段；不得附带正文、标题、图片、metadata、ref 或命令覆盖。`editionId` 必须是合法日期及 am/pm/daily 期次，并同时匹配 trusted main 的 manifest 和实际 archive 身份/路径/issueNumber。
+- Secondary 在切回 trusted main 后验证，只 dispatch `media-enrichment.yml --ref main`，沿用现有验证、媒体提交、state acknowledgement 和 Pages 部署。不会触发正文 revision 或改变 issue/window。
+- Secondary 成功仅表示 dispatch 被接受，不等于媒体或部署成功。继续检查对应 Publish verified media 的 audit、完整 check、main commit、media state 和 Pages 结果；无数据变化时不要求新增提交/部署。
 
 该 workflow 不是长期定时任务，只响应显式的人工 secondary request。
 

@@ -7,6 +7,29 @@ import {
 } from "./lib/title-translations.mjs";
 
 describe("Chinese title translation fallback", () => {
+  it("keeps existing original-name annotations and combined provisional names idempotent", () => {
+    const samples = [
+      ["日本实时速通大会2026冬季场（RTA in Japan Winter 2026，暂译）公布入选游戏", {}],
+      ["日报｜《符文世界》新MMO 符文世界新作（暂名RS4，暂译）公布", { titleEn: "RS4", titleZhCn: "符文世界新作（RS4，暂译）" }],
+      ["《C64掌机／Spectrum掌机（C64 Handheld / Spectrum Handheld，暂译）》：C64掌机（C64 Handheld，暂译）与Spectrum掌机（Spectrum Handheld，暂译）延期", { titleEn: "C64 Handheld / Spectrum Handheld", titleZhCn: "C64掌机／Spectrum掌机（C64 Handheld / Spectrum Handheld，暂译）" }],
+    ];
+    for (const [text, subject] of samples) {
+      expect(localizeRegisteredTitles(text, subject)).toBe(text);
+      expect(localizeRegisteredTitles(localizeHeadline(text, subject), subject)).toBe(text);
+    }
+  });
+  it("does not rename an unrelated company or sequel using a conflicting generated key", () => {
+    expect(getRegisteredTitleTranslation("fable", "Crash Keys")).toBeNull();
+    expect(getRegisteredTitleTranslation("fable", "Fable 99")).toBeNull();
+    expect(resolveTitleTranslation({ titleKey: "fable", titleEn: "Crash Keys" })).toMatchObject({
+      titleEn: "Crash Keys", titleZhCn: null, titleZhStatus: "unavailable", source: "original",
+    });
+    expect(getRegisteredTitleTranslation("fable")).toBeTruthy();
+    expect(getRegisteredTitleTranslation("fable", "FABLE™")).toBeTruthy();
+  });
+  it("keeps an explicitly authorized provisional translation distinct from established usage", () => {
+    expect(resolveTitleTranslation({ titleKey: "audit-provisional-example", titleEn: "Original Name", titleZhCn: "暂译名称（Original Name，暂译）", titleZhStatus: "provisional_translation" })).toMatchObject({ titleEn: "Original Name", titleZhStatus: "provisional_translation", source: "editorial" });
+  });
   it("uses a registered title when editorial output is unavailable", () => {
     expect(resolveTitleTranslation({
       titleKey: "fable",
@@ -91,9 +114,10 @@ describe("Chinese title translation fallback", () => {
 });
 
 describe("registered title copy localization", () => {
-  it("resolves the supplied current-edition titles", () => {
+  it("resolves reviewed titles with honest provisional attribution", () => {
     expect(getRegisteredTitleTranslation("whisper-of-the-house", "Whisper of the House")?.titleZhCn).toBe("呓语小镇");
-    expect(getRegisteredTitleTranslation("gravhounds", "Gravhounds")?.titleZhCn).toBe("重力猎犬");
+    expect(getRegisteredTitleTranslation("gravhounds", "Gravhounds")?.titleZhCn).toBe("重力猎犬（Gravhounds，暂译）");
+    expect(getRegisteredTitleTranslation("gravhounds", "Gravhounds")?.titleZhStatus).toBe("provisional_translation");
     expect(getRegisteredTitleTranslation("militsioner", "Militsioner")?.titleZhCn).toBe("警目如炬");
   });
 

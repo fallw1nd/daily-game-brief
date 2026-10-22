@@ -1,6 +1,7 @@
+import { assertHistoricalIdentity } from "./historical-insertion.mjs";
 import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
 import { hasValidArchiveTitle } from "./archive-title.mjs";
-import { normalizeSubjectHeadline } from "./headline-subject.mjs";
+import { normalizeSubjectHeadline, normalizeEditorialArchiveTitle } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
 import {
@@ -9,7 +10,11 @@ import {
   verifiedWindowTimeError,
 } from "./time-window.mjs";
 import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";
+import { confirmedCompanySubject } from "./company-subject.mjs";
+import { normalizeHeadline } from "./news-pipeline.mjs";
 import { generatedEditorialAlt } from "./media-alt.mjs";
+
+import { mergePublishedCalendar, sameCalendarRelease, sameCalendarSubject, retainCalendarPresentation } from "./published-calendar-identity.mjs";
 
 export { editorialDecisionDigest };
 
@@ -164,6 +169,46 @@ function confirmedSameFact(entry, decision) {
     && normalizeFactText(entry.summary) === normalizeFactText(decision.summary);
 }
 
+// Exact content and provenance only: a source page/game can contain several facts.
+// Exclude IDs/media/editorial verification notes; those may differ on a replay.
+function exactStoryIdentity(entry) {
+  const urls = [...new Set((entry.sources || []).map(source => normalizedSourceUrl(source.url)))].sort();
+  if (!entry.title?.title_key || !entry.headline || !entry.summary || !entry.beijingTime || !urls.length) return null;
+  return JSON.stringify([
+    entry.title.title_key, normalizeFactText(entry.title.title_en), entry.section, normalizeFactText(entry.headline), normalizeFactText(entry.summary),
+    entry.beijingTime, entry.time_status, entry.fact_status, [...(entry.platforms || [])].sort(),
+    entry.region || "全球", entry.releaseType || null, urls,
+  ]);
+}
+
+function coalesceExactPublishedStories(entries, leadEntryId) {
+  const groups = new Map();
+  const replacements = new Map();
+  for (const entry of entries) {
+    if (!exactStoryIdentity(entry) || entry.showcaseRefs?.length) continue;
+    // Historical repair is stricter than replay detection: every factual/editorial
+    // field must agree. Media and missing legacy event keys are not story facts.
+    const facts = { ...entry };
+    for (const key of ["id", "eventKey", "imageSeed", "images", "image_status", "imageNote", "mediaSources"]) delete facts[key];
+    const identity = projectionDigest(facts);
+    const previous = groups.get(identity);
+    if (!previous) { groups.set(identity, entry); continue; }
+    if (previous.eventKey && entry.eventKey && previous.eventKey !== entry.eventKey) continue;
+    const retained = entry.id === leadEntryId ? entry : previous;
+    const removed = retained === entry ? previous : entry;
+    groups.set(identity, retained);
+    replacements.set(removed.id, retained.id);
+  }
+  // Resolve chains when the lead occurs after two earlier exact copies.
+  for (const [removed, retained] of replacements) {
+    let target = retained;
+    while (replacements.has(target)) target = replacements.get(target);
+    replacements.set(removed, target);
+  }
+  return { entries: entries.filter(entry => !replacements.has(entry.id)),
+    repairs: [...replacements].map(([removedEntryId, retainedEntryId]) => ({ removedEntryId, retainedEntryId })) };
+}
+
 function sectionCounters(entries, windowId) {
   const counters = new Map();
   for (const entry of entries || []) {
@@ -175,10 +220,11 @@ function sectionCounters(entries, windowId) {
   return counters;
 }
 
-export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false }) {
+export function buildEdition({ packet, editorial, latest, manifest, now = new Date(), allowSameEditionRevision = false, historicalInsertion = null, repairExactDuplicateStories = false }) {
   const input = packet.editorialInput;
   const window = input.window;
   if (editorial.editionId !== window.id) throw new Error("editorial editionId does not match packet window");
+  if (historicalInsertion) assertHistoricalIdentity({ manifest, editionId: window.id, insertion: historicalInsertion, allowExisting: true });
   const existingManifestItem = manifest.editions.find((item) => item.id === window.id);
   const decisionDigest = editorialDecisionDigest(editorial);
   const degradedEdition = latest.id === window.id && (
@@ -191,7 +237,10 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     latest.id === window.id &&
     latest.issueNumber === existingManifestItem.issueNumber
   );
-  if (authorizedLatestRevision && latest.sourceReport?.editorialDecisionDigest === decisionDigest) {
+  const duplicateRepair = authorizedLatestRevision && repairExactDuplicateStories
+    ? coalesceExactPublishedStories(latest.entries || [], latest.leadEntryId)
+    : { entries: latest.entries || [], repairs: [] };
+  if (authorizedLatestRevision && !duplicateRepair.repairs.length && latest.sourceReport?.editorialDecisionDigest === decisionDigest) {
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
   if (existingManifestItem && !degradedEdition && !authorizedLatestRevision) {
@@ -200,11 +249,12 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const prefix = archiveTitlePrefix(window.period);
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
-  const previousEntries = authorizedLatestRevision ? (latest.entries || []) : [];
+  const previousEntries = authorizedLatestRevision ? duplicateRepair.entries : [];
   const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
   const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
+  if (packet.continuation?.scope === "calendar" && (input.packages.length || input.trackingQueue?.length || editorial.decisions.length)) throw new Error("calendar continuation cannot change news or tracking");
   const previousIds = new Set(previousEntries.map((entry) => entry.id));
-  const counters = sectionCounters(previousEntries, window.id);
+  const counters = sectionCounters(authorizedLatestRevision ? latest.entries : [], window.id);
   const entryByEvent = new Map();
   const revisedEntries = editorial.decisions.filter((item) => item.decision === "include").map((decision) => {
     const packetItem = packetByKey.get(decision.eventKey);
@@ -224,14 +274,39 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       if (timeError) throw new Error(`included ${decision.eventKey}: ${timeError}`);
     }
     const title = displayTitle(decision);
+    const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
+    const summary = localizeRegisteredTitles(decision.summary, { titleEn: title.title_en, titleZhCn: title.title_zh_cn });
+    const exactIdentity = exactStoryIdentity({ title, headline, summary, sources, section: decision.section,
+      beijingTime: decision.beijingTime || window.windowEnd, time_status: decision.timeStatus,
+      fact_status: decision.factStatus, platforms: decision.platforms, region: decision.region, releaseType: decision.releaseType });
+    const exactPrevious = isNewsContinuation && !decision.existingEntryId && exactIdentity
+      ? previousEntries.filter(entry => exactStoryIdentity(entry) === exactIdentity) : [];
+    if (exactPrevious.length > 1) throw new Error(`included ${decision.eventKey}: multiple published exact duplicates require an explicit historical repair`);
     const showcaseRefs = packetItem?.showcaseRefs?.map(ref => ({ ...ref, ...(packetItem.showcaseFacts?.length ? { factIds: decision.coveredFactIds || [] } : {}) }));
-    const previous = authorizedLatestRevision
+    const repair = packetItem?.subjectIdentityRepair;
+    let identityRepairPrevious = null;
+    if (repair) {
+      const confirmed = confirmedCompanySubject(packetItem, packetItem.sources);
+      const sameUrls = values => JSON.stringify([...new Set(values.map(normalizedSourceUrl))].sort());
+      identityRepairPrevious = previousEntries.find(entry => entry.id === repair.expectedEntryId);
+      if (!repairExactDuplicateStories || !authorizedLatestRevision || repair.kind !== "confirmed-company-formation"
+        || !/^[a-f0-9]{40}$/.test(repair.originalPacketBlobSha || "") || !confirmed
+        || normalizeHeadline(decision.titleKey) !== confirmed.subjectKey || decision.titleKey !== packetItem.subjectKey
+        || decision.existingEntryId !== repair.expectedEntryId || !identityRepairPrevious
+        || identityRepairPrevious.eventKey !== decision.eventKey || identityRepairPrevious.title?.title_key !== repair.previousSubjectKey
+        || identityRepairPrevious.beijingTime !== repair.expectedBeijingTime || decision.beijingTime !== repair.expectedBeijingTime
+        || sameUrls(identityRepairPrevious.sources.map(source => source.url)) !== sameUrls(repair.sourceUrls)
+        || sameUrls(sources.map(source => source.url)) !== sameUrls(repair.sourceUrls)) {
+        throw new Error(`included ${decision.eventKey}: company identity repair does not match the bound published event`);
+      }
+    }
+    const previous = identityRepairPrevious || (authorizedLatestRevision
       ? packetItem?.showcaseRefs?.length
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
         : isNewsContinuation
-          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key && confirmedSameFact(entry, decision)) : null
+          ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key && confirmedSameFact(entry, decision)) : exactPrevious[0] || null
           : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
-      : null;
+      : null);
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
       const identity = isNewsContinuation ? "confirmed same fact" : "confirmed subject";
       throw new Error(`included ${decision.eventKey}: existingEntryId must identify the ${identity} in this edition; omit it to create an independent entry`);
@@ -240,17 +315,40 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const id = previous?.id || `${window.id}-${decision.section}-${index}`;
     if (!previous) counters.set(decision.section, index + 1);
     entryByEvent.set(decision.eventKey, id);
-    if (previous && packet.continuation?.preservePublished === true) {
-      return { ...previous, showcaseRefs: mergeShowcaseRefs([...(previous.showcaseRefs || []), ...(showcaseRefs || [])]) };
+    if (identityRepairPrevious) {
+      // Subject repair is presentation identity only; all event facts stay byte-for-byte.
+      const priorFrame = decision.sharedFactFrame ? { ...decision.sharedFactFrame, subjectTitleKey: repair.previousSubjectKey } : null;
+      if (!priorFrame || !previous.sharedFactFrameDigest || projectionDigest(priorFrame) !== previous.sharedFactFrameDigest
+        || decision.titleEn !== previous.title?.title_en) throw new Error(`included ${decision.eventKey}: company identity repair must preserve the shared fact frame`);
+      const corrected = { ...previous, title: { ...previous.title, title_key: decision.titleKey }, imageSeed: decision.titleKey,
+        ...(decision.sharedFactFrame ? { sharedFactFrameDigest: projectionDigest(decision.sharedFactFrame) } : {}) };
+      if (normalizeFactText(headline) !== normalizeFactText(previous.headline)
+        || normalizeFactText(summary) !== normalizeFactText(previous.summary)
+        || decision.factStatus !== previous.fact_status || decision.timeStatus !== previous.time_status
+        || JSON.stringify(decision.platforms) !== JSON.stringify(previous.platforms)
+        || (decision.region || "全球") !== previous.region
+        || (decision.releaseType || null) !== (previous.releaseType || null)) {
+        throw new Error(`included ${decision.eventKey}: company identity repair cannot change event facts`);
+      }
+      return corrected;
     }
-    const headline = normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(decision.headline, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), { titleEn: title.title_en, titleZhCn: title.title_zh_cn }), title, { entities: decision.sharedFactFrame?.peopleAndEntities || [] });
+    if (previous && packet.continuation?.preservePublished === true) {
+      if (repairExactDuplicateStories && decision.existingEntryId && decision.verification !== previous.verification) {
+        if (!confirmedSameFact(previous, decision) || exactIdentity !== exactStoryIdentity(previous)) {
+          throw new Error(`included ${decision.eventKey}: manual verification repair must preserve the exact published fact`);
+        }
+        return { ...previous, verification: decision.verification };
+      }
+      return showcaseRefs?.length ? { ...previous, showcaseRefs: mergeShowcaseRefs([...(previous.showcaseRefs || []), ...showcaseRefs]) } : previous;
+    }
     return {
       id,
+      eventKey: decision.eventKey,
       section: decision.section,
       ...(showcaseRefs ? { showcaseRefs: mergeShowcaseRefs([...(previous?.showcaseRefs || []), ...showcaseRefs]), showcaseBrief: previous ? previous.showcaseBrief === true : packetItem.tier !== "A" } : {}),
       title,
       headline,
-      summary: localizeRegisteredTitles(decision.summary, { titleEn: title.title_en, titleZhCn: title.title_zh_cn }),
+      summary,
       beijingTime: decision.beijingTime || window.windowEnd,
       ...(timeEvidenceAt ? { timeEvidenceAt } : {}),
       timeNote: decision.timeNote || "证据只支持日期或窗口归属，未反推未披露的具体时刻。",
@@ -283,13 +381,25 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         ...previousEntries.flatMap((entry) => {
           const replacement = revisedById.get(entry.id);
           if (replacement) return [replacement];
-          if (isDegradedPlaceholder(entry)) return [];
+          if (isDegradedPlaceholder(entry) && packet.continuation?.preservePublished !== true) return [];
           return [entry];
         }),
         ...revisedEntries.filter((entry) => !previousIds.has(entry.id)),
       ]
     : revisedEntries;
   if (!entries.length) throw new Error("an edition needs at least one included entry");
+  const seenStories = new Map();
+  for (const entry of entries) {
+    const identity = exactStoryIdentity(entry);
+    if (!identity) continue;
+    const prior = seenStories.get(identity);
+    // Existing historical defects do not block unrelated calendar/media work.
+    // New duplicate stories must be resolved by the editor, never silently dropped.
+    if (prior && (revisedById.has(entry.id) || revisedById.has(prior.id))) {
+      throw new Error(`exact duplicate news stories: ${prior.id} and ${entry.id}; merge the same fact into one decision`);
+    }
+    seenStories.set(identity, entry);
+  }
   const removeIds = new Set(editorial.removeUpcomingIds || []);
   if (packet.continuation?.scope === "showcase" && ((editorial.upcoming || []).length || removeIds.size)) throw new Error("showcase completion cannot change the release calendar");
   const baseUpcoming = authorizedLatestRevision
@@ -298,18 +408,28 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const upcomingMap = new Map(baseUpcoming.filter((item) => !removeIds.has(item.id)).map((item) => [item.id, item]));
   const previousUpcoming = latest.upcoming || [];
   for (const item of editorial.upcoming || []) {
-    const previous = previousUpcoming.find((candidate) => candidate.id === item.id || candidate.title?.title_key === item.titleKey);
-    upcomingMap.set(item.id, upcomingEntry(item, previous));
+    const previous = previousUpcoming.find((candidate) => candidate.id === item.id || sameCalendarRelease(candidate, item, window.id.slice(0, 10)));
+    const sameSubject = previous && sameCalendarSubject(previous, item);
+    const next = upcomingEntry(item, sameSubject ? previous : null);
+    const preserveIdentity = sameSubject && !removeIds.has(previous.id)
+      && (previous.id === item.id || !upcomingMap.has(previous.id));
+    const projected = preserveIdentity ? retainCalendarPresentation(previous, next) : next;
+    upcomingMap.set(projected.id, projected);
   }
-  const upcoming = [...upcomingMap.values()]
+  const calendarItems = [...upcomingMap.values()]
     .filter((item) => inUpcomingWindow(item, window.id.slice(0, 10)))
     .sort((a, b) => upcomingTimestamp(window.id.slice(0, 10), a.date.split(/[／/、,]/)[0]) - upcomingTimestamp(window.id.slice(0, 10), b.date.split(/[／/、,]/)[0]))
     .map((item) => ({ ...item, date: canonicalUpcomingDate(item.date) }));
-  const leadEntryId = packet.continuation?.preservePublished && authorizedLatestRevision ? latest.leadEntryId : entryByEvent.get(editorial.leadEventKey) || entries[0].id;
+  const upcoming = !authorizedLatestRevision || (editorial.upcoming || []).length || removeIds.size
+    ? mergePublishedCalendar(calendarItems) : calendarItems;
+  const identityOnlyRevision = repairExactDuplicateStories && editorial.decisions.some(decision => decision.decision === "include")
+    && editorial.decisions.filter(decision => decision.decision === "include").every(decision => packetByKey.get(decision.eventKey)?.subjectIdentityRepair);
+  const preserveEditionPresentation = authorizedLatestRevision && (packet.continuation?.preservePublished || identityOnlyRevision);
+  const leadEntryId = preserveEditionPresentation ? latest.leadEntryId : entryByEvent.get(editorial.leadEventKey) || entries[0].id;
   const leadEntry = entries.find((item) => item.id === leadEntryId) || entries[0];
-  const archiveTitle = packet.continuation?.preservePublished && authorizedLatestRevision
+  const archiveTitle = preserveEditionPresentation
     ? latest.archiveTitle
-    : normalizeSubjectHeadline(localizeRegisteredTitles(localizeHeadline(editorial.archiveTitle, { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }), { titleEn: leadEntry.title?.title_en, titleZhCn: leadEntry.title?.title_zh_cn }), leadEntry.title, { archive: true });
+    : normalizeEditorialArchiveTitle(editorial.archiveTitle, editorial.decisions.find(decision => decision.eventKey === editorial.leadEventKey && decision.decision === "include"));
   if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error("normalized archiveTitle must contain 8–40 characters with the matching period prefix");
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
@@ -334,7 +454,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     schemaVersion: 2,
     sourceReport: {
       checked: ["程序化来源注册表、事件账本与受限证据包", ...(editorial.checkedExtra || [])],
-      limited: [...limitedSources, ...(editorial.limitedExtra || []), ...(input.budget?.omittedItems ? [`本编辑包还有 ${input.budget.omittedItems} 个候选待编辑核验；不代表已完成收录。`] : [])],
+      limited: [...limitedSources, ...(editorial.limitedExtra || []), ...(editorial.calendarReview ? [...editorial.calendarReview.pages, ...editorial.calendarReview.platforms].filter(row => row.status === "deferred").map(row => `日历核验延期 ${row.key}：${row.reason}`) : []), ...(input.budget?.omittedItems ? [`本编辑包还有 ${input.budget.omittedItems} 个候选待编辑核验；不代表已完成收录。`] : [])],
       checkedGroups: ["已配置的 active 官方与活动来源", "已配置的 active 中英日媒体与发现源", "相邻期去重与持续事件账本", "固定截止前最终候选与已打开证据包"],
       trackingResults: included.filter((item) => item.tracking).map((item) => `${item.headline}：继续追踪。`),
       excludedMajorCandidates: editorial.decisions.filter((item) => item.decision !== "include").map((item) => `${item.eventKey}：${item.reason}`),
@@ -351,10 +471,21 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       },
       note: editorial.editorialNote,
       editorialDecisionDigest: decisionDigest,
+      ...(editorial.calendarReview ? { calendarReview: editorial.calendarReview } : authorizedLatestRevision && latest.sourceReport?.calendarReview ? { calendarReview: latest.sourceReport.calendarReview } : {}),
     },
     archiveTitle,
     leadEntryId,
   };
+  if (packet.continuation?.scope === "calendar" && latest.sourceReport) {
+    const calendarReport = edition.sourceReport;
+    edition.sourceReport = {
+      ...latest.sourceReport,
+      checked: [...new Set([...(latest.sourceReport.checked || []), ...(editorial.checkedExtra || [])])],
+      limited: [...(latest.sourceReport.limited || []).filter(row => !row.startsWith("日历核验延期 ")), ...calendarReport.limited],
+      calendarReview: editorial.calendarReview,
+      editorialDecisionDigest: decisionDigest,
+    };
+  }
   if (input.showcases?.events?.length) {
     edition.showcases = input.showcases.events.map(event => {
       const items = input.showcases.announcements.filter(item => item.showcaseId === event.id);
@@ -374,10 +505,11 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     edition,
     archivePath: path,
     entryIdsByEvent: Object.fromEntries(entryByEvent),
+    duplicateStoryRepairs: duplicateRepair.repairs,
     manifest: {
       ...manifest,
       updatedAt: generatedAt,
-      latest: edition.id,
+      latest: historicalInsertion ? manifest.latest : edition.id,
       editions: existingManifestItem
         ? manifest.editions.map((item) => item.id === edition.id ? manifestItem : item)
         : [...manifest.editions, manifestItem],

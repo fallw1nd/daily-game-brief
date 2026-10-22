@@ -19,6 +19,6 @@ describe("Daily rolling upcoming contract", () => {
     expect(publisher).toContain("loadCanonicalUpcomingBaseline");
     expect(publisher).toContain('packet?.editorialInput?.window?.period === "daily"');
     expect(publisher).toContain('editorial.upcomingMode === "inherit_and_patch"');
-    expect(publisher).toContain("publisherLatest = { ...latest, upcoming: baseline.items }");
+    expect(publisher).toContain("publisherLatest = { ...publisherLatest, upcoming: baseline.items }");
   });
 });

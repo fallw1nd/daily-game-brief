@@ -76,6 +76,6 @@ export function projectEnglishEdition(
     archiveTitle: overlay.archiveTitle,
     entries: entries as BriefEntry[],
     upcoming: upcoming as UpcomingEntry[],
-    sourceReport: overlay.sourceReport,
+    sourceReport: overlay.sourceReport ? { ...overlay.sourceReport, calendarReview: canonical.sourceReport?.calendarReview } : canonical.sourceReport?.calendarReview ? { checked: [], limited: [], note: "", calendarReview: canonical.sourceReport.calendarReview } : undefined,
   };
 }

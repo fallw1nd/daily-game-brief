@@ -19,6 +19,7 @@ function unique(values) {
 }
 
 function packageKeys(packet) {
+  if (packet?.continuation?.scope === "calendar") return (packet.editorialInput?.calendarWork?.pages || []).map(page => page.blobSha);
   return (packet?.editorialInput?.packages || []).map(item => item.eventKey);
 }
 
