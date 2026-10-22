@@ -4,65 +4,13 @@ import {
   gitBlobSha,
   SHOWCASE_COMPLETION_REASON,
 } from "./edition-state.mjs";
-import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
+import { assertBatchShape, validateBatchPacket } from "./editorial-queue-state.mjs";
 import { mergeShowcaseRefs, showcaseRetryDue } from "./showcase.mjs";
 import { calendarReviewComplete } from "./calendar-review.mjs";
-
-const SAFE_BATCH_NAME = /^[\w-]+\.json$/u;
+export { openManualRevision } from "./editorial-queue-state.mjs";
 
 function unique(values) {
   return [...new Set(values)];
-}
-
-function assertBatchShape(batch) {
-  if (!batch || !["news", "showcase", "calendar"].includes(batch.scope)) throw new Error("editorial queue contains an unsupported batch scope");
-  if (!SAFE_BATCH_NAME.test(String(batch.name || ""))) throw new Error("editorial queue contains an unsafe batch filename");
-  if (!Array.isArray(batch.eventKeys) || !batch.eventKeys.length || batch.eventKeys.some(key => typeof key !== "string" || !key)) {
-    throw new Error(`editorial batch ${batch.name} requires event identities`);
-  }
-  if (!new Set(["pending", "editing", "awaiting_retry", "completed"]).has(batch.status)) {
-    throw new Error(`editorial batch ${batch.name} has an invalid status`);
-  }
-}
-
-function validateBatchPacket(packetText, batch, editionId) {
-  let packet;
-  try { packet = JSON.parse(packetText); } catch { throw new Error(`editorial batch ${batch.name} is not valid JSON`); }
-  const errors = validateFinalizedEditorialPacket(packet, { editionId });
-  if (errors.length) throw new Error(errors.join("; "));
-  if (packet.continuation?.scope !== batch.scope || packet.continuation?.preservePublished !== true) {
-    throw new Error(`editorial batch ${batch.name} has an invalid continuation scope`);
-  }
-  const packages = packet.editorialInput?.packages || [];
-  if (batch.scope === "calendar") {
-    const keys = packet.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
-    if (packages.length || packet.editorialInput?.trackingQueue?.length || !keys.length
-      || keys.some(key => !/^[0-9a-f]{40}$/.test(key)) || new Set(keys).size !== keys.length
-      || [...keys].sort().join("\0") !== [...batch.eventKeys].sort().join("\0")) {
-      throw new Error(`calendar batch ${batch.name} must contain only its pinned calendar page identities`);
-    }
-    return packet;
-  }
-  if (!packages.length) throw new Error(`editorial batch ${batch.name} must contain at least one package`);
-  const packageKeys = packages.map(item => item.eventKey);
-  if (packageKeys.some(key => typeof key !== "string" || !key) || new Set(packageKeys).size !== packageKeys.length) {
-    throw new Error(`editorial batch ${batch.name} contains duplicate or missing event identities`);
-  }
-  if (batch.scope === "news") {
-    const expected = unique(batch.eventKeys).sort().join("\u0000");
-    const actual = unique(packageKeys).sort().join("\u0000");
-    if (expected !== actual) throw new Error(`news batch ${batch.name} event identities do not match its durable queue entry`);
-    if (packages.some(item => item.showcaseRefs?.length)) throw new Error(`news batch ${batch.name} cannot contain showcase references`);
-  } else {
-    const announcementIds = packages.flatMap(item => {
-      if (!item.showcaseRefs?.length) throw new Error(`showcase batch ${batch.name} contains an ordinary news package`);
-      return item.showcaseRefs.map(ref => ref.announcementId);
-    });
-    if (!announcementIds.length || announcementIds.some(id => !batch.eventKeys.includes(id))) {
-      throw new Error(`showcase batch ${batch.name} contains an out-of-scope announcement`);
-    }
-  }
-  return packet;
 }
 
 function showcaseCoverage(queue, canonical) {
@@ -77,7 +25,7 @@ function showcaseCoverage(queue, canonical) {
 
 function nextBatch(queue, nowMs) {
   const calendar = queue.batches.find(batch => batch.scope === "calendar" && (batch.status === "pending"
-    || (batch.status === "awaiting_retry" && showcaseRetryDue(queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
+    || (batch.status === "awaiting_retry" && showcaseRetryDue(batch.lastAttemptAt || batch.activatedAt || queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
   // News gets the first continuation turn, then a pending showcase gets the
   // next turn when one exists. This keeps Canonical progress ahead of a
   // showcase without allowing a sustained news backlog to starve it.
@@ -101,6 +49,28 @@ function nextBatch(queue, nowMs) {
     nowMs,
   ));
   return newsFirst ? dueNews || dueShowcase : dueShowcase || dueNews;
+}
+
+/** Keep non-calendar activation positions unchanged; share calendar turns across
+ * eligible editions instead of replaying the oldest immutable packet forever. */
+export function orderCalendarQueueEditions(editions, queues, now = Date.now()) {
+  const eligible = new Map();
+  for (const edition of editions) {
+    const queue = queues[edition.id];
+    if (!Array.isArray(queue?.batches)) continue;
+    const batch = nextBatch(queue, now);
+    if (batch?.scope !== "calendar") continue;
+    const attemptedAt = Date.parse(batch.lastAttemptAt || batch.activatedAt);
+    eligible.set(edition.id, Number.isFinite(attemptedAt) ? attemptedAt : -Infinity);
+  }
+  // Stable sort retains the caller's original edition/issue order for ties.
+  const calendars = editions.filter(edition => eligible.has(edition.id))
+    .sort((a, b) => {
+      const left = eligible.get(a.id), right = eligible.get(b.id);
+      return left === right ? 0 : left < right ? -1 : 1;
+    });
+  let index = 0;
+  return editions.map(edition => eligible.has(edition.id) ? calendars[index++] : edition);
 }
 
 /**
@@ -154,6 +124,10 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, ledger
       batch.status = "completed";
     } else {
       batch.status = "awaiting_retry";
+      // An old edition must not immediately reopen the same immutable calendar
+      // packet after a partial review. Anchor its delay to this completed attempt,
+      // not the original publication; retain the unresolved work and exact scope.
+      if (batch.scope === "calendar") batch.lastAttemptAt = state.publication.updatedAt || now;
     }
   }
   if (!nextQueue.batches.some(batch => batch.name === nextQueue.activeBatchName && batch.status === "editing")) nextQueue.activeBatchName = null;

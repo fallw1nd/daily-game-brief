@@ -32,7 +32,7 @@ export function extractCalendarEvidence(html, url) {
  * full work pages (not the small inline preview). No Canonical writes here. */
 export async function collectCalendarPrimaryEvidence(report, { fetcher = fetch, baseline = [], maxRequests = 80, timeoutMs = 8000, now = new Date() } = {}) {
   if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 160) throw new Error("invalid calendar evidence request budget");
-  const candidates = report.allCandidates || report.candidates || [];
+  const candidates = report.admittedCandidates || report.allCandidates || report.candidates || [];
   const urlsFor = candidate => [...new Set([
     ...(candidate.sourceUrls || []),
     ...(candidate.observations || []).flatMap(row => [row.url, row.announcementUrl]),
@@ -86,7 +86,7 @@ export async function collectCalendarPrimaryEvidence(report, { fetcher = fetch, 
   const attach = candidate => ({ ...candidate, primaryEvidence: evidenceFor(urlsFor(candidate)) });
   return {
     ...report,
-    allCandidates: candidates.map(attach),
+    ...(report.admittedCandidates ? { admittedCandidates: candidates.map(attach) } : { allCandidates: candidates.map(attach) }),
     candidates: (report.candidates || []).map(attach),
     baselineChecks: baseline.map(item => ({ item, primaryEvidence: evidenceFor([officialCalendarUrl(item.source?.url)].filter(Boolean)) })),
     reviewLinks: (report.reviewLinks || []).map(link => ({ ...link, primaryEvidence: evidenceFor([officialCalendarUrl(link.url)].filter(Boolean)) })),

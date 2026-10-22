@@ -1,3 +1,4 @@
+import { isEditorialFeedbackEligible } from "./lib/event-ledger.mjs";
 import { assertHistoricalInsertion } from "./lib/historical-insertion.mjs";
 import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
@@ -90,6 +91,8 @@ async function writeLocalePlan(canonical, localePlan, { preservePublished = fals
   await rm(overlayFile, { force: true });
 }
 
+let repairExactDuplicateStories = false;
+let trustedRevisionState = null;
 async function hasAuthorizedSameEditionRevision(editorial) {
   try {
     const { stdout } = await run("git", [
@@ -97,6 +100,7 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`,
     ]);
     const state = JSON.parse(stdout);
+    trustedRevisionState = state;
     const packetEventKeys = new Set(packet?.editorialInput?.packages?.map(item => item.eventKey) || []);
     const continuationKeys = new Set(state.revisionRequest?.eventKeys || []);
     const calendarKeys = packet?.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
@@ -119,12 +123,14 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       packet?.continuation?.preservePublished === true &&
       packet.editorialInput.packages.length > 0 &&
       packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)));
-    return state.editionId === editorial.editionId &&
+    const authorized = state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
       (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation || calendarContinuation) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
+    repairExactDuplicateStories = authorized && state.revisionRequest.reason === SAME_EDITION_REVISION_REASON;
+    return authorized;
   } catch {
     return false;
   }
@@ -212,11 +218,12 @@ if (historicalInsertion) {
 }
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
+const feedbackAllowed = isEditorialFeedbackEligible({ editionId: editorial.editionId, latestEditionId: latest.id, historicalInsertion, state: trustedRevisionState, packetBlobSha: editorial.packetBlobSha, decisionIdentity: editorialDecisionDigest(editorial) });
 const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
 }
-const noOpNewsContinuation = packet.continuation?.scope === "news" &&
+const noOpNewsContinuation = !repairExactDuplicateStories && packet.continuation?.scope === "news" &&
   packet.continuation?.preservePublished === true &&
   !editorial.decisions.some(item => item.decision === "include");
 if (noOpNewsContinuation) {
@@ -229,7 +236,7 @@ if (noOpNewsContinuation) {
     canonicalStatus: "unchanged",
     localeStatus: existingOverlay ? "available" : "unavailable",
     localeReasonCode: existingOverlay ? null : "retained-existing-state",
-    feedbackEligible: true,
+    feedbackEligible: feedbackAllowed,
   });
   console.log(`${editorial.editionId}: news continuation reviewed with no included facts; Canonical publication unchanged.`);
   process.exit(0);
@@ -258,16 +265,17 @@ if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "dai
   publisherLatest = { ...publisherLatest, upcoming: baseline.items };
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
-const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion });
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion, repairExactDuplicateStories });
 if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
   const existingEdition = manifestItem
     ? JSON.parse(await readFile(resolve("public/data", manifestItem.path), "utf8"))
     : null;
-  const feedbackEligible = !historicalInsertion && existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const matchingDecision = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const feedbackEligible = feedbackAllowed && matchingDecision;
   let localeStatus = "unchanged";
-  if (feedbackEligible && editorial.locales?.en) {
+  if (matchingDecision && editorial.locales?.en) {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
     const localePlan = buildEnglishOverlay({
       canonical: existingEdition,
@@ -319,12 +327,13 @@ await writePublicationResult({
   publicationMode: "publish",
   decisionDigest: result.decisionDigest,
   canonicalStatus: "published",
+  duplicateStoryRepairs: result.duplicateStoryRepairs,
   localeStatus: localePlan.status,
   localeReasonCode: localePlan.reasonCode,
   localeSummary: localePlan.summary,
   localeWarnings: localePlan.warnings,
   localeErrors: localePlan.errors || [],
-  feedbackEligible: !historicalInsertion,
+  feedbackEligible: feedbackAllowed,
 });
 if (localePlan.status === "available") {
   console.log(`${result.status === "revised" ? "Revised" : "Built"} ${result.edition.id} issue ${result.edition.issueNumber}: bilingual publication ready.`);
