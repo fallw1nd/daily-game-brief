@@ -78,6 +78,11 @@ jobs:
             edition="${{ inputs.edition_id }}"
             mode="${{ inputs.publication_mode }}"
             branch="automation/editorial/$edition"
+            if [ "$mode" = "locale-repair" ]; then
+              branch="automation/locale/en/$edition"
+              locale_draft=true
+              locale_repair_path="artifacts/locale-repair.json"
+            fi
           else
             branch="$GITHUB_REF_NAME"
             if [[ "$branch" =~ ^automation/locale/en/([0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily))$ ]]; then
@@ -127,9 +132,6 @@ jobs:
             git fetch origin +refs/heads/automation/state:refs/remotes/origin/automation/state
             if [[ "$packet_sha" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$packet_sha^{blob}"; then
               git cat-file blob "$packet_sha" > artifacts/editorial-packet.json
-            elif [ "$mode" = "locale-repair" ]; then
-              git show "refs/remotes/origin/automation/state:automation/packets/$edition.json" > artifacts/editorial-packet.json
-              packet_sha="$(git hash-object artifacts/editorial-packet.json)"
             else
               echo "Decision does not reference a fetchable immutable packet blob: $packet_sha"
               exit 1

@@ -27,6 +27,10 @@ Prefer the first verified same-title source available:
 4. reliable retailer/media/game database only when the exact source page is opened and subject/edition identity is clear;
 5. bounded web-search discovery as a last resort when configured.
 
+Xbox roundup pages are discovery only: the resolver follows only an exact-title HTTPS link to an Xbox product-store page and independently checks that product’s metadata. It does not treat a matching roundup anchor as sufficient identity evidence.
+
+Xbox product pages may expose their real cover through the exact `ProductDetailsHeaderBoxArt` image rather than social metadata. The extractor accepts that element only on Xbox/Microsoft product-store paths, requests a usable size from the official Microsoft image host, and still requires the product-title identity gate before saving any image. Host-scoped `Buy`/Xbox platform chrome and numeric HTML entities are normalized; edition and sequel differences remain significant. Explicit official aliases require a traceable same-product link, not fuzzy title matching.
+
 The order is a reliability preference, not a shape requirement. Square, portrait, and landscape art are all valid when identity/provenance is verified.
 
 ### Editorial images

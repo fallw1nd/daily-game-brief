@@ -9,7 +9,7 @@ import { calendarReviewSchema, validateCalendarReview } from "./calendar-review.
 const sections = ["releases", "reviews", "news", "industry", "features", "rumors", "observations"];
 const factStatuses = ["official", "media_relay_official", "media_report", "multi_source_verified", "unconfirmed"];
 const timeStatuses = ["verified", "date_only", "time_unverified", "uncertain"];
-const titleZhStatuses = ["official_simplified", "official_traditional", "common_translation", "unavailable"];
+const titleZhStatuses = ["official_simplified", "official_traditional", "common_translation", "provisional_translation", "unavailable"];
 const entryFlags = ["supplement", "rumor", "time_uncertain", "platform_difference", "region_difference"];
 
 const sharedFactFrameSchema = {

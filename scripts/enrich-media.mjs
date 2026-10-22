@@ -24,35 +24,70 @@ function isPrivateIp(address) {
     /^172\.(1[6-9]|2\d|3[01])\./.test(address);
 }
 
-async function assertSafeHttps(input) {
+async function assertSafeHttps(input, lookupHost = lookup) {
   const url = new URL(input);
   if (url.protocol !== "https:") throw new Error("only HTTPS media is allowed");
   if (/^(localhost|.+\.local)$/i.test(url.hostname)) throw new Error("local host is not allowed");
-  const addresses = await lookup(url.hostname, { all: true });
+  const addresses = await lookupHost(url.hostname, { all: true });
   if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("private network target is not allowed");
   return url;
 }
 
-async function fetchLimited(input, limit, accept) {
-  const url = await assertSafeHttps(input);
-  const response = await fetch(url, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(18_000),
-    headers: { Accept: accept, "User-Agent": USER_AGENT },
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+async function fetchLimited(input, limit, accept, { fetcher = fetch, lookupHost = lookup } = {}) {
+  let url = await assertSafeHttps(input, lookupHost);
+  // One deadline covers the whole redirect chain and body, not each hop.
+  const signal = AbortSignal.timeout(18_000);
+  let response;
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    response = await fetcher(url, {
+      redirect: "manual",
+      signal,
+      headers: { Accept: accept, "User-Agent": USER_AGENT },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("redirect is missing a location");
+    if (redirects === 5) throw new Error("too many redirects");
+    url = await assertSafeHttps(new URL(location, url).href, lookupHost);
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`HTTP ${response.status}`);
+  }
   const declared = Number(response.headers.get("content-length") || 0);
-  if (declared > limit) throw new Error(`response exceeds ${limit} bytes`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > limit) throw new Error(`response exceeds ${limit} bytes`);
-  return { bytes, contentType: response.headers.get("content-type") || "", url: response.url };
+  if (declared > limit) {
+    await response.body?.cancel();
+    throw new Error(`response exceeds ${limit} bytes`);
+  }
+  const chunks = [];
+  let size = 0;
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > limit) throw new Error(`response exceeds ${limit} bytes`);
+        chunks.push(value);
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
+  return { bytes: Buffer.concat(chunks, size), contentType: response.headers.get("content-type") || "", url: response.url || url.href };
 }
 
 function decodeEntities(value) {
   return value
     .replaceAll("&amp;", "&")
     .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
+    .replace(/&#(?:x([0-9a-f]+)|(\d+));/gi, (entity, hex, dec) => {
+      const code = Number.parseInt(hex || dec, hex ? 16 : 10);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    })
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">");
 }
@@ -76,7 +111,20 @@ function extractMeta(html, pageUrl) {
   const psnImage = pageHost === "store.playstation.com"
     ? html.match(/(?:https:\\\/\\\/|https:\/\/)image\.api\.playstation\.com[^"'\\<\s]+/i)?.[0]
     : null;
-  const rawImage = psnImage?.replaceAll("\\/", "/") ||
+  const isXboxProduct = /(^|\.)(xbox|microsoft)\.com$/.test(pageHost) && /\/games\/store\//.test(new URL(pageUrl).pathname);
+  let xboxBoxArt = isXboxProduct
+    ? (html.match(/<img\b[^>]*>/gi) || []).map(tagAttributes)
+      .find(attrs => attrs["data-testid"] === "ProductDetailsHeaderBoxArt")?.src
+    : null;
+  if (xboxBoxArt) {
+    const art = new URL(xboxBoxArt, pageUrl);
+    if (art.hostname === "store-images.s-microsoft.com") {
+      art.searchParams.set("w", "600");
+      art.searchParams.set("h", "900");
+      xboxBoxArt = art.href;
+    }
+  }
+  const rawImage = xboxBoxArt || psnImage?.replaceAll("\\/", "/") ||
     values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
   const imageUrl = rawImage ? new URL(rawImage, pageUrl).href : null;
@@ -350,7 +398,22 @@ async function discoverFromSource(source, record, { fetchPage = fetchLimited, ki
     const [imageUrl, ...fallbackImageUrls] = youtubeImageCandidates(videoId);
     return { imageUrl, fallbackImageUrls, alt: "", pageUrl: source.url };
   }
-  const result = await openSourcePage(source, fetchPage);
+  let result = await openSourcePage(source, fetchPage);
+  // Roundups are discovery pages, never product identity evidence. Open only an
+  // exact-title Xbox store link and run the ordinary product metadata checks.
+  if (kind === "cover" && new URL(result.url).hostname === "news.xbox.com") {
+    for (const match of result.bytes.toString("utf8").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+      const attrs = tagAttributes(match[1]);
+      if (!attrs.href) continue;
+      let linked;
+      try { linked = new URL(attrs.href, result.url); } catch { continue; }
+      if (linked.protocol !== "https:" || linked.hostname !== "www.xbox.com" || !/\/games\/store\//.test(linked.pathname)) continue;
+      const title = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).replace(/\s+[–—]\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}.*$/i, "").trim();
+      if (identifyProductTitle(titleIdentityRecord(record), { documentTitle: title }, linked.href).status !== "match") continue;
+      result = await openSourcePage({ ...source, url: linked.href }, fetchPage);
+      break;
+    }
+  }
   const { meta } = result;
   if (!meta.imageUrl) throw new Error("no usable social image metadata");
   if (kind === "cover") {
@@ -700,4 +763,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   });
 }
 
-export { discoverFromSource, processEdition, resolveRecord };
+export { discoverFromSource, processEdition, resolveRecord, fetchLimited };
