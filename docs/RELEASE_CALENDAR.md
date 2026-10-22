@@ -59,6 +59,12 @@ GitHub performs fetching, parsing, deduplication, ranking, calendar health and p
 
 See [offline replay](RELEASE_CALENDAR_REPLAY.md) for measured packet gains and provenance. These samples do not establish live discovery recall or recovery of upstream-cap omissions. On the next natural Daily, inspect per-platform task/link counts, cap and character-budget omissions, actual fallback requests, parser failures and known-zero versus unknown health. Rolling tests cover expiry, the new tail day, advance/postponement, explicit cancellation, platform/type changes and retention after discovery failure.
 
+## Calendar name presentation
+
+The calendar presents a researched Chinese name as the primary line and its distinct original name as smaller supporting text. English views and titles with unavailable Chinese names use the original alone. Identical Chinese/original strings do not produce a duplicate line. Intentionally English brands remain original-only; lack of official Chinese naming does not by itself prove that a provisional translation should be discarded.
+
+The shared `calendarTitle` presentation helper uses structured naming status and the exact original title to separate the legacy `中文（Original，暂译）` format. It does not use broad parenthesis stripping, invent translations, or rewrite Canonical names, registry evidence, or naming status. The existing provisional research remains explicitly non-official internally. This calendar-only presentation preference supersedes the older audit's combined visible-title convention, not the normal evidence-based naming policy.
+
 ## Media
 
 Calendar covers follow `docs/MEDIA_PIPELINE.md`. Missing art is not a reason to omit a verified release; use an explicit unavailable state.

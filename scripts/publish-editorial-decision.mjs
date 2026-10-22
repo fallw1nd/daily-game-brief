@@ -30,6 +30,9 @@ const EDITORIAL_CONTINUATION_REASON = "editorial_continuation";
 if (!new Set(["publish", "locale-repair"]).has(PUBLICATION_MODE)) {
   throw new Error(`Unsupported PUBLICATION_MODE: ${PUBLICATION_MODE}`);
 }
+if (PUBLICATION_MODE === "locale-repair" && !LOCALE_REPAIR_DRAFT_PATH) {
+  throw new Error("Locale repair requires LOCALE_REPAIR_DRAFT_PATH pointing to a complete draft with the current trusted factsDigest; editorial decisions cannot be replayed as locale repairs.");
+}
 
 function sha256Text(text) {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -127,15 +130,15 @@ async function hasAuthorizedSameEditionRevision(editorial) {
   }
 }
 
-const localeRepairDraft = PUBLICATION_MODE === "locale-repair" && LOCALE_REPAIR_DRAFT_PATH
-  ? await readOptionalJson(LOCALE_REPAIR_DRAFT_PATH)
+const localeRepairDraft = PUBLICATION_MODE === "locale-repair"
+  ? JSON.parse(await readFile(LOCALE_REPAIR_DRAFT_PATH, "utf8"))
   : null;
-const editorial = localeRepairDraft
-  ? null
-  : JSON.parse(await readFile(DECISION_PATH, "utf8"));
+const editorial = PUBLICATION_MODE === "publish"
+  ? JSON.parse(await readFile(DECISION_PATH, "utf8"))
+  : null;
 const packet = PUBLICATION_MODE === "publish"
   ? JSON.parse(await readFile(PACKET_PATH, "utf8"))
-  : await readOptionalJson(PACKET_PATH);
+  : null;
 const [latestText, manifestText] = await Promise.all([
   readFile("public/data/latest.json", "utf8"),
   readFile("public/data/manifest.json", "utf8"),
@@ -146,7 +149,7 @@ const contractErrors = PUBLICATION_MODE === "locale-repair" ? [] : validateEdito
 if (contractErrors.length) throw new Error(`Editorial decisions failed evidence validation:\n- ${contractErrors.join("\n- ")}`);
 
 if (PUBLICATION_MODE === "locale-repair") {
-  const editionId = localeRepairDraft?.editionId || editorial?.editionId;
+  const editionId = localeRepairDraft?.editionId;
   if (!editionId) throw new Error("Locale repair requires an exact editionId");
   const manifestItem = manifest.editions.find((item) => item.id === editionId);
   if (!manifestItem) throw new Error(`Cannot repair locale for unpublished edition ${editionId}`);
@@ -158,19 +161,8 @@ if (PUBLICATION_MODE === "locale-repair") {
     latest: sha256Text(latestText),
     manifest: sha256Text(manifestText),
   };
-  let localePlan;
-  if (localeRepairDraft) {
-    const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
-    localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
-  } else {
-    const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
-    localePlan = buildEnglishOverlay({
-      canonical,
-      editorial,
-      entryIdsByEvent: deriveEntryIdsByEvent(editorial),
-      previousOverlay: priorOverlay,
-    });
-  }
+  const retained = (await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id))))?.retainedPresentation;
+  const localePlan = buildEnglishRepairOverlay({ canonical, draft: localeRepairDraft, retainedPresentation: retained });
   if (localePlan.status !== "available") {
     throw new Error(`Locale repair rejected: ${localePlan.summary}`);
   }

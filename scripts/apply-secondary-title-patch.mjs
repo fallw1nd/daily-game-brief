@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-const allowedStatuses = new Set(["official_simplified", "official_traditional", "common_translation"]);
+const allowedStatuses = new Set(["official_simplified", "official_traditional", "common_translation", "provisional_translation"]);
 
 export function applySecondaryTitlePatch(registry, request) {
   if (request?.schemaVersion !== 1 || request?.kind !== "title_backfill") throw new Error("title backfill request must use schemaVersion=1 and kind=title_backfill");
@@ -13,6 +13,7 @@ export function applySecondaryTitlePatch(registry, request) {
   for (const [key, entry] of Object.entries(request.translations)) {
     if (!key.trim() || !entry?.titleZhCn?.trim() || !allowedStatuses.has(entry?.titleZhStatus)) throw new Error(`invalid title patch entry: ${key}`);
     if (!entry.evidence?.kind) throw new Error(`title patch entry requires evidence: ${key}`);
+    if (entry.titleZhStatus === "provisional_translation" && entry.evidence.kind !== "assistant_translation") throw new Error(`provisional title must disclose assistant translation evidence: ${key}`);
     const existing = current[key];
     if (existing) {
       if (existing.titleZhCn !== entry.titleZhCn || existing.titleZhStatus !== entry.titleZhStatus) throw new Error(`title patch conflicts with existing registry entry: ${key}`);

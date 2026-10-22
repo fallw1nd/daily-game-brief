@@ -96,6 +96,7 @@ function repairDraft(canonical) {
     schemaVersion: 1,
     locale: "en",
     editionId: canonical.id,
+    factsDigest: factsDigest(canonical),
     archiveTitle: "Morning Brief | Test Game Announces a New Version",
     entries: canonical.entries.map((entry) => ({
       entryId: entry.id,
@@ -122,15 +123,77 @@ describe("trusted bilingual publication planner", () => {
     expect(result.overlay.entries).toEqual(previous.entries);
     expect(result.overlay.factsDigest).not.toBe(previous.factsDigest);
   });
-  it("retains manual English copy when filling a missing supplement translation", () => {
+  it("retains manual English copy only when it shares the current facts baseline", () => {
+    const canonical = canonicalEdition();
+    const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    previous.entries[0].summary = "Manually reviewed English wording that must survive automatic supplement repair.";
+    const result = buildEnglishRepairOverlay({ canonical, draft: repairDraft(canonical), retainedPresentation: previous });
+    expect(result.status).toBe("available");
+    expect(result.overlay.entries[0].summary).toBe(previous.entries[0].summary);
+    expect(result.overlay.entries).toHaveLength(1);
+  });
+
+  it("uses the complete reviewed draft rather than stale retained copy after a same-ID fact correction", () => {
+    const canonical = canonicalEdition();
+    const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    previous.archiveTitle = "Morning Brief | Test Game Announces Console Plans";
+    previous.entries[0].summary = "This old English presentation lists console platforms that are no longer in Canonical.";
+    canonical.entries[0].platforms = ["PC (Steam)"];
+    const draft = repairDraft(canonical);
+    draft.entries[0].summary = "The current Canonical source confirms this version only for PC via Steam.";
+    const result = buildEnglishRepairOverlay({ canonical, draft, retainedPresentation: previous });
+    expect(result.status).toBe("available");
+    expect(result.overlay.archiveTitle).toBe(draft.archiveTitle);
+    expect(result.overlay.entries[0].summary).toBe(draft.entries[0].summary);
+    expect(result.overlay.factsDigest).toBe(draft.factsDigest);
+    expect(result.warnings).toContain("Retained English presentation was ignored because it is not bound to the current Canonical facts; the complete reviewed draft was used instead.");
+  });
+
+  it("carries reviewed manual copy in a current-bound supplement repair draft", () => {
     const canonical = canonicalEdition();
     const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
     previous.entries[0].summary = "Manually reviewed English wording that must survive automatic supplement repair.";
     canonical.entries.push({ ...canonical.entries[0], id: `${canonical.id}-news-1` });
-    const result = buildEnglishRepairOverlay({ canonical, draft: repairDraft(canonical), retainedPresentation: previous });
+    const draft = repairDraft(canonical);
+    draft.entries[0] = structuredClone(previous.entries[0]);
+    const result = buildEnglishRepairOverlay({ canonical, draft, retainedPresentation: previous });
     expect(result.status).toBe("available");
     expect(result.overlay.entries[0].summary).toBe(previous.entries[0].summary);
     expect(result.overlay.entries).toHaveLength(2);
+  });
+
+  it.each([undefined, null, "", 42, "sha256:1234", `sha256:${"A".repeat(64)}`])("rejects a missing or malformed repair factsDigest: %s", (digest) => {
+    const canonical = canonicalEdition();
+    const draft = { ...repairDraft(canonical), factsDigest: digest };
+    const result = buildEnglishRepairOverlay({ canonical, draft });
+    expect(result.status).toBe("unavailable");
+    expect(result.overlay).toBeNull();
+    expect(result.errors).toContain("locale repair factsDigest must be sha256:<64 lowercase hex>");
+  });
+
+  it("rejects a formerly valid repair on every build after same-ID facts change", () => {
+    const canonical = canonicalEdition();
+    const draft = repairDraft(canonical);
+    expect(buildEnglishRepairOverlay({ canonical, draft }).status).toBe("available");
+    canonical.entries[0].platforms = ["PC (Steam)"];
+    const currentPresentation = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    for (const retainedPresentation of [null, currentPresentation]) {
+      const result = buildEnglishRepairOverlay({ canonical, draft, retainedPresentation });
+      expect(result.status).toBe("unavailable");
+      expect(result.reasonCode).toBe("locale-repair-invalid");
+      expect(result.overlay).toBeNull();
+      expect(result.errors).toContain("locale repair factsDigest is stale for canonical facts");
+    }
+  });
+
+  it("allows Chinese copy-only and media-only changes without replacing a repair facts baseline", () => {
+    const canonical = canonicalEdition();
+    const draft = repairDraft(canonical);
+    canonical.entries[0].summary = "这里只调整中文表述，不改变事实。";
+    canonical.entries[0].imageNote = "Updated media availability explanation.";
+    const result = buildEnglishRepairOverlay({ canonical, draft });
+    expect(result.status).toBe("available");
+    expect(result.overlay.factsDigest).toBe(draft.factsDigest);
   });
 
   it("binds English event keys to canonical entry IDs and computes reproducible digests", () => {

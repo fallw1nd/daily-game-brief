@@ -17,7 +17,7 @@ export interface GameTitle {
   title_key: string;
   title_zh_cn?: string;
   title_en: string;
-  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "unavailable";
+  title_zh_status: "official_simplified" | "official_traditional" | "common_translation" | "provisional_translation" | "unavailable";
   edition_zh?: string;
 }
 export interface BriefEntry {
@@ -59,7 +59,7 @@ export type EnglishLocaleAvailability =
 export interface EnglishLocaleIndex { schemaVersion: 1; locale: "en"; updatedAt: string; latestCanonicalEditionId: string; latestAvailableEditionId: string | null; editions: EnglishLocaleAvailability[]; }
 
 export interface BriefSearchEntry {
-  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: EditionPeriod; entryId: string; titleZhCn?: string; titleEn: string;
+  editionId: string; issueNumber: number; tracking?: boolean; date: string; period: EditionPeriod; entryId: string; titleKey?: string; section?: SectionKey; titleStatus?: GameTitle["title_zh_status"]; titleZhCn?: string; titleEn: string;
   headline: string; summary: string; platforms: string[]; region: string; factStatus: FactStatus;
 }
 export interface BriefSearchIndex { schemaVersion: 1; updatedAt: string; entries: BriefSearchEntry[]; }

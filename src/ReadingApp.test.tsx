@@ -33,6 +33,30 @@ beforeEach(() => {
 afterEach(async () => { if (root) { await act(async () => root?.unmount()); root = undefined; } document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
 describe("reading sample", () => {
+  it("uses two-line calendar names and honest missing-cover fallbacks in either language", () => {
+    const value = structuredClone(edition);
+    const base = (calendarSnapshot as BriefEdition).upcoming[0];
+    value.upcoming = [
+      { ...base, id: "provisional", cover: undefined, cover_status: "unavailable", coverNote: "官方来源暂无可核实封面", title: { title_key: "test", title_en: "Original Game", title_zh_cn: "中文游戏（Original Game，暂译）", title_zh_status: "provisional_translation" } },
+      { ...base, id: "original", title: { title_key: "nba", title_en: "NBA 2K27", title_zh_status: "unavailable" } },
+      { ...base, id: "same", title: { title_key: "brand", title_en: "Same Brand", title_zh_cn: "Same Brand", title_zh_status: "official_simplified" } },
+    ];
+    render(value);
+    const cards = document.querySelectorAll(".r-calendar-item");
+    expect(cards[0].querySelector("h3")?.textContent).toBe("中文游戏");
+    expect(cards[0].querySelector(".r-calendar-original")?.textContent).toBe("Original Game");
+    expect(cards[0].querySelector(".r-cover-unavailable")?.textContent).toContain("暂无核实封面");
+    expect(cards[0].querySelector("small")?.textContent).toBe("官方来源暂无可核实封面");
+    expect(cards[0].querySelector("h3")?.textContent).not.toContain("暂译");
+    expect(cards[1].querySelector("h3")?.textContent).toBe("NBA 2K27");
+    expect(cards[1].querySelector(".r-calendar-original")).toBeNull();
+    expect(cards[2].querySelector(".r-calendar-original")).toBeNull();
+    render(value, true);
+    expect(document.querySelector(".r-calendar-item h3")?.textContent).toBe("Original Game");
+    expect(document.querySelector(".r-calendar-original")).toBeNull();
+    expect(document.querySelector(".r-cover-unavailable")?.textContent).toContain("No verified cover");
+  });
+
   it("shows incomplete calendar review even when this edition already has inherited items", () => {
     const value = structuredClone(edition);
     value.upcoming = (calendarSnapshot as BriefEdition).upcoming;
@@ -158,6 +182,10 @@ describe("reading sample", () => {
     await act(async () => jade.click());
     expect(localStorage.getItem("brief-accent")).toBe("jade");
     expect(container.querySelector('.r-edition-line a')).toBeNull();
+    const editionBar = container.querySelector('.r-edition-bar')!;
+    expect(editionBar.firstElementChild?.className).toBe('r-edition-line');
+    expect(editionBar.querySelectorAll('.cu-entry button')).toHaveLength(1);
+    expect(editionBar.querySelector('time')?.textContent).toBe(edition.date.replaceAll('-', '.'));
     expect(container.querySelector<HTMLDetailsElement>("#edition-note")?.open).toBe(false);
     const about = container.querySelector<HTMLElement>("#edition-note summary")!;
     await act(async () => about.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
@@ -344,4 +372,22 @@ describe("reader navigation continuity", () => {
     expect(panel.open).toBe(false);
     expect(document.activeElement).toBe(next);
   });
+});
+
+it("opens and closes the single catch-up entrance while preserving original reading regions", async () => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const entrance = container.querySelector('.cu-entry button') as HTMLButtonElement;
+  await act(async () => entrance.click());
+  expect(window.location.search).toContain('catchup=1');
+  expect(container.querySelector('#catchup')).not.toBeNull();
+  expect(container.querySelector('#content')?.closest('[hidden]')).not.toBeNull();
+  expect(container.querySelector('#archive')).not.toBeNull();
+  expect(container.querySelector('#upcoming')).not.toBeNull();
+  await act(async () => (container.querySelector('.cu-back') as HTMLButtonElement).click());
+  expect(window.location.search).not.toContain('catchup=1');
+  expect(container.querySelector('#content')?.closest('[hidden]')).toBeNull();
 });

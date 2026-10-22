@@ -51,6 +51,8 @@ Resolution order:
 
 Prefer official mainland Simplified Chinese names. A stable widely used name may use `common_translation`. Otherwise keep the original title with unavailable Chinese status. Never machine-translate or invent a title.
 
+The user-authorized 2026-10-19 archive review may record `provisional_translation` after official/common-name research is inconclusive. This status means an explicitly labeled assistant translation, not an official or established name; preserve `title_en`/`title_ja` for search and keep naming evidence in the review ledger. It does not enable automatic translation or change the normal discovery workflow.
+
 Copy localization matches complete aliases at ASCII/Unicode Latin, combining-mark, and numeric boundaries, so adjacent Chinese text is allowed while longer Latin words and sequel numbers stay intact. Registered single-word aliases are localized only inside explicit `《...》` title markers; a confirmed structured subject may also localize its own single-word name in its headline, summary, and generated media alt. Unknown sequel suffixes and aliases with conflicting registered translations are left unchanged. Localization scans once and skips aliases already embedded in their full Chinese translation, so rerunning it is idempotent.
 
 Title/terminology research is naming evidence only. It cannot add event facts, times, platforms, release claims, source authority, tracking decisions, or candidates. For games with an official mainland channel, visible Chinese copy should use its official version/character/class/mode/mechanic terminology when available.
@@ -68,6 +70,10 @@ Detailed discovery behavior lives in `docs/RELEASE_CALENDAR.md`.
 Simplified Chinese Canonical is the factual authority. English Overlay may change presentation fields only and is bound to Canonical identities/fact digests.
 
 If English is missing or invalid, a valid Chinese Canonical edition still publishes with explicit English-unavailable state. A later locale repair may modify only English Overlay/availability and must hash-guard Canonical archive/latest/manifest bytes.
+
+Locale-only repair requires a complete draft with `schemaVersion:1`, `locale:"en"`, the exact `editionId`, and a top-level `factsDigest` binding the reviewed copy to the current Canonical facts. Copy that digest unchanged from the top-level field in `public/data/locales/en/status/YYYY/MM/<edition-id>.json`, reading the status and Canonical archive at the same pinned `main` commit. Do not use `retainedPresentation.factsDigest`: it may describe an older baseline. When no current status is available, trusted code can run `npm run build:locales` on that checkout and export the matching edition's `factsDigest` from the generated `public/data/locales/en/index.json`; that index is generated, not tracked on `main`. The editor never calculates or guesses digests.
+
+Commit the complete presentation to `automation/locale-inbox/<edition-id>.json` on `automation/locale/en/<edition-id>`. Both push and manual `publication_mode:locale-repair` dispatch read this inbox; replaying an ordinary editorial submission as an unbound locale repair is not supported. Validation, publication construction, and every concurrent-main rebuild compare the draft's unchanged digest with current Canonical facts. A missing, malformed, or stale digest stops repair before publication writes. On staleness, reread Canonical and the trusted baseline and review the complete translation, rather than merely replacing its digest. Old retained English can be copied into the reviewed draft where still accurate, but cannot automatically override it unless bound to the same current facts. Normal `locales.en` editorial submissions remain unchanged and do not supply digests.
 
 ## Media
 

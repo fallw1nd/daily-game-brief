@@ -4,6 +4,7 @@ import { upcomingKey } from "../../src/lib/locale-projection.js";
 import {
   canonicalCopyDigest,
   factsDigest,
+  isDigest,
   localeDigest,
 } from "./locale-digest.mjs";
 import { validateEnglishOverlay } from "./locale-overlay.mjs";
@@ -69,13 +70,13 @@ function buildUpcomingOverlay(canonical, draft, previousOverlay) {
   });
 }
 
-function finalizeEnglishOverlay(canonical, presentation) {
+function finalizeEnglishOverlay(canonical, presentation, boundFactsDigest = factsDigest(canonical)) {
   const overlay = {
     schemaVersion: 1,
     locale: "en",
     editionId: canonical.id,
     baseSchemaVersion: canonical.schemaVersion ?? 1,
-    factsDigest: factsDigest(canonical),
+    factsDigest: boundFactsDigest,
     canonicalCopyDigest: canonicalCopyDigest(canonical),
     localeDigest: `sha256:${"0".repeat(64)}`,
     archiveTitle: canonical.entries.length ? normalizeSubjectHeadline(presentation.archiveTitle, canonical.entries.find(entry => entry.id === canonical.leadEntryId)?.title || canonical.entries[0]?.title, { locale: "en", archive: true }) : presentation.archiveTitle,
@@ -172,7 +173,22 @@ export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentati
       errors: ["locale repair identity does not match Canonical edition"],
     };
   }
-  const retained = retainedPresentation?.editionId === canonical.id ? new Map((retainedPresentation.entries || []).map(item => [item.entryId, item])) : new Map();
+  if (!isDigest(draft.factsDigest) || draft.factsDigest !== factsDigest(canonical)) {
+    const error = !isDigest(draft.factsDigest)
+      ? "locale repair factsDigest must be sha256:<64 lowercase hex>"
+      : "locale repair factsDigest is stale for canonical facts";
+    return {
+      status: "unavailable",
+      reasonCode: "locale-repair-invalid",
+      summary: `${error}; reread the current Canonical edition and trusted locale baseline, then review the complete repair draft before resubmitting.`,
+      overlay: null,
+      warnings: [],
+      errors: [error],
+    };
+  }
+  const retainedIsCurrent = retainedPresentation?.editionId === canonical.id
+    && retainedPresentation.factsDigest === draft.factsDigest;
+  const retained = retainedIsCurrent ? new Map((retainedPresentation.entries || []).map(item => [item.entryId, item])) : new Map();
   const entries = (draft.entries || []).map((item) => retained.get(item.entryId) || item).map((item) => ({
     entryId: item.entryId,
     headline: item.headline,
@@ -196,11 +212,14 @@ export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentati
     ...(cleanOptional(item.coverAlt) ? { coverAlt: cleanOptional(item.coverAlt) } : {}),
   }));
   const result = finalizeEnglishOverlay(canonical, {
-    archiveTitle: retainedPresentation?.editionId === canonical.id ? retainedPresentation.archiveTitle : draft.archiveTitle,
+    archiveTitle: retainedIsCurrent ? retainedPresentation.archiveTitle : draft.archiveTitle,
     entries,
     upcoming,
     sourceReport: draft.sourceReport,
-  });
+  }, draft.factsDigest);
+  if (retainedPresentation && !retainedIsCurrent) {
+    result.warnings.push("Retained English presentation was ignored because it is not bound to the current Canonical facts; the complete reviewed draft was used instead.");
+  }
   if (result.status !== "available") {
     return {
       ...result,

@@ -1,10 +1,49 @@
 # Maintenance Issue Log
 
+## MNT-20261023-01 — Avoid unnecessary startup code and misleading secondary-release receipts
+
+- Status: local implementation; production verification recorded in the secondary-publication report.
+- Default reading mode unnecessarily loaded both legacy applications and GSAP. Lazy-load all three application variants under one loading boundary while preserving classic Chinese/English routing and the locale toggle. Production-build default-route JavaScript decreased from 485.05 KB to 297.03 KB (gzip 158.35 KB to 96.00 KB); GSAP remains available on demand rather than being deleted.
+- Secondary workflow summaries previously claimed publisher dispatch even when validation failed. Report the actual dispatch step outcome and distinguish accepted dispatch from confirmed publication/deployment.
+- Media downloads previously checked only the initial target and buffered the full response before enforcing byte limits. Validate every redirect destination, cap redirects, share a fetch timeout, and cancel oversized bodies during streaming. Re-run the full check after rebasing concurrent media updates before another production push.
+- Regression coverage includes all frontend route/language variants, success/failure/skipped dispatch summaries, safe/unsafe redirect chains, missing redirect locations, and declared/streamed oversized responses. No public schema, edition identities, schedules, source priorities, or compatibility pages were removed.
+
+## MNT-20261020-02 — Locale repair silently rebound stale English to corrected facts
+
+- Status: implementation verified locally; release verification pending.
+- Evidence: the September 24 English overlay was accepted as a repair after its Canonical game's platforms changed to Steam-only with the same edition/entry IDs, retaining console claims. Repair checked only identity before stamping a new facts digest; the legacy editorial-replay repair path and stale retained presentation also bypassed baseline binding.
+- Resolution: require a complete repair draft carrying the existing trusted facts digest, compare it against current Canonical during validation and every build/retry, and preserve the checked binding. Only current-bound retained English may override the reviewed draft. Manual dispatch uses the existing locale inbox; ordinary editorial publication stays unchanged. Operational instructions obtain the digest from current trusted status or the existing generated-index exporter, never model calculation.
+- Local verification: 6 focused test files / 40 tests passed, including missing/malformed/stale baselines, copy/media-only compatibility, and the September 24 validator/build/retry CLI reproduction. Rejected builds leave Canonical, English, and index byte hashes unchanged; a freshly reviewed repair preserves Canonical bytes and cannot be overwritten by stale retained console prose. No historical data, registry, dependencies, or schedules changed.
+
+## MNT-20261020-01 — Calendar title clutter and missing store covers
+
+- Calendar names now share one presentation helper across ReadingApp and the classic view: researched Chinese on the first line, a distinct original on the smaller second line, and original-only for unavailable Chinese names or the English view. Only the exact structured provisional suffix is separated; original names, naming status, registry evidence and editorial copy remain intact. This applies to all 1,688 historical calendar occurrences, including 515 provisional occurrences across 189 identities. No automatic translation or blanket provisional-to-English conversion was added.
+- Missing Xbox covers came from product pages whose artwork lives in `ProductDetailsHeaderBoxArt`, whose title includes store/platform chrome, and from roundup links that were not followed to exact product pages. The bounded fix recognizes those structures while retaining independent exact-product verification, rejecting unrelated products and wrong editions. One official same-product singular/plural alias is recorded for Warrior Cats; it does not change its Chinese-name status.
+- Added 17 official product covers, bringing the current calendar from 27/44 to 44/44. The same 17 records were repaired in the October 19/20 archives. Reopened exact official sources also allowed 106 older occurrences across 19 identities to reuse existing assets. Total: 140 archive occurrences across 20 editions, plus 17 latest-mirror occurrences. Historical gaps remain explicit: 120 occurrences across 34 titles; unsupported or mismatched candidates were not filled.
+- Independent invariants confirm all 21 changed Canonical JSON files differ only in calendar media fields, shared facts and editorial copy are unchanged, English overlays/digests are untouched, and latest equals its October 20 archive. All current cover files exist, decode correctly and are below 500 KB. The 17 new artworks were visually inspected. Browser pixel inspection of the local UI was blocked by the cloud browser URL policy; DOM, theme persistence, responsive CSS and build checks do not substitute for that unperformed pixel check.
+
+- Preparation verification: `npm run check` passed 108 test files / 644 tests, 71 archives and English locale validation, typecheck and production build. No remote publication was performed by patch preparation.
+- Release integration rebased onto the noon-published `fb2b9df` after its exact-edition deployment acknowledgement. The scheduled continuation had expanded the current calendar to 68 records. Only the 17 approved media-field repairs were reapplied by matching entry and title identity, retaining all new facts and English. The current result is 68/68 verified covers; the 21-file media-only invariant still passes. The separately approved editorial visual refinement shares this release without changing production scheduling.
+
+## MNT-20261019-01 — Missing-packet wakes rejected before collection
+
+- Root cause: October 16–19 editorial tasks sent the documented three-field wake. Both workflow preflight validators additionally required `period:"daily"`; all four runs failed before collection with `invalid Daily wake payload`. Delayed scheduled packet runs subsequently published October 16/17 degraded editions. October 18 fallback correctly refused a packet with no eligible A-level fact; October 19 had no status at investigation time.
+- Repair: infer Daily from the already-validated exact branch/edition when `period` is absent; retain explicit mismatched-period rejection. Execute both real inline validators in a regression test using the observed minimal payload and explicit Daily/conflicting PM variants. Document a complete payload example. Do not weaken fallback evidence eligibility or change schedules.
+- Verification: full check passed 105 files / 589 tests, data/locales and production build. All four same-window editorial publications then passed trusted checks, yielding 7/5/9/4 Chinese and English stories in issues 67–70. Final Pages 39197480043 succeeded after the unchanged noon gate; all eight Chinese/English archive URLs matched main. A concurrent calendar continuation's English invalidation was repaired through the existing locale-only inbox, preserving Canonical bytes. [Recovery report and publisher receipts](incident-notes/daily-recovery-20261019.md). No direct Canonical or state edits were used.
+
+## MNT-20261015-02 — Official cover titles rejected as mismatches
+
+- Status: resolved.
+- Evidence: six exact Nintendo product pages were rejected because platform suffixes remained in their title metadata. HELLDIVERS™ 2 also failed because NFKC expanded the trademark mark before it was removed. PlayStation platform suffixes prevented exact edition matching for Resident Evil 4 Gold Edition.
+- Resolution: remove trademark marks before normalization; strip only host-scoped Nintendo/PlayStation platform chrome, preserving sequel and edition identity. Add regression coverage and exact official alternate sources for three games. Fill the October 15 edition's nine missing covers; all 24 calendar records now have verified covers. Latest and same-edition archive remain identical; all non-media fields remain unchanged.
+- Verification: full project check passed (105 files / 588 tests), 66 archived editions and locale infrastructure validated, production build succeeded. All nine JPEGs preserve source orientation and are below 125 KB each. No earlier editions or calendar facts were changed.
+
 ## MNT-20261015-01 — Calendar labels reject otherwise complete English editions
 
-- Status: root fix verified locally; production repair in progress.
+- Status: resolved for the October 12–15 English failures; broader historical backlog remains recorded separately.
 - October 10–15 English-unavailable receipts identify unmapped calendar region/release labels. Add the seven observed dictionary values rather than loosening English validation. October 13 also needs its untranslated presentation labels repaired through the locale inbox.
 - Verification: full check passed, 105 files / 585 tests, 66 Canonical archives and locale infrastructure, production build. The new regression runs the English repair builder against all five affected platform release types and both region labels.
+- Production: all four recent English repairs, two-name title backfill, October 15 news supplement and October 14 archive-title revision passed trusted publication and Pages. Content deployment baseline: ee275f7dac2c0fc0516fd22a1cb2d2e63d6f7223; Pages run 38694226240 succeeded.
 - Audit, secondary request results and outstanding work: [2026-10-15 report](incident-notes/second-publish-20261015.md).
 
 ## MNT-20261006-01 — Archive title passes validation but fails after subject normalization
@@ -773,3 +812,47 @@ An additive news continuation on the October 2 automatic fact list removed the f
 - Reproduced search context loss after opening a result, keyboard focus obscured by an open settings panel, and initial footer displacement (390px lab CLS about 0.177).
 - Search URL/history persistence, focus-leave dismissal and stable loading space address these failures. Archive search is deferred until needed. Reading navigation and calendar evidence are more discoverable without changing content or publication behavior.
 - Local verification: full check passed with 573 tests, 20 responsive browser combinations, search/back/refresh, focus, error recovery and evidence disclosure; local CLS approximately 0.0011. Production deployment evidence is recorded in the associated PR and local acceptance artifacts.
+
+## 2026-10-19 — Archive naming evidence and repeated localization
+
+- Review-stage audit found unavailable names with official Chinese evidence, weak historical naming citations, and repeated translated suffixes in existing Chinese copy.
+- The user authorized a pre-launch name-only review, including explicitly labeled assistant fallback after official/common-name lookup. Local review adds the minimal provisional status and prepares evidence-linked, exact-field revisions; no publication or automatic translation workflow is implied.
+- Scope, invariants and verification are recorded in `NAME_AUDIT_2026-10-19.md`. Historical topic-key identity problems remain separate from naming corrections.
+
+### 2026-10-19 — Chinese-name audit local review completed
+
+Applied 5,629 scoped presentation edits to 70 archives on the review branch; no key/ID/fact migration or publication. Reconciled 855 researched decisions across 878 existing keys, including explicit assistant-provisional status and intentional original brands. Updated 61 English overlay digest pairs only, regenerated latest/manifest mirrors, and retained source spelling/identity exceptions for separate review. `npm run check` passed 105 files / 591 tests plus archive/locales validation and build. Separate invariants confirm all shared facts and English prose preserved. Two overlong archive headings use concise 暂译 labels while originals remain in the article. See `NAME_AUDIT_2026-10-19.md` and the standalone evidence package.
+
+## 2026-10-20 — Bind automatic title evidence to complete bilingual labels
+
+- **Reproduced:** A Simplified Chinese Steam page containing `示例二（Example II）` classified as official evidence for the base title `Example`; candidate validation then persisted the sequel's Chinese name under the base key. The same substring/proximity check accepted edition subtitles and nearby unrelated titles.
+- **Local fix:** Compare both complete names in explicit bilingual title labels or standalone bilingual lines, retaining normalized punctuation/case/width matching. Do not infer identity from a 1,000-character proximity window or a suffix blacklist. Existing source-family, locale, reprint, user-name and conflict protections remain unchanged; existing registered aliases remain preserved during adoption.
+- **Verification:** Regression tests exercise classification through candidate validation and in-memory registry adoption, rejecting sequels, editions, Unicode extensions and unrelated nearby names while accepting complete exact identities. Positive source fixtures now contain explicit bilingual evidence instead of appending an unrelated English name.
+- **Boundary:** Ambiguous prose-only evidence is intentionally left unadopted. No new title registry data, archive, schema, publishing flow, or production state is changed. This is a local patch pending review, not a deployment or a historical naming repair.
+
+- **Final local validation:** `npm run check` passed: 108 test files / 669 tests, Canonical and English locale validation for 71 editions, and production build. One prior aggregate attempt hit an unchanged ReadingApp test timeout; its isolated recheck and the unchanged full retry passed. No timeout configuration or unrelated frontend code was changed.
+
+## 2026-10-20 — Successful Pages deployments own their receipts
+
+- **Reproduced:** The exact-edition dispatch could be cancelled/replaced by a main push, while successful push and empty-edition dispatch deployments never acknowledged durable state. Publication replay could also stamp a new SHA into a still-deployed lane without a corresponding success transition.
+- **Local fix:** Keep global Pages serialization and the noon release gate, stop cancelling running releases, and reconcile successful deployments against their immutable manifest/archives plus fresh trusted state. A bounded atomic retry selects only requested/latest or outstanding committed editions, checks publication ancestry, preserves newer receipts, and never creates missing states. Failure receipts remain exact-edition-only.
+- **Boundary:** No Canonical/archive, cadence, issue/window identity, state schema, or historical publication is changed. Focused regression verification and production acceptance are recorded separately; this entry is not proof of deployment.
+
+## 2026-10-20 — Isolate reader content from optional navigation failures
+
+- **Reproduced:** ReadingApp required manifest and latest to finish together, hiding usable latest content when navigation failed and blocking historical deep links on an unrelated latest request. Fetch headers and JSON body reads had no deadline, and a valid archive for the wrong edition was accepted.
+- **Local fix:** Load the requested edition independently, derive historical paths only from valid calendar-date edition IDs, and reject mismatched archive identities. Optional navigation and search have isolated retries; missing navigation no longer implies first/latest boundaries or an endless calendar load. Shared JSON requests have a 15-second full-body deadline and clean up cancellation listeners/timers; URL/language changes cannot reveal stale content.
+- **Verification:** Actual React network/retry tests cover manifest failure/hang, archive independence, stalled headers/body, retry isolation, history/language changes, injected fixtures, wrong IDs, English safety rejection, and unmount cancellation. Loader fake-timer tests cover success/error/abort/deadline cleanup. Existing reader structure, English digest/projection gates, and 10-second slow-loading notice remain unchanged.
+- **Boundary:** No dependencies, lazy-module loading, visual redesign, content data, archive revisions, or publication behavior are changed. Production verification remains separate.
+
+### 2026-10-20 — Preserve semantic symbols in title evidence
+
+Independent review found complete bilingual labels still collapsed different names because identity normalization removed every Unicode punctuation/symbol character: `《忍者》（N）` could validate and persist a name for `N++`. Preserve meaningful symbols and punctuation, including `+`, `#`, `!`, `?`, `&` and `×`; only normalize explicit typographic quote/dash equivalents, case/width/whitespace, and decorative trademark/copyright glyphs. Remove trademark glyphs before compatibility normalization expands `™` into letters. Regression coverage checks classification through adoption, both sides of the bilingual pair, exact plain-line matching, semantic-symbol positives and retained decorative/typographic positives. No registry, archive, schema, workflow or other data changes. Focused checks and final integrated verification are recorded separately.
+
+## 2026-10-20 — Integrated reliability release verification
+
+- Scope: complete title identity (including semantic symbols), Canonical-bound locale repair, successful-deployment receipt reconciliation, and independent bounded reader recovery. The fixes remain separate reversible commits. No historical data, title registry, dependencies, Daily cutoff/noon gate, issue numbers, or schedules changed.
+- Final local `npm run check` passed on the integrated implementation: 111 test files / 761 tests, 71 archive and English infrastructure validations, typecheck, and production build. Fresh lockfile installation used Node 24; CI's Node 22 verification and live release acceptance remain required before completion.
+- Independent review passed 215 focused tests across 13 files. The review's semantic-symbol collision and injected-fixture loading findings were corrected and rechecked; no remaining blocker was identified.
+- The optional legacy `optimization-cli-smoke.mjs` remains unsuitable as a current aggregate gate: its hardcoded September 12 queue fixture fails the existing same-current-edition guard before reaching locale repair when the repository's latest edition is October 20. The new isolated locale CLI regression covers validation/build races, retry rejection, and byte preservation directly. No unrelated queue contract was relaxed to make this old harness pass.
+- This record is pre-publication validation, not a claim of successful production deployment. Production acceptance must use the exact merged commit's CI, deployment logs/receipt and live asset checks.
