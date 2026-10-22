@@ -1,8 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import EnglishApp from "./EnglishApp";
 import "./styles.css";
 import "./locale.css";
 import "./reading.css";
@@ -41,12 +39,16 @@ function LocaleSwitch({ english }: { english: boolean }) {
 
 const reading = new URLSearchParams(window.location.search).get("view") !== "classic";
 const ReadingApp = React.lazy(() => import("./ReadingApp"));
+const App = React.lazy(() => import("./App"));
+const EnglishApp = React.lazy(() => import("./EnglishApp"));
 const english = new URLSearchParams(window.location.search).get("lang") === "en";
 document.documentElement.lang = english ? "en" : "zh-CN";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {reading ? <React.Suspense fallback={<LoadingPage english={english} />}><ReadingApp english={english} /></React.Suspense> : english ? <EnglishApp /> : <App />}
+    <React.Suspense fallback={<LoadingPage english={english} />}>
+      {reading ? <ReadingApp english={english} /> : english ? <EnglishApp /> : <App />}
+    </React.Suspense>
     {!reading && <LocaleSwitch english={english} />}
   </React.StrictMode>,
 );

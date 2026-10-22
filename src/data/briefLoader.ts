@@ -1,5 +1,6 @@
 import { edition as fallbackEdition } from "./brief";
 import { validateEdition } from "../lib/brief";
+import { fetchJson } from "./fetchJson";
 import type {
   BriefEdition,
   BriefManifest,
@@ -47,24 +48,19 @@ export function englishOverlayUrl(
 }
 
 export function archivedBriefUrl(
-  item: BriefManifestItem,
+  item: Pick<BriefManifestItem, "id" | "path"> | string,
   baseUrl = import.meta.env.BASE_URL,
 ): string {
+  if (typeof item === "string") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})-(?:am|pm|daily)$/.exec(item);
+    const date = item.slice(0, 10);
+    const timestamp = Date.parse(`${date}T00:00:00Z`);
+    if (!match || !Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== date) {
+      throw new Error("Invalid archive edition ID.");
+    }
+    return dataUrl(`archive/${match[1]}/${match[2]}/${item}.json`, baseUrl);
+  }
   return dataUrl(item.path, baseUrl);
-}
-
-async function fetchJson(
-  url: string,
-  signal: AbortSignal | undefined,
-  fetcher: typeof fetch,
-): Promise<unknown> {
-  const response = await fetcher(url, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  if (!response.ok) throw new Error(`request failed with ${response.status}: ${url}`);
-  return response.json();
 }
 
 function normalizeSearchIndex(candidate: BriefSearchIndexPayload): BriefSearchIndex {
@@ -80,6 +76,9 @@ function normalizeSearchIndex(candidate: BriefSearchIndexPayload): BriefSearchIn
       date: item.date,
       period: item.period,
       entryId: item.entryId,
+      titleKey: item.titleKey,
+      section: item.section,
+      titleStatus: item.titleStatus,
       titleZhCn: (item as BriefSearchIndexV2["items"][number] & { titleZhCn?: string }).titleZhCn,
       titleEn: (item as BriefSearchIndexV2["items"][number] & { titleEn?: string }).titleEn ?? item.copy.en?.subject ?? item.copy["zh-CN"].subject,
       headline: item.copy["zh-CN"].headline,
@@ -160,12 +159,14 @@ export async function loadEnglishOverlay(
 }
 
 export async function loadArchivedEdition(
-  item: BriefManifestItem,
+  item: Pick<BriefManifestItem, "id" | "path"> | string,
   signal?: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<BriefEdition> {
   const candidate = await fetchJson(archivedBriefUrl(item), signal, fetcher);
   const errors = validateEdition(candidate, { requireEnvelope: true });
   if (errors.length > 0) throw new Error(`archived brief validation failed: ${errors.join("; ")}`);
+  const requestedId = typeof item === "string" ? item : item.id;
+  if ((candidate as BriefEdition).id !== requestedId) throw new Error("Archived edition does not match the requested edition.");
   return candidate as BriefEdition;
 }

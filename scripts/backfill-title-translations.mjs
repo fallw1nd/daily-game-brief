@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { refreshGeneratedEditorialAlts } from "./lib/media-alt.mjs";
-import { getRegisteredTitleTranslation, localizeHeadline, localizeRegisteredTitles } from "./lib/title-translations.mjs";
+import { getRegisteredTitleTranslation, localizeRegisteredTitles } from "./lib/title-translations.mjs";
 
 const archiveRoot = "public/data/archive";
 const latestPath = "public/data/latest.json";
@@ -33,21 +33,31 @@ function backfillTitle(title, stats) {
 }
 
 function localizeEntry(entry, stats) {
-  let changed = backfillTitle(entry.title, stats);
-  const next = localizeRegisteredTitles(localizeHeadline(entry.headline, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn }), { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn });
+  // A backfill fills missing structured names, not an unrestricted rewrite of
+  // every historical headline. Preserve already translated editorial copy.
+  if (!backfillTitle(entry.title, stats)) return false;
+  let changed = true;
+  const registered = getRegisteredTitleTranslation(entry.title.title_key, entry.title.title_en);
+  const localize = (text, subject = {}) => localizeRegisteredTitles(text, {
+    ...subject,
+    translations: { subject: registered },
+    titleEn: entry.title.title_en,
+    titleZhCn: entry.title.title_zh_cn,
+  });
+  const next = localize(entry.headline);
   if (next !== entry.headline) {
     entry.headline = next;
     stats.headlines += 1;
     stats.headlineKeys.add(entry.title?.title_key || entry.id);
     changed = true;
   }
-  const nextSummary = localizeRegisteredTitles(entry.summary, { titleEn: entry.title?.title_en, titleZhCn: entry.title?.title_zh_cn });
+  const nextSummary = localize(entry.summary);
   if (nextSummary !== entry.summary) {
     entry.summary = nextSummary;
     stats.summaries += 1;
     changed = true;
   }
-  const imageAlts = refreshGeneratedEditorialAlts(entry, localizeRegisteredTitles);
+  const imageAlts = refreshGeneratedEditorialAlts(entry, localize);
   if (imageAlts) {
     stats.imageAlts += imageAlts;
     changed = true;
@@ -58,11 +68,15 @@ function localizeEntry(entry, stats) {
 function backfillDocument(file, stats) {
   const document = JSON.parse(fs.readFileSync(file, "utf8"));
   let changed = false;
-  for (const item of document.entries || []) changed = localizeEntry(item, stats) || changed;
+  const filledEntryIds = new Set();
+  for (const item of document.entries || []) {
+    if (localizeEntry(item, stats)) { filledEntryIds.add(item.id); changed = true; }
+  }
   for (const item of document.upcoming || []) changed = backfillTitle(item.title, stats) || changed;
   const lead = (document.entries || []).find((item) => item.id === document.leadEntryId);
-  if (lead && document.archiveTitle) {
-    const next = localizeRegisteredTitles(localizeHeadline(document.archiveTitle, { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn }), { titleEn: lead.title?.title_en, titleZhCn: lead.title?.title_zh_cn });
+  if (lead && filledEntryIds.has(lead.id) && document.archiveTitle) {
+    const registered = getRegisteredTitleTranslation(lead.title.title_key, lead.title.title_en);
+    const next = localizeRegisteredTitles(document.archiveTitle, { translations: { subject: registered }, titleEn: lead.title.title_en, titleZhCn: lead.title.title_zh_cn });
     if (next !== document.archiveTitle) { document.archiveTitle = next; stats.archiveTitles += 1; changed = true; }
   }
   if (changed) { fs.writeFileSync(file, `${JSON.stringify(document, null, 2)}\n`); stats.files += 1; }

@@ -147,6 +147,7 @@ jobs:
           fi
 
       - name: Dispatch trusted publisher
+        id: publisher_dispatch
         if: steps.request.outputs.kind == 'edition'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -197,7 +198,11 @@ jobs:
           if [ "${{ steps.request.outputs.kind }}" = "edition" ]; then
             echo "- Edition: ${{ steps.edition.outputs.edition }}" >> "$GITHUB_STEP_SUMMARY"
             echo "- Failed-publication recovery: ${{ steps.edition.outputs.recover }}" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Trusted publisher dispatched after local evidence validation." >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ steps.publisher_dispatch.outcome }}" = "success" ]; then
+              echo "- Trusted publisher dispatch accepted after local evidence validation; publication/deployment verification remains separate." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- Trusted publisher was not dispatched successfully (step outcome: ${{ steps.publisher_dispatch.outcome || 'skipped' }})." >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             echo "- Title registry/backfill uses the existing title backfill command and full repository check."
             echo "- Title backfill changed production data: ${{ steps.titles.outputs.changed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
