@@ -29,14 +29,18 @@ jobs:
         shell: bash
         run: |
           request_id="${GITHUB_REF_NAME#automation/secondary/}"
+          if ! [[ "$request_id" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$ ]]; then
+            echo "Invalid secondary request branch identity"
+            exit 1
+          fi
           request_path="automation/secondary/$request_id.json"
-          if [ ! -f "$request_path" ]; then
+          if [ ! -f "$request_path" ] || [ -L "$request_path" ]; then
             echo "Secondary request does not match branch identity: $request_path"
             exit 1
           fi
           cp "$request_path" "$RUNNER_TEMP/secondary-request.json"
           kind="$(node -p "JSON.parse(require('fs').readFileSync('$RUNNER_TEMP/secondary-request.json','utf8')).kind || ''")"
-          if [ "$kind" != "edition" ] && [ "$kind" != "title_backfill" ]; then
+          if [ "$kind" != "edition" ] && [ "$kind" != "title_backfill" ] && [ "$kind" != "media_repair" ]; then
             echo "Unsupported secondary publication kind: $kind"
             exit 1
           fi
@@ -147,6 +151,7 @@ jobs:
           fi
 
       - name: Dispatch trusted publisher
+        id: publisher_dispatch
         if: steps.request.outputs.kind == 'edition'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -158,6 +163,23 @@ jobs:
             -f recover_failed_publication="${{ steps.edition.outputs.recover }}" \
             -f historical_insertion_issue="${{ steps.edition.outputs.historical_issue }}" \
             -f historical_insertion_latest="${{ steps.edition.outputs.historical_latest }}"
+
+      - name: Validate exact media repair target
+        if: steps.request.outputs.kind == 'media_repair'
+        id: media
+        run: node scripts/validate-secondary-media-request.mjs "$RUNNER_TEMP/secondary-request.json"
+
+      - name: Dispatch existing trusted media workflow
+        if: steps.request.outputs.kind == 'media_repair'
+        id: media_dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EDITION_ID: ${{ steps.media.outputs.edition }}
+          RECORD_ID: ${{ steps.media.outputs.record }}
+        shell: bash
+        run: |
+          gh workflow run media-enrichment.yml --ref main \
+            -f edition_id="$EDITION_ID" -f record_id="$RECORD_ID"
 
       - name: Merge verified title patch and backfill
         if: steps.request.outputs.kind == 'title_backfill'
@@ -190,14 +212,29 @@ jobs:
       - name: Summary
         if: always()
         shell: bash
+        env:
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          MEDIA_EDITION: ${{ steps.media.outputs.edition }}
+          MEDIA_RECORD: ${{ steps.media.outputs.record }}
         run: |
           echo "### Secondary publication" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Request: ${{ steps.request.outputs.request_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Request: $REQUEST_ID" >> "$GITHUB_STEP_SUMMARY"
           echo "- Kind: ${{ steps.request.outputs.kind }}" >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ steps.request.outputs.kind }}" = "edition" ]; then
             echo "- Edition: ${{ steps.edition.outputs.edition }}" >> "$GITHUB_STEP_SUMMARY"
             echo "- Failed-publication recovery: ${{ steps.edition.outputs.recover }}" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Trusted publisher dispatched after local evidence validation." >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ steps.publisher_dispatch.outcome }}" = "success" ]; then
+              echo "- Trusted publisher dispatch accepted after local evidence validation; publication/deployment verification remains separate." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- Trusted publisher was not dispatched successfully (step outcome: ${{ steps.publisher_dispatch.outcome || 'skipped' }})." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          elif [ "${{ steps.request.outputs.kind }}" = "media_repair" ]; then
+            echo "- Media target: $MEDIA_EDITION / ${MEDIA_RECORD:-all records}" >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ steps.media_dispatch.outcome }}" = "success" ]; then
+              echo "- Trusted media dispatch accepted; this is not publication completion. Verify media audit, full check, main commit, state acknowledgement and Pages separately." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- Trusted media workflow was not dispatched successfully." >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             echo "- Title registry/backfill uses the existing title backfill command and full repository check."
             echo "- Title backfill changed production data: ${{ steps.titles.outputs.changed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"

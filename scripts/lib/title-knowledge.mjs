@@ -1,8 +1,47 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
-const normalizeIdentity = value => String(value || "").normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, " ").trim();
+// Symbols and punctuation can identify a different game (N, N+, N++).
+// Only normalize explicit presentation equivalents, never whole Unicode
+// punctuation/symbol classes. Remove trademark glyphs before NFKC turns ™ into TM.
+const normalizeIdentity = value => String(value || "")
+  .replace(/[™®©]/gu, "")
+  .normalize("NFKC")
+  .toLowerCase()
+  .replace(/[‘’]/gu, "'")
+  .replace(/[“”]/gu, '"')
+  .replace(/[‐‑‒–—]/gu, "-")
+  .replace(/\s+/gu, " ")
+  .trim();
 
 const config = JSON.parse(readFileSync(resolve("config/title-evidence-sources.json")));
+
+// A nearby occurrence is not evidence of a translation: it may name a base
+// game, sequel, edition, or related story. Compare complete bilingual labels.
+function hasBoundTitlePair(text, identity, chinese) {
+  const expected = normalizeIdentity(identity);
+  const proposed = normalizeIdentity(chinese);
+  if (!expected || !proposed) return false;
+  const matches = (left, right) => {
+    const a = normalizeIdentity(left);
+    const b = normalizeIdentity(right);
+    return (a === expected && b === proposed) || (a === proposed && b === expected);
+  };
+  // Explicit title markers may occur in prose. Keep the entire enclosed name
+  // so punctuation, sequel numbers and edition subtitles cannot be truncated.
+  for (const pair of text.matchAll(/《([^《》\n]+)》[ \t]*[（(]([^()（）\n]+)[)）]/gu)) {
+    if (matches(pair[1], pair[2])) return true;
+  }
+  // Unmarked names must form a complete line, not a slice of arbitrary prose.
+  // This deliberately leaves ambiguous pages for review instead of persisting
+  // a guessed identity. Whitespace/punctuation variants still compare normally.
+  for (const line of text.split(/[\r\n]+/u)) {
+    const pair = line.trim().match(/^([^()（）\n]+)[（(]([^()（）\n]+)[)）][.!。！]?$/u);
+    if (pair && matches(pair[1], pair[2])) return true;
+    const normalized = normalizeIdentity(line);
+    if (normalized === `${expected} ${proposed}` || normalized === `${proposed} ${expected}`) return true;
+  }
+  return false;
+}
 
 export function classifyTitleSource(source, subject, chinese, rules = config.sources) {
   const url = new URL(source.url);
@@ -10,16 +49,8 @@ export function classifyTitleSource(source, subject, chinese, rules = config.sou
   if (!rule) return null;
   if (rule.kind === "media" && /(?:^|\.)(?:bbs|forum|forums|tieba)\.|\/(?:bbs|forum|forums|thread)(?:\/|-)/i.test(url.hostname + url.pathname)) return null;
   const text = String(source.pageText || "");
-  const index = text.indexOf(chinese);
-  if (index < 0 || /转载自|本文转载|原文来自|本文来源于/.test(text)) return null;
-  const identity = subject.titleEn || subject.subjectKey;
-  // Require the original full identity beside the proposed name, not in navigation/related stories.
-  const context = text.slice(Math.max(0, index - 500), index + chinese.length + 500);
-  const normalized = normalizeIdentity(context);
-  const expected = normalizeIdentity(identity);
-  if (!expected) return null;
-  const escaped = expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "u").test(normalized)) return null;
+  if (!chinese || /转载自|本文转载|原文来自|本文来源于/.test(text)) return null;
+  if (!hasBoundTitlePair(text, subject.titleEn || subject.subjectKey, chinese)) return null;
   const simplified = rule.kind === "official" && Boolean(rule.simplifiedPath && new RegExp(rule.simplifiedPath, "i").test(url.pathname + url.search));
   return { family: rule.family, kind: simplified ? "official_simplified" : rule.kind === "media" ? "media" : "unverified_locale" };
 }

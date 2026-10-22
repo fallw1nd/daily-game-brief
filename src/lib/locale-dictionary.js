@@ -15,6 +15,7 @@ export const localeDictionary = {
     official_simplified: "Official Simplified Chinese",
     official_traditional: "Official Traditional Chinese",
     common_translation: "Common Chinese translation",
+    provisional_translation: "Provisional assistant translation (unofficial)",
     unavailable: "No established Chinese title",
   },
   sourceKind: {
@@ -68,6 +69,7 @@ const releaseTypeLabels = new Map([
   ["产业动态", "Industry news"],
   ["平台移植上线", "Platform port release"],
   ["PC版发售", "PC release"],
+  ["多平台发售", "Multi-platform release"],
   ["平台版发售", "Platform release"],
   ["PS5版发售", "PlayStation 5 release"],
   ["Nintendo Switch版发售", "Nintendo Switch release"],

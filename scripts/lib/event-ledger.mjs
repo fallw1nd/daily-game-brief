@@ -62,7 +62,7 @@ function selectedSourceUrls(decision, packetItem) {
   return [...new Set([...selected, ...(decision.additionalSources || []).map((source) => source.url)].filter(Boolean))];
 }
 
-function totals(events) {
+export function totals(events) {
   const values = Object.values(events);
   return {
     events: values.length,
@@ -74,7 +74,34 @@ function totals(events) {
   };
 }
 
+// Manual overlays preserve omitted Canonical entries; their compact decisions are
+// not a fresh verdict on the current global tracking ledger.
+export function isEditorialFeedbackEligible({ editionId, latestEditionId, historicalInsertion = false, state, packetBlobSha, decisionIdentity }) {
+  if (historicalInsertion || !editionId || !latestEditionId) return false;
+  // Only the trusted state caller supplies this context; packet metadata cannot
+  // declare itself a continuation and bypass the manual-overlay boundary.
+  if (state?.editionId !== editionId) return editionId >= latestEditionId;
+  const manualReason = "user_authorized_same_edition_revision";
+  const currentPacket = Boolean(packetBlobSha) && state.packet?.blobSha === packetBlobSha && state.editorial?.packetBlobSha === packetBlobSha;
+  if (["open", "completed"].includes(state.revisionRequest?.status) && state.revisionRequest.reason === manualReason &&
+      state.packet?.blobSha === packetBlobSha && state.editorial?.packetBlobSha === packetBlobSha) return false;
+  // A completed manual request may already have been replaced by a queued
+  // continuation. Identify old digest replays from existing immutable receipts.
+  let reason = null;
+  let matchingReceipt = false;
+  for (const transition of state.transitions || []) {
+    if (["revision-opened", "continuation-opened", "supplement-opened"].includes(transition.event)) reason = transition.reason;
+    if (transition.event === "publication-committed" && decisionIdentity && transition.decisionDigest === decisionIdentity &&
+        transition.packetBlobSha === packetBlobSha) {
+      if (reason === manualReason) return false;
+      matchingReceipt = true;
+    }
+  }
+  return editionId >= latestEditionId || currentPacket || matchingReceipt;
+}
+
 export function applyEditorialFeedback(ledger, editorial, packet, options = {}) {
+  if (options.latestEditionId && !isEditorialFeedbackEligible({ editionId: editorial.editionId, latestEditionId: options.latestEditionId, state: options.state, packetBlobSha: editorial.packetBlobSha, decisionIdentity: options.decisionIdentity })) return ledger;
   const decidedAt = options.decidedAt || new Date().toISOString();
   const decisionIdentity = options.decisionIdentity || null;
   const editionId = editorial.editionId;

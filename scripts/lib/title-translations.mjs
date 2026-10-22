@@ -11,8 +11,12 @@ function normalizedAlias(value) {
 }
 
 export function getRegisteredTitleTranslation(titleKey, titleEn = null) {
-  if (typeof titleKey === "string" && titleKey.trim() && titleTranslations[titleKey]) return titleTranslations[titleKey];
   const alias = normalizedAlias(titleEn);
+  const keyed = typeof titleKey === "string" ? titleTranslations[titleKey] : null;
+  // Generated subject keys are hints, not authority to rename an unrelated company
+  // or another game. An explicit original name must agree with a registered alias.
+  if (keyed && (!alias || (keyed.titleEnAliases || []).some(candidate => normalizedAlias(candidate) === alias)
+    || (!(keyed.titleEnAliases || []).length && normalizedAlias(titleKey) === alias))) return keyed;
   if (!alias) return null;
   return Object.values(titleTranslations).find((item) =>
     (item.titleEnAliases || []).some((candidate) => normalizedAlias(candidate) === alias)
@@ -35,6 +39,8 @@ export function resolveTitleTranslation({ titleKey, titleZhCn = null, titleZhSta
 
 function titlePairs(titleEn, titleZhCn) {
   if (typeof titleEn !== "string" || typeof titleZhCn !== "string") return [];
+  // A slash inside an original-name annotation is not a Chinese title separator.
+  if (/[（(][^）)]*\/[^）)]*[）)]/u.test(titleZhCn)) return [[titleEn.trim(), titleZhCn.trim()]];
   const enParts = titleEn.split(/\s*\/\s*/).map((value) => value.trim()).filter(Boolean);
   const zhParts = titleZhCn.split(/\s*\/\s*/).map((value) => value.trim()).filter(Boolean);
   if (enParts.length > 1 && enParts.length === zhParts.length) return enParts.map((english, index) => [english, zhParts[index]]);
@@ -74,6 +80,15 @@ function isInsideExistingTranslation(text, start, end, translations) {
   });
 }
 
+function isInsideTranslationAnnotation(text, start, end) {
+  const open = Math.max(text.lastIndexOf("（", start), text.lastIndexOf("(", start));
+  const closed = Math.max(text.lastIndexOf("）", start), text.lastIndexOf(")", start));
+  if (open <= closed) return false;
+  const close = text.slice(end).search(/[）)]/u);
+  if (close < 0) return false;
+  return /暂译|暂名|原名|英文名/u.test(text.slice(open + 1, end + close));
+}
+
 function singleWordAlias(alias) {
   return !/\s/u.test(alias.trim());
 }
@@ -102,7 +117,7 @@ function localizeTitleMentions(text, entries, { explicitSubjectAliases = new Set
     const end = start + matchedAlias.length;
     const normalized = matchedAlias.normalize("NFKC").toLocaleLowerCase();
     const candidate = candidates.get(normalized);
-    if (!candidate || candidate.translations.size !== 1 || hasUnknownSequelSuffix(text, end) || isInsideExistingTranslation(text, start, end, knownTranslations)) return fullMatch;
+    if (!candidate || candidate.translations.size !== 1 || hasUnknownSequelSuffix(text, end) || isInsideExistingTranslation(text, start, end, knownTranslations) || isInsideTranslationAnnotation(text, start, end)) return fullMatch;
     const enclosedByExactTitle = explicitTitleContentMatches(text, start, end, matchedAlias);
     if (singleWordAlias(matchedAlias) && !explicitSubjectAliases.has(normalized) && !enclosedByExactTitle) return fullMatch;
     if (text.lastIndexOf("《", start) > text.lastIndexOf("》", start) && !enclosedByExactTitle) return fullMatch;

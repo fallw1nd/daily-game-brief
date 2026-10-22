@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
-import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
+import { advanceEditorialQueue, orderCalendarQueueEditions } from "./lib/editorial-queue.mjs";
 import { showcaseRetryDue } from "./lib/showcase.mjs";
 import { mergeShowcaseReports, refreshedShowcaseBatches } from "./lib/showcase-refresh.mjs";
 
@@ -33,6 +33,16 @@ if (!requestedEdition) {
       break;
     }
   }
+}
+// Only the global sweep shares calendar turns. Explicit single-edition repairs
+// and the existing in-flight guard above retain their exact ownership.
+if (!requestedEdition && editions.length) {
+  const queues = {};
+  for (const edition of editions) {
+    try { queues[edition.id] = JSON.parse(await readFile(resolve(root, `automation/batches/${edition.id}/queue.json`), "utf8")); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+  editions = orderCalendarQueueEditions(editions, queues);
 }
 for (const edition of editions) {
   if (activations >= maxActivations) break;

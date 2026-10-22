@@ -8,7 +8,7 @@ function pkg(subjectKey, eventKind = "announcement") {
 function source(url, pageText, extra = {}) {
   return {
     url,
-    pageText: `${pageText} Unregistered Example Game`,
+    pageText,
     label: extra.label || new URL(url).hostname,
     pageTitle: extra.pageTitle || "",
     excerpt: extra.excerpt || "",
@@ -24,7 +24,7 @@ describe("title hint subject selection", () => {
       { ...pkg("未登録タイトル"), titleKey: "fable" },
       pkg("Unregistered Example: Game"), pkg("Unregistered Example – Game"),
       pkg("Unregistered Example: Game 2"),
-    ] }).map(item => item.subjectKey)).toEqual(["Unregistered Example: Game", "Unregistered Example: Game 2"]);
+    ] }).map(item => item.subjectKey)).toEqual(["未登録タイトル", "Unregistered Example: Game", "Unregistered Example: Game 2"]);
   });
   it("does not search titles already registered, including the 2026-08-28 regressions", () => {
     const evidence = {
@@ -77,7 +77,7 @@ describe("title hint candidate verification", () => {
       titleZhCn: "示例游戏",
       suggestedStatus: "official_simplified",
       reason: "Official store page uses this title.",
-    }, [source("https://store.steampowered.com/app/999/?l=schinese", `${"页面前文。".repeat(80)}欢迎来到《示例游戏》的官方页面。`)]);
+    }, [source("https://store.steampowered.com/app/999/?l=schinese", `${"页面前文。".repeat(80)}欢迎来到《示例游戏》（Unregistered Example Game）的官方页面。`)]);
 
     expect(hint).toMatchObject({
       titleZhCn: "示例游戏",
@@ -97,13 +97,13 @@ describe("title hint candidate verification", () => {
     };
 
     expect(validateTitleHintCandidate(subject, candidate, [
-      source("https://gamersky.com/game", "我们称本作为《示例译名》。"),
-      source("https://gamersky.com/preview", "《示例译名》试玩。"),
+      source("https://gamersky.com/game", "我们称本作为《示例译名》（Unregistered Example Game）。"),
+      source("https://gamersky.com/preview", "《示例译名》（Unregistered Example Game）试玩。"),
     ])).toBeNull();
 
     expect(validateTitleHintCandidate(subject, candidate, [
-      source("https://gamersky.com/game", "我们称本作为《示例译名》。"),
-      source("https://3dmgame.com/preview", "《示例译名》试玩。"),
+      source("https://gamersky.com/game", "我们称本作为《示例译名》（Unregistered Example Game）。"),
+      source("https://3dmgame.com/preview", "《示例译名》（Unregistered Example Game）试玩。"),
     ])).toMatchObject({ titleZhCn: "示例译名", suggestedStatus: "common_translation" });
   });
 
@@ -132,7 +132,7 @@ describe("title hint candidate verification", () => {
     ["FINAL FANTASY VII EVER CRISIS", "最终幻想7：永恒危机", "official_simplified", ["https://store.steampowered.com/ff7ec?l=schinese"]],
   ])("validates known regression evidence for %s", (subjectKey, titleZhCn, suggestedStatus, urls) => {
     const knownSubject = { subjectKey, titleKey: subjectKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") };
-    const verified = urls.map((url) => source(url, `${subjectKey} 页面明确使用《${titleZhCn}》作为作品名称。`));
+    const verified = urls.map((url) => source(url, `页面明确使用《${titleZhCn}》（${subjectKey}）作为作品名称。`));
     expect(validateTitleHintCandidate(knownSubject, {
       titleZhCn,
       suggestedStatus,

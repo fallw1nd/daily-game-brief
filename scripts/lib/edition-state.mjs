@@ -149,14 +149,28 @@ export function applyEditionStateEvent(current, event, data = {}) {
     if (event === "continuation-opened" && (!/^[\w-]+\.json$/u.test(String(data.batchName || "")) || !["news", "calendar"].includes(data.batchScope) || !Array.isArray(data.eventKeys) || !data.eventKeys.length || data.eventKeys.some(key => typeof key !== "string" || !key))) {
       throw new Error("editorial continuation requires a scoped news batch");
     }
+    let suspendedContinuation = null;
     if (state.revisionRequest?.status === "open") {
       if (event === "continuation-opened" && (state.revisionRequest.reason !== reason || state.revisionRequest.batchName !== data.batchName)) {
         throw new Error("a different editorial continuation is already open");
       }
-      return state;
+      if (event === "revision-opened" && state.revisionRequest.reason === EDITORIAL_CONTINUATION_REASON) {
+        // Only a finalized, unconsumed queue activation can yield to manual work.
+        // A pending packet may still have an active collector; never preempt it.
+        // The recorder returns its exact batch to pending in the same transaction.
+        if (state.editorial.status !== "pending" || state.editorial.submissionSha !== null
+          || state.publication.status !== "pending" || state.publication.mainSha !== null
+          || state.packet.status !== "ready") {
+          throw new Error("cannot replace an active or consumed editorial continuation");
+        }
+        suspendedContinuation = structuredClone(state.revisionRequest);
+      } else {
+        if (state.revisionRequest.reason !== reason) throw new Error("a different revision reason is already open");
+        return state;
+      }
     }
-    if (state.publication.status !== "committed") throw new Error("same-edition revision requires an already committed publication");
-    const previousMainSha = state.deployment.mainSha || state.publication.mainSha;
+    if (!suspendedContinuation && state.publication.status !== "committed") throw new Error("same-edition revision requires an already committed publication");
+    const previousMainSha = suspendedContinuation?.previousMainSha || state.deployment.mainSha || state.publication.mainSha;
     assertSha(previousMainSha, "previousMainSha");
     state.packet = { status: "pending", blobSha: null, producerRunId: null, completedAt: null };
     state.editorial = { status: "pending", packetBlobSha: null, submissionSha: null, validationErrors: [], updatedAt: at };
@@ -181,6 +195,7 @@ export function applyEditionStateEvent(current, event, data = {}) {
     return record(state, event, at, actor, runId, {
       reason,
       previousMainSha,
+      ...(suspendedContinuation ? { suspendedContinuation } : {}),
       ...(event === "supplement-opened" ? { announcementIds: [...new Set(data.announcementIds)] } : {}),
       ...(event === "continuation-opened" ? { batchName: data.batchName, batchScope: data.batchScope, eventKeys: [...new Set(data.eventKeys)] } : {}),
     });
@@ -273,7 +288,8 @@ export function applyEditionStateEvent(current, event, data = {}) {
     // An acknowledgement describes its own release, not whichever release is
     // currently live. The trusted recorder checks Git ancestry before applying it.
     if (data.superseded === true) return current;
-    if (!deployed && state.deployment.status === "deployed" && state.deployment.mainSha === data.mainSha) return current;
+    if (!deployed && state.deployment.status === "deployed" && state.deployment.mainSha === data.mainSha
+      && state.transitions.findLast(item => item.event === "deployment-succeeded")?.mainSha === data.mainSha) return current;
     state.deployment = { status: deployed ? "deployed" : "failed", mainSha: data.mainSha || state.publication.mainSha, runId, updatedAt: at, error: deployed ? null : String(data.error || "deployment failed") };
     return record(state, event, at, actor, runId, { mainSha: state.deployment.mainSha });
   }

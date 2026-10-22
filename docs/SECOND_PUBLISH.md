@@ -68,6 +68,26 @@
 - 每个新增 registry 项必须携带 `titleZhCn`、`titleZhStatus`、英文 aliases（如有）和证据；
 - workflow 合并 registry、执行 `titles:backfill`、完整 `npm run check`，再提交 `main`；主分支 push 触发正常 Pages 部署。
 
+### media_repair request
+
+仅需重跑某期媒体时优先直接 dispatch 现有 `media-enrichment.yml`（`edition_id`，可选 `record_id`）。调用端只能推送分支、不能 dispatch 时，可使用同一 Secondary 入口；不新增媒体 writer、定时任务或凭据。
+
+例如分支 `automation/secondary/media-2026-09-02-repair-1`，唯一请求文件 `automation/secondary/media-2026-09-02-repair-1.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "media_repair",
+  "editionId": "2026-09-02-daily"
+}
+```
+
+- 分支后缀须为 1–128 位 ASCII 字母/数字/下划线/连字符，首位为字母或数字；不得嵌套路径。文件名必须对应分支后缀。
+- 如只需重验某条日历封面，增加 `"recordId":"目标 upcoming 条目的现有 id"`；必须是该归档中真实且唯一的 upcoming ID，不能用新闻条目 ID。不指定则沿用现有整期媒体补全行为。
+- 仅接受以上四个字段；不得附带正文、标题、图片、metadata、ref 或命令覆盖。`editionId` 必须是合法日期及 am/pm/daily 期次，并同时匹配 trusted main 的 manifest 和实际 archive 身份/路径/issueNumber。
+- Secondary 在切回 trusted main 后验证，只 dispatch `media-enrichment.yml --ref main`，沿用现有验证、媒体提交、state acknowledgement 和 Pages 部署。不会触发正文 revision 或改变 issue/window。
+- Secondary 成功仅表示 dispatch 被接受，不等于媒体或部署成功。继续检查对应 Publish verified media 的 audit、完整 check、main commit、media state 和 Pages 结果；无数据变化时不要求新增提交/部署。
+
 该 workflow 不是长期定时任务，只响应显式的人工 secondary request。
 
 ## 5. 验收与停止条件
