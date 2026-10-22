@@ -1,5 +1,13 @@
 # Maintenance Issue Log
 
+## MNT-20261023-01 — Avoid unnecessary startup code and misleading secondary-release receipts
+
+- Status: local implementation; production verification recorded in the secondary-publication report.
+- Default reading mode unnecessarily loaded both legacy applications and GSAP. Lazy-load all three application variants under one loading boundary while preserving classic Chinese/English routing and the locale toggle. Production-build default-route JavaScript decreased from 485.05 KB to 297.03 KB (gzip 158.35 KB to 96.00 KB); GSAP remains available on demand rather than being deleted.
+- Secondary workflow summaries previously claimed publisher dispatch even when validation failed. Report the actual dispatch step outcome and distinguish accepted dispatch from confirmed publication/deployment.
+- Media downloads previously checked only the initial target and buffered the full response before enforcing byte limits. Validate every redirect destination, cap redirects, share a fetch timeout, and cancel oversized bodies during streaming. Re-run the full check after rebasing concurrent media updates before another production push.
+- Regression coverage includes all frontend route/language variants, success/failure/skipped dispatch summaries, safe/unsafe redirect chains, missing redirect locations, and declared/streamed oversized responses. No public schema, edition identities, schedules, source priorities, or compatibility pages were removed.
+
 ## MNT-20261020-02 — Locale repair silently rebound stale English to corrected facts
 
 - Status: implementation verified locally; release verification pending.

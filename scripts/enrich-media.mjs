@@ -24,28 +24,60 @@ function isPrivateIp(address) {
     /^172\.(1[6-9]|2\d|3[01])\./.test(address);
 }
 
-async function assertSafeHttps(input) {
+async function assertSafeHttps(input, lookupHost = lookup) {
   const url = new URL(input);
   if (url.protocol !== "https:") throw new Error("only HTTPS media is allowed");
   if (/^(localhost|.+\.local)$/i.test(url.hostname)) throw new Error("local host is not allowed");
-  const addresses = await lookup(url.hostname, { all: true });
+  const addresses = await lookupHost(url.hostname, { all: true });
   if (addresses.some(({ address }) => isPrivateIp(address))) throw new Error("private network target is not allowed");
   return url;
 }
 
-async function fetchLimited(input, limit, accept) {
-  const url = await assertSafeHttps(input);
-  const response = await fetch(url, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(18_000),
-    headers: { Accept: accept, "User-Agent": USER_AGENT },
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+async function fetchLimited(input, limit, accept, { fetcher = fetch, lookupHost = lookup } = {}) {
+  let url = await assertSafeHttps(input, lookupHost);
+  // One deadline covers the whole redirect chain and body, not each hop.
+  const signal = AbortSignal.timeout(18_000);
+  let response;
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    response = await fetcher(url, {
+      redirect: "manual",
+      signal,
+      headers: { Accept: accept, "User-Agent": USER_AGENT },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("redirect is missing a location");
+    if (redirects === 5) throw new Error("too many redirects");
+    url = await assertSafeHttps(new URL(location, url).href, lookupHost);
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`HTTP ${response.status}`);
+  }
   const declared = Number(response.headers.get("content-length") || 0);
-  if (declared > limit) throw new Error(`response exceeds ${limit} bytes`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > limit) throw new Error(`response exceeds ${limit} bytes`);
-  return { bytes, contentType: response.headers.get("content-type") || "", url: response.url };
+  if (declared > limit) {
+    await response.body?.cancel();
+    throw new Error(`response exceeds ${limit} bytes`);
+  }
+  const chunks = [];
+  let size = 0;
+  const reader = response.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > limit) throw new Error(`response exceeds ${limit} bytes`);
+        chunks.push(value);
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
+  return { bytes: Buffer.concat(chunks, size), contentType: response.headers.get("content-type") || "", url: response.url || url.href };
 }
 
 function decodeEntities(value) {
@@ -731,4 +763,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   });
 }
 
-export { discoverFromSource, processEdition, resolveRecord };
+export { discoverFromSource, processEdition, resolveRecord, fetchLimited };
