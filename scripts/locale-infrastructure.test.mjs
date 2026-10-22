@@ -144,3 +144,40 @@ describe("English locale infrastructure", () => {
     expect(result.errors).toContain("overlay.localeDigest cannot be reproduced");
   });
 });
+
+
+describe("upcoming cover text before media enrichment", () => {
+  function calendarFixture(titleEn, coverAlt) {
+    const canonical = canonicalEdition();
+    canonical.upcoming = [{
+      id: "upcoming-boring-ball-pc-us", date: "2026-10-22",
+      title: { title_key: "boring-ball", title_en: titleEn, title_zh_status: "unavailable" },
+      platforms: ["PC"], region: "Global", releaseType: "Full release",
+      source: { label: "Steam", url: "https://store.steampowered.com/app/123", kind: "primary" },
+    }];
+    const overlay = validOverlay(canonical);
+    overlay.upcoming = [{ upcomingId: canonical.upcoming[0].id, ...(coverAlt === undefined ? {} : { coverAlt }) }];
+    overlay.localeDigest = localeDigest(overlay);
+    return { canonical, overlay };
+  }
+
+  it.each(["Boring Ball-無聊的球", "無聊的球遊戲"])("rejects untranslated alt for %s even without a cover", titleEn => {
+    const { canonical, overlay } = calendarFixture(titleEn, `《${titleEn}》 cover`);
+    const expected = "upcoming[0].coverAlt: text still contains substantial Chinese copy";
+    expect(canonical.upcoming[0].cover).toBeUndefined();
+    expect(validateEnglishOverlay(canonical, overlay).errors).toContain(expected);
+    const repair = buildEnglishRepairOverlay({ canonical, draft: overlay });
+    expect(repair.status).not.toBe("available");
+    expect(repair.errors).toContain(expected);
+    expect(canonical.upcoming[0].title.title_en).toBe(titleEn);
+  });
+
+  it.each([undefined, "Boring Ball cover", "Game cover artwork"])("allows optional or reviewed English alt %s before and after cover enrichment", coverAlt => {
+    const { canonical, overlay } = calendarFixture("Boring Ball-無聊的球", coverAlt);
+    expect(validateEnglishOverlay(canonical, overlay).errors).toEqual([]);
+    expect(buildEnglishRepairOverlay({ canonical, draft: overlay }).status).toBe("available");
+    canonical.upcoming[0].cover = { url: "media/boring-ball.jpg", alt: "官方封面", kind: "cover" };
+    expect(validateEnglishOverlay(canonical, overlay).errors).toEqual([]);
+    expect(canonical.upcoming[0].title.title_en).toBe("Boring Ball-無聊的球");
+  });
+});
