@@ -16,6 +16,32 @@ describe("Pages deployment trigger contract", () => {
     expect(deploy).not.toContain("Unable to resolve deployed edition from public/data/latest.json");
   });
 
+  it("serializes Pages without cancelling running releases and reconciles every successful deployment", async () => {
+    const deploy = await workflow("deploy.yml");
+    expect(deploy).toMatch(/concurrency:\s*\n\s*group: pages\s*\n\s*cancel-in-progress: false/);
+    const success = deploy.split("- name: Acknowledge successful deployment")[1].split("- name:")[0];
+    expect(success).toContain("if: steps.deployment.outcome == 'success'");
+    expect(success).not.toContain("github.event_name");
+    expect(success).toContain("reconcile-deployment-state-branch.sh");
+    expect(success).toContain('--outcome=success --edition="$EDITION_ID" --main-sha="$DEPLOYED_SHA"');
+    const failure = deploy.split("- name: Acknowledge requested deployment failure")[1];
+    expect(failure).toContain("!cancelled()");
+    expect(failure).toContain("steps.request.outcome == 'success'");
+    expect(failure).toContain("steps.deployment.outcome != 'success'");
+    expect(failure).toContain("github.event_name == 'workflow_dispatch' && inputs.edition_id != ''");
+    expect(failure).toContain("--outcome=failure");
+  });
+
+  it("validates dispatch edition identity before dependency installation or deployment", async () => {
+    const deploy = await workflow("deploy.yml");
+    const validation = deploy.indexOf("- name: Validate requested edition");
+    expect(validation).toBeGreaterThan(deploy.indexOf("- name: Checkout"));
+    expect(validation).toBeLessThan(deploy.indexOf("- name: Install dependencies"));
+    expect(deploy).toContain("editionStatePath(edition)");
+    expect(deploy).toContain("Requested edition is not in this deployment");
+    expect(deploy).not.toContain('edition="${{ inputs.edition_id }}"');
+  });
+
   it("holds a staged Daily build until its noon plannedAt without delaying legacy editions", async () => {
     const deploy = await workflow("deploy.yml");
 

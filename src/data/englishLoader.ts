@@ -1,4 +1,5 @@
 import type { BriefSearchIndex, BriefSearchIndexPayload, BriefSearchIndexV2 } from "../types";
+import { fetchJson } from "./fetchJson";
 
 function dataUrl(path: string, baseUrl = import.meta.env.BASE_URL): string {
   const base = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
@@ -9,13 +10,7 @@ export async function loadEnglishSearchIndex(
   signal?: AbortSignal,
   fetcher: typeof fetch = fetch,
 ): Promise<BriefSearchIndex> {
-  const response = await fetcher(dataUrl("search-index.json"), {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  if (!response.ok) throw new Error(`request failed with ${response.status}`);
-  const candidate = await response.json() as BriefSearchIndexPayload;
+  const candidate = await fetchJson(dataUrl("search-index.json"), signal, fetcher) as BriefSearchIndexPayload;
   if (candidate.schemaVersion !== 2 || !Array.isArray((candidate as BriefSearchIndexV2).items)) {
     return { schemaVersion: 1, updatedAt: "", entries: [] };
   }
@@ -33,6 +28,9 @@ export async function loadEnglishSearchIndex(
         date: item.date,
         period: item.period,
         entryId: item.entryId,
+        titleKey: item.titleKey,
+        section: item.section,
+      titleStatus: item.titleStatus,
         titleEn: item.titleEn,
         headline: copy.headline,
         summary: copy.summary,

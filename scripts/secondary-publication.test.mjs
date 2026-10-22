@@ -112,3 +112,13 @@ describe("secondary publication", () => {
     expect(() => applySecondaryTitlePatch(registry, patch)).toThrow(/conflicts with existing registry entry/);
   });
 });
+
+
+describe("provisional title provenance", () => {
+  it("accepts a clearly labeled assistant translation, not a false official claim", () => {
+    const patch = { schemaVersion: 1, kind: "title_backfill", translations: { provisional: { titleZhCn: "示例（Example，暂译）", titleZhStatus: "provisional_translation", evidence: { kind: "assistant_translation", note: "Explicitly authorized name-only fallback after official and common-name lookup." } } } };
+    expect(applySecondaryTitlePatch({ translations: {} }, patch).registry.translations.provisional.titleZhStatus).toBe("provisional_translation");
+    patch.translations.provisional.evidence.kind = "official_source";
+    expect(() => applySecondaryTitlePatch({ translations: {} }, patch)).toThrow(/disclose assistant translation/);
+  });
+});
