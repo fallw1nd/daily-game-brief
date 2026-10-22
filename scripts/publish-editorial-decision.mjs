@@ -1,3 +1,4 @@
+import { isEditorialFeedbackEligible } from "./lib/event-ledger.mjs";
 import { assertHistoricalInsertion } from "./lib/historical-insertion.mjs";
 import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
 import { createHash } from "node:crypto";
@@ -91,6 +92,7 @@ async function writeLocalePlan(canonical, localePlan, { preservePublished = fals
 }
 
 let repairExactDuplicateStories = false;
+let trustedRevisionState = null;
 async function hasAuthorizedSameEditionRevision(editorial) {
   try {
     const { stdout } = await run("git", [
@@ -98,6 +100,7 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       `refs/remotes/origin/automation/state:automation/status/${editorial.editionId}.json`,
     ]);
     const state = JSON.parse(stdout);
+    trustedRevisionState = state;
     const packetEventKeys = new Set(packet?.editorialInput?.packages?.map(item => item.eventKey) || []);
     const continuationKeys = new Set(state.revisionRequest?.eventKeys || []);
     const calendarKeys = packet?.editorialInput?.calendarWork?.pages?.map(page => page.blobSha) || [];
@@ -215,6 +218,7 @@ if (historicalInsertion) {
 }
 persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
+const feedbackAllowed = isEditorialFeedbackEligible({ editionId: editorial.editionId, latestEditionId: latest.id, historicalInsertion, state: trustedRevisionState, packetBlobSha: editorial.packetBlobSha, decisionIdentity: editorialDecisionDigest(editorial) });
 const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
@@ -232,7 +236,7 @@ if (noOpNewsContinuation) {
     canonicalStatus: "unchanged",
     localeStatus: existingOverlay ? "available" : "unavailable",
     localeReasonCode: existingOverlay ? null : "retained-existing-state",
-    feedbackEligible: true,
+    feedbackEligible: feedbackAllowed,
   });
   console.log(`${editorial.editionId}: news continuation reviewed with no included facts; Canonical publication unchanged.`);
   process.exit(0);
@@ -268,9 +272,10 @@ if (result.status === "already-exists") {
   const existingEdition = manifestItem
     ? JSON.parse(await readFile(resolve("public/data", manifestItem.path), "utf8"))
     : null;
-  const feedbackEligible = !historicalInsertion && existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const matchingDecision = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
+  const feedbackEligible = feedbackAllowed && matchingDecision;
   let localeStatus = "unchanged";
-  if (feedbackEligible && editorial.locales?.en) {
+  if (matchingDecision && editorial.locales?.en) {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
     const localePlan = buildEnglishOverlay({
       canonical: existingEdition,
@@ -328,7 +333,7 @@ await writePublicationResult({
   localeSummary: localePlan.summary,
   localeWarnings: localePlan.warnings,
   localeErrors: localePlan.errors || [],
-  feedbackEligible: !historicalInsertion,
+  feedbackEligible: feedbackAllowed,
 });
 if (localePlan.status === "available") {
   console.log(`${result.status === "revised" ? "Revised" : "Built"} ${result.edition.id} issue ${result.edition.issueNumber}: bilingual publication ready.`);

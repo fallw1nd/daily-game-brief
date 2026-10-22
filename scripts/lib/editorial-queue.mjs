@@ -231,3 +231,33 @@ export function advanceShowcaseQueue(input) {
   queue.batches = queue.batches.filter(batch => batch.scope === "showcase");
   return advanceEditorialQueue({ ...input, queue });
 }
+
+/** Return an unconsumed continuation to its existing queue before manual work.
+ * Persist both outputs atomically; never infer completion from the takeover. */
+export function openManualRevision({ state, queue, packets, ...data }) {
+  const nextState = applyEditionStateEvent(state, "revision-opened", data);
+  const request = state?.revisionRequest;
+  if (request?.status !== "open" || request.reason !== EDITORIAL_CONTINUATION_REASON) {
+    return { state: nextState, queue };
+  }
+  if (queue?.editionId !== state.editionId || !Array.isArray(queue.batches)
+    || queue.activeBatchName !== request.batchName) throw new Error("manual takeover requires the exact active continuation queue");
+  queue.batches.forEach(assertBatchShape);
+  const matches = queue.batches.filter(batch => batch.name === request.batchName);
+  const batch = matches[0];
+  if (matches.length !== 1 || batch.status !== "editing" || batch.scope !== request.batchScope
+    || queue.batches.some(other => other !== batch && other.status === "editing")
+    || [...batch.eventKeys].sort().join("\0") !== [...request.eventKeys].sort().join("\0")) {
+    throw new Error("manual takeover requires the exact unconsumed continuation batch");
+  }
+  const packetText = packets?.[batch.name];
+  if (typeof packetText !== "string") throw new Error("manual takeover requires the durable continuation packet");
+  validateBatchPacket(packetText, batch, state.editionId);
+  if (state.packet.status === "ready" && gitBlobSha(packetText) !== state.packet.blobSha) {
+    throw new Error("manual takeover continuation packet does not match durable acknowledgement");
+  }
+  const nextQueue = structuredClone(queue);
+  nextQueue.batches.find(item => item.name === batch.name).status = "pending";
+  nextQueue.activeBatchName = null;
+  return { state: nextState, queue: nextQueue };
+}

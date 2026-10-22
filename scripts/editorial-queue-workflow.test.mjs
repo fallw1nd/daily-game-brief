@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
+const feedbackWriter = await readFile("scripts/write-editorial-feedback-branch.sh", "utf8");
 const publisher = await readFile(".github/workflows/publish-editorial-decision.yml", "utf8");
 const sla = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");
 const queueScript = await readFile("scripts/advance-showcase-queue.mjs", "utf8");
@@ -11,7 +12,16 @@ const queueUpdater = await readFile("scripts/update-showcase-queue-branch.sh", "
 
 describe("editorial continuation queue orchestration", () => {
   it("advances the publishing edition and keeps one oldest global continuation lane", () => {
-    expect(publisher).toContain('node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --edition="${{ steps.submission.outputs.edition }}" --max-activations=1');
+    const feedbackStep = publisher.split("- name: Write editorial outcomes to persistent ledger")[1].split("- name:")[0];
+    expect(feedbackStep).toContain("steps.publication.outcome == 'success'");
+    expect(feedbackStep).toContain("EDITION_ID: ${{ steps.submission.outputs.edition }}");
+    expect(feedbackStep).toContain("bash scripts/write-editorial-feedback-branch.sh");
+    expect(feedbackWriter).toContain('node scripts/advance-showcase-queue.mjs --state-root="$state_dir" --edition="$EDITION_ID" --max-activations=1');
+    const feedbackBlock = feedbackWriter.split('if [ "${FEEDBACK_ELIGIBLE:-}" = "true" ]; then')[1].split("  fi")[0];
+    expect(feedbackBlock).not.toContain("advance-showcase-queue");
+    expect(feedbackWriter).toContain('  fi\n  node scripts/advance-showcase-queue.mjs');
+    expect(feedbackWriter).toContain('if [ -d "$state_dir/automation/batches" ]; then');
+    expect(feedbackWriter).toContain('git -C "$state_dir" add automation/batches automation/packets automation/status');
     expect(publisher).toContain("Activate one oldest pending continuation");
     expect(publisher).toContain("bash scripts/update-showcase-queue-branch.sh --no-refresh-sources");
     expect(sla).toContain("bash scripts/update-showcase-queue-branch.sh --refresh-sources");

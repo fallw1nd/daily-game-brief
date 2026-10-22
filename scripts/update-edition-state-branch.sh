@@ -53,6 +53,10 @@ for attempt in 1 2 3; do
   git -C "$state_dir" config user.name "daily-game-brief[bot]"
   git -C "$state_dir" config user.email "daily-game-brief[bot]@users.noreply.github.com"
   git -C "$state_dir" add "automation/status/$edition.json"
+  # Manual takeover must release its unconsumed queue activation atomically.
+  if [ "$event" = "revision-opened" ] && [ -f "$state_dir/automation/batches/$edition/queue.json" ]; then
+    git -C "$state_dir" add "automation/batches/$edition/queue.json"
+  fi
   if [ "$event" = "packet-ready" ] && [ -n "$packet_path" ]; then
     git -C "$state_dir" add "automation/packets/$edition.json"
   fi

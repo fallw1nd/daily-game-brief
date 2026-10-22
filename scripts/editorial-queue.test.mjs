@@ -1,6 +1,10 @@
-import { readFileSync } from "node:fs";
+import { applyEditorialFeedback } from "./lib/event-ledger.mjs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { advanceEditorialQueue, orderCalendarQueueEditions } from "./lib/editorial-queue.mjs";
+import { advanceEditorialQueue, orderCalendarQueueEditions, openManualRevision } from "./lib/editorial-queue.mjs";
 import { applyEditionStateEvent, createEditionState, gitBlobSha } from "./lib/edition-state.mjs";
 import { buildEdition } from "./lib/edition-publisher.mjs";
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
@@ -411,4 +415,183 @@ describe("durable editorial continuation queue", () => {
     expect(result.state.revisionRequest).toMatchObject({ reason: "showcase_completion", announcementIds: ["showcase-1"] });
     expect(result.state.revisionRequest).not.toHaveProperty("batchScope", "news");
   });
+});
+
+
+describe("manual revision takeover of an unconsumed continuation", () => {
+  const reason = "user_authorized_same_edition_revision";
+  function active(scope = "news") {
+    const input = queueFixture();
+    if (scope === "calendar") {
+      const key = "a".repeat(40);
+      input.queue.batches = [{ name: "calendar.json", scope, status: "pending", eventKeys: [key], retryAttempts: 2 }];
+      input.packets = { "calendar.json": packet([], scope, { calendarWork: { pages: [{ blobSha: key }] } }) };
+      input.canonical.sourceReport = { calendarReview: deferredCalendarReview({ pages: [{ blobSha: key }] }, "still pending") };
+    }
+    const result = advanceEditorialQueue(input);
+    return { ...input, state: result.state, queue: result.queue };
+  }
+  it.each(["news", "calendar"])("requeues exact %s work and resumes it after manual publication without false completion", scope => {
+    const input = active(scope);
+    const before = structuredClone(input);
+    const result = openManualRevision({ ...input, reason });
+    expect(input).toEqual(before);
+    expect(result.state.revisionRequest).toMatchObject({ status: "open", reason, previousMainSha: input.state.revisionRequest.previousMainSha });
+    expect(result.state.fixedWindow).toEqual(input.state.fixedWindow);
+    expect(result.state.packet.status).toBe("pending");
+    expect(result.state.transitions.at(-1).suspendedContinuation).toEqual(input.state.revisionRequest);
+    expect(result.queue).toEqual({ ...input.queue, activeBatchName: null,
+      batches: input.queue.batches.map(batch => batch.name === input.queue.activeBatchName ? { ...batch, status: "pending" } : batch) });
+    expect(advanceEditorialQueue({ ...input, ...result }).packet).toBeNull();
+    const replay = openManualRevision({ ...input, ...result, reason });
+    expect(replay).toEqual(result);
+    const text = input.packets[input.queue.activeBatchName];
+    const manualText = packet(["manual-revision"]);
+    let manual = applyEditionStateEvent(result.state, "packet-ready", { packetBlobSha: gitBlobSha(manualText) });
+    manual = publishContinuation(manual, manualText, "7".repeat(40));
+    const resumed = advanceEditorialQueue({ ...input, queue: result.queue, state: manual });
+    expect(resumed.packet).toBe(text);
+    expect(resumed.batch.name).toBe(input.queue.activeBatchName);
+    expect(resumed.batch.status).toBe("editing");
+    expect(resumed.state.revisionRequest.eventKeys).toEqual(input.state.revisionRequest.eventKeys);
+    expect(resumed.state.packet.blobSha).toBe(input.state.packet.blobSha);
+    expect(input.canonical).toEqual(before.canonical);
+  });
+  it("records queue and state together, replays without changes, and refuses a newly consumed snapshot", () => {
+    const input = active("calendar");
+    const root = mkdtempSync(join(tmpdir(), "manual-takeover-"));
+    const statePath = join(root, `automation/status/${editionId}.json`);
+    const batchRoot = join(root, `automation/batches/${editionId}`);
+    const queuePath = join(batchRoot, "queue.json");
+    const packetPath = join(batchRoot, input.queue.activeBatchName);
+    const run = () => execFileSync(process.execPath, [resolve("scripts/record-edition-state.mjs"),
+      `--state-root=${root}`, `--edition=${editionId}`, "--event=revision-opened", `--reason=${reason}`],
+      { stdio: "pipe", env: { ...process.env, GITHUB_OUTPUT: "" } });
+    try {
+      mkdirSync(join(root, "automation/status"), { recursive: true });
+      mkdirSync(batchRoot, { recursive: true });
+      writeFileSync(statePath, JSON.stringify(input.state));
+      writeFileSync(queuePath, JSON.stringify(input.queue));
+      writeFileSync(packetPath, input.packets[input.queue.activeBatchName]);
+      run();
+      const written = [statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"));
+      expect(JSON.parse(written[0]).revisionRequest.reason).toBe(reason);
+      expect(JSON.parse(written[1]).batches[0].status).toBe("pending");
+      expect(written[2]).toBe(input.packets[input.queue.activeBatchName]);
+      run();
+      expect([statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"))).toEqual(written);
+      writeFileSync(statePath, JSON.stringify(input.state));
+      const mismatch = structuredClone(input.queue);
+      mismatch.activeBatchName = "wrong.json";
+      writeFileSync(queuePath, JSON.stringify(mismatch));
+      const mismatched = [statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"));
+      expect(run).toThrow();
+      expect([statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"))).toEqual(mismatched);
+      input.state.packet.status = "pending";
+      writeFileSync(statePath, JSON.stringify(input.state));
+      writeFileSync(queuePath, JSON.stringify(input.queue));
+      const collecting = [statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"));
+      expect(run).toThrow();
+      expect([statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"))).toEqual(collecting);
+      input.state.packet.status = "ready";
+      input.state.editorial.status = "submitted";
+      writeFileSync(statePath, JSON.stringify(input.state));
+      writeFileSync(queuePath, JSON.stringify(input.queue));
+      const blocked = [statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"));
+      expect(run).toThrow();
+      expect([statePath, queuePath, packetPath].map(path => readFileSync(path, "utf8"))).toEqual(blocked);
+      expect(readFileSync("scripts/update-edition-state-branch.sh", "utf8")).toContain('git -C "$state_dir" add "automation/batches/$edition/queue.json"');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }, 15_000); // Multiple real Node subprocesses need scheduling headroom under CI load.
+  it.each(["submitted", "valid", "invalid", "timed_out"])("rejects consumed %s work", status => {
+    const input = active();
+    input.state.editorial.status = status;
+    expect(() => openManualRevision({ ...input, reason })).toThrow("active or consumed");
+  });
+  it.each(["failed", "committed"])("rejects %s publication instead of replacing work", status => {
+    const input = active();
+    input.state.publication.status = status;
+    expect(() => openManualRevision({ ...input, reason })).toThrow("active or consumed");
+  });
+  it("rejects hidden consumption and publication identity even with pending lane labels", () => {
+    for (const lane of ["editorial", "publication"]) {
+      const input = active();
+      input.state[lane][lane === "editorial" ? "submissionSha" : "mainSha"] = "f".repeat(40);
+      expect(() => openManualRevision({ ...input, reason })).toThrow("active or consumed");
+    }
+  });
+  it("rejects missing authorization, other open reasons, and failed packets", () => {
+    const input = active();
+    expect(() => openManualRevision({ ...input, reason: "retry" })).toThrow("explicit user authorization");
+    for (const status of ["pending", "failed"]) {
+      input.state.packet.status = status;
+      expect(() => openManualRevision({ ...input, reason })).toThrow("active or consumed");
+    }
+    const showcase = applyEditionStateEvent(publishedState(), "supplement-opened", { reason: "showcase_completion", announcementIds: ["one"] });
+    expect(() => openManualRevision({ ...input, state: showcase, reason })).toThrow("different revision reason");
+  });
+  it("fails closed on queue, scope, packet, and active ownership mismatches without mutations", () => {
+    const mutations = [
+      input => { input.queue = null; },
+      input => { input.queue.editionId = "2026-09-12-daily"; },
+      input => { input.queue.activeBatchName = null; },
+      input => { input.queue.batches[0].status = "completed"; },
+      input => { input.queue.batches[0].scope = "calendar"; },
+      input => { input.queue.batches[0].eventKeys = ["wrong"]; },
+      input => { input.queue.batches.push({ ...input.queue.batches[0] }); },
+      input => { input.queue.batches[1].status = "editing"; },
+      input => { input.packets = {}; },
+      input => { input.packets["news-1.json"] += "\n"; },
+    ];
+    for (const mutate of mutations) {
+      const input = active();
+      mutate(input);
+      const before = structuredClone(input);
+      expect(() => openManualRevision({ ...input, reason })).toThrow();
+      expect(input).toEqual(before);
+    }
+  });
+  it("keeps an already-open manual cycle idempotent even after consumption instead of resetting it", () => {
+    const input = active();
+    const first = openManualRevision({ ...input, reason });
+    for (const status of ["pending", "submitted", "valid", "invalid", "timed_out"]) {
+      const state = structuredClone(first.state);
+      state.editorial.status = status;
+      if (status !== "pending") state.editorial.submissionSha = "f".repeat(40);
+      expect(openManualRevision({ ...input, state, queue: first.queue, reason })).toEqual({ state, queue: first.queue });
+    }
+  });
+  it("leaves completed continuation queues intact when opening a normal manual cycle", () => {
+    const input = active();
+    const text = input.packets[input.queue.activeBatchName];
+    const completed = publishContinuation(input.state, text, "7".repeat(40));
+    const result = openManualRevision({ ...input, state: completed, reason });
+    expect(result.queue).toEqual(input.queue);
+    expect(result.state.revisionRequest.previousMainSha).toBe("7".repeat(40));
+  });
+});
+
+it("integrates manual takeover, ledger suppression, queue resume and older no-include feedback", () => {
+  const input = queueFixture();
+  const active = advanceEditorialQueue(input);
+  const manual = openManualRevision({ ...input, state: active.state, queue: active.queue, reason: "user_authorized_same_edition_revision" });
+  const manualText = packet(["manual-target"]);
+  const manualSha = gitBlobSha(manualText);
+  let manualState = applyEditionStateEvent(manual.state, "packet-ready", { packetBlobSha: manualSha });
+  manualState = publishContinuation(manualState, manualText, "6".repeat(40));
+  const options = { latestEditionId: "2026-10-22-daily", state: manualState, decisionIdentity: "manual", decidedAt: "2026-10-22T19:00:00Z" };
+  const ledger = { events: { "news-1": { editorialState: "included" } } };
+  const decision = { editionId, packetBlobSha: manualSha, decisions: [{ eventKey: "news-1", decision: "exclude", reason: "Compact manual omission" }] };
+  expect(applyEditorialFeedback(ledger, decision, {}, options)).toBe(ledger);
+  const resumed = advanceEditorialQueue({ ...input, queue: manual.queue, state: manualState, ledger });
+  expect(resumed.batch.name).toBe("news-1.json");
+  expect(resumed.queue.batches[0].status).toBe("editing");
+  expect(resumed.state.revisionRequest.reason).toBe("editorial_continuation");
+  const completed = publishContinuation(resumed.state, resumed.packet, "7".repeat(40));
+  const continuationDecision = { editionId, packetBlobSha: gitBlobSha(resumed.packet), decisions: [{ eventKey: "news-1", decision: "exclude", reason: "Reviewed no new fact" }] };
+  const updated = applyEditorialFeedback(ledger, continuationDecision, JSON.parse(resumed.packet), { ...options, state: completed, decisionIdentity: "continuation" });
+  expect(updated.events["news-1"].editorialState).toBe("excluded");
+  const next = advanceEditorialQueue({ ...input, queue: resumed.queue, state: completed, ledger: updated });
+  expect(next.queue.batches[0].status).toBe("completed");
+  expect(next.batch.name).toBe("news-2.json");
 });
