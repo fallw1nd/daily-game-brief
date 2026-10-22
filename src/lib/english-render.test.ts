@@ -74,11 +74,76 @@ function overlay(edition: BriefEdition): EnglishLocaleOverlay {
       timeNote: "English time note.",
       mediaAlts: [{ assetKey: assetKey(edition.entries[0].id, image), alt: "English image description" }],
     }],
-    upcoming: [{ upcomingId: edition.upcoming[0].id, coverAlt: "Next Game cover art" }],
+    upcoming: [{ upcomingId: edition.upcoming[0].id, coverAlt: "English cover description" }],
   };
 }
 
 describe("English presentation projection", () => {
+  it("uses existing English copy when optional news and calendar alts are omitted", () => {
+    const edition = canonical();
+    const english = overlay(edition);
+    delete english.entries[0].mediaAlts;
+    delete english.upcoming[0].coverAlt;
+
+    const projected = projectEnglishEdition(edition, english);
+    expect(projected?.entries[0].images?.[0]).toEqual({
+      ...edition.entries[0].images![0],
+      alt: "Image for: Test Game Announces an Update",
+    });
+    expect(projected?.upcoming[0].cover).toEqual({
+      ...edition.upcoming[0].cover,
+      alt: "Next Game cover art",
+    });
+    expect(edition.entries[0].images?.[0].alt).toBe("中文图片说明");
+    expect(edition.upcoming[0].cover?.alt).toBe("中文封面说明");
+  });
+
+  it("does not reuse translated alt from a different news asset", () => {
+    const edition = canonical();
+    const english = overlay(edition);
+    english.entries[0].mediaAlts![0].assetKey = "different-asset";
+
+    const projected = projectEnglishEdition(edition, english);
+    expect(projected?.entries[0].images?.[0].alt).toBe("Image for: Test Game Announces an Update");
+  });
+
+  it.each([undefined, "", "   "])("uses generic cover copy when an English game name is unavailable (%j)", (titleEn) => {
+    const edition = canonical();
+    const english = overlay(edition);
+    if (titleEn === undefined) Reflect.deleteProperty(edition.upcoming[0].title, "title_en");
+    else edition.upcoming[0].title.title_en = titleEn;
+    delete english.upcoming[0].coverAlt;
+
+    expect(projectEnglishEdition(edition, english)?.upcoming[0].cover?.alt).toBe("Game cover art");
+    expect(edition.upcoming[0].title.title_en).toBe(titleEn);
+    expect(edition.upcoming[0].cover?.alt).toBe("中文封面说明");
+
+    english.upcoming[0].coverAlt = "English cover description";
+    expect(projectEnglishEdition(edition, english)?.upcoming[0].cover?.alt).toBe("English cover description");
+  });
+
+  it.each(["", "   "])("falls back when optional media alts are blank (%j)", (alt) => {
+    const edition = canonical();
+    const english = overlay(edition);
+    english.entries[0].mediaAlts![0].alt = alt;
+    english.upcoming[0].coverAlt = alt;
+
+    const projected = projectEnglishEdition(edition, english);
+    expect(projected?.entries[0].images?.[0].alt).toBe("Image for: Test Game Announces an Update");
+    expect(projected?.upcoming[0].cover?.alt).toBe("Next Game cover art");
+  });
+
+  it("does not create images when Canonical has no media", () => {
+    const edition = canonical();
+    const english = overlay(edition);
+    delete edition.entries[0].images;
+    delete edition.upcoming[0].cover;
+
+    const projected = projectEnglishEdition(edition, english);
+    expect(projected?.entries[0].images).toBeUndefined();
+    expect(projected?.upcoming[0].cover).toBeUndefined();
+  });
+
   it("changes presentation copy while retaining Canonical fact fields", () => {
     const edition = canonical();
     const projected = projectEnglishEdition(edition, overlay(edition));
@@ -94,6 +159,6 @@ describe("English presentation projection", () => {
     expect(projected?.entries[0].releaseType).toBe("Full release");
     expect(projected?.entries[0].sources[0].label).toBe("Steam store");
     expect(projected?.entries[0].images?.[0].alt).toBe("English image description");
-    expect(projected?.upcoming[0].cover?.alt).toBe("Next Game cover art");
+    expect(projected?.upcoming[0].cover?.alt).toBe("English cover description");
   });
 });

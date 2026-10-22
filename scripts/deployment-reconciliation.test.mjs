@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync, readdirSync, chmodSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -59,7 +60,8 @@ function fixture() {
   return { root, git, put, manifest, old, deployed, stateRoot, statePath, save, load, published, success, run };
 }
 
-describe("successful Pages deployment receipt reconciliation", () => {
+// Real Git/Node subprocesses need scheduling headroom under full-suite contention.
+describe("successful Pages deployment receipt reconciliation", { timeout: 15_000 }, () => {
   it("repairs latest and outstanding represented editions after an exact dispatch is replaced, without rewriting covered history", () => {
     const f = fixture();
     f.save(f.success(f.published(ids[0])));
@@ -125,7 +127,7 @@ describe("successful Pages deployment receipt reconciliation", () => {
     expect(f.load(ids[1])).toEqual(newer);
     expect(f.load(ids[2])).toEqual(other);
     expect(f.load(ids[8])).toEqual(unrepresented);
-  }, 15_000);
+  });
 
   it("preserves a newer deployment receipt when an older successful deployment finishes late", () => {
     const f = fixture();
@@ -256,5 +258,5 @@ exec "$REAL_GIT" "$@"
     expect(recovered.localeEn).toEqual(independent.localeEn);
     expect(readdirSync(runnerTemp)).toEqual([]);
     expect(f.git("rev-parse", "HEAD")).toBe(future);
-  }, 15_000); // Real Git subprocess integration may exceed the unit-test budget under CI contention.
+  });
 });

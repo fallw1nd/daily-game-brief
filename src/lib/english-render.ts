@@ -8,7 +8,7 @@ function translatedImage(
   overlay: EnglishLocaleOverlay["entries"][number],
 ): ImageAsset {
   const translatedAlt = overlay.mediaAlts?.find((item) => item.assetKey === assetKey(ownerId, asset))?.alt;
-  return translatedAlt ? { ...asset, alt: translatedAlt } : asset;
+  return { ...asset, alt: translatedAlt?.trim() ? translatedAlt : `Image for: ${overlay.headline}` };
 }
 
 function projectEntry(
@@ -55,8 +55,8 @@ function projectUpcoming(
     region: labels.regionLabel,
     releaseType: labels.releaseTypeLabel,
     source: { ...canonical.source, label: labels.sourceLabel },
-    ...(canonical.cover && overlay.coverAlt
-      ? { cover: { ...canonical.cover, alt: overlay.coverAlt } }
+    ...(canonical.cover
+      ? { cover: { ...canonical.cover, alt: overlay.coverAlt?.trim() ? overlay.coverAlt : `${canonical.title.title_en?.trim() || "Game"} cover art` } }
       : {}),
   };
 }
