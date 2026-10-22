@@ -1,5 +1,12 @@
 # Maintenance Issue Log
 
+## MNT-20261023-02 — Stop immediate replay of incomplete old calendar packets
+
+- Observed October 18 pinned work had 163 unique official URLs: 79 opened, 1 limited and 83 deferred by the 80-request cap. October 20/21/22 also retained explicit budget omissions. Replaying an immutable packet does not fetch these missing details.
+- Root cause of immediate replay: calendar retries reused showcase delays anchored to the original publication. For an old edition, those deadlines had already elapsed when a new partial attempt finished. Anchor calendar retries to the last committed partial attempt, retaining existing delay progression, exact page identities, deferred reasons and awaiting-retry state. Legacy retry records use their activation timestamp when available. The global sweep shares eligible calendar turns: never-attempted first, then least-recently attempted due retries, preserving original edition order on ties and non-calendar activation positions. News/showcase timing, in-flight ownership and scheduled invocations are unchanged.
+- Regression replays a real October 18 budget-blocked source/page identity with explicit clocks: no immediate reopen, no early retry, exact 30-minute first threshold, fresh 120-minute second threshold, unchanged packet and deferred receipt. A real CLI sweep fixture verifies that an unattempted newer calendar activates before an eligible older retry without completing or discarding the old queue.
+- Limitation: cooldown prevents immediate churn and fair calendar activation avoids oldest-first monopolization; neither supplies missing evidence. Existing next-Daily collection rotates its capped remainder; old immutable packets still need authorized editorial verification. Trusted refreshed calendar packets require separate bounded design and are not silently added here. Existing already-open revisions retain their ownership.
+
 ## MNT-20261023-01 — Avoid unnecessary startup code and misleading secondary-release receipts
 
 - Status: local implementation; production verification recorded in the secondary-publication report.
@@ -856,3 +863,15 @@ Independent review found complete bilingual labels still collapsed different nam
 - Independent review passed 215 focused tests across 13 files. The review's semantic-symbol collision and injected-fixture loading findings were corrected and rechecked; no remaining blocker was identified.
 - The optional legacy `optimization-cli-smoke.mjs` remains unsuitable as a current aggregate gate: its hardcoded September 12 queue fixture fails the existing same-current-edition guard before reaching locale repair when the repository's latest edition is October 20. The new isolated locale CLI regression covers validation/build races, retry rejection, and byte preservation directly. No unrelated queue contract was relaxed to make this old harness pass.
 - This record is pre-publication validation, not a claim of successful production deployment. Production acceptance must use the exact merged commit's CI, deployment logs/receipt and live asset checks.
+
+## 2026-10-23 — Preserve semantic calendar release identity
+
+- Reproduced: ID-only publication retained old-slug and store-ID aliases for the same product. Five captured 10/19 and 10/22 duplicate groups include a trademark variant and overlapping ANOMALITH platform coverage; title-key-only media reuse could also cross product scope.
+- Fix: exact recognized primary single-product URL plus original-name, date/region/type and overlapping-platform checks; retain stable published identity, stronger existing naming and verified media. English alias presentations resolve to the retained ID. No generic roundup-URL/title fuzzy deduplication and no automatic historical archive writes.
+- Verification: fixed regression snapshots plus negative scope/edition/bundle/roundup/date cases, publisher integration and English identity tests. Full check and production acceptance are recorded separately; this entry does not claim deployment.
+
+## 2026-10-23 — Preserve news and naming identity during repeated publication
+
+- Exact continuation replay now reuses the existing story ID only when normalized body, subject, time, source set and factual scope agree. New exact duplicates are rejected; unrelated same-game stories remain separate. Only an explicitly authorized manual revision can coalesce byte-equivalent historical factual projections, preserving the lead/first stable ID; automatic continuations cannot delete historical news.
+- Registry keys cannot silently rename a conflicting original subject. Already-translated name annotations are protected against recursive RTA/RS4/C64 expansion. Opened, corroborated company-formation evidence can supersede incidental creator-resume game names without changing event identity or time.
+- Independent review exercised every registry entry for idempotency and found two calendar edge cases, both fixed before release: cross-product same-ID media/name inheritance and narrow English labels masking broader platform coverage. This record describes implementation, not deployment; final publication receipts are recorded in the release report.

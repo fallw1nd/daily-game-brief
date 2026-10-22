@@ -24,7 +24,7 @@ describe("title hint subject selection", () => {
       { ...pkg("未登録タイトル"), titleKey: "fable" },
       pkg("Unregistered Example: Game"), pkg("Unregistered Example – Game"),
       pkg("Unregistered Example: Game 2"),
-    ] }).map(item => item.subjectKey)).toEqual(["Unregistered Example: Game", "Unregistered Example: Game 2"]);
+    ] }).map(item => item.subjectKey)).toEqual(["未登録タイトル", "Unregistered Example: Game", "Unregistered Example: Game 2"]);
   });
   it("does not search titles already registered, including the 2026-08-28 regressions", () => {
     const evidence = {

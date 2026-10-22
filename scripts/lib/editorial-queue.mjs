@@ -77,7 +77,7 @@ function showcaseCoverage(queue, canonical) {
 
 function nextBatch(queue, nowMs) {
   const calendar = queue.batches.find(batch => batch.scope === "calendar" && (batch.status === "pending"
-    || (batch.status === "awaiting_retry" && showcaseRetryDue(queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
+    || (batch.status === "awaiting_retry" && showcaseRetryDue(batch.lastAttemptAt || batch.activatedAt || queue.firstPublishedAt, batch.retryAttempts || 0, nowMs))));
   // News gets the first continuation turn, then a pending showcase gets the
   // next turn when one exists. This keeps Canonical progress ahead of a
   // showcase without allowing a sustained news backlog to starve it.
@@ -101,6 +101,28 @@ function nextBatch(queue, nowMs) {
     nowMs,
   ));
   return newsFirst ? dueNews || dueShowcase : dueShowcase || dueNews;
+}
+
+/** Keep non-calendar activation positions unchanged; share calendar turns across
+ * eligible editions instead of replaying the oldest immutable packet forever. */
+export function orderCalendarQueueEditions(editions, queues, now = Date.now()) {
+  const eligible = new Map();
+  for (const edition of editions) {
+    const queue = queues[edition.id];
+    if (!Array.isArray(queue?.batches)) continue;
+    const batch = nextBatch(queue, now);
+    if (batch?.scope !== "calendar") continue;
+    const attemptedAt = Date.parse(batch.lastAttemptAt || batch.activatedAt);
+    eligible.set(edition.id, Number.isFinite(attemptedAt) ? attemptedAt : -Infinity);
+  }
+  // Stable sort retains the caller's original edition/issue order for ties.
+  const calendars = editions.filter(edition => eligible.has(edition.id))
+    .sort((a, b) => {
+      const left = eligible.get(a.id), right = eligible.get(b.id);
+      return left === right ? 0 : left < right ? -1 : 1;
+    });
+  let index = 0;
+  return editions.map(edition => eligible.has(edition.id) ? calendars[index++] : edition);
 }
 
 /**
@@ -154,6 +176,10 @@ export function advanceEditorialQueue({ queue, state, canonical, packets, ledger
       batch.status = "completed";
     } else {
       batch.status = "awaiting_retry";
+      // An old edition must not immediately reopen the same immutable calendar
+      // packet after a partial review. Anchor its delay to this completed attempt,
+      // not the original publication; retain the unresolved work and exact scope.
+      if (batch.scope === "calendar") batch.lastAttemptAt = state.publication.updatedAt || now;
     }
   }
   if (!nextQueue.batches.some(batch => batch.name === nextQueue.activeBatchName && batch.status === "editing")) nextQueue.activeBatchName = null;

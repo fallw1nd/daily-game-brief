@@ -256,5 +256,5 @@ exec "$REAL_GIT" "$@"
     expect(recovered.localeEn).toEqual(independent.localeEn);
     expect(readdirSync(runnerTemp)).toEqual([]);
     expect(f.git("rev-parse", "HEAD")).toBe(future);
-  });
+  }, 15_000); // Real Git subprocess integration may exceed the unit-test budget under CI contention.
 });

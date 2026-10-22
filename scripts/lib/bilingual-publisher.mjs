@@ -1,3 +1,4 @@
+import { sameCalendarRelease } from "./published-calendar-identity.mjs";
 import { normalizeSubjectHeadline } from "./headline-subject.mjs";
 import { programmaticRegionLabel, programmaticReleaseTypeLabel } from "../../src/lib/locale-dictionary.js";
 import { upcomingKey } from "../../src/lib/locale-projection.js";
@@ -54,16 +55,26 @@ function previousUpcomingByIdentity(previousOverlay) {
   return new Map((previousOverlay?.upcoming || []).map((item) => [item.upcomingId ?? item.upcomingKey, item]));
 }
 
-function buildUpcomingOverlay(canonical, draft, previousOverlay) {
+function buildUpcomingOverlay(canonical, draft, previousOverlay, editorial) {
   const draftById = new Map((draft?.upcoming || []).map((item) => [item.upcomingId, item]));
   const previousById = previousUpcomingByIdentity(previousOverlay);
   return (canonical.upcoming || []).map((item) => {
     const identity = upcomingKey(canonical.id, item);
-    const source = draftById.get(item.id) || previousById.get(item.id) || previousById.get(identity) || {};
+    const aliases = (editorial?.upcoming || []).filter(candidate => sameCalendarRelease(item, candidate, canonical.id.slice(0, 10))
+      && candidate.platforms?.some(platform => item.platforms?.includes(platform)));
+    const aliasDraft = aliases.length === 1 ? draftById.get(aliases[0].id) : null;
+    const source = draftById.get(item.id) || aliasDraft || previousById.get(item.id) || previousById.get(identity) || {};
+    const submitted = (editorial?.upcoming || []).find(candidate => candidate.id === item.id)
+      || (aliasDraft ? aliases[0] : null);
+    const sameScope = !submitted || (submitted.releaseType === item.releaseType
+      && JSON.stringify([...new Set(submitted.platforms || [])].sort()) === JSON.stringify([...new Set(item.platforms || [])].sort()));
+    // An overlapping alias can supply names/alt text, but its narrower launch
+    // label cannot describe the retained broader Canonical platform coverage.
+    const releaseTypeLabel = programmaticReleaseTypeLabel(item.releaseType) || (sameScope ? source.releaseTypeLabel : undefined);
     return {
       upcomingId: identity,
       ...(cleanOptional(source.regionLabel) ? { regionLabel: cleanOptional(source.regionLabel) } : {}),
-      ...(cleanOptional(source.releaseTypeLabel) ? { releaseTypeLabel: cleanOptional(source.releaseTypeLabel) } : {}),
+      ...(cleanOptional(releaseTypeLabel) ? { releaseTypeLabel: cleanOptional(releaseTypeLabel) } : {}),
       ...(cleanOptional(source.sourceLabel) ? { sourceLabel: cleanOptional(source.sourceLabel) } : {}),
       ...(cleanOptional(source.coverAlt) ? { coverAlt: cleanOptional(source.coverAlt) } : {}),
     };
@@ -157,7 +168,7 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   return finalizeEnglishOverlay(canonical, {
     archiveTitle: preservePublished && previousOverlay?.editionId === canonical.id ? previousOverlay.archiveTitle : draft.archiveTitle,
     entries,
-    upcoming: buildUpcomingOverlay(canonical, draft, previousOverlay),
+    upcoming: buildUpcomingOverlay(canonical, draft, previousOverlay, editorial),
     sourceReport: draft.sourceReport,
   });
 }

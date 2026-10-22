@@ -90,6 +90,7 @@ async function writeLocalePlan(canonical, localePlan, { preservePublished = fals
   await rm(overlayFile, { force: true });
 }
 
+let repairExactDuplicateStories = false;
 async function hasAuthorizedSameEditionRevision(editorial) {
   try {
     const { stdout } = await run("git", [
@@ -119,12 +120,14 @@ async function hasAuthorizedSameEditionRevision(editorial) {
       packet?.continuation?.preservePublished === true &&
       packet.editorialInput.packages.length > 0 &&
       packet.editorialInput.packages.every(item => item.showcaseRefs?.length && item.showcaseRefs.every(ref => state.revisionRequest.announcementIds?.includes(ref.announcementId)));
-    return state.editionId === editorial.editionId &&
+    const authorized = state.editionId === editorial.editionId &&
       state.revisionRequest?.status === "open" &&
       (state.revisionRequest?.reason === SAME_EDITION_REVISION_REASON || newsContinuation || showcaseContinuation || calendarContinuation) &&
       state.packet?.status === "ready" &&
       state.packet?.blobSha === editorial.packetBlobSha &&
       state.editorial?.packetBlobSha === editorial.packetBlobSha;
+    repairExactDuplicateStories = authorized && state.revisionRequest.reason === SAME_EDITION_REVISION_REASON;
+    return authorized;
   } catch {
     return false;
   }
@@ -216,7 +219,7 @@ const continuationPacket = ["news", "showcase", "calendar"].includes(packet.cont
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
 }
-const noOpNewsContinuation = packet.continuation?.scope === "news" &&
+const noOpNewsContinuation = !repairExactDuplicateStories && packet.continuation?.scope === "news" &&
   packet.continuation?.preservePublished === true &&
   !editorial.decisions.some(item => item.decision === "include");
 if (noOpNewsContinuation) {
@@ -258,7 +261,7 @@ if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "dai
   publisherLatest = { ...publisherLatest, upcoming: baseline.items };
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
-const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion });
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion, repairExactDuplicateStories });
 if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
@@ -319,6 +322,7 @@ await writePublicationResult({
   publicationMode: "publish",
   decisionDigest: result.decisionDigest,
   canonicalStatus: "published",
+  duplicateStoryRepairs: result.duplicateStoryRepairs,
   localeStatus: localePlan.status,
   localeReasonCode: localePlan.reasonCode,
   localeSummary: localePlan.summary,

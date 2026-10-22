@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { advanceEditorialQueue } from "./lib/editorial-queue.mjs";
+import { advanceEditorialQueue, orderCalendarQueueEditions } from "./lib/editorial-queue.mjs";
 import { applyEditionStateEvent, createEditionState, gitBlobSha } from "./lib/edition-state.mjs";
 import { buildEdition } from "./lib/edition-publisher.mjs";
 import { expectedEditorialWindow } from "./lib/editorial-packet.mjs";
@@ -31,6 +32,69 @@ it("keeps deferred calendar work in the trusted queue and closes it only after e
   const tampered = packet(["foreign-news"], "calendar", { calendarWork });
   expect(() => advanceEditorialQueue({ ...fixture, packets: { "calendar.json": tampered } })).toThrow(/only its pinned calendar/);
   expect(() => advanceEditorialQueue({ ...fixture, queue: { ...fixture.queue, batches: [{ ...fixture.queue.batches[0], eventKeys: ["b".repeat(40)] }] } })).toThrow(/only its pinned calendar/);
+});
+
+it("backs off an old calendar's newly completed partial attempt without losing its pinned budget blocker", () => {
+  const observed = JSON.parse(readFileSync("scripts/fixtures/release-calendar/continuation-budget-blocker.json", "utf8"));
+  expect(observed.source.status).toBe("deferred");
+  expect(observed.deferredSources).toBe(83);
+  const calendarWork = { pages: [{ blobSha: observed.source.pageBlobSha }] };
+  const text = packet([], "calendar", { calendarWork });
+  const canonical = { id: editionId, entries: [], sourceReport: {
+    calendarReview: deferredCalendarReview(calendarWork, observed.source.error),
+  } };
+  const input = { state: publishedState(), canonical,
+    queue: { editionId, firstPublishedAt: "2026-09-11T04:00:00.000Z", batches: [
+      { name: "calendar.json", scope: "calendar", status: "pending", eventKeys: [observed.source.pageBlobSha] },
+    ] }, packets: { "calendar.json": text } };
+  const first = advanceEditorialQueue({ ...input, now: "2026-10-22T04:00:00.000Z" });
+  const state = publishContinuation(first.state, text, "4".repeat(40));
+  state.publication.updatedAt = "2026-10-22T04:10:00.000Z";
+  const partial = advanceEditorialQueue({ ...input, state, queue: first.queue, now: state.publication.updatedAt });
+  expect(partial.packet).toBeNull();
+  expect(partial.state).toEqual(state);
+  expect(partial.queue.batches[0]).toMatchObject({ status: "awaiting_retry", lastAttemptAt: state.publication.updatedAt });
+  // Pre-fix durable queues have no lastAttemptAt; use their last activation,
+  // not an already expired first-publication deadline.
+  const legacy = structuredClone(partial.queue);
+  delete legacy.batches[0].lastAttemptAt;
+  expect(advanceEditorialQueue({ ...input, state, queue: legacy, now: "2026-10-22T04:29:59.999Z" }).packet).toBeNull();
+  expect(advanceEditorialQueue({ ...input, state, queue: legacy, now: "2026-10-22T04:30:00.000Z" }).packet).toBe(text);
+  const retry = now => advanceEditorialQueue({ ...input, state, queue: partial.queue, now });
+  expect(retry("2026-10-22T04:39:59.999Z").packet).toBeNull();
+  const due = retry("2026-10-22T04:40:00.000Z");
+  expect(due.packet).toBe(text);
+  expect(due.state.packet.blobSha).toBe(gitBlobSha(text));
+  expect(due.batch).toMatchObject({ retryAttempts: 1, eventKeys: [observed.source.pageBlobSha] });
+  expect(canonical.sourceReport.calendarReview.pages[0]).toMatchObject({ status: "deferred", reason: observed.source.error });
+  // The next completion starts a fresh, longer retry delay, even weeks after the edition.
+  const secondState = publishContinuation(due.state, text, "5".repeat(40));
+  secondState.publication.updatedAt = "2026-10-22T05:00:00.000Z";
+  const second = advanceEditorialQueue({ ...input, state: secondState, queue: due.queue, now: secondState.publication.updatedAt });
+  expect(second.packet).toBeNull();
+  expect(advanceEditorialQueue({ ...input, state: secondState, queue: second.queue, now: "2026-10-22T06:59:59.999Z" }).packet).toBeNull();
+  expect(advanceEditorialQueue({ ...input, state: secondState, queue: second.queue, now: "2026-10-22T07:00:00.000Z" }).packet).toBe(text);
+});
+
+it("shares eligible calendar turns without displacing news, showcase, or not-yet-due work", () => {
+  const editions = ["2026-10-18-daily", "news", "2026-10-20-daily", "showcase", "2026-10-21-daily", "2026-10-22-daily"].map(id => ({ id }));
+  const batch = (status, activatedAt) => ({ scope: "calendar", status, activatedAt, retryAttempts: 0 });
+  const queue = batches => ({ firstPublishedAt: "2026-10-18T04:00:00Z", batches });
+  const queues = {
+    "2026-10-18-daily": queue([batch("awaiting_retry", "2026-10-22T04:00:00Z")]),
+    news: queue([{ scope: "news", status: "pending" }]),
+    "2026-10-20-daily": queue([batch("pending")]),
+    showcase: queue([{ scope: "showcase", status: "pending" }]),
+    "2026-10-21-daily": queue([batch("awaiting_retry", "2026-10-21T04:00:00Z")]),
+    "2026-10-22-daily": queue([batch("awaiting_retry", "2026-10-22T04:50:00Z")]),
+  };
+  const before = structuredClone(queues);
+  const ordered = orderCalendarQueueEditions(editions, queues, Date.parse("2026-10-22T05:00:00Z"));
+  expect(ordered.map(row => row.id)).toEqual(["2026-10-20-daily", "news", "2026-10-21-daily", "showcase", "2026-10-18-daily", "2026-10-22-daily"]);
+  expect(queues).toEqual(before);
+  // Equal never-attempted priorities remain oldest-first and do not drop work.
+  queues["2026-10-18-daily"] = queue([batch("pending")]);
+  expect(orderCalendarQueueEditions(editions, queues, Date.parse("2026-10-22T05:00:00Z"))[0].id).toBe("2026-10-18-daily");
 });
 
 it("publishes a calendar-only continuation without changing news, issue, lead, tracking or news audit", () => {
