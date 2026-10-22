@@ -1,5 +1,5 @@
 import { applyEditorialFeedback } from "./lib/event-ledger.mjs";
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, cpSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -457,17 +457,22 @@ describe("manual revision takeover of an unconsumed continuation", () => {
     expect(resumed.state.packet.blobSha).toBe(input.state.packet.blobSha);
     expect(input.canonical).toEqual(before.canonical);
   });
-  it("records queue and state together, replays without changes, and refuses a newly consumed snapshot", () => {
+  it("cold-starts eligible takeover without installed dependencies, records both files, and rejects unsafe retries", () => {
     const input = active("calendar");
     const root = mkdtempSync(join(tmpdir(), "manual-takeover-"));
     const statePath = join(root, `automation/status/${editionId}.json`);
     const batchRoot = join(root, `automation/batches/${editionId}`);
     const queuePath = join(batchRoot, "queue.json");
     const packetPath = join(batchRoot, input.queue.activeBatchName);
-    const run = () => execFileSync(process.execPath, [resolve("scripts/record-edition-state.mjs"),
+    const run = () => execFileSync(process.execPath, [join(root, "scripts/record-edition-state.mjs"),
       `--state-root=${root}`, `--edition=${editionId}`, "--event=revision-opened", `--reason=${reason}`],
-      { stdio: "pipe", env: { ...process.env, GITHUB_OUTPUT: "" } });
+      { cwd: root, stdio: "pipe", env: { ...process.env, GITHUB_OUTPUT: "", NODE_PATH: "" } });
     try {
+      // Copy source, not node_modules: this is the workflow's pre-npm-ci path.
+      mkdirSync(join(root, "scripts"), { recursive: true });
+      cpSync(resolve("scripts/lib"), join(root, "scripts/lib"), { recursive: true });
+      cpSync(resolve("scripts/record-edition-state.mjs"), join(root, "scripts/record-edition-state.mjs"));
+      expect(existsSync(join(root, "node_modules"))).toBe(false);
       mkdirSync(join(root, "automation/status"), { recursive: true });
       mkdirSync(batchRoot, { recursive: true });
       writeFileSync(statePath, JSON.stringify(input.state));

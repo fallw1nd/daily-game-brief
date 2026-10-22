@@ -6,6 +6,7 @@ const publisher = await readFile(".github/workflows/publish-editorial-decision.y
 const sla = await readFile(".github/workflows/brief-sla-watchdog.yml", "utf8");
 const queueScript = await readFile("scripts/advance-showcase-queue.mjs", "utf8");
 const queueLib = await readFile("scripts/lib/editorial-queue.mjs", "utf8");
+const queueStateLib = await readFile("scripts/lib/editorial-queue-state.mjs", "utf8");
 const stateLib = await readFile("scripts/lib/edition-state.mjs", "utf8");
 const publisherLib = await readFile("scripts/publish-editorial-decision.mjs", "utf8");
 const queueUpdater = await readFile("scripts/update-showcase-queue-branch.sh", "utf8");
@@ -37,8 +38,9 @@ describe("editorial continuation queue orchestration", () => {
     expect(stateLib).toContain('event === "continuation-opened"');
     expect(queueLib).toContain('reason: EDITORIAL_CONTINUATION_REASON');
     expect(queueLib).toContain('reason: SHOWCASE_COMPLETION_REASON');
-    expect(queueLib).toContain('packet.continuation?.scope !== batch.scope');
-    expect(queueLib).toContain('news batch ${batch.name} event identities do not match');
+    expect(queueLib).toContain('import { assertBatchShape, validateBatchPacket } from "./editorial-queue-state.mjs"');
+    expect(queueStateLib).toContain('packet.continuation?.scope !== batch.scope');
+    expect(queueStateLib).toContain('news batch ${batch.name} event identities do not match');
     expect(publisherLib).toContain("editorial continuation requires a matching durable state authorization");
     expect(publisherLib).toContain("packet.editorialInput.packages.every(item => !item.showcaseRefs?.length)");
   });

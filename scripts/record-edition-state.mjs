@@ -50,7 +50,7 @@ let nextQueue = null;
 const queuePath = resolve(stateRoot, `automation/batches/${editionId}/queue.json`);
 if (event === "revision-opened" && current?.revisionRequest?.status === "open"
   && current.revisionRequest.reason === "editorial_continuation") {
-  const { openManualRevision } = await import("./lib/editorial-queue.mjs");
+  const { openManualRevision } = await import("./lib/editorial-queue-state.mjs");
   const queue = await optionalJson(queuePath);
   const name = current.revisionRequest.batchName;
   // Validate before using the durable name as a filesystem component.
