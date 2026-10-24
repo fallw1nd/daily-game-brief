@@ -162,3 +162,75 @@ describe("English presentation projection", () => {
     expect(projected?.upcoming[0].cover?.alt).toBe("English cover description");
   });
 });
+
+
+describe("English media availability and credits", () => {
+  it.each([undefined, "", "   ", "未能取得已核验配图：来源页面不可读。"])("projects unavailable notes without changing canonical media (%j)", (note) => {
+    const edition = canonical();
+    const english = overlay(edition);
+    delete edition.entries[0].images;
+    delete edition.upcoming[0].cover;
+    edition.entries[0].image_status = "unavailable";
+    edition.upcoming[0].cover_status = "unavailable";
+    edition.entries[0].imageNote = note;
+    edition.upcoming[0].coverNote = note;
+    const before = JSON.stringify(edition);
+    const projected = projectEnglishEdition(edition, english)!;
+    expect(projected.entries[0].imageNote).toBe(note?.trim()
+      ? "Image availability details are recorded in the Chinese edition." : "Verified image unavailable.");
+    expect(projected.upcoming[0].coverNote).toBe(note?.trim()
+      ? "Cover availability details are recorded in the Chinese edition." : "Verified cover unavailable.");
+    expect(projected.entries[0].images).toBeUndefined();
+    expect(projected.upcoming[0].cover).toBeUndefined();
+    expect(projected.entries[0].image_status).toBe("unavailable");
+    expect(projected.upcoming[0].cover_status).toBe("unavailable");
+    expect(JSON.stringify(edition)).toBe(before);
+  });
+
+  it("preserves explicit English notes and does not label verified media unavailable", () => {
+    const edition = canonical();
+    const english = overlay(edition);
+    expect(projectEnglishEdition(edition, english)?.entries[0].imageNote).toBeUndefined();
+    expect(projectEnglishEdition(edition, english)?.upcoming[0].coverNote).toBeUndefined();
+    edition.entries[0].imageNote = "Source identity does not match.";
+    edition.upcoming[0].coverNote = "Cover download failed.";
+    const projected = projectEnglishEdition(edition, english)!;
+    expect(projected.entries[0].imageNote).toBe(edition.entries[0].imageNote);
+    expect(projected.upcoming[0].coverNote).toBe(edition.upcoming[0].coverNote);
+    expect(projected.entries[0].images?.[0].sourceUrl).toBe(edition.entries[0].images?.[0].sourceUrl);
+  });
+
+  it("uses only the matching asset's explicit translated credit", () => {
+    const edition = canonical();
+    const english = overlay(edition);
+    english.entries[0].mediaAlts![0].creditLabel = "English publisher";
+    expect(projectEnglishEdition(edition, english)?.entries[0].images?.[0].credit).toBe("English publisher");
+    expect(edition.entries[0].images?.[0].credit).toBe("Publisher");
+    english.entries[0].mediaAlts![0].assetKey = "other-asset";
+    expect(projectEnglishEdition(edition, english)?.entries[0].images?.[0].credit).toBe("Publisher");
+  });
+
+  it.each([undefined, "", "   "])("retains original credit for an absent or blank translation (%j)", (creditLabel) => {
+    const edition = canonical();
+    const english = overlay(edition);
+    english.entries[0].mediaAlts![0].creditLabel = creditLabel;
+    expect(projectEnglishEdition(edition, english)?.entries[0].images?.[0].credit).toBe("Publisher");
+  });
+});
+
+
+it.each(["", "   "])("does not mark verified or placeholder media unavailable for blank notes (%j)", (note) => {
+  const edition = canonical();
+  const english = overlay(edition);
+  edition.entries[0].imageNote = note;
+  edition.upcoming[0].coverNote = note;
+  edition.entries[0].images![0].placeholder = true;
+  const before = JSON.stringify(edition);
+  const projected = projectEnglishEdition(edition, english)!;
+  expect(projected.entries[0].imageNote).toBe(note);
+  expect(projected.upcoming[0].coverNote).toBe(note);
+  expect(projected.entries[0].images![0].placeholder).toBe(true);
+  expect(projected.entries[0].image_status).toBe("verified");
+  expect(projected.upcoming[0].cover_status).toBe("verified");
+  expect(JSON.stringify(edition)).toBe(before);
+});

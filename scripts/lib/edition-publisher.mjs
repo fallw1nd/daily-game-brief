@@ -169,6 +169,22 @@ function confirmedSameFact(entry, decision) {
     && normalizeFactText(entry.summary) === normalizeFactText(decision.summary);
 }
 
+function manualRevisionPrevious(entries, decision, title, sources) {
+  const sameSubject = entries.filter(entry => entry.title?.title_key === title.title_key);
+  if (decision.existingEntryId) {
+    // An explicit ID is a constraint, not a hint: never fall through to another
+    // story from the same game or a source-based match after a mismatch.
+    return sameSubject.find(entry => entry.id === decision.existingEntryId
+      && (!entry.eventKey || entry.eventKey === decision.eventKey)) || null;
+  }
+  const sameEvent = sameSubject.filter(entry => entry.eventKey === decision.eventKey);
+  if (sameEvent.length === 1) return sameEvent[0];
+  if (sameEvent.length > 1 || sameSubject.length > 1) {
+    throw new Error(`included ${decision.eventKey}: ambiguous published subject; provide an exact existingEntryId`);
+  }
+  return sameSubject[0] || degradedPreviousBySource(entries, sources);
+}
+
 // Exact content and provenance only: a source page/game can contain several facts.
 // Exclude IDs/media/editorial verification notes; those may differ on a replay.
 function exactStoryIdentity(entry) {
@@ -250,7 +266,6 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const previousEntries = authorizedLatestRevision ? duplicateRepair.entries : [];
-  const previousByTitleKey = new Map(previousEntries.flatMap((entry) => entry.title?.title_key ? [[entry.title.title_key, entry]] : []));
   const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
   if (packet.continuation?.scope === "calendar" && (input.packages.length || input.trackingQueue?.length || editorial.decisions.length)) throw new Error("calendar continuation cannot change news or tracking");
   const previousIds = new Set(previousEntries.map((entry) => entry.id));
@@ -305,7 +320,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         ? previousEntries.find(entry => entry.title?.title_key === title.title_key && (entry.id === decision.existingEntryId || entry.showcaseRefs?.some(ref => showcaseRefs.some(next => next.showcaseId === ref.showcaseId && next.announcementId === ref.announcementId && (next.factIds || []).every(id => ref.factIds?.includes(id))))))
         : isNewsContinuation
           ? decision.existingEntryId ? previousEntries.find(entry => entry.id === decision.existingEntryId && entry.title?.title_key === title.title_key && confirmedSameFact(entry, decision)) : exactPrevious[0] || null
-          : previousByTitleKey.get(title.title_key) || degradedPreviousBySource(previousEntries, sources)
+          : manualRevisionPrevious(previousEntries, decision, title, sources)
       : null);
     if (decision.existingEntryId && (!authorizedLatestRevision || previous?.id !== decision.existingEntryId)) {
       const identity = isNewsContinuation ? "confirmed same fact" : "confirmed subject";

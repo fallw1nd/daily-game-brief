@@ -7,8 +7,21 @@ function translatedImage(
   asset: ImageAsset,
   overlay: EnglishLocaleOverlay["entries"][number],
 ): ImageAsset {
-  const translatedAlt = overlay.mediaAlts?.find((item) => item.assetKey === assetKey(ownerId, asset))?.alt;
-  return { ...asset, alt: translatedAlt?.trim() ? translatedAlt : `Image for: ${overlay.headline}` };
+  const translation = overlay.mediaAlts?.find((item) => item.assetKey === assetKey(ownerId, asset));
+  return {
+    ...asset,
+    alt: translation?.alt?.trim() ? translation.alt : `Image for: ${overlay.headline}`,
+    ...(translation?.creditLabel?.trim() ? { credit: translation.creditLabel } : {}),
+  };
+}
+
+function englishMediaNote(note: string | undefined, kind: "Image" | "Cover"): string {
+  if (note?.trim()) {
+    // Keep already translated notes; do not invent a translation of audit reasons.
+    if (!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(note)) return note;
+    return `${kind} availability details are recorded in the Chinese edition.`;
+  }
+  return `Verified ${kind.toLowerCase()} unavailable.`;
 }
 
 function projectEntry(
@@ -23,6 +36,8 @@ function projectEntry(
       ...canonical.title,
       title_zh_cn: undefined,
     },
+    ...(canonical.imageNote?.trim() || canonical.image_status === "unavailable"
+      ? { imageNote: englishMediaNote(canonical.imageNote, "Image") } : {}),
     headline: overlay.headline,
     summary: overlay.summary,
     verification: overlay.verification,
@@ -55,6 +70,8 @@ function projectUpcoming(
     region: labels.regionLabel,
     releaseType: labels.releaseTypeLabel,
     source: { ...canonical.source, label: labels.sourceLabel },
+    ...(canonical.coverNote?.trim() || canonical.cover_status === "unavailable"
+      ? { coverNote: englishMediaNote(canonical.coverNote, "Cover") } : {}),
     ...(canonical.cover
       ? { cover: { ...canonical.cover, alt: overlay.coverAlt?.trim() ? overlay.coverAlt : `${canonical.title.title_en?.trim() || "Game"} cover art` } }
       : {}),

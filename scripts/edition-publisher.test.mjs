@@ -476,3 +476,45 @@ describe("manual factual metadata corrections", () => {
     expect(() => buildEdition(options)).toThrow("preserve the shared fact frame");
   });
 });
+
+
+describe("manual revision preserves separate stories about one game", () => {
+  function multipleStories() {
+    const input = structuredClone(packet);
+    input.editorialInput.packages.push({ ...structuredClone(input.editorialInput.packages[0]), eventKey: "event-2" });
+    input.editorialInput.packages.push({ ...structuredClone(input.editorialInput.packages[0]), eventKey: "event-3" });
+    const draft = structuredClone(editorial);
+    draft.decisions.push({ ...structuredClone(draft.decisions[0]), eventKey: "event-2", headline: "《Example Game》公布独立地图机制", summary: "这是一条不同的地图机制消息。" });
+    draft.decisions.push({ ...structuredClone(draft.decisions[0]), eventKey: "event-3", titleKey: "another-game", titleEn: "Another Game", headline: "《Another Game》公布更新", summary: "另一款游戏的消息。" });
+    const initial = buildEdition({ packet: input, editorial: draft, latest, manifest });
+    const revision = { ...structuredClone(draft), decisions: [structuredClone(draft.decisions[0])] };
+    revision.decisions[0].headline = "《Example Game》正式公布（修订译名）";
+    return { input, initial, revision };
+  }
+  it.each([true, false])("selects the actual first event instead of the last same-title story (explicit ID: %j)", (explicit) => {
+    const { input, initial, revision } = multipleStories();
+    if (explicit) revision.decisions[0].existingEntryId = initial.edition.entries[0].id;
+    const result = buildEdition({ packet: input, editorial: revision, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries.map(x => x.id)).toEqual(initial.edition.entries.map(x => x.id));
+    expect(result.edition.entries[0].headline).toBe(revision.decisions[0].headline);
+    expect(result.edition.entries.slice(1)).toEqual(initial.edition.entries.slice(1));
+    expect(result.edition.upcoming).toEqual(initial.edition.upcoming);
+    expect(result.edition.issueNumber).toBe(initial.edition.issueNumber);
+  });
+  it.each([1, 2, 99])("rejects wrong-event, wrong-subject or absent explicit ID (%j)", (index) => {
+    const { input, initial, revision } = multipleStories();
+    revision.decisions[0].existingEntryId = initial.edition.entries[index]?.id || "missing-entry";
+    expect(() => buildEdition({ packet: input, editorial: revision, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true }))
+      .toThrow("existingEntryId must identify");
+  });
+  it("rejects ambiguous legacy subject fallback rather than choosing the last story", () => {
+    const { input, initial, revision } = multipleStories();
+    for (const entry of initial.edition.entries) delete entry.eventKey;
+    expect(() => buildEdition({ packet: input, editorial: revision, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true }))
+      .toThrow("ambiguous published subject");
+    revision.decisions[0].existingEntryId = initial.edition.entries[0].id;
+    const result = buildEdition({ packet: input, editorial: revision, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true });
+    expect(result.edition.entries[0].id).toBe(initial.edition.entries[0].id);
+    expect(result.edition.entries.slice(1)).toEqual(initial.edition.entries.slice(1));
+  });
+});
