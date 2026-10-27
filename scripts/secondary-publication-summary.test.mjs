@@ -19,6 +19,8 @@ async function runSummary(dispatchOutcome, kind = "edition") {
     "steps.publisher_dispatch.outcome": dispatchOutcome,
     "steps.publisher_dispatch.outcome || 'skipped'": dispatchOutcome || "skipped",
     "steps.titles.outputs.changed || 'false'": "false",
+    "steps.correction.outputs.changed || 'false'": "false",
+    "steps.correction_deploy.outcome || 'skipped'": dispatchOutcome || "skipped",
   };
   try {
     const script = summary.replace(/\$\{\{\s*(.*?)\s*\}\}/g, (_, expression) => {
@@ -54,6 +56,12 @@ describe("secondary publication summary", () => {
     expect(text).toContain("Media target: 2026-09-02-daily / all records");
     expect(text).toContain("Trusted media dispatch accepted; this is not publication completion");
     expect(text).not.toContain("not dispatched successfully");
+  });
+
+  it.each(["success", "failure", "skipped"])("reports archive correction deployment outcome %s without claiming completion", async (outcome) => {
+    const text = await runSummary(outcome, "archive_correction");
+    expect(text).toContain(`Pages dispatch outcome: ${outcome}`);
+    expect(text).toContain("deployment/live verification remains separate");
   });
 
   it("distinguishes dispatch acceptance from completed publication", async () => {

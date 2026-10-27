@@ -68,7 +68,7 @@ export function buildDegradedDecision(packet, { packetBlobSha } = {}) {
       verification: primary.length ? "程序已打开一手来源并提取正文；本条为缺期时的无AI降级稿。" : "程序已打开两家独立来源；本条为缺期时的无AI降级稿。",
       reason: "满足无AI降级收录门槛。", beijingTime: eventTime,
       timeNote: eventTime ? "来源发布时间已换算为北京时间并处于固定窗口。" : "来源未披露可验证的具体时刻，仅确认属于本期窗口。",
-      platforms: [], region: "全球", releaseType: item.eventKind,
+      platforms: [], region: "来源所述范围", releaseType: item.eventKind,
       sourceIndexes: opened.map((source) => source.sourceIndex), additionalSources: [],
       sharedFactFrame: {
         subjectTitleKey: slug(titleName), dates: [], times: eventTime ? [eventTime] : [], numbers: [],

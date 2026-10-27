@@ -1,5 +1,18 @@
 # Maintenance Issue Log
 
+## MNT-20261027-02 — Bound historical corrections and stop invented global scope
+
+- Full archive audit found omitted story regions defaulted to Global, an explicitly overbroad CERO region, elapsed AVA service days written as a future countdown, and a Japan date incorrectly inferred as Beijing. Use the existing source-stated-scope label for omitted regions and degraded fallback; explicit supported editorial regions remain unchanged. Editorial guidance now preserves scope, elapsed-duration meaning and source timezone.
+- Early AM/PM archives have no durable packet/state, while news continuation preservation intentionally rejects ordinary factual rewrites. Add an explicit user-authorized `archive_correction` request to the existing Secondary workflow, not a new schedule/publisher: current archive/English blob leases, exact old values, original-source review, strict headline/summary/region allowlist, complete protected-projection comparison, coherent English, generated-alt-only refresh, full check and one commit. Concurrent main writes abort rather than rebase generated data.
+- Legacy valid English can have Japanese-only subject metadata; this adapter preserves already-validated presentation rather than normalizing unrelated headlines. Ordinary locale repair behavior is unchanged. No fabricated packets, state/ledger edits, title invention, issue renumbering or window changes.
+- Regression covers scope defaults, stale bindings, protected fields, incorrect English scope, historical presentation compatibility, copy-only digest changes, actual CLI dry-run/apply/latest synchronization, replay rejection and I/O rollback. End-to-end results and remaining uncertainties are recorded in `docs/ARCHIVE_AUDIT_2026-10-27.md`.
+
+## MNT-20261027-01 — Reconcile retained English calendar identities
+
+- October 24 calendar continuation added two verified releases (41 → 43), but the no-English-draft preservation branch reused the old calendar array, rejecting the entire English overlay. Reconcile retained rows against current Canonical identities/order through the existing calendar projection; preserve reviewed copy and remove obsolete identities.
+- Missing custom-region translations still fail closed; the two October 24 regions require reviewed locale inbox copy. Calendar editorial instructions now explicitly request patch translations, without blocking valid Chinese publication.
+- Regression covers insertion, removal/reordering, retained artwork copy, unchanged stories and unsupported regional labels. Full `npm run check`: 124 files / 938 tests passed, data and locale checks and production build passed. Initial parallel-load run hit an unrelated 5-second workflow-fixture timeout; a clean full rerun passed. Publication/deployment evidence is tracked in the archive audit report.
+
 ## MNT-20261023-03 — Target archived media through the existing secondary entry
 
 - Demonstrated invocation gap: a connector could push a secondary request but could not dispatch the existing exact-edition media workflow; the old run was outside GitHub's rerun window.

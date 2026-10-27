@@ -193,7 +193,7 @@ function exactStoryIdentity(entry) {
   return JSON.stringify([
     entry.title.title_key, normalizeFactText(entry.title.title_en), entry.section, normalizeFactText(entry.headline), normalizeFactText(entry.summary),
     entry.beijingTime, entry.time_status, entry.fact_status, [...(entry.platforms || [])].sort(),
-    entry.region || "全球", entry.releaseType || null, urls,
+    entry.region || "来源所述范围", entry.releaseType || null, urls,
   ]);
 }
 
@@ -341,7 +341,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         || normalizeFactText(summary) !== normalizeFactText(previous.summary)
         || decision.factStatus !== previous.fact_status || decision.timeStatus !== previous.time_status
         || JSON.stringify(decision.platforms) !== JSON.stringify(previous.platforms)
-        || (decision.region || "全球") !== previous.region
+        || (decision.region || "来源所述范围") !== previous.region
         || (decision.releaseType || null) !== (previous.releaseType || null)) {
         throw new Error(`included ${decision.eventKey}: company identity repair cannot change event facts`);
       }
@@ -370,7 +370,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       fact_status: decision.factStatus,
       time_status: decision.timeStatus,
       platforms: decision.platforms,
-      region: decision.region || "全球",
+      region: decision.region || "来源所述范围",
       ...(decision.releaseType ? { releaseType: decision.releaseType } : {}),
       sources,
       verification: decision.verification,

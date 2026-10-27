@@ -81,7 +81,7 @@ function buildUpcomingOverlay(canonical, draft, previousOverlay, editorial) {
   });
 }
 
-function finalizeEnglishOverlay(canonical, presentation, boundFactsDigest = factsDigest(canonical)) {
+function finalizeEnglishOverlay(canonical, presentation, boundFactsDigest = factsDigest(canonical), { preserveValidatedPresentation = false } = {}) {
   const overlay = {
     schemaVersion: 1,
     locale: "en",
@@ -90,10 +90,10 @@ function finalizeEnglishOverlay(canonical, presentation, boundFactsDigest = fact
     factsDigest: boundFactsDigest,
     canonicalCopyDigest: canonicalCopyDigest(canonical),
     localeDigest: `sha256:${"0".repeat(64)}`,
-    archiveTitle: canonical.entries.length ? normalizeSubjectHeadline(presentation.archiveTitle, canonical.entries.find(entry => entry.id === canonical.leadEntryId)?.title || canonical.entries[0]?.title, { locale: "en", archive: true }) : presentation.archiveTitle,
+    archiveTitle: !preserveValidatedPresentation && canonical.entries.length ? normalizeSubjectHeadline(presentation.archiveTitle, canonical.entries.find(entry => entry.id === canonical.leadEntryId)?.title || canonical.entries[0]?.title, { locale: "en", archive: true }) : presentation.archiveTitle,
     entries: presentation.entries.map(item => {
       const entry = canonical.entries.find(entry => entry.id === item.entryId);
-      return entry ? {
+      return entry && !preserveValidatedPresentation ? {
         ...item,
         headline: normalizeSubjectHeadline(item.headline, entry.title, { locale: "en" }),
         ...(item.regionLabel === entry.region && programmaticRegionLabel(entry.region) ? { regionLabel: programmaticRegionLabel(entry.region) } : {}),
@@ -130,7 +130,10 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   if (!draft) {
     if (preservePublished && previousOverlay?.editionId === canonical.id
       && canonical.entries.every(entry => previousOverlay.entries?.some(item => item.entryId === entry.id))) {
-      return finalizeEnglishOverlay(canonical, previousOverlay);
+      return finalizeEnglishOverlay(canonical, {
+        ...previousOverlay,
+        upcoming: buildUpcomingOverlay(canonical, null, previousOverlay, editorial),
+      });
     }
     return {
       status: "unavailable",
@@ -173,7 +176,7 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   });
 }
 
-export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentation = null }) {
+export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentation = null, preserveValidatedPresentation = false }) {
   if (!draft || draft.schemaVersion !== 1 || draft.locale !== "en" || draft.editionId !== canonical?.id) {
     return {
       status: "unavailable",
@@ -227,7 +230,7 @@ export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentati
     entries,
     upcoming,
     sourceReport: draft.sourceReport,
-  }, draft.factsDigest);
+  }, draft.factsDigest, { preserveValidatedPresentation });
   if (retainedPresentation && !retainedIsCurrent) {
     result.warnings.push("Retained English presentation was ignored because it is not bound to the current Canonical facts; the complete reviewed draft was used instead.");
   }

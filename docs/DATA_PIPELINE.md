@@ -90,6 +90,8 @@ Explicit user-authorized manual repair may coalesce exact historical duplicate s
 Resolved subject overrides remain prohibited except for an incidental game key misclassifying a named-company formation. The original acknowledged packet must independently corroborate the same uniquely named company in its headline and opened evidence. The manual wake binds the expected old subject, entry ID, Beijing time, and original selected source URLs. Trusted restoration records internal provenance and GitHub acknowledges a new packet blob before publication. The publisher rechecks those bindings, the stable event key, and the otherwise unchanged shared fact frame; only subject key, image seed, and the corresponding fact-frame digest change. Identity-only repair preserves edition title, lead, calendar, and all unrelated entries. This is not permission to add event facts or perform arbitrary cross-key replacement.
 
 
+Explicit historical text/region corrections may also use the narrowly bound `archive_correction` adapter in `docs/SECOND_PUBLISH.md`, including legacy archives without durable packets. It requires current archive/English blob leases, exact old values and selected-source review, and preserves all other published identity/fact fields. It is not a replacement for packet-based new-content revisions.
+
 ## Publication and failure behavior
 
 `publish-editorial-decision.yml` restores the immutable packet, validates the submission, runs `npm run check`, rebuilds on current `main` if necessary, and publishes atomically. Exact-edition Pages/media workflows are then dispatched.

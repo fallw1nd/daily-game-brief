@@ -71,6 +71,15 @@ const latest = {
 const manifest = { schemaVersion: 1, updatedAt: "2026-08-26 17:04", latest: "2026-08-26-pm", editions: [{ id: "2026-08-26-pm", issueNumber: 12 }] };
 
 describe("idempotent edition publisher", () => {
+  it("does not invent global coverage when editorial region is omitted", () => {
+    const draft = structuredClone(editorial);
+    draft.decisions[0].region = null;
+    expect(buildEdition({ packet, editorial: draft, latest, manifest }).edition.entries[0].region).toBe("来源所述范围");
+    draft.decisions[0].region = "日本";
+    expect(buildEdition({ packet, editorial: draft, latest, manifest }).edition.entries[0].region).toBe("日本");
+    draft.decisions[0].region = "全球";
+    expect(buildEdition({ packet, editorial: draft, latest, manifest }).edition.entries[0].region).toBe("全球");
+  });
   it("does not inherit a corrected same-ID row's old subject or cover", () => {
     const old = { ...latest.upcoming[0], title: { title_key: "old-game", title_en: "Old Game", title_zh_cn: "旧游戏", title_zh_status: "official_simplified" }, cover_status: "verified", cover: { kind: "cover", url: "old.jpg" } };
     const patch = { id: old.id, date: "2026-08-28", titleKey: "correct-game", titleEn: "Correct Game", titleZhCn: "正确游戏", titleZhStatus: "official_simplified", platforms: ["PC"], region: "全球", releaseType: "正式发售", source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/456/" } };

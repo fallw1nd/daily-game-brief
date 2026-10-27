@@ -40,7 +40,7 @@ jobs:
           fi
           cp "$request_path" "$RUNNER_TEMP/secondary-request.json"
           kind="$(node -p "JSON.parse(require('fs').readFileSync('$RUNNER_TEMP/secondary-request.json','utf8')).kind || ''")"
-          if [ "$kind" != "edition" ] && [ "$kind" != "title_backfill" ] && [ "$kind" != "media_repair" ]; then
+          if [ "$kind" != "edition" ] && [ "$kind" != "title_backfill" ] && [ "$kind" != "media_repair" ] && [ "$kind" != "archive_correction" ]; then
             echo "Unsupported secondary publication kind: $kind"
             exit 1
           fi
@@ -209,6 +209,32 @@ jobs:
         shell: bash
         run: gh workflow run deploy.yml --ref main
 
+      - name: Apply bound historical archive correction
+        if: steps.request.outputs.kind == 'archive_correction'
+        id: correction
+        shell: bash
+        run: |
+          git checkout --detach origin/main
+          node scripts/apply-archive-correction.mjs "$RUNNER_TEMP/secondary-request.json" --apply
+          npm run check
+          git config user.name "daily-game-brief[bot]"
+          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
+          git add public/data/archive public/data/locales/en/archive public/data/latest.json
+          git diff --cached --quiet && { echo "No correction was applied"; exit 1; }
+          git commit -m "fix(content): apply reviewed historical archive correction"
+          # Never rebase generated archive bytes. A concurrent main advance must
+          # fail and be reviewed again against fresh archive/English blob leases.
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy historical archive correction
+        if: steps.request.outputs.kind == 'archive_correction' && steps.correction.outputs.changed == 'true'
+        id: correction_deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh workflow run deploy.yml --ref main
+
       - name: Summary
         if: always()
         shell: bash
@@ -235,6 +261,9 @@ jobs:
             else
               echo "- Trusted media workflow was not dispatched successfully." >> "$GITHUB_STEP_SUMMARY"
             fi
+          elif [ "${{ steps.request.outputs.kind }}" = "archive_correction" ]; then
+            echo "- Historical archive correction changed production data: ${{ steps.correction.outputs.changed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Pages dispatch outcome: ${{ steps.correction_deploy.outcome || 'skipped' }}; deployment/live verification remains separate." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "- Title registry/backfill uses the existing title backfill command and full repository check."
             echo "- Title backfill changed production data: ${{ steps.titles.outputs.changed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"

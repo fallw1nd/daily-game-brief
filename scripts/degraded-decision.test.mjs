@@ -18,6 +18,7 @@ describe("zero-AI degraded decision", () => {
     const included = output.decisions[0];
     expect(included.decision).toBe("include");
     expect(included.factStatus).toBe("official");
+    expect(included.region).toBe("来源所述范围");
     expect(included.headline).toContain("自动事实清单");
   });
 

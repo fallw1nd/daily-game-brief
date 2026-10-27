@@ -90,6 +90,18 @@
 
 该 workflow 不是长期定时任务，只响应显式的人工 secondary request。
 
+### archive_correction request（显式历史纠错）
+
+只在用户明确授权历史内容纠错时使用，不纳入定时编辑或自动 fallback。用于已发布事实的有界文字/地区纠错，包括缺少原始 packet/state 的早期 AM/PM；不能借此增加新闻、事实、来源或改写期次身份。
+
+- `kind:"archive_correction"`、`schemaVersion:1`、精确 `editionId`；同一 Secondary 临时分支/request ID 规则。
+- `expectedArchiveBlobSha` 与 `expectedOverlayBlobSha` 必须从同一最新 main 复制对应文件的 Git blob SHA；任何并发变更均需重新复核，不能只刷新 SHA。
+- `corrections` 中每项绑定唯一现有 `entryId`；`expected` / `replacement` 仅允许 `headline`、`summary`、`region`。原文必须精确匹配，不能改头条 headline（需支持标题联动的正常 revision）。
+- `englishExpected` / `englishReplacement` 必须同步相同字段（region 对应 regionLabel）；不存在的可选英文字段用 null 明示。已正确的英文可原样保留，但仍需确认。现有完整英文须通过当前 Canonical 校验；缺失/过期英文先走 locale repair。
+- `evidence:{sourceUrl,excerpt,reason}` 记录人工重新打开的原选定来源及纠错理由。sourceUrl 必须已存在于该条来源列表。摘录是复核记录，不是机器自动证明，不能借重新打开页面把新事实塞进旧窗口。
+- Trusted main 的 `apply-archive-correction.mjs` 先在内存校验全部变更，保持 issue/window/ID/title/source/time/fact status/platform/tracking/calendar/sharedFactFrameDigest 不变；只同步精确匹配的自动生成配图 alt，不更换图片或出处。最新期对应 latest 必须同步，manifest 身份/标题不变。英文通过既有 trusted builder 重新校验，不能用旧稿覆盖已复核纠错。
+- 默认 dry-run，`--apply` 才写入；完整 `npm run check` 后由现有 Secondary writer 单次提交 main，再 dispatch 现有 Pages。并发 non-fast-forward 直接停止，不 rebase 生成数据；重新读取、复核并提交新请求。无需伪造 packet、编辑 automation/state/ledger 或调整编号/窗口。
+
 ## 5. 验收与停止条件
 
 每一期必须确认：

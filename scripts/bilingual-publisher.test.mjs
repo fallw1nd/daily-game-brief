@@ -140,6 +140,24 @@ describe("trusted bilingual publication planner", () => {
     expect(result.overlay.entries).toEqual(previous.entries);
     expect(result.overlay.factsDigest).not.toBe(previous.factsDigest);
   });
+  it("reconciles inserted, removed and reordered calendar identities without an English draft", () => {
+    const canonical = canonicalEdition();
+    const item = id => ({ id, date: "09.01", title: { title_key: id, title_en: "Test Game", title_zh_status: "unavailable" }, platforms: ["PC"], region: "全球", releaseType: "PC版发售", source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/123/" }, cover_status: "unavailable" });
+    canonical.upcoming = [item("keep-a"), item("remove"), item("keep-b")];
+    const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
+    previous.upcoming[0].coverAlt = "Reviewed Test Game artwork";
+    canonical.upcoming = [item("keep-b"), item("insert"), item("keep-a")];
+    const result = buildEnglishOverlay({ canonical, editorial: {}, previousOverlay: previous, preservePublished: true });
+    expect(result.status).toBe("available");
+    expect(result.overlay.upcoming.map(item => item.upcomingId)).toEqual(["keep-b", "insert", "keep-a"]);
+    expect(result.overlay.upcoming[2].coverAlt).toBe("Reviewed Test Game artwork");
+    expect(result.overlay.entries).toEqual(previous.entries);
+    canonical.upcoming[1].region = "Spike Chunsoft英语发行地区";
+    const unavailable = buildEnglishOverlay({ canonical, editorial: {}, previousOverlay: previous, preservePublished: true });
+    expect(unavailable.status).toBe("unavailable");
+    expect(unavailable.errors).toEqual(["upcoming[1].regionLabel: required English text is missing or too short"]);
+  });
+
   it("retains manual English copy only when it shares the current facts baseline", () => {
     const canonical = canonicalEdition();
     const previous = buildEnglishOverlay({ canonical, editorial: bilingualEditorial() }).overlay;
