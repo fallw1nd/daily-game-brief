@@ -1,3 +1,4 @@
+import { isExactCommittedPublicationReplay, retainedLocaleAvailability } from "./lib/committed-publication-replay.mjs";
 import { isEditorialFeedbackEligible } from "./lib/event-ledger.mjs";
 import { assertHistoricalInsertion } from "./lib/historical-insertion.mjs";
 import { persistVerifiedTitleHints } from "./lib/title-translations.mjs";
@@ -57,6 +58,12 @@ async function previousEnglishOverlay(manifest, editionId) {
 async function readEnglishPresentation(editionId) {
   return await readOptionalJson(resolve("public/data", localeArchivePath(editionId)))
     || (await readOptionalJson(resolve("public/data", localeStatusPath(editionId))))?.retainedPresentation || null;
+}
+
+async function retainedLocaleState(canonical) {
+  const overlay = await readOptionalJson(resolve("public/data", localeArchivePath(canonical.id)));
+  const status = await readOptionalJson(resolve("public/data", localeStatusPath(canonical.id)));
+  return retainedLocaleAvailability(canonical, overlay, status);
 }
 
 async function writePublicationResult(value) {
@@ -216,26 +223,48 @@ if (historicalInsertion) {
   assertHistoricalInsertion({ manifest, editionId: editorial.editionId, insertion: historicalInsertion,
     state: JSON.parse(stdout), packetBlobSha: editorial.packetBlobSha, phase: "publication" });
 }
-persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
 const feedbackAllowed = isEditorialFeedbackEligible({ editionId: editorial.editionId, latestEditionId: latest.id, historicalInsertion, state: trustedRevisionState, packetBlobSha: editorial.packetBlobSha, decisionIdentity: editorialDecisionDigest(editorial) });
 const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
+if (!allowSameEditionRevision && trustedRevisionState?.revisionRequest?.status === "completed") {
+  const item = manifest.editions.find(item => item.id === editorial.editionId);
+  if (item) {
+    const archivePath = `public/data/${item.path}`;
+    const archiveText = await readFile(archivePath, "utf8");
+    const canonical = JSON.parse(archiveText);
+    const exactReplay = await isExactCommittedPublicationReplay({
+      state: trustedRevisionState, editorial, canonical, archivePath, archiveText,
+      git: async args => (await run("git", args)).stdout,
+    });
+    if (exactReplay) {
+      await writePublicationResult({
+        editionId: editorial.editionId, status: "already-exists", publicationMode: "publish",
+        decisionDigest: editorialDecisionDigest(editorial), canonicalStatus: "unchanged",
+        ...await retainedLocaleState(canonical), feedbackEligible: false,
+      });
+      console.log(`${editorial.editionId}: exact committed receipt replay; publication bytes unchanged.`);
+      process.exit(0);
+    }
+  }
+}
 if (continuationPacket && !allowSameEditionRevision) {
   throw new Error("editorial continuation requires a matching durable state authorization");
 }
+persistVerifiedTitleHints(packet.editorialInput.titleHints);
 const noOpNewsContinuation = !repairExactDuplicateStories && packet.continuation?.scope === "news" &&
   packet.continuation?.preservePublished === true &&
   !editorial.decisions.some(item => item.decision === "include");
 if (noOpNewsContinuation) {
-  const existingOverlay = await readOptionalJson(resolve("public/data", localeArchivePath(editorial.editionId)));
+  const item = manifest.editions.find(item => item.id === editorial.editionId);
+  if (!item) throw new Error("no-op continuation target is not published");
+  const canonical = JSON.parse(await readFile(resolve("public/data", item.path), "utf8"));
   await writePublicationResult({
     editionId: editorial.editionId,
     status: "continuation-noop",
     publicationMode: "publish",
     decisionDigest: editorialDecisionDigest(editorial),
     canonicalStatus: "unchanged",
-    localeStatus: existingOverlay ? "available" : "unavailable",
-    localeReasonCode: existingOverlay ? null : "retained-existing-state",
+    ...await retainedLocaleState(canonical),
     feedbackEligible: feedbackAllowed,
   });
   console.log(`${editorial.editionId}: news continuation reviewed with no included facts; Canonical publication unchanged.`);
@@ -274,7 +303,8 @@ if (result.status === "already-exists") {
     : null;
   const matchingDecision = existingEdition?.sourceReport?.editorialDecisionDigest === result.decisionDigest;
   const feedbackEligible = feedbackAllowed && matchingDecision;
-  let localeStatus = "unchanged";
+  let { localeStatus, localeReasonCode } = await retainedLocaleState(existingEdition);
+  let repairedLocale = false;
   if (matchingDecision && editorial.locales?.en) {
     const priorOverlay = await previousEnglishOverlay(manifest, editorial.editionId);
     const localePlan = buildEnglishOverlay({
@@ -284,18 +314,26 @@ if (result.status === "already-exists") {
       previousOverlay: priorOverlay,
     });
     if (localePlan.status === "available") {
-      await writeLocalePlan(existingEdition, localePlan);
-      await rebuildGeneratedIndexes();
+      const overlayPath = resolve("public/data", localeArchivePath(existingEdition.id));
+      const oldOverlayText = await exists(overlayPath) ? await readFile(overlayPath, "utf8") : null;
+      const hadStatus = await exists(resolve("public/data", localeStatusPath(existingEdition.id)));
+      repairedLocale = oldOverlayText !== JSON.stringify(localePlan.overlay, null, 2) + "\n" || hadStatus;
+      if (repairedLocale) {
+        await writeLocalePlan(existingEdition, localePlan);
+        await rebuildGeneratedIndexes();
+      }
       localeStatus = "available";
+      localeReasonCode = repairedLocale ? null : "retained-existing-state";
     }
   }
   await writePublicationResult({
     editionId: editorial.editionId,
-    status: localeStatus === "available" ? "already-exists-locale-repaired" : result.status,
+    status: repairedLocale ? "already-exists-locale-repaired" : result.status,
     publicationMode: "publish",
     decisionDigest: result.decisionDigest,
     canonicalStatus: "unchanged",
     localeStatus,
+    localeReasonCode,
     feedbackEligible,
   });
   console.log(`${editorial.editionId} already exists; canonical unchanged; locale=${localeStatus}.`);
