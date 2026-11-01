@@ -11,6 +11,7 @@ import { buildEdition, editorialDecisionDigest } from "./lib/edition-publisher.m
 import { validateEditorialOutput } from "./lib/editorial-contract.mjs";
 import {
   buildEnglishOverlay,
+  buildManualRevisionEnglishOverlay,
   buildEnglishRepairOverlay,
   buildLocaleUnavailableStatus,
   deriveEntryIdsByEvent,
@@ -341,8 +342,10 @@ if (result.status === "already-exists") {
 }
 
 const priorOverlay = await readEnglishPresentation(publisherLatest.id);
-const localePlan = buildEnglishOverlay({
+const manualRevision = allowSameEditionRevision && trustedRevisionState?.revisionRequest?.reason === SAME_EDITION_REVISION_REASON;
+const localePlan = (manualRevision ? buildManualRevisionEnglishOverlay : buildEnglishOverlay)({
   canonical: result.edition,
+  previousCanonical: publisherLatest,
   editorial,
   entryIdsByEvent: result.entryIdsByEvent,
   previousOverlay: priorOverlay,

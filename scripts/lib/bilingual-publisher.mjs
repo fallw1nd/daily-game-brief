@@ -176,6 +176,45 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
   });
 }
 
+// A manual overlay can target one story while the archive also contains later
+// continuations absent from its original packet. Retain only already-validated,
+// byte-unchanged Canonical rows; changed rows still require a fresh English draft.
+export function buildManualRevisionEnglishOverlay({ canonical, previousCanonical, previousOverlay, editorial, entryIdsByEvent }) {
+  if (previousCanonical?.id !== canonical.id || previousOverlay?.editionId !== canonical.id
+    || ["issueNumber", "date", "period", "windowStart", "windowEnd", "timezone"].some(key => previousCanonical[key] !== canonical[key])
+    || !validateEnglishOverlay(previousCanonical, previousOverlay).valid) {
+    // A complete fresh draft remains valid even when there is nothing safe to
+    // retain. Never supply the invalid/mismatched baseline to this fallback.
+    return buildEnglishOverlay({ canonical, editorial, entryIdsByEvent });
+  }
+  const unchanged = (item, oldItems) => oldItems.some(old => old.id === item.id && JSON.stringify(old) === JSON.stringify(item));
+  const retainedEntryIds = new Set(canonical.entries.filter(item => unchanged(item, previousCanonical.entries)).map(item => item.id));
+  const retainedUpcomingIds = new Set((canonical.upcoming || []).filter(item => unchanged(item, previousCanonical.upcoming || [])).map(item => upcomingKey(canonical.id, item)));
+  const retained = {
+    ...previousOverlay,
+    entries: previousOverlay.entries.filter(item => retainedEntryIds.has(item.entryId)),
+    upcoming: previousOverlay.upcoming.filter(item => retainedUpcomingIds.has(item.upcomingId ?? item.upcomingKey)),
+  };
+  const draft = editorial.locales?.en;
+  const edited = (draft?.entries || []).map(item => ({
+    entryId: entryIdsByEvent[item.eventKey],
+    headline: item.headline, summary: item.summary, verification: item.verification, timeNote: item.timeNote,
+    ...(cleanOptional(item.regionLabel) ? { regionLabel: cleanOptional(item.regionLabel) } : {}),
+    ...(cleanOptional(item.releaseTypeLabel) ? { releaseTypeLabel: cleanOptional(item.releaseTypeLabel) } : {}),
+    ...(Array.isArray(item.sourceLabels) && item.sourceLabels.length ? { sourceLabels: normalizeSourceLabels(item.sourceLabels) } : {}),
+  }));
+  const entries = new Map(retained.entries.map(item => [item.entryId, item]));
+  for (const item of edited) entries.set(item.entryId, item);
+  const order = new Map(canonical.entries.map((item, index) => [item.id, index]));
+  return finalizeEnglishOverlay(canonical, {
+    archiveTitle: draft?.archiveTitle || (canonical.archiveTitle === previousCanonical.archiveTitle ? previousOverlay.archiveTitle : ""),
+    entries: [...entries.values()].sort((a, b) => (order.get(a.entryId) ?? Infinity) - (order.get(b.entryId) ?? Infinity)),
+    upcoming: buildUpcomingOverlay(canonical, draft, retained, editorial),
+    // Source-report prose describes this review, not a retained story row.
+    sourceReport: draft?.sourceReport,
+  });
+}
+
 export function buildEnglishRepairOverlay({ canonical, draft, retainedPresentation = null, preserveValidatedPresentation = false }) {
   if (!draft || draft.schemaVersion !== 1 || draft.locale !== "en" || draft.editionId !== canonical?.id) {
     return {

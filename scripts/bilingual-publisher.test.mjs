@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEnglishOverlay,
+  buildManualRevisionEnglishOverlay,
   buildEnglishRepairOverlay,
   buildLocaleUnavailableStatus,
   deriveEntryIdsByEvent,
 } from "./lib/bilingual-publisher.mjs";
-import { editorialDecisionDigest, factsDigest } from "./lib/locale-digest.mjs";
+import { editorialDecisionDigest, factsDigest, localeDigest } from "./lib/locale-digest.mjs";
 
 function canonicalEdition() {
   return {
@@ -316,5 +317,83 @@ describe("trusted bilingual publication planner", () => {
     expect(result.status).toBe("unavailable");
     expect(result.reasonCode).toBe("editorial-overlay-invalid");
     expect(result.summary).toContain("English overlay rejected");
+  });
+});
+
+
+describe("manual same-edition English overlay", () => {
+  function scenario() {
+    const previousCanonical = canonicalEdition();
+    previousCanonical.entries.push({ ...structuredClone(previousCanonical.entries[0]), id: "2026-08-30-am-news-1" });
+    const full = bilingualEditorial();
+    full.decisions.push({ ...structuredClone(full.decisions[0]), eventKey: "later-continuation" });
+    full.locales.en.entries.push({ ...structuredClone(full.locales.en.entries[0]), eventKey: "later-continuation" });
+    const previousOverlay = buildEnglishOverlay({ canonical: previousCanonical, editorial: full }).overlay;
+    const canonical = structuredClone(previousCanonical);
+    canonical.entries[0].headline = "《测试游戏》确认新版本";
+    const editorial = bilingualEditorial();
+    editorial.locales.en.entries[0].headline = "Test Game Confirms the New Version";
+    return { canonical, previousCanonical, previousOverlay, editorial, entryIdsByEvent: { "event-test-game": canonical.entries[0].id } };
+  }
+  it("keeps unchanged continuation stories absent from the packet while applying reviewed changed copy", () => {
+    const input = scenario();
+    const result = buildManualRevisionEnglishOverlay(input);
+    expect(result.status, result.summary).toBe("available");
+    expect(result.overlay.entries).toHaveLength(2);
+    expect(result.overlay.entries[0].headline).toBe("Test Game Confirms the New Version");
+    expect(result.overlay.entries[1]).toEqual(input.previousOverlay.entries[1]);
+  });
+  it("removes old calendar rows and never carries custom labels across a changed fact", () => {
+    const input = scenario();
+    const item = id => ({ id, date: "09.01", title: { title_key: id, title_en: "Test Game", title_zh_status: "unavailable" }, platforms: ["PC"], region: "测试发行地区", releaseType: "PC版发售", source: { kind: "primary", label: "Steam", url: "https://store.steampowered.com/app/123/" }, cover_status: "unavailable" });
+    input.previousCanonical.upcoming = [item("keep"), item("remove")];
+    const full = bilingualEditorial();
+    full.decisions.push({ ...structuredClone(full.decisions[0]), eventKey: "later-continuation" });
+    full.locales.en.entries.push({ ...structuredClone(full.locales.en.entries[0]), eventKey: "later-continuation" });
+    full.locales.en.upcoming = input.previousCanonical.upcoming.map(item => ({ upcomingId: item.id, regionLabel: "Verified distribution region", coverAlt: "Reviewed cover" }));
+    input.previousOverlay = buildEnglishOverlay({ canonical: input.previousCanonical, editorial: full }).overlay;
+    input.canonical.upcoming = [structuredClone(input.previousCanonical.upcoming[0])];
+    const result = buildManualRevisionEnglishOverlay(input);
+    expect(result.status, result.summary).toBe("available");
+    expect(result.overlay.upcoming.map(item => item.upcomingId)).toEqual(["keep"]);
+    expect(result.overlay.upcoming[0].coverAlt).toBe("Reviewed cover");
+    input.canonical.upcoming[0].region = "另一发行地区";
+    expect(buildManualRevisionEnglishOverlay(input).status).toBe("unavailable");
+  });
+  it.each(["sharedFactFrameDigest", "summary", "region", "headline"])("does not retain a stale omitted row after %s changes", field => {
+    const input = scenario();
+    input.canonical.entries[1][field] = field === "sharedFactFrameDigest" ? `sha256:${"2".repeat(64)}` : "changed";
+    const result = buildManualRevisionEnglishOverlay(input);
+    expect(result.status).toBe("unavailable");
+    expect(result.errors.join(" ")).toContain("cover every canonical entry");
+  });
+  it.each(["id", "issueNumber", "windowEnd"])("rejects another edition identity in %s", field => {
+    const input = scenario(); input.previousCanonical[field] = field === "issueNumber" ? 99 : "wrong";
+    expect(buildManualRevisionEnglishOverlay(input).status).toBe("unavailable");
+  });
+  it("rejects an unbound prior English overlay", () => {
+    const input = scenario(); input.previousOverlay.factsDigest = `sha256:${"0".repeat(64)}`;
+    expect(buildManualRevisionEnglishOverlay(input).status).toBe("unavailable");
+  });
+  it("does not carry old source-report prose into a new review", () => {
+    const input = scenario();
+    input.previousOverlay.sourceReport = { checked: ["Official website"], limited: [], note: "Only the official website was checked." };
+    input.previousOverlay.localeDigest = localeDigest(input.previousOverlay);
+    input.canonical.sourceReport = { checked: ["Steam"], limited: ["Official website"], note: "The official website is inaccessible." };
+    input.editorial.locales.en.sourceReport = null;
+    const result = buildManualRevisionEnglishOverlay(input);
+    expect(result.status, result.summary).toBe("available");
+    expect(result.overlay.sourceReport).toBeUndefined();
+  });
+  it.each([null, { editionId: "wrong-edition" }])("accepts a complete fresh draft without a usable old overlay: %j", previousOverlay => {
+    const canonical = canonicalEdition();
+    const editorial = bilingualEditorial();
+    const result = buildManualRevisionEnglishOverlay({ canonical, previousCanonical: canonical, previousOverlay, editorial, entryIdsByEvent: deriveEntryIdsByEvent(editorial) });
+    expect(result.status, result.summary).toBe("available");
+    expect(result.overlay.entries).toHaveLength(1);
+  });
+  it("does not silently retain a changed story without its English draft", () => {
+    const input = scenario(); delete input.editorial.locales;
+    expect(buildManualRevisionEnglishOverlay(input).status).toBe("unavailable");
   });
 });
