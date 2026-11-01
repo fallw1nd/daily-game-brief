@@ -5,6 +5,9 @@ export default defineConfig({
   base: "/daily-game-brief/",
   plugins: [react()],
   test: {
-    environment: "jsdom",
+    projects: [
+      { extends: true, test: { name: "node", environment: "node", include: ["scripts/**/*.test.mjs"] } },
+      { extends: true, test: { name: "ui", environment: "jsdom", include: ["src/**/*.test.{ts,tsx}"] } },
+    ],
   },
 });

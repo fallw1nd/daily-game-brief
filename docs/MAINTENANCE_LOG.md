@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261101-01 — Rebuild media on concurrent publication and avoid DOM setup for Node checks
+
+- Nov1 media run `41268947634` lost a main-branch race after enrichment and full validation, then failed rebasing generated archive/latest JSON. Pin the initially selected edition/record, confirm uncertain push acceptance, and regenerate from fresh main with refreshed dependencies and a full check on each bounded retry. Preserve concurrent news and newer latest; do not rebase generated Canonical data. Upload the final-attempt audit and keep all existing publication/deployment gates. Pass dispatch input through environment variables, validate before workflow outputs, and never interpolate raw input into the always-running acknowledgment shell.
+- Regression uses real local Git remotes for concurrent editorial changes/latest advancement, already-applied no-op, unchanged-remote failure, accepted-but-response-lost push, and three-attempt exhaustion.
+- Existing CI logs showed roughly 62 seconds aggregate jsdom environment initialization across 127 test files, predominantly Node scripts. Split existing tests into Node and UI projects without removing checks or weakening isolation. Same local 987-test baseline: Vitest 15.34s → 11.02s; aggregate environment 33.98s → 4.45s. These are local measurements, not a CI speed guarantee. Keep recovery/noon waits: observed delayed cron starts make them necessary.
+
 ## MNT-20261027-02 — Bound historical corrections and stop invented global scope
 
 - Full archive audit found omitted story regions defaulted to Global, an explicitly overbroad CERO region, elapsed AVA service days written as a future countdown, and a Japan date incorrectly inferred as Beijing. Use the existing source-stated-scope label for omitted regions and degraded fallback; explicit supported editorial regions remain unchanged. Editorial guidance now preserves scope, elapsed-duration meaning and source timezone.
