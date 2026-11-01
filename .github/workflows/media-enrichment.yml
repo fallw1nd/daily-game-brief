@@ -44,6 +44,7 @@ jobs:
         run: npm ci
 
       - name: Discover and normalize verified media
+        id: discovery
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           EDITION_ID: ${{ inputs.edition_id }}
@@ -52,32 +53,39 @@ jobs:
         run: |
           edition="$EDITION_ID"
           record="$RECORD_ID"
+          if [ -n "$record" ] && [ -z "$edition" ]; then
+            echo "record_id requires an exact edition_id"
+            exit 1
+          fi
+          if [ -z "$edition" ]; then
+            edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
+          fi
+          if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily)$ ]]; then
+            echo "Invalid edition_id: $edition"
+            exit 1
+          fi
+          if [[ -n "$record" && ! "$record" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "Invalid record_id: $record"
+            exit 1
+          fi
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
           if [ -n "$record" ]; then
-            if [ -z "$edition" ]; then
-              echo "record_id requires an exact edition_id"
-              exit 1
-            fi
-            if [[ ! "$record" =~ ^[A-Za-z0-9_-]+$ ]]; then
-              echo "Invalid record_id: $record"
-              exit 1
-            fi
-            if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily)$ ]]; then
-              echo "Invalid edition_id: $edition"
-              exit 1
-            fi
             node scripts/enrich-media.mjs --apply --edition="$edition" --revalidate-cover-id="$record"
-          elif [ -n "$edition" ]; then
-            if [[ ! "$edition" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(am|pm|daily)$ ]]; then
-              echo "Invalid edition_id: $edition"
-              exit 1
-            fi
-            node scripts/enrich-media.mjs --apply --edition="$edition"
           else
-            npm run media:enrich
+            node scripts/enrich-media.mjs --apply --edition="$edition"
           fi
 
       - name: Validate media update
         run: npm run check
+
+      - name: Publish verified media
+        id: publication
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          EDITION_ID: ${{ steps.discovery.outputs.edition }}
+          RECORD_ID: ${{ inputs.record_id }}
+        shell: bash
+        run: bash scripts/publish-verified-media.sh "$EDITION_ID" "$RECORD_ID"
 
       - name: Upload media audit
         if: always()
@@ -88,42 +96,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Publish verified media
-        id: publication
-        shell: bash
-        run: |
-          edition="${{ inputs.edition_id }}"
-          if [ -z "$edition" ]; then
-            edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
-          fi
-          echo "edition=$edition" >> "$GITHUB_OUTPUT"
-          if git diff --quiet -- public/data public/media; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git config user.name "daily-game-brief[bot]"
-          git config user.email "daily-game-brief[bot]@users.noreply.github.com"
-          git add public/data/latest.json public/data/archive public/media
-          git commit -m "chore(media): enrich $edition"
-          for attempt in 1 2 3; do
-            if git push origin HEAD:main; then
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-              echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            git fetch origin main
-            git rebase origin/main
-            # A clean Git merge can still violate data or code contracts.
-            npm run check
-          done
-          echo "Failed to publish media after three attempts"
-          exit 1
-
       - name: Deploy media update
         if: steps.publication.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          EDITION_ID: ${{ steps.publication.outputs.edition || inputs.edition_id }}
+          EDITION_ID: ${{ steps.discovery.outputs.edition || inputs.edition_id }}
         shell: bash
         run: |
           if [ -z "$EDITION_ID" ]; then
@@ -134,9 +111,11 @@ jobs:
 
       - name: Acknowledge nonblocking media lane
         if: always()
+        env:
+          EDITION_ID: ${{ steps.discovery.outputs.edition || inputs.edition_id }}
         shell: bash
         run: |
-          edition="${{ steps.publication.outputs.edition || inputs.edition_id }}"
+          edition="$EDITION_ID"
           if [ -z "$edition" ]; then
             edition="$(node -p "JSON.parse(require('fs').readFileSync('public/data/latest.json','utf8')).id")"
           fi

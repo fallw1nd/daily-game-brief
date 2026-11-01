@@ -59,9 +59,10 @@ describe("bounded media fetch", () => {
     expect(stream.cancel).toHaveBeenCalledTimes(1);
   });
 
-  it("requires validation again after rebasing media onto concurrent production changes", async () => {
-    const workflow = await readFile(".github/workflows/media-enrichment.yml", "utf8");
-    const retry = workflow.split("for attempt in 1 2 3; do")[1].split("          done")[0];
-    expect(retry).toMatch(/git rebase origin\/main\n\s*#[^\n]*\n\s*npm run check/);
+  it("requires validation after regenerating media against concurrent production changes", async () => {
+    const publisher = await readFile("scripts/publish-verified-media.sh", "utf8");
+    expect(publisher.indexOf("npm run check")).toBeGreaterThan(publisher.indexOf('node scripts/enrich-media.mjs "${args[@]}"'));
+    expect(publisher.indexOf('node scripts/enrich-media.mjs "${args[@]}"')).toBeGreaterThan(publisher.indexOf("git reset --hard origin/main"));
+    expect(publisher).not.toContain("git rebase");
   });
 });
