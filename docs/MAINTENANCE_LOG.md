@@ -1,5 +1,10 @@
 # Maintenance Issue Log
 
+## MNT-20261101-02 — Preserve validated untouched English in manual overlays
+
+- A Nov1 dry-run repairing one headline and removing a duplicate calendar row preserved all 11 Canonical stories, but rejected English because its scoped draft could not include two later continuation stories absent from the original packet. No degraded draft was submitted.
+- The existing authorized manual-revision publisher now retains only byte-unchanged Canonical rows from a validated same-edition English baseline. Explicit new English wins for edited rows; changed omitted facts/copy, stale digests, mismatched edition/window/issue identity, and incomplete final coverage fail closed through the existing locale validator. Calendar presentation is retained only for unchanged rows; removed IDs disappear. An unusable old baseline is never retained but still permits a complete independently valid fresh draft. Ordinary continuation and complete locale-repair behavior are unchanged.
+
 ## MNT-20261101-01 — Rebuild media on concurrent publication and avoid DOM setup for Node checks
 
 - Nov1 media run `41268947634` lost a main-branch race after enrichment and full validation, then failed rebasing generated archive/latest JSON. Pin the initially selected edition/record, confirm uncertain push acceptance, and regenerate from fresh main with refreshed dependencies and a full check on each bounded retry. Preserve concurrent news and newer latest; do not rebase generated Canonical data. Upload the final-attempt audit and keep all existing publication/deployment gates. Pass dispatch input through environment variables, validate before workflow outputs, and never interpolate raw input into the always-running acknowledgment shell.
