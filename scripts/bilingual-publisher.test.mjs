@@ -115,6 +115,26 @@ function repairDraft(canonical) {
 }
 
 describe("trusted bilingual publication planner", () => {
+  it("merges a trusted news report only with a valid same-edition English baseline", () => {
+    const canonical = canonicalEdition();
+    const editorial = bilingualEditorial();
+    editorial.locales.en.sourceReport = { checked: ["Nintendo"], limited: ["Primary body limited"], note: "Initial review." };
+    const previous = buildEnglishOverlay({ canonical, editorial }).overlay;
+    editorial.locales.en.sourceReport = { checked: ["IGN"], limited: [], note: "News continuation review." };
+    const input = { canonical, previousCanonical: structuredClone(canonical), editorial, previousOverlay: previous, preservePublished: true, preserveNewsSourceReport: true };
+    const merged = buildEnglishOverlay(input);
+    expect(merged.status).toBe("available");
+    expect(merged.overlay.sourceReport.checked).toEqual(["Nintendo", "IGN"]);
+    expect(merged.overlay.sourceReport.limited).toEqual(["Primary body limited"]);
+    expect(merged.overlay.entries).toEqual(previous.entries);
+    expect(merged.overlay.factsDigest).toBe(previous.factsDigest);
+    expect(merged.overlay.localeDigest).not.toBe(previous.localeDigest);
+    expect(buildEnglishOverlay({ ...input, preserveNewsSourceReport: false }).overlay.sourceReport).toEqual(editorial.locales.en.sourceReport);
+    expect(buildEnglishOverlay({ ...input, previousCanonical: { ...canonical, id: "different-edition" } }).overlay.sourceReport).toEqual(editorial.locales.en.sourceReport);
+    const invalid = { ...previous, localeDigest: `sha256:${"f".repeat(64)}` };
+    expect(buildEnglishOverlay({ ...input, previousOverlay: invalid }).overlay.sourceReport).toEqual(editorial.locales.en.sourceReport);
+    expect(buildManualRevisionEnglishOverlay({ ...input, entryIdsByEvent: deriveEntryIdsByEvent(editorial) }).overlay.sourceReport).toEqual(editorial.locales.en.sourceReport);
+  });
   it("binds an incoming calendar alias presentation to the retained Canonical ID", () => {
     const canonical = canonicalEdition();
     const editorial = bilingualEditorial();

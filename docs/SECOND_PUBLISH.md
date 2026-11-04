@@ -99,6 +99,11 @@
 - `corrections` 中每项绑定唯一现有 `entryId`；`expected` / `replacement` 仅允许 `headline`、`summary`、`region`。原文必须精确匹配，不能改头条 headline（需支持标题联动的正常 revision）。
 - `englishExpected` / `englishReplacement` 必须同步相同字段（region 对应 regionLabel）；不存在的可选英文字段用 null 明示。已正确的英文可原样保留，但仍需确认。现有完整英文须通过当前 Canonical 校验；缺失/过期英文先走 locale repair。
 - `evidence:{sourceUrl,excerpt,reason}` 记录人工重新打开的原选定来源及纠错理由。sourceUrl 必须已存在于该条来源列表。摘录是复核记录，不是机器自动证明，不能借重新打开页面把新事实塞进旧窗口。
+- 同一期 continuation 曾覆盖累计检索说明时，可加 `sourceReportCorrection:{expected,replacement,englishExpected,englishReplacement,evidence}`；只修复报告文字，不能借此重开 tracking 或更改新闻/日历事实。`corrections:[]` 允许报告单独纠错，也可与条目纠错同一事务提交；没有任何纠错或报告完全无变化的请求拒绝。
+  - 中文 `expected` / `replacement` 必须包含相同的非空字段集合，仅允许 `checked`、`limited`、`checkedGroups`、`trackingResults`、`excludedMajorCandidates`、`limitedSources`、`note`。数组逐项精确匹配当前值；原先不存在的可选字段用 `null` 绑定。replacement 中除非空 note 外均为字符串数组（可为空），不支持删除字段。
+  - 英文 `englishExpected` / `englishReplacement` 必须完整绑定当前 `checked`、`limited`、`note` 三字段，允许已正确英文保持不变；必须已有完整有效英文及现有 sourceReport，不能借此绕过 locale repair。
+  - 报告 evidence 沿用 `{sourceUrl,excerpt,reason}`，URL 必须是 `https://github.com/fallw1nd/daily-game-brief/blob/<40位commit SHA>/public/data/archive/YYYY/MM/<同一期ID>.json`。人工须先复核该历史同一期归档，并记录原报告摘录和恢复理由；URL 结构绑定不是机器证明历史内容或授权。
+  - `auditStats`、`editorialDecisionDigest`、`calendarReview` 等受保护报告字段保持不变；报告修复不改变 factsDigest。仍要求当前双语 Git blob SHA lease、精确原文比较、protected projection 校验和 trusted English rebuild，不直接覆盖 Canonical 文件。
 - Trusted main 的 `apply-archive-correction.mjs` 先在内存校验全部变更，保持 issue/window/ID/title/source/time/fact status/platform/tracking/calendar/sharedFactFrameDigest 不变；只同步精确匹配的自动生成配图 alt，不更换图片或出处。最新期对应 latest 必须同步，manifest 身份/标题不变。英文通过既有 trusted builder 重新校验，不能用旧稿覆盖已复核纠错。
 - 默认 dry-run，`--apply` 才写入；完整 `npm run check` 后由现有 Secondary writer 单次提交 main，再 dispatch 现有 Pages。并发 non-fast-forward 直接停止，不 rebase 生成数据；重新读取、复核并提交新请求。无需伪造 packet、编辑 automation/state/ledger 或调整编号/窗口。
 

@@ -71,6 +71,24 @@ const latest = {
 const manifest = { schemaVersion: 1, updatedAt: "2026-08-26 17:04", latest: "2026-08-26-pm", editions: [{ id: "2026-08-26-pm", issueNumber: 12 }] };
 
 describe("idempotent edition publisher", () => {
+  it("cumulates source reports only for explicitly trusted news continuations, not manual revisions", () => {
+    const initial = buildEdition({ packet, editorial, latest, manifest });
+    initial.edition.sourceReport.checked.push("Earlier checked source");
+    initial.edition.sourceReport.limited.push("本编辑包还有 6 个候选待编辑核验；不代表已完成收录。");
+    initial.edition.sourceReport.excludedMajorCandidates.push("old-exclusion：Retained reason");
+    const scoped = { ...packet, continuation: { scope: "news", preservePublished: true } };
+    const draft = { ...editorial, editorialNote: "Completed continuation review." };
+    const input = { packet: scoped, editorial: draft, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true };
+    const result = buildEdition({ ...input, preserveNewsSourceReport: true });
+    expect(result.edition.sourceReport.checked).toContain("Earlier checked source");
+    expect(result.edition.sourceReport.excludedMajorCandidates).toEqual(["old-exclusion：Retained reason"]);
+    expect(result.edition.sourceReport.limited).toEqual([]);
+    expect(result.edition.sourceReport.editorialDecisionDigest).toBe(result.decisionDigest);
+    expect(result.edition.entries).toEqual(initial.edition.entries);
+    expect(buildEdition(input).edition.sourceReport.checked).not.toContain("Earlier checked source");
+    expect(buildEdition({ ...input, preserveNewsSourceReport: true, repairExactDuplicateStories: true }).edition.sourceReport.checked).not.toContain("Earlier checked source");
+    expect(buildEdition({ ...input, packet, preserveNewsSourceReport: true }).edition.sourceReport.checked).not.toContain("Earlier checked source");
+  });
   it("does not invent global coverage when editorial region is omitted", () => {
     const draft = structuredClone(editorial);
     draft.decisions[0].region = null;

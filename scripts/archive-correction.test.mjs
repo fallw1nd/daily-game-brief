@@ -25,6 +25,87 @@ function fixture() {
   } };
 }
 
+function reportFixture({ combined = false } = {}) {
+  const input = fixture();
+  if (!combined) input.request.corrections = [];
+  input.request.sourceReportCorrection = {
+    expected: { checked: input.canonical.sourceReport.checked, limited: input.canonical.sourceReport.limited, note: input.canonical.sourceReport.note },
+    replacement: { checked: [...input.canonical.sourceReport.checked, "已复核同一期早期归档的检索说明"], limited: [], note: "保留同一期累计检索说明；新闻与日历事实不变。" },
+    englishExpected: structuredClone(input.overlay.sourceReport),
+    englishReplacement: { checked: [...input.overlay.sourceReport.checked, "Earlier same-edition source report reviewed"], limited: [], note: "Cumulative same-edition source review restored without changing news or calendar facts." },
+    evidence: { sourceUrl: `https://github.com/fallw1nd/daily-game-brief/blob/${"c".repeat(40)}/public/data/archive/2026/10/${input.canonical.id}.json`, excerpt: "Earlier same-edition source report", reason: "Restore cumulative reviewed coverage lost during continuation." },
+  };
+  return input;
+}
+
+describe("bounded sourceReport correction", () => {
+  it("repairs report-only bilingual prose, preserving every fact and audit receipt", () => {
+    const input = reportFixture(), before = structuredClone(input);
+    const result = planArchiveCorrection(input);
+    expect(input).toEqual(before);
+    expect(result.canonical).toEqual({ ...input.canonical, sourceReport: { ...input.canonical.sourceReport, ...input.request.sourceReportCorrection.replacement } });
+    expect(result.overlay.sourceReport).toEqual(input.request.sourceReportCorrection.englishReplacement);
+    expect(result.overlay.entries).toEqual(input.overlay.entries);
+    expect(result.overlay.upcoming).toEqual(input.overlay.upcoming);
+    expect(result.overlay.factsDigest).toBe(input.overlay.factsDigest);
+    expect(validateEnglishOverlay(result.canonical, result.overlay).valid).toBe(true);
+  });
+  it("allows combined story and report corrections in one validated plan", () => {
+    const input = reportFixture({ combined: true }), result = planArchiveCorrection(input);
+    expect(result.canonical.entries.find(row => row.id === input.request.corrections[0].entryId).region).toBe("日本");
+    expect(result.canonical.sourceReport.note).toBe(input.request.sourceReportCorrection.replacement.note);
+    expect(validateEnglishOverlay(result.canonical, result.overlay).valid).toBe(true);
+  });
+  it("allows reviewed optional prose fields with null binding for absence", () => {
+    const input = reportFixture(), correction = input.request.sourceReportCorrection;
+    for (const key of ["checkedGroups", "trackingResults", "excludedMajorCandidates", "limitedSources"]) {
+      correction.expected[key] = input.canonical.sourceReport[key] ?? null;
+      correction.replacement[key] = ["已复核历史记录，未改变当前跟踪状态。"];
+    }
+    const result = planArchiveCorrection(input);
+    expect(result.canonical.tracking).toEqual(input.canonical.tracking);
+    for (const key of ["checkedGroups", "trackingResults", "excludedMajorCandidates", "limitedSources"]) expect(result.canonical.sourceReport[key]).toEqual(correction.replacement[key]);
+  });
+  it("requires an existing English report even if the remaining overlay is valid", () => {
+    const input = reportFixture();
+    delete input.overlay.sourceReport;
+    input.overlay = buildEnglishRepairOverlay({ canonical: input.canonical, draft: input.overlay, retainedPresentation: null, preserveValidatedPresentation: true }).overlay;
+    expect(validateEnglishOverlay(input.canonical, input.overlay).valid).toBe(true);
+    expect(() => planArchiveCorrection(input)).toThrow("current English sourceReport required");
+  });
+  it("accepts already correct English with explicit complete bindings", () => {
+    const input = reportFixture(); input.request.sourceReportCorrection.englishReplacement = structuredClone(input.overlay.sourceReport);
+    expect(planArchiveCorrection(input).overlay.sourceReport).toEqual(input.overlay.sourceReport);
+  });
+  it.each([
+    ["unknown envelope field", x => x.request.sourceReportCorrection.force = true],
+    ["unknown prose field", x => x.request.sourceReportCorrection.replacement.entries = []],
+    ...["auditStats", "calendarReview", "editorialDecisionDigest"].map(key => [key, x => { x.request.sourceReportCorrection.expected[key] = x.canonical.sourceReport[key]; x.request.sourceReportCorrection.replacement[key] = {}; }]),
+    ["mismatched fields", x => delete x.request.sourceReportCorrection.expected.note],
+    ["stale Chinese prose", x => x.request.sourceReportCorrection.expected.checked = []],
+    ["stale English prose", x => x.request.sourceReportCorrection.englishExpected.note = "Incorrect old text"],
+    ["missing English expected", x => delete x.request.sourceReportCorrection.englishExpected],
+    ["incomplete English replacement", x => delete x.request.sourceReportCorrection.englishReplacement.limited],
+    ["unsupported English report field", x => x.request.sourceReportCorrection.englishReplacement.auditStats = {}],
+    ["non-English replacement", x => x.request.sourceReportCorrection.englishReplacement.note = "这不是英文报告"],
+    ["invalid report array", x => x.request.sourceReportCorrection.replacement.checked = "not an array"],
+    ["invalid report item", x => x.request.sourceReportCorrection.replacement.checked = [{}]],
+    ["empty report note", x => x.request.sourceReportCorrection.replacement.note = ""],
+    ["unbound evidence ref", x => x.request.sourceReportCorrection.evidence.sourceUrl = x.request.sourceReportCorrection.evidence.sourceUrl.replace("c".repeat(40), "main")],
+    ["different edition evidence", x => x.request.sourceReportCorrection.evidence.sourceUrl = x.request.sourceReportCorrection.evidence.sourceUrl.replace(x.canonical.id, "2026-10-17-daily")],
+    ["different repository evidence", x => x.request.sourceReportCorrection.evidence.sourceUrl = x.request.sourceReportCorrection.evidence.sourceUrl.replace("fallw1nd", "other")],
+    ["missing reason", x => delete x.request.sourceReportCorrection.evidence.reason],
+    ["no-op report", x => { const c=x.request.sourceReportCorrection; c.replacement=structuredClone(c.expected);c.englishReplacement=structuredClone(c.englishExpected); }],
+    ["empty request", x => delete x.request.sourceReportCorrection],
+    ["null report correction", x => x.request.sourceReportCorrection = null],
+    ["stale report archive lease", x => x.request.expectedArchiveBlobSha = "d".repeat(40)],
+    ["stale report English lease", x => x.request.expectedOverlayBlobSha = "d".repeat(40)],
+  ])("rejects %s before mutations", (_name, mutate) => {
+    const input = reportFixture(); mutate(input); const before = structuredClone(input);
+    expect(() => planArchiveCorrection(input)).toThrow(); expect(input).toEqual(before);
+  });
+});
+
 describe("bounded archive correction", () => {
   it("preserves valid legacy presentation without normalizing unrelated old title identities", () => {
     const input = fixture();

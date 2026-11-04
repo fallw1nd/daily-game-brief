@@ -64,6 +64,38 @@ describe("archive correction CLI transaction", () => {
     expect(JSON.parse(after[overlayPath]).entries.find(row => row.entryId === request.corrections[0].entryId).regionLabel).toBe("Japan");
     expect(after[unrelated]).toBe(before[unrelated]); expect(after["public/data/manifest.json"]).toBe(before["public/data/manifest.json"]);
   });
+  it("report-only dry-run and apply use the existing bilingual/latest transaction", async () => {
+    const before = await snapshot(), canonical = JSON.parse(before[archive]), overlay = JSON.parse(before[overlayPath]);
+    request.corrections = [];
+    request.sourceReportCorrection = {
+      expected: { note: canonical.sourceReport.note }, replacement: { note: "已恢复同一期累计检索说明，不改变新闻事实。" },
+      englishExpected: structuredClone(overlay.sourceReport),
+      englishReplacement: { ...overlay.sourceReport, note: "Cumulative same-edition source report restored without changing facts." },
+      evidence: { sourceUrl: `https://github.com/fallw1nd/daily-game-brief/blob/${"c".repeat(40)}/public/data/archive/2026/10/${editionId}.json`, excerpt: "Earlier source report", reason: "Restore lost same-edition review prose." },
+    };
+    await saveRequest();
+    expect((await applyArchiveCorrection(requestPath, {root})).applied).toBe(false);
+    expect(await snapshot()).toEqual(before);
+    await applyArchiveCorrection(requestPath, {root,apply:true});
+    const after = await snapshot(), updated = JSON.parse(after[archive]), english = JSON.parse(after[overlayPath]);
+    expect(updated).toEqual({ ...canonical, sourceReport: { ...canonical.sourceReport, note: request.sourceReportCorrection.replacement.note } });
+    expect(english.sourceReport).toEqual(request.sourceReportCorrection.englishReplacement);
+    expect(english.factsDigest).toBe(overlay.factsDigest);
+    expect(after[archive]).toBe(after["public/data/latest.json"]);
+    expect(after[unrelated]).toBe(before[unrelated]);
+    expect(after["public/data/manifest.json"]).toBe(before["public/data/manifest.json"]);
+  });
+  it("invalid report binding prevents a combined entry correction from being written", async () => {
+    const before = await snapshot(), canonical = JSON.parse(before[archive]), overlay = JSON.parse(before[overlayPath]);
+    request.sourceReportCorrection = {
+      expected: { note: canonical.sourceReport.note }, replacement: { note: "已恢复累计检索说明。" },
+      englishExpected: { ...overlay.sourceReport, note: "Stale note" }, englishReplacement: overlay.sourceReport,
+      evidence: { sourceUrl: `https://github.com/fallw1nd/daily-game-brief/blob/${"c".repeat(40)}/public/data/archive/2026/10/${editionId}.json`, excerpt: "Earlier source report", reason: "Restore lost same-edition review prose." },
+    };
+    await saveRequest();
+    await expect(applyArchiveCorrection(requestPath, {root,apply:true})).rejects.toThrow("stale English sourceReport");
+    expect(await snapshot()).toEqual(before);
+  });
   it("stale overlay SHA rejects without mutations", async () => {
     request.expectedOverlayBlobSha = "c".repeat(40); await saveRequest(); const before=await snapshot();
     await expect(applyArchiveCorrection(requestPath, {root,apply:true})).rejects.toThrow("expectedOverlayBlobSha"); expect(await snapshot()).toEqual(before);

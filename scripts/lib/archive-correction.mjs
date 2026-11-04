@@ -6,6 +6,8 @@ import { factsDigest } from "./locale-digest.mjs";
 import { programmaticRegionLabel } from "../../src/lib/locale-dictionary.js";
 
 const own = (object, key) => Object.hasOwn(object, key);
+const REPORT_FIELDS = ["checked", "limited", "checkedGroups", "trackingResults", "excludedMajorCandidates", "limitedSources", "note"];
+const ENGLISH_REPORT_FIELDS = ["checked", "limited", "note"];
 const FIELD_MAP = { headline: "headline", summary: "summary", region: "regionLabel" };
 function fail(message) { throw new Error(`archive correction: ${message}`); }
 function record(value, keys, label) {
@@ -24,9 +26,46 @@ function overlayPresentation(overlay) {
   return copy;
 }
 
+/** Report prose only: audit receipts and all fact-bearing fields stay outside this adapter. */
+function correctSourceReport(canonical, overlay, correction, archivePath) {
+  record(correction, ["expected", "replacement", "englishExpected", "englishReplacement", "evidence"], "sourceReportCorrection");
+  record(correction.expected, REPORT_FIELDS, "sourceReportCorrection.expected");
+  record(correction.replacement, REPORT_FIELDS, "sourceReportCorrection.replacement");
+  const fields = Object.keys(correction.replacement);
+  if (!fields.length || !isDeepStrictEqual([...fields].sort(), Object.keys(correction.expected).sort())) fail("sourceReport expected/replacement fields must match");
+  for (const key of ["englishExpected", "englishReplacement"]) {
+    record(correction[key], ENGLISH_REPORT_FIELDS, `sourceReportCorrection.${key}`);
+    if (!isDeepStrictEqual(Object.keys(correction[key]).sort(), [...ENGLISH_REPORT_FIELDS].sort())) fail("complete English sourceReport bindings required");
+  }
+  record(correction.evidence, ["sourceUrl", "excerpt", "reason"], "sourceReportCorrection.evidence");
+  for (const key of ["sourceUrl", "excerpt", "reason"]) nonempty(correction.evidence[key], `sourceReportCorrection.evidence.${key}`);
+  // Human-attested historical evidence, not a claim that the adapter fetched or verified the old revision.
+  const evidenceMatch = /^https:\/\/github\.com\/fallw1nd\/daily-game-brief\/blob\/([0-9a-f]{40})\/(.+)$/.exec(correction.evidence.sourceUrl);
+  if (!evidenceMatch || evidenceMatch[2] !== `public/data/${archivePath}`) fail("sourceReport evidence must pin the same-edition GitHub archive");
+  let changed = false;
+  for (const [target, expected, replacement, keys, label] of [
+    [canonical.sourceReport, correction.expected, correction.replacement, fields, "sourceReport"],
+    [overlay.sourceReport, correction.englishExpected, correction.englishReplacement, ENGLISH_REPORT_FIELDS, "English sourceReport"],
+  ]) {
+    if (!target || typeof target !== "object" || Array.isArray(target)) fail(`current ${label} required`);
+    for (const key of keys) {
+      if (!isDeepStrictEqual(own(target, key) ? target[key] : null, expected[key])) fail(`stale ${label} expected ${key}`);
+      if (key === "note") nonempty(replacement[key], `${label}.${key}`);
+      else {
+        if (!Array.isArray(replacement[key])) fail(`${label}.${key} must be an array`);
+        replacement[key].forEach(value => nonempty(value, `${label}.${key} item`));
+      }
+      changed ||= !isDeepStrictEqual(target[key], replacement[key]);
+      target[key] = structuredClone(replacement[key]);
+    }
+  }
+  if (!changed) fail("unchanged sourceReport correction");
+  return fields;
+}
+
 /** Pure, evidence-attested manual adapter. No input mutation, writes, or state/ledger work. */
 export function planArchiveCorrection({ canonical, overlay, manifest, request, archiveBlobSha, overlayBlobSha }) {
-  record(request, ["schemaVersion", "kind", "editionId", "expectedArchiveBlobSha", "expectedOverlayBlobSha", "corrections"], "request");
+  record(request, ["schemaVersion", "kind", "editionId", "expectedArchiveBlobSha", "expectedOverlayBlobSha", "corrections", "sourceReportCorrection"], "request");
   if (request.schemaVersion !== 1 || request.kind !== "archive_correction") fail("unsupported request envelope");
   if (!/^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/.test(request.editionId || "")) fail("invalid edition identity");
   for (const [key, actual] of [["expectedArchiveBlobSha", archiveBlobSha], ["expectedOverlayBlobSha", overlayBlobSha]]) {
@@ -45,9 +84,13 @@ export function planArchiveCorrection({ canonical, overlay, manifest, request, a
   unique(canonical.entries, "id", "canonical entries");
   unique(overlay.entries, "entryId", "English entries");
   if (!validateEnglishOverlay(canonical, overlay).valid) fail("current English overlay is invalid or stale");
-  if (!Array.isArray(request.corrections) || !request.corrections.length || request.corrections.length > 100) fail("corrections must contain 1–100 entries");
+  if (!Array.isArray(request.corrections) || request.corrections.length > 100) fail("corrections must contain 0–100 entries");
+  if (!request.corrections.length && !own(request, "sourceReportCorrection")) fail("at least one correction required");
   unique(request.corrections, "entryId", "corrections");
   const next = structuredClone(canonical), presentation = structuredClone(overlay);
+  const reportFields = own(request, "sourceReportCorrection")
+    ? correctSourceReport(next, presentation, request.sourceReportCorrection, archivePath) : [];
+  if (factsDigest(next) !== factsDigest(canonical)) fail("sourceReport correction changed facts digest");
   const allowed = new Map();
   const allowedAlts = new Map();
   for (const correction of request.corrections) {
@@ -98,6 +141,7 @@ export function planArchiveCorrection({ canonical, overlay, manifest, request, a
   // Defense in depth: the protected projection must be identical in both languages.
   const strip = (value, english = false) => {
     const result = structuredClone(value);
+    for (const key of (english && reportFields.length ? ENGLISH_REPORT_FIELDS : reportFields)) delete result.sourceReport[key];
     for (const entry of result.entries) {
       for (const field of allowed.get(english ? entry.entryId : entry.id) || []) delete entry[english ? FIELD_MAP[field] : field];
       if (!english) for (const [index, asset] of (entry.images || []).entries()) {

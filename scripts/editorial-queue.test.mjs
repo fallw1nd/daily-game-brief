@@ -107,6 +107,7 @@ it("publishes a calendar-only continuation without changing news, issue, lead, t
   const manifest = { latest: editionId, editions: [{ id: editionId, issueNumber: 40 }] };
   const calendarWork = { pages: [{ blobSha: "a".repeat(40) }] };
   const calendarPacket = JSON.parse(packet([], "calendar", { calendarWork }));
+  calendarPacket.editorialInput.budget = { omittedItems: 6 };
   const editorial = { editionId, archiveTitle: latest.archiveTitle, decisions: [], upcomingMode: "inherit_and_patch", removeUpcomingIds: [], upcoming: [{ id: "release", date: "2026-09-12", titleKey: "new-game", titleEn: "New Game", titleZhCn: null, titleZhStatus: "unavailable", platforms: ["PC"], region: "US", releaseType: "正式发售", source: { label: "Steam", url: "https://store.steampowered.com/app/123/", kind: "primary" }, note: "Official store date verified" }], checkedExtra: ["calendar detail"], limitedExtra: [], editorialNote: "Calendar review", calendarReview: deferredCalendarReview(calendarWork, "one remaining blocker") };
   const result = buildEdition({ packet: calendarPacket, editorial, latest, manifest, allowSameEditionRevision: true });
   expect(result.edition.entries).toEqual(latest.entries);
@@ -120,6 +121,7 @@ it("publishes a calendar-only continuation without changing news, issue, lead, t
   expect(result.edition.sourceReport.note).toBe("news note");
   expect(result.edition.sourceReport.limited).toContain("news limitation");
   expect(result.edition.sourceReport.limited).not.toContain("日历核验延期 old");
+  expect(result.edition.sourceReport.limited.some(row => row.includes("6 个候选待编辑核验"))).toBe(false);
   expect(() => buildEdition({ packet: calendarPacket, editorial: { ...editorial, decisions: [{ decision: "include" }] }, latest, manifest, allowSameEditionRevision: true })).toThrow(/cannot change news/);
 });
 

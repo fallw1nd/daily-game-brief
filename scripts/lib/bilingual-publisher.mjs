@@ -9,6 +9,7 @@ import {
   localeDigest,
 } from "./locale-digest.mjs";
 import { validateEnglishOverlay } from "./locale-overlay.mjs";
+import { mergeEnglishNewsSourceReport } from "./continuation-source-report.mjs";
 
 export function localeArchivePath(editionId) {
   const [year, month] = editionId.split("-");
@@ -125,7 +126,7 @@ function finalizeEnglishOverlay(canonical, presentation, boundFactsDigest = fact
   };
 }
 
-export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null, preservePublished = false }) {
+export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, previousOverlay = null, previousCanonical = null, preservePublished = false, preserveNewsSourceReport = false }) {
   const draft = editorial?.locales?.en;
   if (!draft) {
     if (preservePublished && previousOverlay?.editionId === canonical.id
@@ -172,7 +173,9 @@ export function buildEnglishOverlay({ canonical, editorial, entryIdsByEvent, pre
     archiveTitle: preservePublished && previousOverlay?.editionId === canonical.id ? previousOverlay.archiveTitle : draft.archiveTitle,
     entries,
     upcoming: buildUpcomingOverlay(canonical, draft, previousOverlay, editorial),
-    sourceReport: draft.sourceReport,
+    sourceReport: preserveNewsSourceReport && preservePublished && previousCanonical?.id === canonical.id
+      && previousOverlay?.editionId === canonical.id && validateEnglishOverlay(previousCanonical, previousOverlay).valid
+      ? mergeEnglishNewsSourceReport(previousOverlay.sourceReport, draft.sourceReport) : draft.sourceReport,
   });
 }
 

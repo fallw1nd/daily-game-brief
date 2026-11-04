@@ -225,6 +225,10 @@ if (historicalInsertion) {
     state: JSON.parse(stdout), packetBlobSha: editorial.packetBlobSha, phase: "publication" });
 }
 const allowSameEditionRevision = await hasAuthorizedSameEditionRevision(editorial);
+const manualRevision = allowSameEditionRevision && trustedRevisionState?.revisionRequest?.reason === SAME_EDITION_REVISION_REASON;
+const preserveNewsSourceReport = allowSameEditionRevision && !manualRevision
+  && trustedRevisionState?.revisionRequest?.reason === EDITORIAL_CONTINUATION_REASON
+  && packet.continuation?.scope === "news" && packet.continuation.preservePublished === true;
 const feedbackAllowed = isEditorialFeedbackEligible({ editionId: editorial.editionId, latestEditionId: latest.id, historicalInsertion, state: trustedRevisionState, packetBlobSha: editorial.packetBlobSha, decisionIdentity: editorialDecisionDigest(editorial) });
 const continuationPacket = ["news", "showcase", "calendar"].includes(packet.continuation?.scope);
 if (!allowSameEditionRevision && trustedRevisionState?.revisionRequest?.status === "completed") {
@@ -295,7 +299,7 @@ if (!allowSameEditionRevision && packet?.editorialInput?.window?.period === "dai
   publisherLatest = { ...publisherLatest, upcoming: baseline.items };
   console.log(`Daily upcoming baseline: ${baseline.sourceEditionId || "none"}; items=${baseline.items.length}`);
 }
-const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion, repairExactDuplicateStories });
+const result = buildEdition({ packet, editorial, latest: publisherLatest, manifest, now, allowSameEditionRevision, historicalInsertion, repairExactDuplicateStories, preserveNewsSourceReport });
 if (historicalRevision) result.manifest.latest = manifest.latest;
 if (result.status === "already-exists") {
   const manifestItem = manifest.editions.find((item) => item.id === editorial.editionId);
@@ -342,7 +346,6 @@ if (result.status === "already-exists") {
 }
 
 const priorOverlay = await readEnglishPresentation(publisherLatest.id);
-const manualRevision = allowSameEditionRevision && trustedRevisionState?.revisionRequest?.reason === SAME_EDITION_REVISION_REASON;
 const localePlan = (manualRevision ? buildManualRevisionEnglishOverlay : buildEnglishOverlay)({
   canonical: result.edition,
   previousCanonical: publisherLatest,
@@ -350,6 +353,7 @@ const localePlan = (manualRevision ? buildManualRevisionEnglishOverlay : buildEn
   entryIdsByEvent: result.entryIdsByEvent,
   previousOverlay: priorOverlay,
   preservePublished: packet.continuation?.preservePublished === true,
+  preserveNewsSourceReport,
 });
 
 const archiveFile = resolve("public/data", result.archivePath);
