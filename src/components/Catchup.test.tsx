@@ -99,3 +99,32 @@ it('pins the source-page history entry and restores its scroll after the index l
   expect(scroll).toHaveBeenCalledWith({ top: 640, behavior: 'instant' });
   expect(document.querySelectorAll('.cu-story')).toHaveLength(15);
 });
+
+
+it.each([false, true])('shows one reviewed GTA VI dossier from an old link while preserving unrelated topics and evidence (English=%s)', async english => {
+  const keys = ['grand-theft-auto-vi', 'gta-6', 'gta 6 all the major new details', 'twitch ceo says gta 6 multiplayer will', 'gta-online', 'unreviewed-same-name'];
+  const gtaIndex: BriefSearchIndex = { ...index, entries: keys.map((titleKey, i) => ({ ...index.entries[i], editionId: `2026-11-0${i + 1}-daily`, entryId: `original-gta-${i}`, date: `2026-11-0${i + 1}`, titleKey, titleEn: 'Grand Theft Auto VI', titleZhCn: '侠盗猎车手VI', headline: english ? `Original headline ${i}` : `原始标题 ${i}`, summary: english ? `Original summary ${i}` : `原始摘要 ${i}`, factStatus: i === 3 ? 'unconfirmed' : 'media_report', section: i === 3 ? 'rumors' : 'news' })) };
+  const before = structuredClone(gtaIndex);
+  window.history.replaceState(null, '', '?catchup=1&cuDays=all&cuTopic=gta-6');
+  await render({ english, index: gtaIndex });
+  expect(document.querySelector('select')?.value).toBe('grand-theft-auto-vi');
+  expect(document.querySelector('option[value="gta-6"]')).toBeNull();
+  expect(document.querySelectorAll('.cu-story')).toHaveLength(4);
+  expect(document.querySelector('.cu-results-heading h2')?.textContent).toBe(english ? 'Grand Theft Auto VI' : '侠盗猎车手VI');
+  expect(document.querySelector('.cu-timeline')?.textContent).toContain(english ? 'Rumor / unconfirmed' : '传闻 / 未证实');
+  expect(document.querySelector('.cu-timeline')?.textContent).toContain(english ? 'Media report' : '媒体报道');
+  expect(document.querySelector('.cu-coverage')?.textContent).toContain(english ? 'Only reviewed topic aliases are grouped' : '仅合并已经核对的主题别名');
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('.cu-story-links a')];
+  expect(links).toHaveLength(4);
+  links.forEach((link, i) => {
+    const url = new URL(link.href);
+    expect(url.searchParams.get('edition')).toBe(gtaIndex.entries[i].editionId);
+    expect(url.hash).toBe(`#${gtaIndex.entries[i].entryId}`);
+    expect(url.searchParams.get('lang')).toBe(english ? 'en' : null);
+  });
+  const copy = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copy } });
+  await click(english ? 'Copy catch-up link' : '复制这份补课');
+  expect(new URL(copy.mock.calls[0][0]).searchParams.get('cuTopic')).toBe('grand-theft-auto-vi');
+  expect(gtaIndex).toEqual(before);
+});
