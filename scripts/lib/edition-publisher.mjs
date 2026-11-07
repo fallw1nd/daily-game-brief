@@ -1,6 +1,6 @@
 import { assertHistoricalIdentity } from "./historical-insertion.mjs";
 import { auditShowcase, mergeShowcaseRefs } from "./showcase.mjs";
-import { hasValidArchiveTitle } from "./archive-title.mjs";
+import { archiveTitleDetails, hasValidArchiveTitle } from "./archive-title.mjs";
 import { normalizeSubjectHeadline, normalizeEditorialArchiveTitle } from "./headline-subject.mjs";
 import { nextEditionAtForPeriod } from "./edition-window.mjs";
 import { localizeHeadline, localizeRegisteredTitles, resolveTitleTranslation } from "./title-translations.mjs";
@@ -264,7 +264,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     return { status: "already-exists", edition: null, manifest, decisionDigest, entryIdsByEvent: {} };
   }
   const prefix = archiveTitlePrefix(window.period);
-  if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix}`);
+  if (!editorial.archiveTitle.startsWith(prefix)) throw new Error(`archiveTitle must start with ${prefix} without leading whitespace; ${archiveTitleDetails(editorial.archiveTitle)}`);
   const packetByKey = new Map(input.packages.map((item) => [item.eventKey, item]));
   const previousEntries = authorizedLatestRevision ? duplicateRepair.entries : [];
   const isNewsContinuation = packet.continuation?.scope === "news" && packet.continuation?.preservePublished === true;
@@ -446,7 +446,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
   const archiveTitle = preserveEditionPresentation
     ? latest.archiveTitle
     : normalizeEditorialArchiveTitle(editorial.archiveTitle, editorial.decisions.find(decision => decision.eventKey === editorial.leadEventKey && decision.decision === "include"));
-  if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error("normalized archiveTitle must contain 8–40 characters with the matching period prefix");
+  if (!hasValidArchiveTitle(archiveTitle, window.period)) throw new Error(`normalized archiveTitle must contain 8–40 characters with the matching period prefix; expectedPrefix=${JSON.stringify(prefix)}; ${archiveTitleDetails(archiveTitle, "normalizedTitle")}`);
   const generatedAt = beijingNow(now);
   const limitedSources = input.packages.flatMap((item) => item.sources)
     .filter((source) => source.status === "limited")

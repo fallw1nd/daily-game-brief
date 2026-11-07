@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSubjectHeadline as headline } from "./lib/headline-subject.mjs";
+import { normalizeSubjectHeadline as headline, normalizeEditorialArchiveTitle } from "./lib/headline-subject.mjs";
 
 const title = { title_key: "fable", title_en: "Fable", title_zh_cn: "神鬼寓言" };
 describe("standalone headline subjects", () => {
@@ -31,4 +31,13 @@ describe("standalone headline subjects", () => {
     expect(headline("日报｜Nintendo推出日本限定套装", title, { archive: true, entities: ["Nintendo"] })).toBe("日报｜Nintendo推出日本限定套装");
     expect(headline("日报｜Nintendo Direct结束后上线", title, { archive: true, entities: ["Nintendo Direct"] })).toBe("日报｜《神鬼寓言》：Nintendo Direct结束后上线");
   });
+});
+
+
+it("keeps Chinese canonical localization separate from English subject normalization", () => {
+  const decision = { titleKey: "fable", titleEn: "Fable", titleZhCn: null, titleZhStatus: "unavailable" };
+  expect(normalizeEditorialArchiveTitle("早报｜Fable公开新消息", decision)).toBe("早报｜神鬼寓言公开新消息");
+  const english = "Morning Brief | New gameplay details for the upcoming adventure";
+  expect(headline(english, title, { locale: "en", archive: true })).toBe("Morning Brief | Fable: New gameplay details for the upcoming adventure");
+  expect(headline("Morning Brief | Fable shares new gameplay details", title, { locale: "en", archive: true })).toBe("Morning Brief | Fable shares new gameplay details");
 });

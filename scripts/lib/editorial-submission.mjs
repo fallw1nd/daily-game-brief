@@ -1,6 +1,6 @@
 import { validateEditorialOutput } from "./editorial-contract.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
-import { archiveTitlePrefix, hasValidArchiveTitle } from "./archive-title.mjs";
+import { archiveTitleDetails, archiveTitlePrefix, hasValidArchiveTitle } from "./archive-title.mjs";
 import { normalizeEditorialArchiveTitle } from "./headline-subject.mjs";
 
 const editionPattern = /^\d{4}-\d{2}-\d{2}-(?:am|pm|daily)$/;
@@ -42,7 +42,7 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   }
   const prefix = archiveTitlePrefix(period);
   if (!hasValidArchiveTitle(editorial?.archiveTitle, period)) {
-    errors.push(`archiveTitle must use ${prefix} and contain 8–40 characters`);
+    errors.push(`archiveTitle must use ${prefix} and contain 8–40 characters; ${archiveTitleDetails(editorial?.archiveTitle)}`);
   }
   for (const key of ["decisions", "removeUpcomingIds", "upcoming", "checkedExtra", "limitedExtra"]) {
     if (!Array.isArray(editorial?.[key])) errors.push(`${key} must be an array`);
@@ -81,8 +81,9 @@ export function validateEditorialSubmission({ branchName, packet, editorial, pac
   if (!lead && !noOpNewsContinuation && !isCalendarContinuation) errors.push("leadEventKey must reference an included decision");
   if (lead && !packet?.continuation?.preservePublished) {
     try {
-      if (!hasValidArchiveTitle(normalizeEditorialArchiveTitle(editorial.archiveTitle, lead), period)) {
-        errors.push("normalized archiveTitle must contain 8–40 characters with the matching period prefix; use a confirmed subject and shorten the title");
+      const normalizedTitle = normalizeEditorialArchiveTitle(editorial.archiveTitle, lead);
+      if (!hasValidArchiveTitle(normalizedTitle, period)) {
+        errors.push(`normalized archiveTitle must contain 8–40 characters with the matching period prefix; expectedPrefix=${JSON.stringify(prefix)}; ${archiveTitleDetails(normalizedTitle, "normalizedTitle")}`);
       }
     } catch (error) { errors.push(`archiveTitle normalization failed: ${error.message}`); }
   }

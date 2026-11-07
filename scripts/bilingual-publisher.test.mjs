@@ -417,3 +417,16 @@ describe("manual same-edition English overlay", () => {
     expect(buildManualRevisionEnglishOverlay(input).status).toBe("unavailable");
   });
 });
+
+
+it("keeps an English archive title longer than the Chinese limit available", () => {
+  const canonical = canonicalEdition();
+  const before = structuredClone(canonical);
+  const editorial = bilingualEditorial();
+  editorial.locales.en.archiveTitle = "Morning Brief | Test Game Announces a New Version Across Supported Platforms";
+  expect([...editorial.locales.en.archiveTitle].length).toBeGreaterThan(40);
+  const result = buildEnglishOverlay({ canonical, editorial });
+  expect(result.status).toBe("available");
+  expect(result.overlay.archiveTitle).toBe(editorial.locales.en.archiveTitle);
+  expect(canonical).toEqual(before);
+});

@@ -1,5 +1,6 @@
 import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 import { describe, expect, it } from "vitest";
+import { normalizeEditorialArchiveTitle } from "./lib/headline-subject.mjs";
 import { validateEditorialSubmission } from "./lib/editorial-submission.mjs";
 
 const source = { sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher", label: "Publisher", url: "https://publisher.example/news", evidenceText: "Announcement." };
@@ -44,7 +45,12 @@ describe("editorial submission handoff", () => {
   it("rejects an archive title that only exceeds the limit after subject normalization", () => {
     const longTitle = "Nintendo Switch 2 (Japanese / Japan-Only) Choose-Your-Game Bundle";
     const draft = { ...editorial, archiveTitle: "早报｜日本自选软件套装公布", decisions: [{ ...editorial.decisions[0], titleKey: "nintendo-bundle", titleZhCn: null, titleEn: longTitle, sharedFactFrame: { ...editorial.decisions[0].sharedFactFrame, subjectTitleKey: "nintendo-bundle" } }] };
-    expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: draft, packetBlobSha })).toContain("normalized archiveTitle must contain 8–40 characters with the matching period prefix; use a confirmed subject and shorten the title");
+    const errors = validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: draft, packetBlobSha });
+    const normalized = normalizeEditorialArchiveTitle(draft.archiveTitle, draft.decisions[0]);
+    expect(errors).toEqual([expect.stringContaining(`normalizedTitle=${JSON.stringify(normalized)}`)]);
+    expect(errors[0]).toContain('expectedPrefix="早报｜"');
+    expect(errors[0]).toContain("characterCount=120; exceeds 40 by 80");
+    expect(errors[0]).toContain("including prefix and punctuation");
     const repaired = { ...draft, archiveTitle: "早报｜Nintendo推出日本自选软件套装", decisions: [{ ...draft.decisions[0], sharedFactFrame: { ...draft.decisions[0].sharedFactFrame, peopleAndEntities: ["Nintendo"] } }] };
     expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: repaired, packetBlobSha })).toEqual([]);
   });
@@ -117,7 +123,8 @@ describe("editorial submission handoff", () => {
       editorial: { ...editorial, archiveTitle: "早报｜《Wo Long 2: Wings of Ember》定档2027年3月4日" },
       packetBlobSha,
     });
-    expect(errors).toContain("archiveTitle must use 早报｜ and contain 8–40 characters");
+    expect(errors).toContainEqual(expect.stringContaining("archiveTitle must use 早报｜ and contain 8–40 characters"));
+    expect(errors).toContainEqual(expect.stringContaining("characterCount=41; exceeds 40 by 1"));
   });
 
   it("only waives leadEventKey for a true no-include news continuation", () => {
@@ -170,4 +177,32 @@ it("accepts generated Daily fallback through the real submission validator and r
  const validate = editorial => validateEditorialSubmission({branchName:"automation/editorial/2026-09-09-daily",packet:p,editorial,packetBlobSha});
  expect(validate(output)).toEqual([]);
  expect(validate({...output, upcomingMode:"replace"})).toContain("upcomingMode must be inherit_and_patch");
+});
+
+
+it("counts astral characters as code points without changing the 40-character boundary", () => {
+  const title = "早报｜Example Game" + "🎮".repeat(25);
+  const validate = archiveTitle => validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: { ...editorial, archiveTitle }, packetBlobSha });
+  expect(title.length).toBeGreaterThan(40);
+  expect(validate(title)).toEqual([]);
+  expect(validate(title + "🎮")).toContainEqual(expect.stringContaining("characterCount=41; exceeds 40 by 1"));
+});
+
+it("retains raw rejection even when registered localization would make the title short enough", () => {
+  const draft = structuredClone(editorial);
+  Object.assign(draft.decisions[0], { titleKey: "fountains", titleEn: "Fountains", titleZhCn: "永泉传说", titleZhStatus: "official_simplified" });
+  draft.decisions[0].sharedFactFrame.subjectTitleKey = "fountains";
+  draft.archiveTitle = "早报｜《Fountains》推出 Shattered Shape DLC并公开新内容";
+  const normalized = normalizeEditorialArchiveTitle(draft.archiveTitle, draft.decisions[0]);
+  expect([...draft.archiveTitle].length).toBeGreaterThan(40);
+  expect([...normalized].length).toBeLessThanOrEqual(40);
+  const errors = validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet, editorial: draft, packetBlobSha });
+  expect(errors).toContainEqual(expect.stringContaining("archiveTitle must use 早报｜ and contain 8–40 characters"));
+  expect(errors.some(error => error.startsWith("normalized archiveTitle"))).toBe(false);
+});
+
+it("does not normalize an included lead again during a preservePublished continuation", () => {
+  const draft = { ...editorial, archiveTitle: "早报｜" + "公告".repeat(15) };
+  const continuation = { ...packet, continuation: { scope: "news", preservePublished: true } };
+  expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet: continuation, editorial: draft, packetBlobSha })).toEqual([]);
 });
