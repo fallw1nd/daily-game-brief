@@ -978,3 +978,9 @@ The following records describe acceptance of the October 22/23 audit at 2026-10-
 - Live Chinese/English topic histories split the November 6 and November 7 GTA VI stories into 15- and 2-record groups despite their matching original game identity. Two other reviewed legacy keys each held one additional story.
 - An explicit three-alias display mapping now joins those four known keys into one 19-record history as of November 7. The audit is recorded in `docs/READING_SAMPLE.md`. Incoming old URLs, filtering, topic selection, copy links and language links share the resolver; no name-based or registry-generated matching is used.
 - Original archive keys, IDs, facts, uncertainty labels, issue/window identity and source anchors remain unchanged. GTA Online and unreviewed same-name entities remain separate. No new model call, external lookup, index schema, publication gate or dependency is introduced.
+
+## 2026-11-07 — Extend individually audited display identities
+
+- A read-only bilingual production audit confirmed Phantom Blade Zero split into 1+1+4 stories and Cyberpunk 2077 into 1+1. Reviewed each of the eight archived stories and its stored source identity before adding three exact aliases to the existing display-only resolver; the audit and source links are in `docs/READING_SAMPLE.md`.
+- Treat `steam-4115450` as an opaque historical key, not proof of a Steam app identity. Do not infer aliases from other app IDs, similar names, anime titles or companies. Cyberpunk: Edgerunners 2 remains separate, all eight stories remain distinct, and historical calendar records are not added to the news history.
+- Real archive/English overlay regressions cover old URLs, counts, labels, source anchors, original copy, sharing, date filters and negative identity cases. No archive, locale, translation-registry, calendar, workflow or dependency changes; no additional model calls or discovery requests.

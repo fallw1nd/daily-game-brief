@@ -13,6 +13,9 @@ const reviewedTopicAliases = new Map([
   ["gta-6", "grand-theft-auto-vi"],
   ["gta 6 all the major new details", "grand-theft-auto-vi"],
   ["twitch ceo says gta 6 multiplayer will", "grand-theft-auto-vi"],
+  ["phantom blade zero", "phantom-blade-zero"],
+  ["steam-4115450", "phantom-blade-zero"],
+  ["from the anime to the game free", "cyberpunk-2077"],
 ]);
 
 export function resolveCatchupTopic(key: string): string {
