@@ -7,6 +7,18 @@ export interface CatchupTopic { key: string; label: string; count: number; }
 const dayMilliseconds = 24 * 60 * 60 * 1000;
 const periodOrder: Record<EditionPeriod, number> = { am: 0, daily: 1, pm: 2 };
 
+// Display-only, individually reviewed identities. See docs/READING_SAMPLE.md.
+// Never derive these mappings from similar names or the translation registry.
+const reviewedTopicAliases = new Map([
+  ["gta-6", "grand-theft-auto-vi"],
+  ["gta 6 all the major new details", "grand-theft-auto-vi"],
+  ["twitch ceo says gta 6 multiplayer will", "grand-theft-auto-vi"],
+]);
+
+export function resolveCatchupTopic(key: string): string {
+  return reviewedTopicAliases.get(key) ?? key;
+}
+
 function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -27,10 +39,10 @@ export function catchupRange(end: string, days: number): CatchupRange {
   return validCatchupDate(start) ? { start, end } : { start: "", end: "" };
 }
 
-/** Canonical identities win; legacy names are exact except for case/whitespace. */
+/** Only reviewed key aliases join topics; otherwise retain exact canonical identity. */
 export function topicKey(entry: Pick<BriefSearchEntry, "titleKey" | "titleEn">): string {
   const canonical = entry.titleKey?.trim();
-  if (canonical) return canonical;
+  if (canonical) return resolveCatchupTopic(canonical);
   const title = entry.titleEn.trim().normalize("NFC").replace(/\s+/g, " ").toLowerCase();
   return title ? `title:${title}` : "";
 }
@@ -73,8 +85,9 @@ export function catchupTopics(entries: readonly BriefSearchEntry[], english: boo
 /** Inclusive archive dates, not generation timestamps or late issue allocation. */
 export function filterCatchup(entries: readonly BriefSearchEntry[], { start, end, topic }: CatchupFilter): BriefSearchEntry[] {
   if (!validCatchupDate(start) || !validCatchupDate(end) || start > end) return [];
+  const selectedTopic = topic ? resolveCatchupTopic(topic) : "";
   return entries.filter((entry) => validCatchupDate(entry.date)
     && entry.date >= start && entry.date <= end
-    && (!topic || topicKey(entry) === topic))
+    && (!selectedTopic || topicKey(entry) === selectedTopic))
     .sort(oldestFirst);
 }

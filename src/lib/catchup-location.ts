@@ -1,4 +1,4 @@
-import { catchupRange, validCatchupDate, type CatchupRange } from "./catchup";
+import { catchupRange, resolveCatchupTopic, validCatchupDate, type CatchupRange } from "./catchup";
 import { readingHref } from "./reading";
 
 export type CatchupDays = 7 | 30 | "all" | "custom";
@@ -20,7 +20,7 @@ export function readCatchupLocation(search: string): CatchupLocation {
     days: days === "all" || days === "custom" ? days : days === "30" ? 30 : 7,
     start: params.get("cuFrom") ?? "",
     end: params.get("cuTo") ?? "",
-    topic: params.get("cuTopic") ?? "",
+    topic: resolveCatchupTopic(params.get("cuTopic") ?? ""),
     limit: Number.isSafeInteger(limit) && limit >= 12 ? Math.min(limit, 1200) : 12,
   };
 }
@@ -40,7 +40,7 @@ export function writeCatchupLocation(url: URL, location: CatchupLocation): URL {
   next.searchParams.set("cuDays", String(location.days));
   if (location.start) next.searchParams.set("cuFrom", location.start);
   if (location.end) next.searchParams.set("cuTo", location.end);
-  if (location.topic) next.searchParams.set("cuTopic", location.topic);
+  if (location.topic) next.searchParams.set("cuTopic", resolveCatchupTopic(location.topic));
   if (location.limit > 12) next.searchParams.set("cuLimit", String(location.limit));
   next.hash = "catchup";
   return next;
@@ -50,13 +50,14 @@ export function catchupTopicHref(topic: string, editionId: string, english: bool
   const params = new URLSearchParams(readingHref(editionId, undefined, english).split("?")[1]);
   params.set("catchup", "1");
   params.set("cuDays", "all");
-  params.set("cuTopic", topic);
+  params.set("cuTopic", resolveCatchupTopic(topic));
   return `${import.meta.env.BASE_URL}?${params}#catchup`;
 }
 
 export function catchupLanguageHref(search: string, english: boolean): string {
   const params = new URLSearchParams(search);
   params.set("view", "reading");
+  if (params.has("cuTopic")) params.set("cuTopic", resolveCatchupTopic(params.get("cuTopic")!));
   if (english) params.set("lang", "en"); else params.delete("lang");
   return `${import.meta.env.BASE_URL}?${params}#catchup`;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BriefSearchEntry } from "../types";
-import { catchupRange, catchupTopics, filterCatchup, topicKey, topicLabel, validCatchupDate } from "./catchup";
+import { catchupRange, catchupTopics, filterCatchup, resolveCatchupTopic, topicKey, topicLabel, validCatchupDate } from "./catchup";
 
 function entry(overrides: Partial<BriefSearchEntry> = {}): BriefSearchEntry {
   return {
@@ -134,5 +134,35 @@ describe("catchup filtering", () => {
     expect(filterCatchup(entries, { start: "2026-02-30", end: "2026-10-19" })).toEqual([]);
     expect(filterCatchup(entries, { start: "2026-10-20", end: "2026-10-19" })).toEqual([]);
     expect(filterCatchup([], range)).toEqual([]);
+  });
+});
+
+
+describe("reviewed topic identities", () => {
+  const aliases = ["grand-theft-auto-vi", "gta-6", "gta 6 all the major new details", "twitch ceo says gta 6 multiplayer will"];
+  const stories = aliases.map((titleKey, index) => entry({ titleKey, entryId: `gta-${index}`, titleEn: index === 1 ? "GTA6" : "Grand Theft Auto VI", titleZhCn: "侠盗猎车手VI", date: `2026-10-${15 + index}`, factStatus: index === 3 ? "unconfirmed" : "media_report", section: index === 3 ? "rumors" : "news" }));
+  it.each(aliases)("resolves only the reviewed identity %s", key => {
+    expect(resolveCatchupTopic(key)).toBe("grand-theft-auto-vi");
+    expect(topicKey(entry({ titleKey: key }))).toBe("grand-theft-auto-vi");
+    expect(filterCatchup(stories, { start: "2026-10-01", end: "2026-10-19", topic: key })).toEqual(stories);
+  });
+  it.each([false, true])("joins reviewed histories without changing source records (English=%s)", english => {
+    const before = structuredClone(stories);
+    const topics = catchupTopics(stories, english);
+    expect(topics).toEqual([{ key: "grand-theft-auto-vi", label: english ? "Grand Theft Auto VI" : "侠盗猎车手VI", count: 4 }]);
+    expect(catchupTopics([...stories].reverse(), english)).toEqual(topics);
+    expect(filterCatchup(stories, { start: "2026-10-17", end: "2026-10-18", topic: "gta-6" })).toEqual(stories.slice(2));
+    expect(stories).toEqual(before);
+    expect(stories[3].factStatus).toBe("unconfirmed");
+  });
+  it("never infers identity from same-name games, companies, events, sequels or key spelling", () => {
+    const distinct = ["gta-online", "grand-theft-auto-v", "grand-theft-auto-vi-showcase", "rockstar-games", "unknown-same-name", "GTA-6", "gta_6", "gta-6-remastered", "title:grand theft auto vi", "__proto__", "constructor"];
+    const entries = distinct.map(titleKey => entry({ titleKey, titleEn: "Grand Theft Auto VI", titleZhCn: "侠盗猎车手VI" }));
+    for (const item of entries) {
+      expect(resolveCatchupTopic(item.titleKey!)).toBe(item.titleKey);
+      expect(topicKey(item)).toBe(item.titleKey);
+    }
+    expect(catchupTopics([...stories, ...entries], false)).toHaveLength(distinct.length + 1);
+    expect(filterCatchup([...stories, ...entries], { start: "2026-10-01", end: "2026-10-19", topic: "gta-6" })).toEqual(stories);
   });
 });

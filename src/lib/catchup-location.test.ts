@@ -43,3 +43,20 @@ describe("catch-up location", () => {
     expect(new URL(catchupLanguageHref(switched.search, false), "https://example.com").searchParams.has("lang")).toBe(false);
   });
 });
+
+
+it.each([false, true])("keeps old reviewed links, copy links and language switches on the same identity (English=%s)", english => {
+  const old = new URL("https://example.com/daily-game-brief/?catchup=1&edition=2026-11-07-daily&cuDays=custom&cuFrom=2026-11-06&cuTo=2026-11-07&cuTopic=gta-6&cuLimit=24#catchup");
+  const location = readCatchupLocation(old.search);
+  expect(location).toEqual({ days: "custom", start: "2026-11-06", end: "2026-11-07", topic: "grand-theft-auto-vi", limit: 24 });
+  const copy = writeCatchupLocation(old, { ...location, topic: "gta-6" });
+  expect(copy.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  expect(readCatchupLocation(copy.search)).toEqual(location);
+  const switched = new URL(catchupLanguageHref(old.search, english), old);
+  expect(switched.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  expect(readCatchupLocation(switched.search)).toEqual(location);
+  const href = new URL(catchupTopicHref("gta-6", "2026-11-07-daily", english), old);
+  expect(href.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  expect(href.searchParams.get("edition")).toBe("2026-11-07-daily");
+  expect(href.searchParams.get("lang")).toBe(english ? "en" : null);
+});

@@ -10,6 +10,8 @@ import latest from "../public/data/archive/2026/09/2026-09-07-daily.json";
 import manifestData from "../public/data/manifest.json";
 import calendarSnapshot from "../public/data/archive/2026/08/2026-08-31-daily.json";
 import { calendarDate, calendarWindow, loadReadingCalendar } from "./lib/reading-calendar";
+import november6 from "../public/data/archive/2026/11/2026-11-06-daily.json";
+import november7 from "../public/data/archive/2026/11/2026-11-07-daily.json";
 import legacy from "../public/data/archive/2026/08/2026-08-21-pm.json";
 import type { BriefEdition, BriefManifest, BriefSearchIndex } from "./types";
 
@@ -419,4 +421,20 @@ describe("topic history navigation", () => {
     expect(params.get("cuTo")).toBe("2026-08-21");
     expect(params.get("lang")).toBe("en");
   });
+});
+
+
+it.each([false, true])("links both real November GTA VI editions to the same reviewed dossier (English=%s)", english => {
+  for (const snapshot of [november6, november7]) {
+    const value = snapshot as BriefEdition;
+    const story = value.entries.find(item => item.title.title_en === "Grand Theft Auto VI")!;
+    const originalKey = story.title.title_key;
+    render(value, english);
+    const href = document.querySelector<HTMLAnchorElement>(`article[id="${story.id}"] .r-topic-link`)!.href;
+    const params = new URL(href).searchParams;
+    expect(params.get("cuTopic")).toBe("grand-theft-auto-vi");
+    expect(params.get("edition")).toBe(value.id);
+    expect(params.get("lang")).toBe(english ? "en" : null);
+    expect(story.title.title_key).toBe(originalKey);
+  }
 });
