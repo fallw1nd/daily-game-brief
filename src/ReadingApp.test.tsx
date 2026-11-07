@@ -391,3 +391,32 @@ it("opens and closes the single catch-up entrance while preserving original read
   expect(window.location.search).not.toContain('catchup=1');
   expect(container.querySelector('#content')?.closest('[hidden]')).toBeNull();
 });
+
+
+describe("topic history navigation", () => {
+  it("links each story to its exact topic in full indexed coverage", () => {
+    render();
+    for (const entry of edition.entries) {
+      const href = document.querySelector<HTMLAnchorElement>(`article[id="${entry.id}"] .r-topic-link`)!.href;
+      const params = new URL(href).searchParams;
+      expect(params.get("cuTopic")).toBe(entry.title.title_key);
+      expect(params.get("edition")).toBe(edition.id);
+      expect(params.get("cuDays")).toBe("all");
+    }
+  });
+  it("keeps the language-switch target synchronized with catch-up filters", async () => {
+    window.history.replaceState(null, "", "/daily-game-brief/?catchup=1&cuDays=all");
+    document.body.innerHTML = '<div id="root"></div>';
+    root = createRoot(document.getElementById("root")!);
+    await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+    const select = document.querySelector<HTMLSelectElement>(".cu select")!;
+    await act(async () => { select.value = "title:archive"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    const href = document.querySelector<HTMLAnchorElement>('.r-controls a[lang="en"]')!.href;
+    const params = new URL(href).searchParams;
+    expect(params.get("cuTopic")).toBe("title:archive");
+    expect(params.get("cuDays")).toBe("all");
+    expect(params.get("cuFrom")).toBe("2026-08-21");
+    expect(params.get("cuTo")).toBe("2026-08-21");
+    expect(params.get("lang")).toBe("en");
+  });
+});

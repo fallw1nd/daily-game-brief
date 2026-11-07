@@ -13,6 +13,8 @@ import { calendarTitle } from "./lib/calendar-title";
 import { readingHref, readingLead, readingWindow } from "./lib/reading";
 import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactStatus, ImageAsset, SectionKey } from "./types";
 import "./reading.css";
+import { catchupLanguageHref, catchupTopicHref } from "./lib/catchup-location";
+import { topicKey } from "./lib/catchup";
 import { Catchup } from "./components/Catchup";
 import { EditionLoading } from "./components/EditionLoading";
 import { accents, storedTheme, storedAccent, type Theme, type Accent } from "./lib/reading-preferences";
@@ -68,12 +70,13 @@ function Signals({ entry, english }: { entry: BriefEntry; english: boolean }) {
   </div>;
 }
 
-function Evidence({ entry, english, lead = false }: { entry: BriefEntry; english: boolean; lead?: boolean }) {
+function Evidence({ entry, english, editionId, lead = false }: { entry: BriefEntry; english: boolean; editionId: string; lead?: boolean }) {
   return <div className="r-evidence">
     <div className="r-source-line">
       {entry.sources[0] && <a href={entry.sources[0].url} target="_blank" rel="noreferrer">{entry.sources[0].label}<ArrowUpRight aria-hidden="true" /></a>}
       {entry.platforms.length > 0 && <span>{entry.platforms.join(" / ")}</span>}
       {entry.region && <span>{entry.region}</span>}
+      <a className="r-topic-link" href={catchupTopicHref(topicKey({ titleKey: entry.title.title_key, titleEn: entry.title.title_en }), editionId, english)}>{english ? "Topic history" : "同主题前情"}<ArrowRight aria-hidden="true" /></a>
     </div>
     <details><summary>{english ? "Sources & verification" : "来源与核验"}<CaretDown aria-hidden="true" /></summary>
       <div className="r-evidence-panel">
@@ -87,13 +90,13 @@ function Evidence({ entry, english, lead = false }: { entry: BriefEntry; english
   </div>;
 }
 
-function Story({ entry, english }: { entry: BriefEntry; english: boolean }) {
+function Story({ entry, english, editionId }: { entry: BriefEntry; english: boolean; editionId: string }) {
   const hasPhoto = entry.images?.some((asset) => !asset.placeholder);
   return <article className={`r-story${hasPhoto ? " r-story--with-photo" : ""}`} id={entry.id}>
     <div className="r-story-copy">
       <Signals entry={entry} english={english} />
       <h3>{entry.headline}</h3><p className="r-summary">{entry.summary}</p>
-      <Evidence entry={entry} english={english} />
+      <Evidence entry={entry} english={english} editionId={editionId} />
     </div>
     {hasPhoto && <Photo asset={entry.images?.find((asset) => !asset.placeholder)} english={english} />}
   </article>;
@@ -107,6 +110,7 @@ export interface ReadingProps {
 }
 
 export default function ReadingApp({ english = false, initialEdition, initialManifest, initialSearchIndex }: ReadingProps) {
+  const [catchupSearch, setCatchupSearch] = useState(() => window.location.search);
   const [catchupOpen, setCatchupOpen] = useState(() => new URLSearchParams(window.location.search).get("catchup") === "1");
   const [requestedId, setRequestedId] = useState(() => new URLSearchParams(window.location.search).get("edition"));
   const [loadedEdition, setLoadedEdition] = useState<{ value: BriefEdition; requestedId: string | null; english: boolean }>();
@@ -144,7 +148,8 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     const url = new URL(window.location.href);
     if (open) url.searchParams.set("catchup", "1"); else url.searchParams.delete("catchup");
     url.hash = open ? "catchup" : "top";
-    window.history.pushState(window.history.state, "", url);
+    window.history.pushState({ ...window.history.state, catchupPosition: null }, "", url);
+    setCatchupSearch(url.search);
     window.scrollTo({ top: 0 });
   };
   const updateSearch = (value: string, limit = 12) => {
@@ -158,6 +163,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   useEffect(() => {
     const restore = () => {
       const params = new URLSearchParams(window.location.search);
+      setCatchupSearch(window.location.search);
       setRequestedId(params.get("edition"));
       setCatchupOpen(params.get("catchup") === "1");
       if (params.get("catchup")) setSearchRequested(true);
@@ -179,11 +185,11 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   }, [edition, searchRequested, initialSearchIndex]);
   useEffect(() => {
     const saved = window.history.state?.readingSearch;
-    if (!edition || !searchIndex || !query || saved?.query !== query || !Number.isFinite(saved.y)) return;
+    if (catchupOpen || !edition || !searchIndex || !query || saved?.query !== query || !Number.isFinite(saved.y)) return;
     let second = 0;
     const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => window.scrollTo({ top: saved.y, behavior: "instant" })); });
     return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
-  }, [edition, searchIndex, query]);
+  }, [edition, searchIndex, query, catchupOpen]);
 
   useEffect(() => {
     if (!edition || !pageRef.current) return;
@@ -310,7 +316,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     document.title = `${edition.archiveTitle || t("游戏日报", "Daily Game Brief")} · ${t("游戏圈动态", "Daily Game Brief")}`;
     let id = "";
     try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
-    if (!id) return;
+    if (!id || (id === "catchup" && window.history.state?.catchupPosition)) return;
     const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" }));
     return () => cancelAnimationFrame(frame);
   }, [edition, english]);
@@ -324,7 +330,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const previous = position >= 0 ? archives[position + 1] : undefined;
   const next = position > 0 ? archives[position - 1] : undefined;
   const currentId = edition?.id || requestedId || undefined;
-  const switchHref = readingHref(currentId, window.location.hash.slice(1) || undefined, !english).replace("?view=reading", `?view=reading${catchupOpen ? "&catchup=1" : ""}`);
+  const switchHref = catchupOpen ? catchupLanguageHref(catchupSearch, !english) : readingHref(currentId, window.location.hash.slice(1) || undefined, !english);
   const archiveTitle = (id: string, title?: string) => english ? englishTitles[id] : title;
 
   return <IconContext.Provider value={{ weight: "regular", size: 20, "aria-hidden": true, focusable: false }}><div ref={pageRef} className="reading-app" data-theme={theme} data-accent={accent}>
@@ -342,7 +348,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     {!edition ? <main className="r-loading r-container" aria-live="polite">
       {loadError ? <><h1>{t("暂时无法打开这份简报", "This edition is unavailable")}</h1><p>{loadError}</p><div><button className="r-button" onClick={() => setRetry((value) => value + 1)}>{t("重试", "Try again")}</button><a href={english ? readingHref(currentId) : manifest?.editions[0] ? readingHref(editionsNewestFirst(manifest.editions)[0].id) : readingHref()}>{t(manifest?.editions.length ? "查看最近归档" : "返回最新一期", "Read in Chinese")}<ArrowRight aria-hidden="true" /></a></div></> : <EditionLoading english={english} />}
     </main> : <main className="r-container" id="top">
-      {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setSearchRetry(value => value + 1)} onClose={() => toggleCatchup(false)} />}
+      {catchupOpen && <Catchup index={searchIndex} english={english} error={searchError} onRetry={() => setSearchRetry(value => value + 1)} onClose={() => toggleCatchup(false)} onLocationChange={setCatchupSearch} />}
       <div hidden={catchupOpen}>
       <div className="r-edition-bar">
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
@@ -352,7 +358,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {lead ? <article id={lead.id} className={`r-lead-grid${lead.images?.some((asset) => !asset.placeholder) ? "" : " r-lead-grid--text"}`}>
           <div className="r-lead-copy"><div className="r-eyebrow">{t("本期头条", "The lead")}<span>{label(sectionNames[lead.section], english)}</span></div>
             <h1 id="r-edition-title">{edition.archiveTitle || lead.headline}</h1><p className="r-lead-summary">{lead.summary}</p>
-            <Signals entry={lead} english={english} /><Evidence entry={lead} english={english} lead />
+            <Signals entry={lead} english={english} /><Evidence entry={lead} english={english} editionId={edition.id} lead />
           </div><Photo asset={lead.images?.find((asset) => !asset.placeholder)} lead english={english} />
         </article> : <><h1 id="r-edition-title">{edition.archiveTitle || t("游戏日报", "Daily Game Brief")}</h1><p>{t("本期暂无新闻条目。", "There are no stories in this edition.")}</p></>}
       </section>
@@ -362,14 +368,14 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {sections.map((section) => <section className="r-department" id={section.key === "focus" ? "focus-news" : section.key} key={section.key} aria-labelledby={`r-section-${section.key}`}>
           <header><h2 id={`r-section-${section.key}`}>{label(sectionNames[section.key], english)}</h2><span>{section.entries.length.toString().padStart(2, "0")}</span></header>
           {section.key === "observations" && <p className="r-department-note">{t("补遗与跨窗口观察，不计入本轮新增。", "Supplements and cross-window observations, separate from new reports.")}</p>}
-          {section.entries.map((entry) => <Story key={entry.id} entry={entry} english={english} />)}
+          {section.entries.map((entry) => <Story key={entry.id} entry={entry} english={english} editionId={edition.id} />)}
         </section>)}
       </div><aside className="r-overview"><div className="r-overview-sticky"><h2>{t("精选速览", "Selected stories")}</h2><p>{t(`本期 ${edition.entries.length} 条 · 以下精选 ${Math.min(5, otherStories.length)} 条`, `${edition.entries.length} stories · ${Math.min(5, otherStories.length)} selected`)}</p><ol>{otherStories.slice(0, 5).map((entry) => <li key={entry.id}><a href={`#${entry.id}`}><small>{label(sectionNames[entry.section], english)}</small><span>{entry.headline}</span><ArrowDown aria-hidden="true" /></a></li>)}</ol><a className="r-overview-archive" href="#archive"><MagnifyingGlass aria-hidden="true" />{t("查找往期新闻", "Search past stories")}</a></div></aside></div>}
 
       {edition.showcases?.map(showcase => <section className="r-department r-showcase" id={showcase.id} key={showcase.id} aria-labelledby={`heading-${showcase.id}`}>
         <header><h2 id={`heading-${showcase.id}`}>{english ? showcase.titleEn : showcase.title}</h2><span>{showcase.covered}</span></header>
         <p className="r-department-note">{showcase.status === "complete" ? t("本场实质公告已全部收录；重复展示已合并。", "All substantive announcements covered; repeated presentations merged.") : t("本场内容尚在补齐，地区版本与未核验公告仍在核对。", "Coverage is still being completed, including regional broadcasts and unverified announcements.")}</p>
-        {showcase.entryIds.map(id => edition.entries.find(entry => entry.id === id)).filter((entry): entry is BriefEntry => Boolean(entry)).map(entry => entry.showcaseBrief && entry.id !== lead?.id && edition.showcases?.find(group => group.entryIds.includes(entry.id))?.id === showcase.id ? <Story key={entry.id} entry={entry} english={english} /> : <p className="r-showcase-link" key={entry.id}><a href={`#${entry.id}`}>{entry.headline}<ArrowUpRight aria-hidden="true" /></a></p>)}
+        {showcase.entryIds.map(id => edition.entries.find(entry => entry.id === id)).filter((entry): entry is BriefEntry => Boolean(entry)).map(entry => entry.showcaseBrief && entry.id !== lead?.id && edition.showcases?.find(group => group.entryIds.includes(entry.id))?.id === showcase.id ? <Story key={entry.id} entry={entry} english={english} editionId={edition.id} /> : <p className="r-showcase-link" key={entry.id}><a href={`#${entry.id}`}>{entry.headline}<ArrowUpRight aria-hidden="true" /></a></p>)}
       </section>)}
 
       {<section className="r-calendar" id="upcoming" aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${calendarFocus.items.length} 项计划`, `${calendarFocus.items.length} release plans`)}</span></header>

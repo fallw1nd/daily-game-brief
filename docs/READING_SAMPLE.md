@@ -92,3 +92,12 @@
 - GitHub alternatives reviewed: [nuqs](https://github.com/47ng/nuqs), [Radix Popover](https://github.com/radix-ui/primitives), [React Loading Skeleton](https://github.com/dvtng/react-loading-skeleton). Existing History/React/details/CSS capabilities cover this limited scope without adding dependencies.
 - Validation: 573 tests, production build, 20 Chrome responsive/theme/language layouts; actual 13th-result navigation and back restores 24 results and the same scroll position; focus dismissal, unavailable-latest recovery and calendar disclosure verified. Local 390px loading shift measured approximately 0.0011 (lab observation, not a field percentile).
 - Safari, physical devices, screen readers and full zoom conformance remain separate acceptance work; large-text preferences were an optional research recommendation, not introduced here.
+
+
+## 2026-11-07 可恢复的主题补课
+
+- 新闻的“同主题前情”使用现有准确 title key 进入全部已收录时间线，不做模糊合并，不将公司、活动误当成游戏。
+- 补课的日期、主题、展开条数保存在 URL；刷新、返回原期前的补课页、切换语言不再清空筛选。筛选使用 replaceState，避免每次输入都增加历史记录；打开/关闭补课和原期导航仍使用普通浏览器历史。
+- “复制这份补课”固定所选日期，保留主题及展开条数；剪贴板不可用时提供可手动复制的链接。未知或当前语言不可用的主题明确显示无收录，不以其他主题代替。
+- 主题数字按所选日期计算；新增“全部收录”。打开原期前记录滚动位置，索引载入后恢复。所有摘要、传闻/媒体证据标签和原期来源锚点沿用既有索引。
+- 零新增模型调用、采集源、搜索请求、运行依赖或定时任务；不修改 Canonical、编号、历史窗口或发布流程。

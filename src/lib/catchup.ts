@@ -28,7 +28,7 @@ export function catchupRange(end: string, days: number): CatchupRange {
 }
 
 /** Canonical identities win; legacy names are exact except for case/whitespace. */
-export function topicKey(entry: BriefSearchEntry): string {
+export function topicKey(entry: Pick<BriefSearchEntry, "titleKey" | "titleEn">): string {
   const canonical = entry.titleKey?.trim();
   if (canonical) return canonical;
   const title = entry.titleEn.trim().normalize("NFC").replace(/\s+/g, " ").toLowerCase();
