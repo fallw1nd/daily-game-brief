@@ -40,6 +40,12 @@ describe("Daily scheduled-task contract", () => {
     expect(architecture).toContain("GitHub Actions is the durable orchestrator and only trusted publisher");
   });
 
+  it("keeps editorial commits eligible for the push-triggered publisher", () => {
+    expect(contract).toContain("Do not put `[skip ci]`, `[ci skip]`, or other CI-skip markers");
+    expect(contract).toContain("editorial, locale-inbox, or wake commits");
+    expect(contract).toContain("push triggers are the handoff to GitHub");
+  });
+
   it("keeps facts, English, and publication responsibilities separated", () => {
     expect(contract).toContain("complete `sharedFactFrame`");
     expect(contract).toContain("English is nonblocking");
