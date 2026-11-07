@@ -201,7 +201,7 @@ describe("idempotent edition publisher", () => {
     const draft = structuredClone(editorial);
     draft.archiveTitle = "早报｜" + "公告".repeat(15);
     expect([...draft.archiveTitle].length).toBeLessThanOrEqual(40);
-    expect(() => buildEdition({ packet, editorial: draft, latest, manifest })).toThrow("normalized archiveTitle");
+    expect(() => buildEdition({ packet, editorial: draft, latest, manifest })).toThrow('normalizedTitle="早报｜《Example Game》：' + "公告".repeat(15) + '"; characterCount=48; exceeds 40 by 8');
   });
   it("builds the next edition and preserves valid upcoming entries", () => {
     const result = buildEdition({ packet, editorial, latest, manifest, now: new Date("2026-08-27T02:12:00Z") });
@@ -544,4 +544,16 @@ describe("manual revision preserves separate stories about one game", () => {
     expect(result.edition.entries[0].id).toBe(initial.edition.entries[0].id);
     expect(result.edition.entries.slice(1)).toEqual(initial.edition.entries.slice(1));
   });
+});
+
+
+it("explains the raw leading-whitespace rejection without changing publisher acceptance", () => {
+  expect(() => buildEdition({ packet, editorial: { ...editorial, archiveTitle: "  " + editorial.archiveTitle }, latest, manifest })).toThrow("archiveTitle must start with 早报｜ without leading whitespace");
+});
+
+it("reports the preserved archive title rather than normalizing a continuation draft", () => {
+  const initial = buildEdition({ packet, editorial, latest, manifest });
+  initial.edition.archiveTitle = "早报｜" + "公告".repeat(20);
+  const draft = { ...editorial, editorialNote: "New continuation receipt." };
+  expect(() => buildEdition({ packet: { ...packet, continuation: { scope: "news", preservePublished: true } }, editorial: draft, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true })).toThrow(`normalizedTitle=${JSON.stringify(initial.edition.archiveTitle)}; characterCount=43; exceeds 40 by 3`);
 });
