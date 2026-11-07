@@ -45,18 +45,24 @@ describe("catch-up location", () => {
 });
 
 
-it.each([false, true])("keeps old reviewed links, copy links and language switches on the same identity (English=%s)", english => {
-  const old = new URL("https://example.com/daily-game-brief/?catchup=1&edition=2026-11-07-daily&cuDays=custom&cuFrom=2026-11-06&cuTo=2026-11-07&cuTopic=gta-6&cuLimit=24#catchup");
+it.each([
+  ["gta-6", "grand-theft-auto-vi"],
+  ["phantom blade zero", "phantom-blade-zero"],
+  ["steam-4115450", "phantom-blade-zero"],
+  ["from the anime to the game free", "cyberpunk-2077"],
+].flatMap(([alias, canonical]) => [false, true].map(english => ({ alias, canonical, english }))))("keeps old $alias links, copy links and language switches on the same identity (English=$english)", ({ alias, canonical, english }) => {
+  const old = new URL("https://example.com/daily-game-brief/?catchup=1&edition=2026-11-07-daily&cuDays=custom&cuFrom=2026-11-06&cuTo=2026-11-07&cuLimit=24#catchup");
+  old.searchParams.set("cuTopic", alias);
   const location = readCatchupLocation(old.search);
-  expect(location).toEqual({ days: "custom", start: "2026-11-06", end: "2026-11-07", topic: "grand-theft-auto-vi", limit: 24 });
-  const copy = writeCatchupLocation(old, { ...location, topic: "gta-6" });
-  expect(copy.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  expect(location).toEqual({ days: "custom", start: "2026-11-06", end: "2026-11-07", topic: canonical, limit: 24 });
+  const copy = writeCatchupLocation(old, { ...location, topic: alias });
+  expect(copy.searchParams.get("cuTopic")).toBe(canonical);
   expect(readCatchupLocation(copy.search)).toEqual(location);
   const switched = new URL(catchupLanguageHref(old.search, english), old);
-  expect(switched.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  expect(switched.searchParams.get("cuTopic")).toBe(canonical);
   expect(readCatchupLocation(switched.search)).toEqual(location);
-  const href = new URL(catchupTopicHref("gta-6", "2026-11-07-daily", english), old);
-  expect(href.searchParams.get("cuTopic")).toBe("grand-theft-auto-vi");
+  const href = new URL(catchupTopicHref(alias, "2026-11-07-daily", english), old);
+  expect(href.searchParams.get("cuTopic")).toBe(canonical);
   expect(href.searchParams.get("edition")).toBe("2026-11-07-daily");
   expect(href.searchParams.get("lang")).toBe(english ? "en" : null);
 });

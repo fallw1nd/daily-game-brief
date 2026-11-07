@@ -113,3 +113,15 @@
 复核范围是8月21日至11月7日的既有归档，合计19条；四组均有有效英文展示。相关来源链接保留在各条原期正文中，译名证据仍位于 `config/title-translations.json` 对应键。本映射不修改该译名登记表，也不从它自动推导其他身份关系。
 
 `src/lib/catchup.ts` 的显式映射只影响主题分组与链接。旧主题链接、日期筛选、复制链接和中英切换共用同一解析；原始title key、条目ID、摘要、证据等级、原期锚点、期号和事实窗口全部保留。GTA Online、其他作品、公司、活动、大小写变体及未审核同名键不会因名称相似而合并；新增映射须另行核对具体归档身份。
+
+### 影之刃零与赛博朋克2077的补充审计
+
+同日逐条复核既有归档的原名、正文与已存来源，线上中英文也复现相同拆分。仅增加以下三条展示映射，不进行新的新闻检索或按名称自动推断：
+
+- `phantom blade zero` → `phantom-blade-zero`：10月23日 `2026-10-23-daily-news-5`，原名Phantom Blade Zero，[Gematsu上市预告及PS5实体版报道](https://www.gematsu.com/2026/10/phantom-blade-zero-launch-trailer-ps5-physical-editions-launch-in-2027)。规范键原有10月26日 `2026-10-26-daily-reviews-0`，[电Fami首批评分报道](https://news.denfaminicogamer.jp/news/261026h)。
+- `steam-4115450` → `phantom-blade-zero`：10月29日 `2026-10-29-daily-features-1` 的[PlayStation Blog武器专题](https://blog.playstation.com/2026/10/28/phantom-blade-zero-how-boss-weapons-transform-combat-and-exploration/)、`2026-10-29-daily-industry-0` 的[AUTOMATON预购估算](https://automaton-media.com/articles/newsjp/20261028-476178/)、`2026-10-29-daily-releases-3` 的[电Fami发售报道](https://news.denfaminicogamer.jp/news/2610292w)，以及11月3日 `2026-11-03-daily-industry-0` 的[4Gamer销量报道](https://www.4gamer.net/games/709/G070944/20261102007/)，四条原名均为Phantom Blade Zero。合组共6条，不按eventKey去重，也不把10月13日至27日的15条历史日历记录计作新闻。
+- `from the anime to the game free` → `cyberpunk-2077`：10月23日 `2026-10-23-daily-news-0`，[Xbox Wire游戏免费更新稿](https://news.xbox.com/en-us/2026/10/22/cyberpunk-2077-edgerunners-2-update/)，原名Cyberpunk 2077；与10月22日 `2026-10-22-daily-news-2` 的[Gematsu更新详情](https://www.gematsu.com/2026/10/cyberpunk-2077-version-2-5-edgerunners-ii-update-detailed)合计2条，未合入动画作品。
+
+上述5期英文Overlay均为available，8条新闻有匹配英文内容。测试使用这些真实归档及英文文案，覆盖全部旧键、来源期次锚点、复制链接、语言切换、日期筛选、事实状态与原数据不变。
+
+`steam-4115450` 在这里仅作为已核对的历史不透明键：11月3日配图来源URL另含Steam app/2493660，不能据此宣称两个商店ID相同或新增 `steam-2493660` 别名。实际动画键 `cyberpunk-edgerunners-2` 的4条消息保持独立；Phantom Line、Phantom Line: Prologue、PHANTOM OF INFERNO、其他作品/扩展、公司和未知同名键均不因词形相近而归组。没有修改译名表、日历、Canonical或发布流程。
