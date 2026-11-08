@@ -13,7 +13,7 @@ import { calendarTitle } from "./lib/calendar-title";
 import { readingHref, readingLead, readingWindow } from "./lib/reading";
 import type { BriefEdition, BriefEntry, BriefManifest, BriefSearchIndex, FactStatus, ImageAsset, SectionKey } from "./types";
 import "./reading.css";
-import { catchupLanguageHref, catchupTopicHref } from "./lib/catchup-location";
+import { catchupExitHref, catchupLanguageHref, catchupTopicHref } from "./lib/catchup-location";
 import { topicKey } from "./lib/catchup";
 import { Catchup } from "./components/Catchup";
 import { EditionLoading } from "./components/EditionLoading";
@@ -140,18 +140,33 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const settingsRef = useRef<HTMLDetailsElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const [activeArea, setActiveArea] = useState("content");
+  const pendingCatchupNavigation = useRef<{ open: boolean; anchor: string } | null>(null);
   const t = (zh: string, en: string) => english ? en : zh;
 
-  const toggleCatchup = (open: boolean) => {
+  const toggleCatchup = (open: boolean, anchor = "top") => {
     setCatchupOpen(open);
     if (open) setSearchRequested(true);
     const url = new URL(window.location.href);
     if (open) url.searchParams.set("catchup", "1"); else url.searchParams.delete("catchup");
-    url.hash = open ? "catchup" : "top";
-    window.history.pushState({ ...window.history.state, catchupPosition: null }, "", url);
+    url.hash = open ? "catchup" : anchor;
+    pendingCatchupNavigation.current = { open, anchor };
+    window.history.pushState({ ...window.history.state, catchupPosition: null, readingSearch: null }, "", url);
     setCatchupSearch(url.search);
-    window.scrollTo({ top: 0 });
+    if (open || anchor === "top") window.scrollTo({ top: 0 });
   };
+  useEffect(() => {
+    const navigation = pendingCatchupNavigation.current;
+    if (!navigation || navigation.open !== catchupOpen) return;
+    pendingCatchupNavigation.current = null;
+    // Move only after React reveals the destination, never on initial load or Back.
+    if (navigation.open) document.getElementById("cu-title")?.focus({ preventScroll: true });
+    else if (navigation.anchor === "top") pageRef.current?.querySelector<HTMLButtonElement>(".cu-entry button")?.focus({ preventScroll: true });
+    else {
+      const target = document.getElementById(navigation.anchor);
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: "start" });
+    }
+  }, [catchupOpen]);
   const updateSearch = (value: string, limit = 12) => {
     setQuery(value); setResultLimit(limit); setSearchRequested(true);
     const url = new URL(window.location.href);
@@ -162,6 +177,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const saveSearchPosition = () => window.history.replaceState({ ...window.history.state, readingSearch: { query, y: window.scrollY } }, "");
   useEffect(() => {
     const restore = () => {
+      pendingCatchupNavigation.current = null;
       const params = new URLSearchParams(window.location.search);
       setCatchupSearch(window.location.search);
       setRequestedId(params.get("edition"));
@@ -337,7 +353,11 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
     <a className="r-skip" href={catchupOpen ? "#catchup" : "#content"}>{t("跳到新闻正文", "Skip to news")}</a>
     <header className="r-header"><div className="r-header-inner">
       <a className="r-brand" href={readingHref(undefined, undefined, english)}><NewspaperClipping aria-hidden="true" /><span>{t("游戏圈动态", "Daily Game Brief")}</span></a>
-      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={`#${id}`} onClick={() => { if (catchupOpen) toggleCatchup(false); }} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
+      <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={catchupOpen ? catchupExitHref(catchupSearch, id) : `#${id}`} onClick={event => {
+        if (!catchupOpen || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        toggleCatchup(false, id);
+      }} aria-current={activeArea === id ? "location" : undefined}>{name}</a>)}</nav>
       <div className="r-controls">
         <a href={switchHref} lang={english ? "zh-CN" : "en"} aria-label={t("Switch to English", "切换到中文")}>{english ? "中文" : "EN"}</a>
         <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? t("切换夜间模式", "Use dark theme") : t("切换日间模式", "Use light theme")} title={t("切换明暗主题", "Toggle theme")}>{theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</button>
@@ -354,7 +374,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
       <div className="r-edition-line"><span><time>{edition.date.replaceAll("-", ".")}</time><span>NO.{String(edition.issueNumber).padStart(3, "0")}</span><span>{t("北京时间", "Beijing time")}</span></span></div>
       <div className="cu-entry"><button onClick={() => toggleCatchup(true)}><BookOpen aria-hidden="true" />{t("离线补课", "Catch up")}<ArrowRight aria-hidden="true" /></button><span>{t("离开了几天？从这里接上。", "Away for a few days? Pick up where you left off.")}</span></div>
       </div>
-      <section className="r-lead" id="content" aria-labelledby="r-edition-title">
+      <section className="r-lead" id="content" tabIndex={-1} aria-labelledby="r-edition-title">
         {lead ? <article id={lead.id} className={`r-lead-grid${lead.images?.some((asset) => !asset.placeholder) ? "" : " r-lead-grid--text"}`}>
           <div className="r-lead-copy"><div className="r-eyebrow">{t("本期头条", "The lead")}<span>{label(sectionNames[lead.section], english)}</span></div>
             <h1 id="r-edition-title">{edition.archiveTitle || lead.headline}</h1><p className="r-lead-summary">{lead.summary}</p>
@@ -378,7 +398,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {showcase.entryIds.map(id => edition.entries.find(entry => entry.id === id)).filter((entry): entry is BriefEntry => Boolean(entry)).map(entry => entry.showcaseBrief && entry.id !== lead?.id && edition.showcases?.find(group => group.entryIds.includes(entry.id))?.id === showcase.id ? <Story key={entry.id} entry={entry} english={english} editionId={edition.id} /> : <p className="r-showcase-link" key={entry.id}><a href={`#${entry.id}`}>{entry.headline}<ArrowUpRight aria-hidden="true" /></a></p>)}
       </section>)}
 
-      {<section className="r-calendar" id="upcoming" aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${calendarFocus.items.length} 项计划`, `${calendarFocus.items.length} release plans`)}</span></header>
+      {<section className="r-calendar" id="upcoming" tabIndex={-1} aria-labelledby="r-calendar-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("发售日历", "Release calendar")}</span><h2 id="r-calendar-title">{t("未来15天发售", "The next 15 days")}</h2></div><span>{t(`${calendarFocus.items.length} 项计划`, `${calendarFocus.items.length} release plans`)}</span></header>
         <p className="r-calendar-note">{t(`以本期 ${edition.date} 为基准，展示次日起15天内的发售计划。`, `Scheduled releases in the 15 days after this edition, ${edition.date}.`)}</p>
         <CalendarFocusControl focus={calendarFocus} english={english} />
         {!calendar && edition.sourceReport?.calendarReview && [...edition.sourceReport.calendarReview.pages, ...edition.sourceReport.calendarReview.platforms].some(row => row.status === "deferred") && <p className="r-calendar-note r-warning">{t("本期发售日历尚未完成复核，包含沿用计划，也可能遗漏新公布或调整的发售日期。请以各条目官方来源为准。", "Calendar review is incomplete. Some plans are carried forward; newly announced or changed dates may be missing. Check the official sources linked below.")}</p>}
@@ -393,7 +413,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
         {next ? <a href={readingHref(next.id, undefined, english)}><small>{t("下一期", "Next edition")} · {next.date}</small><span>{archiveTitle(next.id, next.archiveTitle)}<ArrowRight aria-hidden="true" /></span></a> : <span className="r-pager-boundary">{t("已是最新一期", "Latest edition")}<small>{t("下期计划：", "Next scheduled: ")}{edition.nextEditionAt}</small></span>}
       </nav>}
 
-      <section ref={archiveRef} id="archive" className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{manifest ? t(`${archives.length} 期归档`, `${archives.length} editions`) : ""}</span></header>
+      <section ref={archiveRef} id="archive" tabIndex={-1} className="r-archive" aria-labelledby="r-archive-title"><header className="r-section-heading"><div><span className="r-eyebrow">{t("继续探索", "Explore the archive")}</span><h2 id="r-archive-title">{t("往期简报", "Past editions")}</h2></div><span>{manifest ? t(`${archives.length} 期归档`, `${archives.length} editions`) : ""}</span></header>
         {!manifest && <p className="r-result-count" role="status">{manifestState === "error" ? <>{t("归档目录暂时无法读取，当前简报仍可阅读。", "The archive list could not be loaded. You can still read this edition.")} {!initialEdition && <button className="r-button" onClick={() => setManifestRetry(value => value + 1)}>{t("重试归档目录", "Retry archive list")}</button>}</> : t("正在读取归档目录…", "Loading archive list…")}</p>}
         <label className="r-search"><MagnifyingGlass aria-hidden="true" /><span className="r-sr-only">{t("搜索所有期次的游戏、平台或事件", "Search all editions by game, platform or event")}</span><input type="search" value={query} placeholder={t("搜索游戏、平台或事件", "Search games, platforms or events")} onFocus={() => setSearchRequested(true)} onChange={(event) => updateSearch(event.target.value)} /></label>
         {query.trim() ? <div className="r-search-results"><p className="r-result-count" role="status">{searchError ? t("搜索暂时不可用。", "Search is temporarily unavailable.") : !searchIndex ? t("正在读取搜索索引…", "Loading search…") : t(`找到 ${results.length} 条新闻`, `${results.length} matching stories`)}</p>{searchError && <button className="r-button" onClick={() => setSearchRetry((value) => value + 1)}>{t("重新加载", "Retry")}</button>}{results.slice(0, resultLimit).map((item) => <a key={`${item.editionId}-${item.entryId}`} className="r-search-result" onClick={saveSearchPosition} href={readingHref(item.editionId, item.entryId, english)}><small>{item.date} · NO.{String(item.issueNumber).padStart(3, "0")} · {label(statusNames[item.factStatus], english)}{item.tracking ? t(" · 持续跟踪", " · Tracking") : ""}</small><h3>{item.headline}</h3><p>{item.summary}</p><ArrowRight aria-hidden="true" /></a>)}{searchIndex && !results.length && <p>{t("没有匹配的新闻，试试更短的关键词。", "No matching stories. Try a shorter keyword.")}</p>}{results.length > resultLimit && <button className="r-button" onClick={() => updateSearch(query, resultLimit + 12)}>{t("显示更多结果", "Show more results")}</button>}</div> : <><div className="r-archive-list">{archives.slice(0, archiveLimit).map((item) => <a href={readingHref(item.id, undefined, english)} className={item.id === edition.id ? "is-current" : ""} key={item.id} aria-current={item.id === edition.id ? "page" : undefined}><span className="r-archive-meta"><time>{item.date}</time><span>NO.{String(item.issueNumber).padStart(3, "0")}</span>{item.id === edition.id && <small>{t("当前阅读", "Reading")}</small>}</span><strong>{archiveTitle(item.id, item.archiveTitle) || t("本期简报", "Edition")}</strong><ArrowRight aria-hidden="true" /></a>)}</div>{archives.length > archiveLimit && <button className="r-button" onClick={() => setArchiveLimit((value) => value + 12)}>{t("浏览更多期次", "More editions")}<ArrowDown aria-hidden="true" /></button>}</>}
