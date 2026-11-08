@@ -61,3 +61,11 @@ export function catchupLanguageHref(search: string, english: boolean): string {
   if (english) params.set("lang", "en"); else params.delete("lang");
   return `${import.meta.env.BASE_URL}?${params}#catchup`;
 }
+
+/** A real reader destination also works for new-tab and modified link clicks. */
+export function catchupExitHref(search: string, anchor: string): string {
+  const params = new URLSearchParams(search);
+  params.delete("catchup");
+  const query = params.toString();
+  return `${import.meta.env.BASE_URL}${query ? `?${query}` : ""}#${encodeURIComponent(anchor)}`;
+}

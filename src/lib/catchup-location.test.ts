@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { catchupLanguageHref, catchupLocationRange, catchupTopicHref, readCatchupLocation, writeCatchupLocation } from "./catchup-location";
+import { catchupExitHref, catchupLanguageHref, catchupLocationRange, catchupTopicHref, readCatchupLocation, writeCatchupLocation } from "./catchup-location";
 
 describe("catch-up location", () => {
+  it("makes reader destinations without discarding language, edition, search or catch-up filters", () => {
+    const search = "?view=reading&edition=2026-11-07-daily&lang=en&q=007&results=24&catchup=1&cuDays=custom&cuFrom=2026-11-01&cuTo=2026-11-07&cuTopic=gta-6&cuLimit=36";
+    const original = new URLSearchParams(search);
+    original.delete("catchup");
+    for (const anchor of ["content", "upcoming", "archive"]) {
+      const target = new URL(catchupExitHref(search, anchor), "https://example.com");
+      expect(target.pathname).toBe("/daily-game-brief/");
+      expect(target.searchParams.toString()).toBe(original.toString());
+      expect(target.hash).toBe(`#${anchor}`);
+    }
+    expect(catchupExitHref("?catchup=1", "archive")).toBe("/daily-game-brief/#archive");
+  });
   it("safely parses absent and malformed pagination and presets", () => {
     expect(readCatchupLocation("")).toEqual({ days: 7, start: "", end: "", topic: "", limit: 12 });
     for (const limit of ["NaN", "Infinity", "-1", "12.5", "0"]) expect(readCatchupLocation(`?cuLimit=${limit}&cuDays=bad`).limit).toBe(12);

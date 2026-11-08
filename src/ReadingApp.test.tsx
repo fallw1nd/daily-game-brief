@@ -438,3 +438,124 @@ it.each([false, true])("links both real November GTA VI editions to the same rev
     expect(story.title.title_key).toBe(originalKey);
   }
 });
+
+it.each([false, true])("moves keyboard focus when opening and closing catch-up (English=%s)", async english => {
+  vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} english={english} />));
+  const entrance = container.querySelector<HTMLButtonElement>(".cu-entry button")!;
+  for (let i = 0; i < 2; i++) {
+    await act(async () => { entrance.focus(); entrance.click(); });
+    expect(document.activeElement).toBe(container.querySelector("#cu-title"));
+    expect(container.querySelector("#cu-title")?.getAttribute("tabindex")).toBe("-1");
+    const close = container.querySelector<HTMLButtonElement>(".cu-back")!;
+    await act(async () => { close.focus(); close.click(); });
+    expect(document.activeElement).toBe(entrance);
+  }
+});
+
+it.each(["content", "upcoming", "archive"])("leaves catch-up for %s in a single history step and restores it on Back", async anchor => {
+  vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
+  const savedSearch = "?view=reading&edition=2026-09-07-daily&lang=en&q=archive&results=24&catchup=1&cuDays=all&cuTopic=title%3Aarchive&cuLimit=24";
+  window.history.replaceState(null, "", `/daily-game-brief/${savedSearch}#catchup`);
+  const container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} english />));
+  const push = vi.spyOn(window.history, "pushState");
+  const target = container.querySelector<HTMLElement>(`#${anchor}`)!;
+  target.scrollIntoView = vi.fn(() => expect(target.closest("[hidden]")).toBeNull());
+  const link = container.querySelector<HTMLAnchorElement>(`.r-header nav a[href$="#${anchor}"]`)!;
+  const href = new URL(link.href);
+  expect(href.searchParams.has("catchup")).toBe(false);
+  expect(href.searchParams.get("cuTopic")).toBe("title:archive");
+  expect(href.searchParams.get("lang")).toBe("en");
+  const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  await act(async () => { link.dispatchEvent(event); });
+  expect(event.defaultPrevented).toBe(true); // No second native anchor-history entry.
+  expect(push).toHaveBeenCalledTimes(1);
+  expect(window.location.href).toBe(href.href);
+  expect(container.querySelector("#catchup")).toBeNull();
+  expect(target.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  expect(document.activeElement).toBe(target);
+  expect(target.tabIndex).toBe(-1);
+  await act(async () => {
+    await new Promise<void>(resolve => {
+      window.addEventListener("popstate", () => resolve(), { once: true });
+      window.history.back();
+    });
+  });
+  expect(window.location.search).toBe(savedSearch);
+  expect(container.querySelector("#catchup")).not.toBeNull();
+  expect(container.querySelector<HTMLSelectElement>(".cu select")?.value).toBe("title:archive");
+  expect(container.querySelector("#cu-title")).not.toBe(document.activeElement);
+  await act(async () => {
+    await new Promise<void>(resolve => {
+      window.addEventListener("popstate", () => resolve(), { once: true });
+      window.history.forward();
+    });
+  });
+  expect(window.location.href).toBe(href.href);
+  expect(container.querySelector("#catchup")).toBeNull();
+});
+
+it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }])("keeps modified main-navigation clicks native without closing catch-up (%j)", async modifiers => {
+  vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
+  window.history.replaceState(null, "", "/daily-game-brief/?catchup=1&cuDays=30&cuTo=2026-11-07#catchup");
+  const container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const before = window.location.href;
+  const push = vi.spyOn(window.history, "pushState");
+  const link = container.querySelector<HTMLAnchorElement>('.r-header nav a[href$="#archive"]')!;
+  let preventedByApp = true;
+  // Stop jsdom's unsupported navigation only after React has handled the event.
+  const stopNative = (event: MouseEvent) => { preventedByApp = event.defaultPrevented; event.preventDefault(); };
+  document.addEventListener("click", stopNative, { once: true });
+  await act(async () => { link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...modifiers })); });
+  expect(preventedByApp).toBe(false);
+  expect(push).not.toHaveBeenCalled();
+  expect(window.location.href).toBe(before);
+  expect(container.querySelector("#catchup")).not.toBeNull();
+  expect(new URL(link.href).searchParams.has("catchup")).toBe(false);
+});
+
+it.each(["content", "upcoming", "archive", "top"])("does not let stale archive-search restoration override an explicit %s destination", async anchor => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => { frames.set(++frameId, callback); return frameId; });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(id => { frames.delete(id); });
+  const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const originalState = { readingSearch: { query: "archive", y: 6700 }, unrelated: "keep" };
+  window.history.replaceState(originalState, "", "/daily-game-brief/?q=archive&results=24&catchup=1#catchup");
+  const container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const initialTarget = container.querySelector<HTMLElement>("#catchup")!;
+  initialTarget.scrollIntoView = vi.fn();
+  await act(async () => {
+    for (const [id, callback] of frames) { frames.delete(id); callback(0); }
+  });
+  const target = container.querySelector<HTMLElement>(`#${anchor}`)!;
+  target.scrollIntoView = vi.fn();
+  const control = anchor === "top" ? container.querySelector<HTMLButtonElement>(".cu-back")! : container.querySelector<HTMLAnchorElement>(`.r-header nav a[href$="#${anchor}"]`)!;
+  await act(async () => control.click());
+  expect(window.history.state).toEqual({ unrelated: "keep", catchupPosition: null, readingSearch: null });
+  await act(async () => {
+    for (const [id, callback] of frames) { frames.delete(id); callback(0); }
+  });
+  expect(scroll).not.toHaveBeenCalledWith({ top: 6700, behavior: "instant" });
+  if (anchor === "top") {
+    expect(scroll).toHaveBeenCalledWith({ top: 0 });
+    expect(document.activeElement).toBe(container.querySelector(".cu-entry button"));
+  } else expect(target.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  await act(async () => {
+    await new Promise<void>(resolve => {
+      window.addEventListener("popstate", () => resolve(), { once: true });
+      window.history.back();
+    });
+  });
+  expect(window.history.state).toEqual(originalState);
+  expect(container.querySelector("#catchup")).not.toBeNull();
+});
