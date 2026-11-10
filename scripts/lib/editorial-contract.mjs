@@ -43,7 +43,7 @@ const englishEntryDraftSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        properties: { sourceIndex: { type: "integer", minimum: 0 }, label: { type: "string" } },
+        properties: { sourceIndex: { type: "integer", minimum: 0, description: "Zero-based position in final Canonical sources after selection, additionalSources and URL deduplication; not the packet sourceIndex. Selecting only packet source 2 gives Canonical source 0." }, label: { type: "string" } },
         required: ["sourceIndex", "label"],
       },
     },

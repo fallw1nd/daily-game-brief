@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { gitBlobSha } from "./lib/edition-state.mjs";
 import { validateEditorialSubmission } from "./lib/editorial-submission.mjs";
+import { readEnglishEditorialWarnings } from "./lib/editorial-locale-preflight.mjs";
 
 const PACKET_PATH = resolve(process.env.EDITORIAL_PACKET_PATH || "artifacts/editorial-packet.json");
 const DECISION_PATH = resolve(process.env.EDITORIAL_DECISION_PATH || "artifacts/editorial-decisions.json");
@@ -11,7 +12,9 @@ const [packetText, editorial] = await Promise.all([readFile(PACKET_PATH, "utf8")
 const packet = JSON.parse(packetText);
 const packetBlobSha = gitBlobSha(packetText);
 const errors = validateEditorialSubmission({ branchName, packet, editorial, packetBlobSha, publicationMode: process.env.PUBLICATION_MODE || "publish" });
+const localeWarnings = await readEnglishEditorialWarnings({ packet, editorial });
 await mkdir(dirname(RESULT_PATH), { recursive: true });
-await writeFile(RESULT_PATH, JSON.stringify({ schemaVersion: 1, editionId: editorial?.editionId || null, packetBlobSha, valid: errors.length === 0, errors }, null, 2) + "\n");
+await writeFile(RESULT_PATH, JSON.stringify({ schemaVersion: 1, editionId: editorial?.editionId || null, packetBlobSha, valid: errors.length === 0, errors, localeWarnings }, null, 2) + "\n");
+for (const warning of localeWarnings) console.warn(`English preflight (nonblocking): ${warning}`);
 if (errors.length) throw new Error(`Editorial submission is invalid:\n- ${errors.join("\n- ")}`);
 console.log(`Validated editorial submission ${editorial.editionId} from ${branchName}.`);
