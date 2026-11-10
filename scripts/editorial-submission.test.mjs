@@ -2,6 +2,11 @@ import { buildDegradedDecision } from "./lib/degraded-decision.mjs";
 import { describe, expect, it } from "vitest";
 import { normalizeEditorialArchiveTitle } from "./lib/headline-subject.mjs";
 import { validateEditorialSubmission } from "./lib/editorial-submission.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { gitBlobSha } from "./lib/edition-state.mjs";
 
 const source = { sourceIndex: 0, status: "opened", kind: "primary", independenceKey: "publisher", label: "Publisher", url: "https://publisher.example/news", evidenceText: "Announcement." };
 const packetBlobSha = "a".repeat(40);
@@ -205,4 +210,35 @@ it("does not normalize an included lead again during a preservePublished continu
   const draft = { ...editorial, archiveTitle: "早报｜" + "公告".repeat(15) };
   const continuation = { ...packet, continuation: { scope: "news", preservePublished: true } };
   expect(validateEditorialSubmission({ branchName: "automation/editorial/2026-08-27-am", packet: continuation, editorial: draft, packetBlobSha })).toEqual([]);
+});
+
+it("records actionable English warnings without rejecting valid Chinese in the actual preflight CLI", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "editorial-preflight-"));
+  try {
+    const packetText = JSON.stringify(packet);
+    const draft = structuredClone(editorial);
+    draft.packetBlobSha = gitBlobSha(packetText);
+    draft.locales = { en: {
+      schemaVersion: 1, locale: "en", archiveTitle: "Morning Brief | Example Game Announcement", upcoming: [], sourceReport: null,
+      entries: [{ eventKey: "event-1", headline: "Example Game Announced", summary: "The publisher confirmed the announcement in its official source.", verification: "The official source was opened.", timeNote: "Inside the fixed edition window.", regionLabel: null, releaseTypeLabel: null, sourceLabels: [{ sourceIndex: 2, label: "Publisher" }] }],
+    } };
+    const packetPath = join(dir, "packet.json");
+    const decisionPath = join(dir, "decision.json");
+    const resultPath = join(dir, "validation.json");
+    await writeFile(packetPath, packetText);
+    await writeFile(decisionPath, JSON.stringify(draft));
+    const env = { ...process.env, EDITORIAL_BRANCH: "automation/editorial/2026-08-27-am", EDITORIAL_PACKET_PATH: packetPath, EDITORIAL_DECISION_PATH: decisionPath, EDITORIAL_VALIDATION_PATH: resultPath, PUBLICATION_MODE: "publish" };
+    const run = () => execFileSync(process.execPath, ["scripts/validate-editorial-submission.mjs"], { env, stdio: "pipe", encoding: "utf8" });
+    expect(run()).toContain("Validated editorial submission");
+    const result = JSON.parse(await readFile(resultPath, "utf8"));
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.localeWarnings).toContainEqual(expect.stringContaining("0=https://publisher.example/news"));
+    draft.packetBlobSha = "b".repeat(40);
+    await writeFile(decisionPath, JSON.stringify(draft));
+    expect(run).toThrow();
+    const rejected = JSON.parse(await readFile(resultPath, "utf8"));
+    expect(rejected.valid).toBe(false);
+    expect(rejected.errors).toContain("editorial packetBlobSha does not match the restored packet blob");
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

@@ -75,7 +75,7 @@ function degradedPreviousBySource(previousEntries, sources) {
   return matches.length === 1 ? matches[0] : null;
 }
 
-function sourcesFor(decision, packetItem) {
+export function sourcesFor(decision, packetItem) {
   const selected = (packetItem?.sources || []).filter((source) =>
     (decision.sourceIndexes || []).includes(source.sourceIndex)
   ).map((source) => ({ label: source.label, url: source.canonicalUrl || source.url, kind: source.kind }));

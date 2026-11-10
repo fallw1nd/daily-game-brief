@@ -60,7 +60,7 @@ function archivePrefix(period) {
   return null;
 }
 
-function validateSourceLabels(entry, overlayEntry, context, errors) {
+export function validateSourceLabels(entry, overlayEntry, context, errors) {
   const labels = Array.isArray(overlayEntry.sourceLabels) ? overlayEntry.sourceLabels : [];
   const byIndex = new Map();
   for (const [index, item] of labels.entries()) {

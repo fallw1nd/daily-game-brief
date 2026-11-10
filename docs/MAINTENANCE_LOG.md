@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261110-01 — Diagnose English source positions before publication
+
+- November 10's initial English overlay used a packet source index after Canonical source selection had collapsed that list to index 0. Chinese published successfully, but later news/calendar continuations had no complete English baseline and produced cascading coverage errors before a separate locale repair restored English.
+- The existing submission preflight now reports advisory English source-label errors with the publisher's exact selected-source order, and checks continuation baselines using the archive/retained-presentation fallback. The packet schema and editorial instructions distinguish packet indices from filtered Canonical positions and keep incomplete continuations on the established locale-repair path. No automatic remapping, new publication gate, history rewrite, schedule change, model call or discovery request is introduced.
+- Regressions cover sparse/reversed packet indices, canonical URL and additional-source deduplication, non-HTTPS filtering, duplicate/missing labels, valid/missing/partial/stale baselines, retained fallback and actual CLI success despite English warnings. Canonical rejection and final overlay validation remain unchanged.
+
 ## MNT-20261101-02 — Preserve validated untouched English in manual overlays
 
 - A Nov1 dry-run repairing one headline and removing a duplicate calendar row preserved all 11 Canonical stories, but rejected English because its scoped draft could not include two later continuation stories absent from the original packet. No degraded draft was submitted.
