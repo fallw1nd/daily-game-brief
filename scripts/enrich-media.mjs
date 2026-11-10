@@ -101,6 +101,34 @@ function tagAttributes(tag) {
   return attrs;
 }
 
+function playStationProductMetadata(html, pageUrl) {
+  const page = new URL(pageUrl);
+  const path = page.pathname.match(/^\/[^/]+\/(product|concept)\/([^/]+)\/?$/);
+  if (page.hostname !== "store.playstation.com" || !path) return null;
+  const products = [];
+  for (const script of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    if (tagAttributes(script[1]).type !== "application/ld+json") continue;
+    try {
+      const parsed = JSON.parse(script[2]);
+      const nodes = Array.isArray(parsed) ? parsed : [parsed, ...(parsed?.["@graph"] || [])];
+      for (const node of nodes) {
+        if (node?.["@type"] !== "Product" || typeof node.name !== "string") continue;
+        // Product pages must identify the requested SKU, not an upsell edition.
+        if (path[1] === "product" && node.sku !== decodeURIComponent(path[2])) continue;
+        products.push(node);
+      }
+    } catch { /* Ignore malformed structured data; ordinary metadata remains available. */ }
+  }
+  if (products.length !== 1) return null;
+  const product = products[0];
+  let imageUrl = null;
+  try {
+    const image = new URL(product.image);
+    if (image.protocol === "https:" && image.hostname === "image.api.playstation.com" && image.pathname !== "/") imageUrl = image.href;
+  } catch { /* No usable product image. */ }
+  return { title: product.name, imageUrl };
+}
+
 function extractMeta(html, pageUrl) {
   const values = new Map();
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
@@ -109,9 +137,7 @@ function extractMeta(html, pageUrl) {
     if (key && attrs.content && !values.has(key)) values.set(key, attrs.content);
   }
   const pageHost = new URL(pageUrl).hostname.toLowerCase();
-  const psnImage = pageHost === "store.playstation.com"
-    ? html.match(/(?:https:\\\/\\\/|https:\/\/)image\.api\.playstation\.com[^"'\\<\s]+/i)?.[0]
-    : null;
+  const psnProduct = playStationProductMetadata(html, pageUrl);
   const isXboxProduct = /(^|\.)(xbox|microsoft)\.com$/.test(pageHost) && /\/games\/store\//.test(new URL(pageUrl).pathname);
   let xboxBoxArt = isXboxProduct
     ? (html.match(/<img\b[^>]*>/gi) || []).map(tagAttributes)
@@ -125,7 +151,7 @@ function extractMeta(html, pageUrl) {
       xboxBoxArt = art.href;
     }
   }
-  const rawImage = xboxBoxArt || psnImage?.replaceAll("\\/", "/") ||
+  const rawImage = xboxBoxArt || psnProduct?.imageUrl ||
     values.get("og:image:secure_url") || values.get("og:image") ||
     values.get("twitter:image") || values.get("twitter:image:src");
   const imageUrl = rawImage ? new URL(rawImage, pageUrl).href : null;
@@ -144,6 +170,7 @@ function extractMeta(html, pageUrl) {
     alt: values.get("og:image:alt") || values.get("twitter:image:alt") || "",
     pageTitle: openGraphTitle || twitterTitle || documentTitle,
     productTitleMetadata: {
+      playStationProductName: psnProduct?.title || "",
       steamAppName: decodeEntities(steamTitle),
       openGraphTitle,
       twitterTitle,
@@ -340,23 +367,17 @@ async function mapLimit(items, limit, worker) {
   await Promise.all(runners);
 }
 
-function coverPreference(source, platforms) {
+function coverPreference(source) {
   const url = new URL(source.url);
   const host = url.hostname.toLowerCase();
   const path = url.pathname.toLowerCase();
-  const joined = platforms.join(" ").toLowerCase();
-  const hasPlayStation = /ps[45]|playstation/.test(joined);
-  const hasNintendo = /switch|nintendo/.test(joined);
-  const hasXbox = /xbox/.test(joined);
-  const isPsn = /(^|\.)store\.playstation\.com$/.test(host) || /playstation\.com$/.test(host) && path.includes("/product/");
-  const isNintendoJp = host === "store-jp.nintendo.com";
+  const isPsn = host === "store.playstation.com" && /\/(product|concept)\//.test(path);
+  const isNintendo = host === "store-jp.nintendo.com" || /(^|\.)nintendo\.com$/.test(host);
   const isXboxStore = /(^|\.)(xbox|microsoft)\.com$/.test(host) && /\/games\/store\/|\/store\//.test(path);
-  const pcOnly = !hasPlayStation && !hasNintendo && !hasXbox;
-
-  if (hasPlayStation && isPsn) return 0;
-  if (!hasPlayStation && hasNintendo && isNintendoJp) return 0;
-  if (!hasPlayStation && !hasNintendo && hasXbox && isXboxStore) return 0;
-  if (pcOnly && host === "store.steampowered.com") return 1;
+  if (isPsn) return path.startsWith("/zh-hans-hk/") ? 0 : /^\/(?:zh-hant|zh|en)-hk\//.test(path) ? 1 : 2;
+  if (isNintendo) return 3;
+  if (isXboxStore) return 4;
+  if (host === "store.steampowered.com") return 5;
   return 20 + sourceRank(source);
 }
 
@@ -701,8 +722,8 @@ async function processEdition(manifestItem, options) {
       item.source,
     ]
       .filter((source) => source?.url?.startsWith("https://"))
-      .sort((a, b) => coverPreference(a, item.platforms) - coverPreference(b, item.platforms));
-    if (options.revalidateCoverId === item.id) {
+      .sort((a, b) => coverPreference(a) - coverPreference(b));
+    if (options.revalidateCoverId === item.id && item.cover && !item.cover.placeholder) {
       const result = await revalidateExistingCover(edition, item, candidates, options);
       results.push(result);
       if (options.apply && result.status !== "preserved") changed = true;

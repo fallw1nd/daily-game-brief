@@ -4,7 +4,7 @@ Media enrichment runs after Canonical publication and is nonblocking. It opens t
 
 Current recovery schedule is 11:10 `Asia/Shanghai`; exact-edition enrichment is also dispatched immediately after Canonical publication. Production timing belongs in `docs/SCHEDULED_TASK_PROMPT.md`, not historical migration notes.
 
-Cover identity is confirmed from the opened page's product title metadata against the record's exact English/Chinese title and registered aliases. URLs, descriptions, and partial title matches do not establish product identity. Existing covers are left alone during normal runs; for a bounded repair, run `node scripts/enrich-media.mjs --apply --edition=2026-09-29-daily --revalidate-cover-id=upcoming-end-of-abyss`. This reopens only that cover's source page in the selected edition. A confirmed product mismatch removes that one bad cover and resolves it from that record's configured sources; a fetch failure or indeterminate page title retains the current cover. The media workflow's manual dispatch accepts the same optional `edition_id` and `record_id` pair. Omitting `record_id` keeps the normal media flow.
+Cover identity is confirmed from the opened page's product title metadata against the record's exact English/Chinese title and registered aliases. URLs, descriptions, and partial title matches do not establish product identity. Existing covers are left alone during normal runs; for a bounded repair, run `node scripts/enrich-media.mjs --apply --edition=2026-09-29-daily --revalidate-cover-id=upcoming-end-of-abyss`. This reopens only that cover's source page in the selected edition. A confirmed product mismatch removes that one bad cover and resolves it from that record's configured sources; a fetch failure or indeterminate page title retains the current cover. If that record has no real cover yet, the same bounded request fills it from its configured sources instead of preserving an empty cover. The media workflow's manual dispatch accepts the same optional `edition_id` and `record_id` pair. Omitting `record_id` keeps the normal media flow.
 
 ## Required state
 
@@ -21,7 +21,7 @@ Store repository assets under `public/media/briefs/YYYY/MM/<edition-id>/`; prefe
 
 Prefer the first verified same-title source available:
 
-1. PlayStation Store, preferably Hong Kong/Simplified Chinese when appropriate;
+1. PlayStation Store, Hong Kong/Simplified Chinese first, then other Hong Kong locales and other regions;
 2. Nintendo eShop / official Nintendo product page;
 3. Microsoft/Xbox Store, Steam, publisher store/media room;
 4. reliable retailer/media/game database only when the exact source page is opened and subject/edition identity is clear;
@@ -31,7 +31,9 @@ Xbox roundup pages are discovery only: the resolver follows only an exact-title 
 
 Xbox product pages may expose their real cover through the exact `ProductDetailsHeaderBoxArt` image rather than social metadata. The extractor accepts that element only on Xbox/Microsoft product-store paths, requests a usable size from the official Microsoft image host, and still requires the product-title identity gate before saving any image. Host-scoped `Buy`/Xbox platform chrome and numeric HTML entities are normalized; edition and sequel differences remain significant. Explicit official aliases require a traceable same-product link, not fuzzy title matching.
 
-The order is a reliability preference, not a shape requirement. Square, portrait, and landscape art are all valid when identity/provenance is verified.
+PlayStation product pages supply a structured `Product` image; product URLs must match its exact SKU, and its name must agree with the opened page's title metadata. A single Product on a concept page still needs the same exact-title check. Prefer that product's usual square cover over arbitrary page backgrounds or upsell images. Normalize only known language-availability suffixes such as `(中英韩文版)` or `(韩语, 简体中文, 繁体中文, 英语)` on PlayStation Store; retain edition, add-on and sequel distinctions.
+
+The order is a reliability preference, not a shape requirement. Square, portrait, and landscape art are all valid when identity/provenance is verified. When a missing cover exposes a verified product source, save that source in `config/media-catalog.json` so later normal enrichment can reuse it without another search. A missing image is repaired directly within these provenance checks; do not substitute unrelated art or change the production schedule.
 
 ### Editorial images
 
