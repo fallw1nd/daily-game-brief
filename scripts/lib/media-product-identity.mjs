@@ -8,13 +8,28 @@ function normalizeTitle(value) {
     .trim();
 }
 
+const playStationLanguages = new Set([
+  "简体中文", "簡體中文", "繁体中文", "繁體中文", "中文", "韩语", "韓語", "英语", "英語", "日语", "日語",
+  "德语", "德語", "法语", "法語", "西班牙语", "西班牙語", "葡萄牙语", "葡萄牙語", "俄语", "俄語", "意大利语", "義大利語",
+  "english", "chinese", "korean", "japanese", "german", "french", "spanish", "portuguese", "russian", "italian",
+]);
+
+function stripPlayStationLanguages(title) {
+  return title.replace(/\s*[（(]([^（）()]+)[）)]\s*$/, (suffix, content) => {
+    if (/^[中英日韩韓德法西葡俄意]+文版$/.test(content)) return "";
+    const languages = content.replace(/\s+Ver\.$/i, "").toLowerCase().split(/\s*[,，、/]\s*/);
+    return languages.every(language => playStationLanguages.has(language)) ? "" : suffix;
+  });
+}
+
 function stripStoreSuffix(value, host = "") {
   const title = String(value || "")
     .replace(/\s+on\s+steam\s*$/i, "")
     .replace(/\s*[|–—-]\s*(?:steam(?:\s+store)?|xbox(?:\s+(?:games\s+)?store)?|official\s+playstation\s+store(?:\s+[a-z]{2}(?:-[a-z]{2})?)?|nintendo\s+official\s+site|the\s+official\s+(?:game\s+)?(?:site|website|product\s+page))\s*$/i, "")
     .trim();
   if (host === "store.playstation.com") {
-    return title.replace(/\s+PS[45](?:\s*&\s*PS[45])?\s*$/i, "").trim();
+    // Language availability is store chrome, unlike editions or sequel names.
+    return stripPlayStationLanguages(title.replace(/\s+PS[45](?:\s*&\s*PS[45])?\s*$/i, "")).trim();
   }
   if (host === "xbox.com" || host.endsWith(".xbox.com")) {
     return title.replace(/^Buy\s+/i, "").replace(/\s*\(Xbox (?:Series(?: X\|S)?|One)\)\s*$/i, "").trim();
@@ -54,13 +69,14 @@ export function identifyProductTitle(record, metadata = {}, pageUrl = "") {
   if (!aliases.length) return { status: "unknown", pageTitle: null };
 
   const expected = new Set(aliases.map(normalizeTitle).filter(Boolean));
-  const visibleTitles = [metadata.documentTitle, metadata.openGraphTitle, metadata.twitterTitle]
-    .filter((value) => typeof value === "string" && value.trim());
-  if (visibleTitles.some(isInterstitialTitle)) return { status: "unknown", pageTitle: visibleTitles.find(isInterstitialTitle) };
-
   const host = (() => {
     try { return new URL(pageUrl).hostname.toLowerCase(); } catch { return ""; }
   })();
+  const psnProductName = host === "store.playstation.com" ? metadata.playStationProductName : null;
+  const visibleTitles = [metadata.documentTitle, metadata.openGraphTitle, metadata.twitterTitle, psnProductName]
+    .filter((value) => typeof value === "string" && value.trim());
+  if (visibleTitles.some(isInterstitialTitle)) return { status: "unknown", pageTitle: visibleTitles.find(isInterstitialTitle) };
+
   const isSteamStore = host === "store.steampowered.com" || host.endsWith(".steampowered.com");
   const identifiedTitles = [...new Set(visibleTitles
     .map(value => stripStoreSuffix(value, host))
@@ -71,7 +87,7 @@ export function identifyProductTitle(record, metadata = {}, pageUrl = "") {
   }
   const productTitle = isSteamStore
     ? metadata.steamAppName
-    : metadata.openGraphTitle || metadata.twitterTitle || metadata.documentTitle;
+    : psnProductName || metadata.openGraphTitle || metadata.twitterTitle || metadata.documentTitle;
   if (!productTitle || typeof productTitle !== "string" || !productTitle.trim()) {
     return { status: "unknown", pageTitle: null };
   }
