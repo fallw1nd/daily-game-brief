@@ -1,3 +1,4 @@
+import { calendarCards } from "./calendar-cards";
 import { useEffect, useState } from "react";
 import generated from "../generated/calendar-focus.json";
 import type { UpcomingEntry } from "../types";
@@ -20,5 +21,5 @@ export function useCalendarFocus(items: UpcomingEntry[], editionId?: string, lat
   const key = `${editionId}:${calendarSnapshot(items)}`;
   useEffect(() => setExpandedKey(undefined), [key]);
   const expanded = expandedKey === key;
-  return { ...result, expanded, items: result.status === "available" && !expanded ? result.selected : items, total: items.length, toggle: () => setExpandedKey(expanded ? undefined : key) };
+  return { ...result, expanded, items: result.status === "available" && !expanded ? result.selected : items, total: items.length, totalCards: calendarCards(items).length, toggle: () => setExpandedKey(expanded ? undefined : key) };
 }
