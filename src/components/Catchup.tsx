@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, ClockCounterClockwise, Link } from "@phosphor-icons/react";
 import type { BriefSearchIndex, FactStatus } from "../types";
-import { catchupTopics, filterCatchup, topicKey, topicLabel, validCatchupDate } from "../lib/catchup";
+import { catchupTopics, matchingCatchupTopicKeys, filterCatchup, topicKey, topicLabel, validCatchupDate } from "../lib/catchup";
 import { readingHref } from "../lib/reading";
 import { catchupLocationRange, readCatchupLocation, writeCatchupLocation, type CatchupDays, type CatchupLocation } from "../lib/catchup-location";
 import { PinnedTopics } from "./PinnedTopics";
@@ -17,6 +17,11 @@ export function Catchup({ index, english, error, onRetry, onClose, onLocationCha
   const range = catchupLocationRange(location, earliest, latest);
   const valid = validCatchupDate(range.start) && validCatchupDate(range.end) && range.start <= range.end;
   const topics = useMemo(() => catchupTopics(entries, english), [entries, english]);
+  const [topicQuery, setTopicQuery] = useState("");
+  const matchingKeys = useMemo(() => matchingCatchupTopicKeys(entries, topicQuery), [entries, topicQuery]);
+  const matchingTopics = topics.filter(item => matchingKeys.has(item.key));
+  // Keep the active choice visible even when a new search does not match it.
+  const visibleTopics = topics.filter(item => matchingKeys.has(item.key) || item.key === topic);
   const inRange = filterCatchup(entries, range);
   const periodTopics = catchupTopics(inRange, english);
   const periodCounts = new Map(periodTopics.map(item => [item.key, item.count]));
@@ -85,7 +90,10 @@ export function Catchup({ index, english, error, onRetry, onClose, onLocationCha
     {error ? <div className="cu-empty" role="alert"><h2>{t("补课索引暂时不可用", "The catch-up index is unavailable")}</h2><p>{t("日报仍可正常阅读。这里不会用旧结论代替缺失数据。", "You can still read the daily brief. No conclusions are inferred from missing data.")}</p><button className="r-button" onClick={onRetry}>{t("重试", "Retry")}</button></div> : !index ? <p role="status" className="cu-empty">{t("正在整理已收录的新闻…", "Loading indexed stories…")}</p> : <>
     <div className="cu-controls">
       <fieldset><legend>{t("01 / 选择时间", "01 / TIME WINDOW")}</legend><div className="cu-presets">{([7, 30, "all", "custom"] as const).map(value => <button key={value} aria-pressed={days === value} onClick={() => chooseDays(value)}>{value === "custom" ? t("自定义", "Custom") : value === "all" ? t("全部收录", "All indexed") : t(`近 ${value} 天`, `Last ${value} days`)}</button>)}</div>{days === "custom" && <div className="cu-dates"><label>{t("开始", "From")}<input type="date" value={location.start} onChange={event => updateLocation({ ...location, start: event.target.value, limit: 12 })} /></label><label>{t("结束", "To")}<input type="date" value={location.end} onChange={event => updateLocation({ ...location, end: event.target.value, limit: 12 })} /></label></div>}<p>{t("快捷选择以索引最新日期为终点；链接保留所选日期，起止日均包含。", "Presets end on the latest indexed date; links keep your dates. Both boundaries are inclusive.")}</p></fieldset>
-      <label className="cu-topic-select"><span>{t("02 / 选择主题", "02 / TOPIC")}</span><select value={topic} onChange={event => chooseTopic(event.target.value)}><option value="">{t("全部主题", "All topics")}</option>{topic && !selected && <option value={topic}>{t("此主题未收录", "Topic not indexed")}</option>}{topics.map(item => <option key={item.key} value={item.key}>{item.label} · {periodCounts.get(item.key) ?? 0}</option>)}</select><small>{t("数字为所选期间的条数；主题包含游戏、公司与活动。", "Counts are for your selected dates. Topics include games, companies and events.")}</small></label>
+      <div className="cu-topic-select"><label htmlFor="cu-topic-search">{t("02 / 查找主题", "02 / FIND A TOPIC")}</label><input id="cu-topic-search" type="search" value={topicQuery} onChange={event => setTopicQuery(event.target.value)} placeholder={t("输入中文或英文名称", "Search Chinese or English names")} aria-describedby="cu-topic-help cu-topic-matches" />
+      {topicQuery && <button className="cu-text-button" onClick={() => { setTopicQuery(""); document.getElementById("cu-topic-search")?.focus(); }}>{t("清除搜索", "Clear search")}</button>}
+      <label htmlFor="cu-topic-choice" className="cu-choice-label">{t("选择主题", "Choose a topic")}</label><select id="cu-topic-choice" aria-describedby="cu-topic-help cu-topic-matches" value={topic} onChange={event => chooseTopic(event.target.value)}><option value="">{t("全部主题", "All topics")}</option>{topic && !selected && <option value={topic}>{t("此主题未收录", "Topic not indexed")}</option>}{visibleTopics.map(item => <option key={item.key} value={item.key}>{item.label} · {periodCounts.get(item.key) ?? 0}</option>)}</select>
+      <small id="cu-topic-matches" role="status">{topicQuery.trim() ? t(`找到 ${matchingTopics.length} 个主题；搜索不会改变当前已选主题。`, `${matchingTopics.length} matching topics. Search does not change your current selection.`) : t(`共 ${topics.length} 个主题`, `${topics.length} topics`)}</small><small id="cu-topic-help">{t("数字为所选期间的条数；主题包含游戏、公司与活动。", "Counts are for your selected dates. Topics include games, companies and events.")}</small></div>
     </div>
     <PinnedTopics topics={topics} counts={periodCounts} selected={selected} activeTopic={topic} english={english} onChoose={chooseTopic} />
     <div className="cu-layout"><div className="cu-timeline">

@@ -94,3 +94,13 @@ export function filterCatchup(entries: readonly BriefSearchEntry[], { start, end
     && (!selectedTopic || topicKey(entry) === selectedTopic))
     .sort(oldestFirst);
 }
+
+/** Search both published title languages without joining unreviewed identities. */
+export function matchingCatchupTopicKeys(entries: readonly BriefSearchEntry[], query: string): Set<string> {
+  const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  const words = normalize(query).split(" ").filter(Boolean);
+  return new Set(entries.filter(entry => {
+    const names = normalize([entry.titleZhCn, entry.titleEn, entry.titleKey].filter(Boolean).join(" "));
+    return words.every(word => names.includes(word));
+  }).map(topicKey).filter(Boolean));
+}

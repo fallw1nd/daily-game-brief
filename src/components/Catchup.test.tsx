@@ -128,3 +128,33 @@ it.each([false, true])('shows one reviewed GTA VI dossier from an old link while
   expect(new URL(copy.mock.calls[0][0]).searchParams.get('cuTopic')).toBe('grand-theft-auto-vi');
   expect(gtaIndex).toEqual(before);
 });
+
+it.each([false, true])('searches published Chinese and English topic names without changing selection or dates (English=%s)', async english => {
+  await render({english});
+  const search = document.querySelector<HTMLInputElement>('#cu-topic-search')!;
+  const fill = async (value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, value);
+    search.dispatchEvent(new Event('input', {bubbles:true}));
+  });
+  const originalUrl = window.location.href;
+  await fill(' ＧＡＭＥ  a ');
+  expect(document.querySelectorAll('select option')).toHaveLength(2);
+  expect(document.querySelector('option[value="a"]')).not.toBeNull();
+  expect(window.location.href).toBe(originalUrl);
+  expect(document.querySelectorAll('.cu-story')).toHaveLength(12);
+  const select = document.querySelector('select')!;
+  await act(async () => { select.value='a'; select.dispatchEvent(new Event('change',{bubbles:true})); });
+  const selectedUrl = window.location.href;
+  await fill('公司乙');
+  expect(document.querySelector('option[value="a"]')).not.toBeNull();
+  expect(document.querySelector('option[value="b"]')).not.toBeNull();
+  expect(select.value).toBe('a');
+  expect(window.location.href).toBe(selectedUrl);
+  await fill('not-present');
+  expect(document.querySelector('#cu-topic-matches')?.textContent).toContain('0');
+  expect(select.value).toBe('a');
+  await click(english ? 'Clear search' : '清除搜索');
+  expect(search.value).toBe('');
+  expect(document.activeElement).toBe(search);
+  expect(document.querySelectorAll('select option')).toHaveLength(3);
+});
