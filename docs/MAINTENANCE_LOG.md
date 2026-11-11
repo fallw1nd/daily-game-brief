@@ -1,5 +1,11 @@
 # Maintenance Issue Log
 
+## MNT-20261111-01 — Pages artifact lookup and same-run retry conflict
+
+- UI PR #268 passed the full local check (137 test files / 1,180 tests, data/English validation and production build) and both Verify workflows. Deployment run `42978413076`, attempt 1, built and uploaded the `github-pages` artifact successfully, but the immediately following Pages deployment found zero artifacts. The subsequent artifact API lookup showed an unexpired upload. This is deployment evidence, not a content-validation or UI failure.
+- A single failed-job retry rebuilt successfully but Pages then found two artifacts with the same `github-pages` name in the same run and rejected the deployment. Do not repeat that same-run retry as a recovery: a fresh execution of the existing deployment workflow gives a new run/artifact scope. This documentation follow-up supplies a fresh main push without changing the workflow, production schedule, data, permissions, dependencies or validation gates.
+- Until a fresh deployment succeeds and the live assets are verified, the topic-search feature is merged but not confirmed live. No artifact deletion or fabricated deployment acknowledgment was used. This incident note records observations and does not establish a new production contract.
+
 ## MNT-20261110-01 — Diagnose English source positions before publication
 
 - November 10's initial English overlay used a packet source index after Canonical source selection had collapsed that list to index 0. Chinese published successfully, but later news/calendar continuations had no complete English baseline and produced cascading coverage errors before a separate locale repair restored English.
