@@ -10,6 +10,7 @@ import latest from "../public/data/archive/2026/09/2026-09-07-daily.json";
 import manifestData from "../public/data/manifest.json";
 import calendarSnapshot from "../public/data/archive/2026/08/2026-08-31-daily.json";
 import { calendarDate, calendarWindow, loadReadingCalendar } from "./lib/reading-calendar";
+import november11 from "../public/data/archive/2026/11/2026-11-11-daily.json";
 import november6 from "../public/data/archive/2026/11/2026-11-06-daily.json";
 import november7 from "../public/data/archive/2026/11/2026-11-07-daily.json";
 import legacy from "../public/data/archive/2026/08/2026-08-21-pm.json";
@@ -57,6 +58,33 @@ describe("reading sample", () => {
     expect(document.querySelector(".r-calendar-item h3")?.textContent).toBe("Original Game");
     expect(document.querySelector(".r-calendar-original")).toBeNull();
     expect(document.querySelector(".r-cover-unavailable")?.textContent).toContain("No verified cover");
+  });
+
+  it("shows Hutuo once while retaining both platform records, types, notes and source links", () => {
+    const value = structuredClone(november11) as BriefEdition;
+    value.upcoming = value.upcoming.filter(item => item.title.title_key === "where-winds-meet");
+    const before = JSON.stringify(value);
+    render(value);
+    expect(document.querySelectorAll(".r-calendar-item")).toHaveLength(1);
+    expect(document.querySelector(".r-calendar-item h3")?.textContent).toBe("燕云十六声");
+    expect(document.querySelector("#r-calendar-title")?.parentElement?.parentElement?.textContent).toContain("1 个游戏日程");
+    for (const item of value.upcoming) {
+      const row = document.querySelector(`[data-calendar-record="${item.id}"]`)!;
+      expect(row.textContent).toContain(item.platforms[0]);
+      expect(row.textContent).toContain(item.releaseType);
+      expect(row.textContent).toContain(item.note);
+      expect(row.querySelector("a")?.getAttribute("href")).toBe(item.source.url);
+    }
+    render(value, true);
+    expect(document.querySelectorAll(".r-calendar-item")).toHaveLength(1);
+    expect(document.querySelector(".r-calendar-item h3")?.textContent).toBe("Where Winds Meet");
+    expect(document.querySelectorAll(".calendar-platform-record")).toHaveLength(2);
+    for (const item of value.upcoming) {
+      const row = document.querySelector(`[data-calendar-record="${item.id}"]`)!;
+      expect(row.textContent).toContain(item.releaseType);
+      expect(row.querySelector("a")?.getAttribute("href")).toBe(item.source.url);
+    }
+    expect(JSON.stringify(value)).toBe(before);
   });
 
   it("shows incomplete calendar review even when this edition already has inherited items", () => {

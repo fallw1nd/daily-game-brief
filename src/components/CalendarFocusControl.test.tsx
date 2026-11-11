@@ -37,6 +37,24 @@ describe("calendar focus", () => {
     expect(document.querySelector(".calendar-focus-control")).toBeNull();
   });
 
+  it("counts grouped game dates consistently through focus/all toggles", async () => {
+    const pair = [items[0], { ...items[0], id: "platform-two", platforms: ["PS5"] }, items[1]];
+    Object.assign(metadata, valid(), { snapshot: calendarSnapshot(pair), selectedIds: ["0", "platform-two"] });
+    await render();
+    const edition = { ...fixture, id: "latest", upcoming: pair } as BriefEdition;
+    const manifest = { schemaVersion: 1, updatedAt: "now", latest: "latest", editions: [] } as BriefManifest;
+    await act(async () => root.render(<ReadingApp initialEdition={edition} initialManifest={manifest} />));
+    expect(document.querySelectorAll(".r-calendar-item")).toHaveLength(1);
+    expect(document.querySelectorAll(".calendar-platform-record")).toHaveLength(2);
+    expect(document.querySelector(".calendar-focus-control")?.textContent).toContain("重点 1 项 / 已收录 2 项");
+    const toggle = document.querySelector<HTMLButtonElement>(".calendar-focus-control button")!;
+    await act(async () => toggle.click());
+    expect(document.querySelectorAll(".r-calendar-item")).toHaveLength(2);
+    expect(document.querySelectorAll(".calendar-platform-record")).toHaveLength(3);
+    await act(async () => toggle.click());
+    expect(document.querySelectorAll(".r-calendar-item")).toHaveLength(1);
+  });
+
   it("defaults latest to focus, toggles all, preserves native keyboard access and English labels", async () => {
     Object.assign(metadata, valid()); await render("latest", true);
     expect(document.querySelectorAll("li")).toHaveLength(1);
