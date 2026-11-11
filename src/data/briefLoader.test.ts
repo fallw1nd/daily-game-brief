@@ -14,6 +14,7 @@ import {
 } from "./briefLoader";
 import type { BriefManifest, BriefSearchIndex, BriefSearchIndexV2 } from "../types";
 import { loadEnglishSearchIndex } from "./englishLoader";
+import { matchingCatchupTopicKeys, topicLabel } from "../lib/catchup";
 import { JSON_REQUEST_TIMEOUT_MS } from "./fetchJson";
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -133,11 +134,32 @@ describe("brief loader", () => {
       updatedAt: payload.updatedAt,
       entries: [{
         editionId: item.editionId, issueNumber: item.issue, tracking: true, date: item.date, period: item.period,
-        entryId: item.entryId, titleKey: item.titleKey, section: item.section, titleStatus: item.titleStatus, titleEn: item.titleEn,
+        entryId: item.entryId, titleKey: item.titleKey, section: item.section, titleStatus: item.titleStatus, titleZhCn: item.titleZhCn, titleEn: item.titleEn,
         headline: englishCopy.headline, summary: englishCopy.summary, platforms: item.platforms,
         region: item.region, factStatus: item.factStatus,
       }],
     });
+  });
+
+  it("keeps published Chinese names searchable through the English loading path without changing English copy", async () => {
+    const item = searchIndexV2.items[0];
+    const copy = { subject: "Grand Theft Auto VI", headline: "English headline", summary: "English summary" };
+    const payload: BriefSearchIndexV2 = { ...searchIndexV2, items: [
+      { ...item, titleKey: "grand-theft-auto-vi", titleZhCn: "侠盗猎车手VI", titleEn: copy.subject,
+        availableLocales: ["zh-CN", "en"], copy: { ...item.copy, en: copy } },
+      { ...item, entryId: "untranslated", titleKey: "untranslated", titleZhCn: "只在中文发布" },
+      { ...item, entryId: "no-chinese-name", titleKey: "english-only", titleZhCn: undefined, titleEn: "English Only",
+        availableLocales: ["en"], copy: { ...item.copy, en: copy } },
+    ] };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload))) as unknown as typeof fetch;
+    const result = await loadEnglishSearchIndex(undefined, fetcher);
+    expect([...matchingCatchupTopicKeys(result.entries, "侠盗")]).toEqual(["grand-theft-auto-vi"]);
+    expect([...matchingCatchupTopicKeys(result.entries, "Grand Theft")]).toEqual(["grand-theft-auto-vi"]);
+    expect([...matchingCatchupTopicKeys(result.entries, "只在中文发布")]).toEqual([]);
+    expect([...matchingCatchupTopicKeys(result.entries, "English Only")]).toEqual(["english-only"]);
+    expect(topicLabel(result.entries[0], true)).toBe(copy.subject);
+    expect(result.entries[0]).toMatchObject({ headline: copy.headline, summary: copy.summary });
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it("does not treat Chinese v1 copy as an English search archive", async () => {
