@@ -113,3 +113,32 @@ describe("bound resolved-company identity correction", () => {
     expect(() => applyRevisionSubjectIdentityOverrides(original, { ...wake, subjectIdentityOverrides: { "event-1": override } })).toThrow();
   });
 });
+
+describe("bound new-game identity correction", () => {
+  function setup() {
+    const original = structuredClone(packet);
+    Object.assign(original.editorialInput.packages[0], { subjectKey: "milk inside a bag of milk inside a bag of milk", publishability: "direct", eventKind: "announcement",
+      headline: '『Milk inside a bag of milk inside a bag of milk』開発者による新作『MEGALITH』発表。',
+      sources: [{ sourceIndex: 0, status: "opened", url: "https://example.com/megalith", evidenceText: "Nikita Kryukov氏は11月11日、『MEGALITH』を発表した。" }] });
+    const override = { key: "megalith", kind: "game", expectedOldSubjectKey: original.editorialInput.packages[0].subjectKey,
+      expectedEntryId: `${editionId}-news-2`, expectedBeijingTime: "2026-09-11 00:01", expectedSourceUrls: ["https://example.com/megalith"] };
+    return { original, override };
+  }
+  it("preserves original event and source bytes with explicit old-identity bindings", () => {
+    const { original, override } = setup();
+    const item = applyRevisionSubjectIdentityOverrides(original, { ...wake, subjectIdentityOverrides: { "event-1": override } }).editorialInput.packages[0];
+    expect(item).toMatchObject({ eventKey: "event-1", subjectKey: "megalith", eventKind: "announcement", subject: { kind: "game", key: "megalith" },
+      subjectIdentityRepair: { kind: "confirmed-new-game-announcement", originalPacketBlobSha: sha, previousSubjectKey: override.expectedOldSubjectKey } });
+    expect(item.sources).toEqual(original.editorialInput.packages[0].sources);
+    expect(item.headline).toBe(original.editorialInput.packages[0].headline);
+  });
+  it("rejects wrong kind, title, old key, source and nonmanual permission", () => {
+    const { original, override } = setup();
+    for (const patch of [{ kind: "entity" }, { key: "other-game" }, { expectedOldSubjectKey: "wrong" }, { expectedSourceUrls: ["https://other.example/"] }]) {
+      expect(() => applyRevisionSubjectIdentityOverrides(original, { ...wake, subjectIdentityOverrides: { "event-1": { ...override, ...patch } } })).toThrow();
+    }
+    expect(() => applyRevisionSubjectIdentityOverrides(original, { ...wake, reason: "editorial_continuation", subjectIdentityOverrides: { "event-1": override } })).toThrow();
+    original.editorialInput.packages[0].sources[0].evidenceText = original.editorialInput.packages[0].headline;
+    expect(() => applyRevisionSubjectIdentityOverrides(original, { ...wake, subjectIdentityOverrides: { "event-1": override } })).toThrow();
+  });
+});

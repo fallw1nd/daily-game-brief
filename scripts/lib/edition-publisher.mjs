@@ -10,6 +10,7 @@ import {
   verifiedWindowTimeError,
 } from "./time-window.mjs";
 import { editorialDecisionDigest, projectionDigest } from "./locale-digest.mjs";
+import { confirmedNewGameSubject } from "./new-game-subject.mjs";
 import { confirmedCompanySubject } from "./company-subject.mjs";
 import { normalizeHeadline } from "./news-pipeline.mjs";
 import { generatedEditorialAlt } from "./media-alt.mjs";
@@ -302,10 +303,11 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
     const repair = packetItem?.subjectIdentityRepair;
     let identityRepairPrevious = null;
     if (repair) {
-      const confirmed = confirmedCompanySubject(packetItem, packetItem.sources);
+      const confirmed = repair.kind === "confirmed-company-formation" ? confirmedCompanySubject(packetItem, packetItem.sources)
+        : repair.kind === "confirmed-new-game-announcement" ? confirmedNewGameSubject(packetItem, packetItem.sources) : null;
       const sameUrls = values => JSON.stringify([...new Set(values.map(normalizedSourceUrl))].sort());
       identityRepairPrevious = previousEntries.find(entry => entry.id === repair.expectedEntryId);
-      if (!repairExactDuplicateStories || !authorizedLatestRevision || repair.kind !== "confirmed-company-formation"
+      if (!repairExactDuplicateStories || !authorizedLatestRevision
         || !/^[a-f0-9]{40}$/.test(repair.originalPacketBlobSha || "") || !confirmed
         || normalizeHeadline(decision.titleKey) !== confirmed.subjectKey || decision.titleKey !== packetItem.subjectKey
         || decision.existingEntryId !== repair.expectedEntryId || !identityRepairPrevious
@@ -313,7 +315,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         || identityRepairPrevious.beijingTime !== repair.expectedBeijingTime || decision.beijingTime !== repair.expectedBeijingTime
         || sameUrls(identityRepairPrevious.sources.map(source => source.url)) !== sameUrls(repair.sourceUrls)
         || sameUrls(sources.map(source => source.url)) !== sameUrls(repair.sourceUrls)) {
-        throw new Error(`included ${decision.eventKey}: company identity repair does not match the bound published event`);
+        throw new Error(`included ${decision.eventKey}: subject identity repair does not match the bound published event`);
       }
     }
     const previous = identityRepairPrevious || (authorizedLatestRevision
@@ -335,7 +337,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       // Subject repair is presentation identity only; all event facts stay byte-for-byte.
       const priorFrame = decision.sharedFactFrame ? { ...decision.sharedFactFrame, subjectTitleKey: repair.previousSubjectKey } : null;
       if (!priorFrame || !previous.sharedFactFrameDigest || projectionDigest(priorFrame) !== previous.sharedFactFrameDigest
-        || decision.titleEn !== previous.title?.title_en) throw new Error(`included ${decision.eventKey}: company identity repair must preserve the shared fact frame`);
+        || decision.titleEn !== previous.title?.title_en) throw new Error(`included ${decision.eventKey}: subject identity repair must preserve the shared fact frame`);
       const corrected = { ...previous, title: { ...previous.title, title_key: decision.titleKey }, imageSeed: decision.titleKey,
         ...(decision.sharedFactFrame ? { sharedFactFrameDigest: projectionDigest(decision.sharedFactFrame) } : {}) };
       if (normalizeFactText(headline) !== normalizeFactText(previous.headline)
@@ -344,7 +346,7 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
         || JSON.stringify(decision.platforms) !== JSON.stringify(previous.platforms)
         || (decision.region || "来源所述范围") !== previous.region
         || (decision.releaseType || null) !== (previous.releaseType || null)) {
-        throw new Error(`included ${decision.eventKey}: company identity repair cannot change event facts`);
+        throw new Error(`included ${decision.eventKey}: subject identity repair cannot change event facts`);
       }
       return corrected;
     }
@@ -504,6 +506,13 @@ export function buildEdition({ packet, editorial, latest, manifest, now = new Da
       calendarReview: editorial.calendarReview,
       editorialDecisionDigest: decisionDigest,
     };
+  }
+  if (identityOnlyRevision && latest.sourceReport && !(editorial.upcoming || []).length
+    && !removeIds.size && !duplicateRepair.repairs.length
+    && JSON.stringify(upcoming) === JSON.stringify(latest.upcoming || [])) {
+    // A subject-key-only correction must not replace the completed edition's
+    // cumulative coverage audit with the smaller repair packet's report.
+    edition.sourceReport = { ...latest.sourceReport, editorialDecisionDigest: decisionDigest };
   }
   if (input.showcases?.events?.length) {
     edition.showcases = input.showcases.events.map(event => {

@@ -1,3 +1,4 @@
+import { confirmedNewGameSubject } from "./new-game-subject.mjs";
 import { confirmedCompanySubject } from "./company-subject.mjs";
 import { normalizeHeadline } from "./news-pipeline.mjs";
 import { validateFinalizedEditorialPacket } from "./editorial-packet.mjs";
@@ -18,7 +19,8 @@ function normalizedSubjectOverride(eventKey, raw) {
 
 /**
  * A historical revision may repair an unresolved subject identity, or correct
- * an incidental game key to a uniquely corroborated company formation. The
+ * an incidental game key to a uniquely corroborated company formation or new
+ * game announcement. The
  * latter requires explicit old-canonical bindings and manual authorization.
  * Evidence, timing, headline, score, and source bytes remain untouched.
  */
@@ -40,23 +42,25 @@ export function applyRevisionSubjectIdentityOverrides(packet, wake) {
     const resolved = item.publishability !== "requires_subject_identity" || Boolean(item.subjectKey);
     const override = normalizedSubjectOverride(eventKey, rawOverride);
     if (resolved) {
-      const confirmed = confirmedCompanySubject(item, item.sources);
+      const company = confirmedCompanySubject(item, item.sources);
+      const game = confirmedNewGameSubject(item, item.sources);
+      const confirmed = override.kind === "entity" ? company : override.kind === "game" ? game : null;
       const urls = rawOverride?.expectedSourceUrls;
       const openedUrls = new Set((item.sources || []).filter(source => source.status === "opened").map(source => source.canonicalUrl || source.url));
       if (wake.reason !== "user_authorized_same_edition_revision" || !/^[a-f0-9]{40}$/.test(wake.packetBlobSha || "")
-        || !confirmed || override.kind !== "entity" || normalizeHeadline(override.key) !== confirmed.subjectKey
+        || !confirmed || normalizeHeadline(override.key) !== confirmed.subjectKey
         || rawOverride.expectedOldSubjectKey !== item.subjectKey
         || !String(rawOverride.expectedEntryId || "").startsWith(`${wake.editionId}-`)
         || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(rawOverride.expectedBeijingTime || "")
         || !Array.isArray(urls) || !urls.length || new Set(urls).size !== urls.length || urls.some(url => !openedUrls.has(url))) {
-        throw new Error(`Subject identity override is only allowed for unresolved candidates or a bound, confirmed company formation: ${eventKey}`);
+        throw new Error(`Subject identity override is only allowed for unresolved candidates or a bound, confirmed company formation or new-game announcement: ${eventKey}`);
       }
       item.subjectIdentityRepair = {
-        kind: "confirmed-company-formation", originalPacketBlobSha: wake.packetBlobSha,
+        kind: company && override.kind === "entity" ? "confirmed-company-formation" : "confirmed-new-game-announcement", originalPacketBlobSha: wake.packetBlobSha,
         previousSubjectKey: item.subjectKey, expectedEntryId: rawOverride.expectedEntryId,
         expectedBeijingTime: rawOverride.expectedBeijingTime, sourceUrls: [...urls],
       };
-      item.eventKind = "company";
+      item.eventKind = confirmed.eventKind;
       item.canonicalSubjectKey = null;
     }
     if (!(item.sources || []).some(source => source.status === "opened")) {

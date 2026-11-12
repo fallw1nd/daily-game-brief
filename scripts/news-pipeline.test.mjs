@@ -3,6 +3,7 @@ import {
   latestDueWindow,
   mergeCandidates,
   eventIdentity,
+  namedNewGameSubject,
   parseFeed,
   parseHtmlLinks,
   plannedWindow,
@@ -84,6 +85,26 @@ describe("low-token news discovery pipeline", () => {
     expect(eventIdentity("Onimusha: Way of the Sword review scores are live on Metacritic").eventKind).toBe("review-score");
     expect(eventIdentity("『Game X』レビュー解禁、メタスコア85").eventKind).toBe("review-score");
     expect(eventIdentity("Onimusha: Way of the Sword Review").eventKind).toBe("other");
+  });
+
+  it("identifies the new game rather than its developer's prior work in an explicit announcement", () => {
+    const headline = "『Milk inside a bag of milk inside a bag of milk』開発者による新作『MEGALITH』発表。地球最後の人間が冬の終末世界を巡る旅";
+    expect(namedNewGameSubject(headline)).toBe("MEGALITH");
+    const identity = eventIdentity(headline);
+    expect(identity).toMatchObject({ eventKind: "announcement", subjectKey: "megalith" });
+    expect(identity.eventKey).toBe(eventIdentity("『MEGALITH』発表").eventKey);
+    expect(identity.eventKey).not.toBe(eventIdentity("『Milk inside a bag of milk inside a bag of milk』発表").eventKey);
+  });
+
+  it.each([
+    "『Game Old』開発者が『Game New』について語る",
+    "『Game Old』開発者による新作『Game New』インタビュー発表",
+    "『Game Old』発表。『Game New』と比較",
+    "『Game Old』開発者による新作『Game New』発表予定について否定",
+    "『Game Old』発表。『Other Old』開発者による新作『Game New』発表",
+  ])("does not infer a new-game subject from ambiguous or unrelated quotations: %s", (headline) => {
+    expect(namedNewGameSubject(headline)).toBe("");
+    expect(eventIdentity(headline).subjectKey).toBe("game old");
   });
 
   it("clusters differently worded reports around a quoted subject and event", () => {
