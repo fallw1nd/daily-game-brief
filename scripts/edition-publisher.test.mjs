@@ -492,7 +492,52 @@ describe("manual factual metadata corrections", () => {
     expect(result.edition.entries).toHaveLength(2);
     expect(result.edition.leadEntryId).toBe(other.id);
     expect(result.edition.archiveTitle).toBe(initial.edition.archiveTitle);
+    expect(result.edition.sourceReport).toEqual({ ...initial.edition.sourceReport, editorialDecisionDigest: result.decisionDigest });
+    const mixedDraft = { ...draft, removeUpcomingIds: [initial.edition.upcoming[0].id], editorialNote: "Calendar also reviewed." };
+    const mixed = buildEdition({ ...options, editorial: mixedDraft });
+    expect(mixed.edition.upcoming).toHaveLength(0);
+    expect(mixed.edition.sourceReport.note).toBe("Calendar also reviewed.");
     expect(result.edition.entries[0]).toMatchObject({ id: prior.id, title: { title_key: "crash-keys", title_en: "Crash Keys" }, headline: prior.headline, summary: prior.summary, sources: prior.sources, beijingTime: prior.beijingTime });
+    expect(result.edition.entries[0].sharedFactFrameDigest).not.toBe(prior.sharedFactFrameDigest);
+    expect(() => buildEdition({ ...options, repairExactDuplicateStories: false })).toThrow("bound published event");
+    for (const property of ["eventKey", "beijingTime"]) {
+      const badLatest = structuredClone(initial.edition); badLatest.entries[0][property] = "wrong";
+      expect(() => buildEdition({ ...options, latest: badLatest })).toThrow("bound published event");
+    }
+    draft.decisions[0].sharedFactFrame.numbers = ["invented fact"];
+    expect(() => buildEdition(options)).toThrow("preserve the shared fact frame");
+  });
+  it("reuses the bound new game's stable ID across a key correction and rejects unsafe rebindings", () => {
+    const input = structuredClone(packet);
+    Object.assign(input.editorialInput.packages[0], { subjectKey: "old-game", publishability: "direct", eventKind: "announcement", headline: '『Old Game』開発者による新作『MEGALITH』発表。' });
+    input.editorialInput.packages[0].sources[0].evidenceText = "開発者は『MEGALITH』を発表した。";
+    const draft = structuredClone(editorial);
+    Object.assign(draft.decisions[0], { titleKey: "old-game", titleEn: "MEGALITH", headline: "《MEGALITH》正式公布", summary: "MEGALITH将于明年发行。", sharedFactFrame: { subjectTitleKey: "old-game", dates: [], times: [], numbers: [], platforms: ["PC"], peopleAndEntities: [], versionsAndTerms: [] } });
+    draft.archiveTitle = "早报｜MEGALITH正式公布";
+    const initial = buildEdition({ packet: input, editorial: draft, latest, manifest });
+    draft.decisions[0].existingEntryId = initial.edition.entries[0].id;
+    const prior = initial.edition.entries[0];
+    delete input.continuation;
+    const other = { ...prior, id: `${initial.edition.id}-news-9`, title: { title_key: "other", title_en: "Other", title_zh_status: "unavailable" }, headline: "Other story", summary: "Different facts" };
+    initial.edition.entries.push(other);
+    initial.edition.leadEntryId = other.id;
+    initial.edition.archiveTitle = "早报｜另外一条新闻作为本期头条";
+    const repaired = applyRevisionSubjectIdentityOverrides(input, { editionId: initial.edition.id, reason: "user_authorized_same_edition_revision", packetBlobSha: "a".repeat(40),
+      subjectIdentityOverrides: { "event-1": { key: "megalith", kind: "game", expectedOldSubjectKey: "old-game", expectedEntryId: prior.id,
+        expectedBeijingTime: prior.beijingTime, expectedSourceUrls: prior.sources.map(source => source.url) } } });
+    draft.decisions[0].titleKey = "megalith";
+    draft.decisions[0].sharedFactFrame.subjectTitleKey = "megalith";
+    const options = { packet: repaired, editorial: draft, latest: initial.edition, manifest: initial.manifest, allowSameEditionRevision: true, repairExactDuplicateStories: true };
+    const result = buildEdition(options);
+    expect(result.edition.entries).toHaveLength(2);
+    expect(result.edition.leadEntryId).toBe(other.id);
+    expect(result.edition.archiveTitle).toBe(initial.edition.archiveTitle);
+    expect(result.edition.sourceReport).toEqual({ ...initial.edition.sourceReport, editorialDecisionDigest: result.decisionDigest });
+    const mixedDraft = { ...draft, removeUpcomingIds: [initial.edition.upcoming[0].id], editorialNote: "Calendar also reviewed." };
+    const mixed = buildEdition({ ...options, editorial: mixedDraft });
+    expect(mixed.edition.upcoming).toHaveLength(0);
+    expect(mixed.edition.sourceReport.note).toBe("Calendar also reviewed.");
+    expect(result.edition.entries[0]).toMatchObject({ id: prior.id, title: { title_key: "megalith", title_en: "MEGALITH" }, headline: prior.headline, summary: prior.summary, sources: prior.sources, beijingTime: prior.beijingTime });
     expect(result.edition.entries[0].sharedFactFrameDigest).not.toBe(prior.sharedFactFrameDigest);
     expect(() => buildEdition({ ...options, repairExactDuplicateStories: false })).toThrow("bound published event");
     for (const property of ["eventKey", "beijingTime"]) {

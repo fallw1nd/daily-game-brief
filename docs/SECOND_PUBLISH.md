@@ -26,6 +26,8 @@
 
 写入 `user_authorized_same_edition_revision` wake，等待 GitHub 重新确认同一期 immutable packet，再提交正式编辑稿。revision 是 overlay：保留未被本次新决定替换的既有条目、媒体、日历和稳定 entry ID。
 
+已明确误识别的新作主体可使用已有 wake 的 `subjectIdentityOverrides`：仅接受标题明确为“旧作开发者宣布新作”、且原 packet 已打开正文另有肯定公布句的情况。`kind:"game"`、新 key、`expectedOldSubjectKey`、`expectedEntryId`、`expectedBeijingTime`、`expectedSourceUrls` 必须逐项绑定；wake 固定原已确认 `packetBlobSha`。受信 publisher 再检查原事件、来源、时间和 sharedFactFrame，只修改 title key、imageSeed 及对应 digest，保留所有正文事实、entry/event ID、媒体、期次和窗口。不允许借此泛化任意主体替换；缺少独立正文佐证时停止。此修订仅用于显式授权人工维护，不进入每日任务。
+
 ### C. Canonical 缺失且自动 fallback 已失败
 
 `user_authorized_failed_publication_recovery` 只用于 state 明确为 `editorial:timed_out` + `publication:failed`、目标 Canonical 仍缺失，且 **尚未发布任何日期更晚的 Canonical edition** 的情况。此时仍使用原 packet/window，不能通过新抓取事实“补造”旧期。

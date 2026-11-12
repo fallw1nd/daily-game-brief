@@ -178,7 +178,18 @@ function tierFor(record) {
   return "C";
 }
 
+export function namedNewGameSubject(headline) {
+  const raw = stripHtml(headline);
+  // A prior work can identify the developer rather than the announced game.
+  // Require the explicit Japanese new-work announcement construction; choosing
+  // the last quotation generally would misidentify comparisons and interviews.
+  const newWork = raw.match(/^『[^』]{2,100}』\s*(?:の)?開発者による新作\s*『([^』]{2,100})』\s*(?:を)?発表(?:[。！!、\s]|$)/)?.[1];
+  return newWork || "";
+}
+
 function preferredQuotedSubject(raw) {
+  const newWork = namedNewGameSubject(raw);
+  if (newWork) return newWork;
   const titleQuote = raw.match(/[《『]([^》』]{2,100})[》』]/)?.[1];
   if (titleQuote) return titleQuote;
   return raw.match(/[「“"]([^」”"]{2,100})[」”"]/)?.[1] || "";
