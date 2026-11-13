@@ -352,7 +352,7 @@ export default function ReadingApp({ english = false, initialEdition, initialMan
   const archiveTitle = (id: string, title?: string) => english ? englishTitles[id] : title;
 
   return <IconContext.Provider value={{ weight: "regular", size: 20, "aria-hidden": true, focusable: false }}><div ref={pageRef} className="reading-app" data-theme={theme} data-accent={accent}>
-    <a className="r-skip" href={catchupOpen ? "#catchup" : "#content"}>{t("跳到新闻正文", "Skip to news")}</a>
+    <a className="r-skip" href={catchupOpen ? "#catchup" : "#content"}>{catchupOpen ? t("跳到补课正文", "Skip to catch-up") : t("跳到新闻正文", "Skip to news")}</a>
     <header className="r-header"><div className="r-header-inner">
       <a className="r-brand" href={readingHref(undefined, undefined, english)}><NewspaperClipping aria-hidden="true" /><span>{t("游戏圈动态", "Daily Game Brief")}</span></a>
       <nav aria-label={t("主导航", "Main navigation")}>{[["content", t("内容", "Content")], ["upcoming", t("日历", "Calendar")], ["archive", t("归档与搜索", "Archive & search")]].map(([id, name]) => <a key={id} href={catchupOpen ? catchupExitHref(catchupSearch, id) : `#${id}`} onClick={event => {

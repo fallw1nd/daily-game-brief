@@ -587,3 +587,19 @@ it.each(["content", "upcoming", "archive", "top"])("does not let stale archive-s
   expect(window.history.state).toEqual(originalState);
   expect(container.querySelector("#catchup")).not.toBeNull();
 });
+
+it("labels the skip link for the current view and targets a focusable section", async () => {
+  window.history.replaceState(null, "", "/daily-game-brief/?catchup=1");
+  const container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root!.render(<ReadingApp initialEdition={edition} initialManifest={manifest} initialSearchIndex={search} />));
+  const link = container.querySelector<HTMLAnchorElement>(".r-skip")!;
+  expect(link.textContent).toBe("跳到补课正文");
+  expect(link.hash).toBe("#catchup");
+  expect(container.querySelector(link.hash)?.getAttribute("tabindex")).toBe("-1");
+  await act(async () => container.querySelector<HTMLButtonElement>(".cu-back")!.click());
+  expect(link.textContent).toBe("跳到新闻正文");
+  expect(link.hash).toBe("#content");
+  expect(container.querySelector(link.hash)?.getAttribute("tabindex")).toBe("-1");
+});

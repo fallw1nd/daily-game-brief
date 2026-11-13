@@ -84,7 +84,7 @@ export function Catchup({ index, english, error, onRetry, onClose, onLocationCha
     updateLocation({ ...next, ...(value === "custom" ? range : catchupLocationRange(next, earliest, latest)) });
   }
   function chooseTopic(value: string) { updateLocation({ ...location, ...range, topic: value, limit: 12 }); }
-  return <section className="cu" id="catchup" aria-labelledby="cu-title">
+  return <section className="cu" id="catchup" tabIndex={-1} aria-labelledby="cu-title">
     <div className="cu-top"><button className="cu-back" onClick={onClose}><ArrowLeft />{t("回到日报", "Back to the daily brief")}</button><span>{reviewOnly ? t("功能预览 · 独立审阅快照", "Feature preview · review snapshot") : t("从已发布日报中整理", "From published editions")}</span></div>
     <header className="cu-intro"><div className="cu-eyebrow"><ClockCounterClockwise />{t("离线补课", "THE CATCH-UP")}</div><h1 id="cu-title" tabIndex={-1}>{t("不必每天追，\n回来就能看懂。", "Away for a while?\nPick up the thread.")}</h1><p>{t("选一段时间，把散落在日报里的消息，按时间重新读一遍。", "Choose a period and follow the stories across our daily editions.")}</p></header>
     {error ? <div className="cu-empty" role="alert"><h2>{t("补课索引暂时不可用", "The catch-up index is unavailable")}</h2><p>{t("日报仍可正常阅读。这里不会用旧结论代替缺失数据。", "You can still read the daily brief. No conclusions are inferred from missing data.")}</p><button className="r-button" onClick={onRetry}>{t("重试", "Retry")}</button></div> : !index ? <p role="status" className="cu-empty">{t("正在整理已收录的新闻…", "Loading indexed stories…")}</p> : <>
