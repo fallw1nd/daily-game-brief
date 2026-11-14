@@ -1,4 +1,5 @@
 import { act } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 const { metadata } = vi.hoisted(() => ({ metadata: {} as Record<string, unknown> }));
@@ -22,6 +23,12 @@ async function render(editionId = "latest", english = false) {
 }
 afterEach(async () => { if (root) await act(async () => root.unmount()); root = undefined as unknown as Root; document.body.innerHTML = ""; Object.keys(metadata).forEach(key => delete metadata[key]); });
 describe("calendar focus", () => {
+  it.each([[0, 2], [1, 1], [1, 2], [2, 2]])("inflects English focus counts for %i selected / %i total", (selectedCount, totalCount) => {
+    const focus = { status: "available", selected: items.slice(0, selectedCount), totalCards: totalCount, expanded: false, toggle: () => {} } as ReturnType<typeof useCalendarFocus>;
+    const text = renderToStaticMarkup(<CalendarFocusControl focus={focus} english />);
+    expect(text).toContain(`${selectedCount} focus release${selectedCount === 1 ? "" : "s"} / ${totalCount} recorded plan${totalCount === 1 ? "" : "s"}.`);
+  });
+
   it("filters the real reading calendar and retains all rows for historical editions", async () => {
     Object.assign(metadata, valid());
     await render();

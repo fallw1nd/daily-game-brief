@@ -36,6 +36,31 @@ beforeEach(() => {
 afterEach(async () => { if (root) { await act(async () => root?.unmount()); root = undefined; } document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
 describe("reading sample", () => {
+  it("uses singular and plural English calendar counts without changing Chinese labels", () => {
+    const base = (calendarSnapshot as BriefEdition).upcoming[0];
+    for (const count of [0, 1, 2]) {
+      const value = { ...edition, upcoming: Array.from({ length: count }, (_, index) => ({
+        ...base, id: `count-${index}`, title: { ...base.title, title_key: `count-${index}`, title_en: `Game ${index}` },
+      })) };
+      render(value, true);
+      expect(document.querySelector(".r-calendar header")?.textContent).toContain(`${count} game date${count === 1 ? "" : "s"}`);
+      render(value);
+      expect(document.querySelector(".r-calendar header")?.textContent).toContain(`${count} 个游戏日程`);
+    }
+  });
+
+  it("labels the known game_launch calendar token and preserves editorial release descriptions", () => {
+    const base = (calendarSnapshot as BriefEdition).upcoming[0];
+    for (const english of [false, true]) {
+      const value = { ...edition, upcoming: [{ ...base, releaseType: "game_launch" }] };
+      render(value, english);
+      expect(document.querySelector(".calendar-platform-record")?.textContent).toContain(english ? "Game launch" : "游戏发售");
+      expect(document.querySelector(".calendar-platform-record")?.textContent).not.toContain("game_launch");
+      render({ ...value, upcoming: [{ ...base, releaseType: "Custom platform release" }] }, english);
+      expect(document.querySelector(".calendar-platform-record")?.textContent).toContain("Custom platform release");
+    }
+  });
+
   it("uses two-line calendar names and honest missing-cover fallbacks in either language", () => {
     const value = structuredClone(edition);
     const base = (calendarSnapshot as BriefEdition).upcoming[0];
