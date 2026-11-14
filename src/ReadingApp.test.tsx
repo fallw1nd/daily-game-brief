@@ -49,13 +49,17 @@ describe("reading sample", () => {
     }
   });
 
-  it("labels the known game_launch calendar token and preserves editorial release descriptions", () => {
+  it.each([
+    ["game_launch", "游戏发售", "Game launch"],
+    ["early_access_launch", "抢先体验上线", "Early Access launch"],
+    ["season_update", "赛季更新", "Season update"],
+  ])("labels the known %s calendar token and preserves editorial release descriptions", (token, chineseLabel, englishLabel) => {
     const base = (calendarSnapshot as BriefEdition).upcoming[0];
     for (const english of [false, true]) {
-      const value = { ...edition, upcoming: [{ ...base, releaseType: "game_launch" }] };
+      const value = { ...edition, upcoming: [{ ...base, releaseType: token }] };
       render(value, english);
-      expect(document.querySelector(".calendar-platform-record")?.textContent).toContain(english ? "Game launch" : "游戏发售");
-      expect(document.querySelector(".calendar-platform-record")?.textContent).not.toContain("game_launch");
+      expect(document.querySelector(".calendar-platform-record")?.textContent).toContain(english ? englishLabel : chineseLabel);
+      expect(document.querySelector(".calendar-platform-record")?.textContent).not.toContain(token);
       render({ ...value, upcoming: [{ ...base, releaseType: "Custom platform release" }] }, english);
       expect(document.querySelector(".calendar-platform-record")?.textContent).toContain("Custom platform release");
     }
